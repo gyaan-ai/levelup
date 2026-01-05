@@ -72,9 +72,9 @@ export const tenants: Record<string, TenantConfig> = {
         accent: "#F59E0B"       // Amber 500
       },
       stateOrg: {
-        primary: "#003366",     // NC United navy
-        secondary: "#CC0000",   // NC United red
-        accent: "#FFD700"       // NC United gold
+        primary: "#0D1A4D",     // NC United navy (nc-navy-950)
+        secondary: "#B31B1B",   // NC United red (nc-red-800)
+        accent: "#D3B574"       // NC United gold (nc-gold-400)
       }
     },
     

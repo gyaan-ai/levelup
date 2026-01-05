@@ -77,11 +77,11 @@ export default function LoginPage() {
       // Redirect based on role
       const role = userData.role;
       if (role === 'athlete') {
-        router.push('/dashboard');
+        router.push('/athlete-dashboard');
       } else if (role === 'admin') {
         router.push('/admin');
       } else {
-        router.push('/browse');
+        router.push('/dashboard');
       }
 
       // Refresh the page to update auth state

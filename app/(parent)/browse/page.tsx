@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
+import Link from 'next/link';
 
 export default async function BrowsePage() {
   const headersList = await headers();
@@ -32,7 +33,7 @@ export default async function BrowsePage() {
   if (userData?.role !== 'parent') {
     // Redirect based on role
     if (userData?.role === 'athlete') {
-      redirect('/dashboard');
+      redirect('/athlete-dashboard');
     } else if (userData?.role === 'admin') {
       redirect('/admin');
     }
@@ -42,6 +43,11 @@ export default async function BrowsePage() {
     <div className="container mx-auto px-4 py-8">
       <h1 className="text-3xl font-bold mb-6">Browse Athletes</h1>
       <p className="text-muted-foreground">Browse page coming soon...</p>
+      <p className="text-sm text-muted-foreground mt-4">
+        <Link href="/dashboard" className="text-levelup-primary hover:underline">
+          ← Back to Dashboard
+        </Link>
+      </p>
     </div>
   );
 }

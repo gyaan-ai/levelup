@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
       .single();
 
     const role = userData?.role || 'parent';
-    const redirectPath = role === 'athlete' ? '/dashboard' : role === 'admin' ? '/admin' : '/browse';
+    const redirectPath = role === 'athlete' ? '/athlete-dashboard' : role === 'admin' ? '/admin' : '/dashboard';
 
     return NextResponse.redirect(new URL(redirectPath, req.url));
   } catch (error) {

@@ -41,12 +41,17 @@ export function Header() {
           ) : user ? (
             <>
               {userRole === 'parent' && (
-                <Link href="/browse">
-                  <Button variant="ghost">Browse</Button>
-                </Link>
+                <>
+                  <Link href="/dashboard">
+                    <Button variant="ghost">Dashboard</Button>
+                  </Link>
+                  <Link href="/browse">
+                    <Button variant="ghost">Browse</Button>
+                  </Link>
+                </>
               )}
               {userRole === 'athlete' && (
-                <Link href="/dashboard">
+                <Link href="/athlete-dashboard">
                   <Button variant="ghost">Dashboard</Button>
                 </Link>
               )}

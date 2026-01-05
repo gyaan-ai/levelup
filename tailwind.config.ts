@@ -27,6 +27,17 @@ const config = {
         'org-primary': 'var(--color-org-primary)',
         'org-secondary': 'var(--color-org-secondary)',
         'org-accent': 'var(--color-org-accent)',
+        // NC United specific colors
+        'nc-navy': {
+          950: '#0D1A4D',
+        },
+        'nc-red': {
+          800: '#B31B1B',
+        },
+        'nc-gold': {
+          400: '#D3B574',
+          500: '#CBAF5D',
+        },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",

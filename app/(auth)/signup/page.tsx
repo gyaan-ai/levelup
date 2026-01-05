@@ -123,11 +123,11 @@ export default function SignupPage() {
       // Redirect based on role
       const role = userData?.role || values.role;
       if (role === 'athlete') {
-        router.push('/dashboard');
+        router.push('/athlete-dashboard');
       } else if (role === 'admin') {
         router.push('/admin');
       } else {
-        router.push('/browse');
+        router.push('/dashboard');
       }
 
       router.refresh();

@@ -172,7 +172,7 @@ export default function ProfilePage() {
       }
 
       // Redirect to dashboard
-      router.push('/dashboard');
+      router.push('/athlete-dashboard');
       router.refresh();
     } catch (err: any) {
       setError(err.message || 'An unexpected error occurred');

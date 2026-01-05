@@ -44,6 +44,7 @@ export interface Session {
   parent_id: string;
   athlete_id: string;
   facility_id: string;
+  youth_wrestler_id?: string;
   session_type: SessionType;
   scheduled_datetime: string;
   duration_minutes: number;
@@ -66,5 +67,28 @@ export interface Facility {
   school: string;
   address?: string;
   created_at: string;
+}
+
+// Youth Wrestler types
+export type SkillLevel = 'beginner' | 'intermediate' | 'advanced' | 'elite';
+
+export interface YouthWrestler {
+  id: string;
+  parent_id: string;
+  first_name: string;
+  last_name: string;
+  date_of_birth?: string;
+  age?: number;
+  school?: string;
+  grade?: string;
+  weight_class?: string;
+  skill_level?: SkillLevel;
+  wrestling_experience?: string;
+  goals?: string;
+  medical_notes?: string;
+  photo_url?: string;
+  active: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
