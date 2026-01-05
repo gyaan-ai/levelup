@@ -96,22 +96,33 @@ export async function PUT(req: NextRequest) {
       facility_id: facilityId || null,
     };
 
-    // Use upsert to handle both insert and update cases safely
-    // This prevents duplicate key errors if the record already exists
-    const { error: upsertError } = await supabase
+    // Try UPDATE first (record should exist from signup)
+    const { data: updateResult, error: updateError } = await supabase
       .from('athletes')
-      .upsert({
-        id: user.id,
-        first_name: existing?.first_name || 'Athlete', // Preserve existing or use fallback
-        last_name: existing?.last_name || 'User', // Preserve existing or use fallback
-        school: existing?.school || '', // Preserve existing or use fallback
-        ...updateData,
-      }, {
-        onConflict: 'id'
-      });
+      .update(updateData)
+      .eq('id', user.id)
+      .select();
 
-    if (upsertError) {
-      return NextResponse.json({ error: upsertError.message }, { status: 500 });
+    if (updateError) {
+      return NextResponse.json({ error: updateError.message }, { status: 500 });
+    }
+
+    // If no rows were updated, the record doesn't exist - try INSERT
+    if (!updateResult || updateResult.length === 0) {
+      // This shouldn't happen if signup worked, but handle it gracefully
+      const { error: insertError } = await supabase
+        .from('athletes')
+        .insert({
+          id: user.id,
+          first_name: existing?.first_name || 'Athlete',
+          last_name: existing?.last_name || 'User',
+          school: existing?.school || '',
+          ...updateData,
+        });
+
+      if (insertError) {
+        return NextResponse.json({ error: insertError.message }, { status: 500 });
+      }
     }
 
     return NextResponse.json({ success: true });
