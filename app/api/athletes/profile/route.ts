@@ -70,12 +70,23 @@ export async function PUT(req: NextRequest) {
     const body = await req.json();
     const { weightClass, bio, credentials, photoUrl, facilityId } = body;
 
-    // Check if athlete profile exists
-    const { data: existing } = await supabase
-      .from('athletes')
-      .select('id')
+    // Check if user is an athlete
+    const { data: userData } = await supabase
+      .from('users')
+      .select('role')
       .eq('id', user.id)
       .single();
+
+    if (!userData || userData.role !== 'athlete') {
+      return NextResponse.json({ error: 'User is not an athlete' }, { status: 400 });
+    }
+
+    // Get existing athlete data to preserve first_name, last_name, school
+    const { data: existing } = await supabase
+      .from('athletes')
+      .select('first_name, last_name, school')
+      .eq('id', user.id)
+      .maybeSingle();
 
     const updateData: any = {
       weight_class: weightClass || null,
@@ -85,48 +96,22 @@ export async function PUT(req: NextRequest) {
       facility_id: facilityId || null,
     };
 
-    if (existing) {
-      // Update existing profile
-      const { error } = await supabase
-        .from('athletes')
-        .update(updateData)
-        .eq('id', user.id);
+    // Use upsert to handle both insert and update cases safely
+    // This prevents duplicate key errors if the record already exists
+    const { error: upsertError } = await supabase
+      .from('athletes')
+      .upsert({
+        id: user.id,
+        first_name: existing?.first_name || 'Athlete', // Preserve existing or use fallback
+        last_name: existing?.last_name || 'User', // Preserve existing or use fallback
+        school: existing?.school || '', // Preserve existing or use fallback
+        ...updateData,
+      }, {
+        onConflict: 'id'
+      });
 
-      if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
-      }
-    } else {
-      // Create new profile (shouldn't happen, but handle it)
-      const { data: userData } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-
-      if (!userData || userData.role !== 'athlete') {
-        return NextResponse.json({ error: 'User is not an athlete' }, { status: 400 });
-      }
-
-      // Get athlete's basic info from signup
-      const { data: athleteData } = await supabase
-        .from('athletes')
-        .select('first_name, last_name, school')
-        .eq('id', user.id)
-        .single();
-
-      const { error } = await supabase
-        .from('athletes')
-        .insert({
-          id: user.id,
-          first_name: athleteData?.first_name || '',
-          last_name: athleteData?.last_name || '',
-          school: athleteData?.school || '',
-          ...updateData,
-        });
-
-      if (error) {
-        return NextResponse.json({ error: error.message }, { status: 500 });
-      }
+    if (upsertError) {
+      return NextResponse.json({ error: upsertError.message }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });
