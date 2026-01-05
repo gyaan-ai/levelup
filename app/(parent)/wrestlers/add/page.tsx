@@ -59,7 +59,7 @@ export default function AddYouthWrestlerPage() {
       school: '',
       grade: '',
       weightClass: '',
-      skillLevel: undefined,
+      skillLevel: '' as any,
       wrestlingExperience: '',
       goals: '',
       medicalNotes: '',
@@ -279,13 +279,13 @@ export default function AddYouthWrestlerPage() {
                   )}
                 />
 
-                <FormField
+                  <FormField
                   control={form.control}
                   name="skillLevel"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Skill Level</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value || ''}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select skill level" />

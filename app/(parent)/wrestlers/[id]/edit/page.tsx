@@ -62,7 +62,7 @@ export default function EditYouthWrestlerPage() {
       school: '',
       grade: '',
       weightClass: '',
-      skillLevel: undefined,
+      skillLevel: '' as any,
       wrestlingExperience: '',
       goals: '',
       medicalNotes: '',
@@ -91,7 +91,7 @@ export default function EditYouthWrestlerPage() {
           school: youthWrestler.school || '',
           grade: youthWrestler.grade || '',
           weightClass: youthWrestler.weight_class || '',
-          skillLevel: youthWrestler.skill_level || undefined,
+          skillLevel: youthWrestler.skill_level || '',
           wrestlingExperience: youthWrestler.wrestling_experience || '',
           goals: youthWrestler.goals || '',
           medicalNotes: youthWrestler.medical_notes || '',
@@ -333,7 +333,7 @@ export default function EditYouthWrestlerPage() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Skill Level</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
+                      <Select onValueChange={field.onChange} value={field.value || ''}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select skill level" />

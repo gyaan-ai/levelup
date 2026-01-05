@@ -54,12 +54,29 @@ export async function POST(req: NextRequest) {
     }
 
     // Upload photo (reuse athlete photo storage, but with youth wrestler ID)
-    const supabaseClient = await createClient(tenant.slug);
     const fileExt = file.name.split('.').pop();
     const fileName = `${Date.now()}.${fileExt}`;
     const filePath = `youth-wrestlers/${youthWrestlerId}/${fileName}`;
 
-    const { data, error: uploadError } = await supabaseClient.storage
+    // Delete old photo if exists
+    const { data: oldData } = await supabase
+      .from('youth_wrestlers')
+      .select('photo_url')
+      .eq('id', youthWrestlerId)
+      .single();
+
+    if (oldData?.photo_url) {
+      // Extract path from URL
+      const oldUrl = oldData.photo_url;
+      const oldPathMatch = oldUrl.match(/\/storage\/v1\/object\/public\/athlete-photos\/(.+)/);
+      if (oldPathMatch) {
+        await supabase.storage
+          .from('athlete-photos')
+          .remove([oldPathMatch[1]]);
+      }
+    }
+
+    const { data, error: uploadError } = await supabase.storage
       .from('athlete-photos')
       .upload(filePath, file, {
         cacheControl: '3600',
@@ -67,6 +84,7 @@ export async function POST(req: NextRequest) {
       });
 
     if (uploadError) {
+      console.error('Upload error:', uploadError);
       return NextResponse.json(
         { error: `Failed to upload photo: ${uploadError.message}` },
         { status: 500 }
@@ -74,7 +92,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Get public URL
-    const { data: urlData } = supabaseClient.storage
+    const { data: urlData } = supabase.storage
       .from('athlete-photos')
       .getPublicUrl(data.path);
 

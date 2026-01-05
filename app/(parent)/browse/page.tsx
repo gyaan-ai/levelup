@@ -2,7 +2,8 @@ import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
-import Link from 'next/link';
+import { BrowseAthletesClient } from './browse-client';
+import { Athlete } from '@/types';
 
 export default async function BrowsePage() {
   const headersList = await headers();
@@ -39,15 +40,21 @@ export default async function BrowsePage() {
     }
   }
 
-  return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-6">Browse Athletes</h1>
-      <p className="text-muted-foreground">Browse page coming soon...</p>
-      <p className="text-sm text-muted-foreground mt-4">
-        <Link href="/dashboard" className="text-levelup-primary hover:underline">
-          ← Back to Dashboard
-        </Link>
-      </p>
-    </div>
-  );
+  // Fetch active, verified athletes with photos
+  const { data: athletes, error } = await supabase
+    .from('athletes')
+    .select('*')
+    .eq('active', true)
+    .eq('certifications_verified', true)
+    .not('photo_url', 'is', null)
+    .order('average_rating', { ascending: false, nullsFirst: false })
+    .order('school', { ascending: true });
+
+  if (error) {
+    console.error('Error fetching athletes:', error);
+  }
+
+  const athletesList = (athletes || []) as Athlete[];
+
+  return <BrowseAthletesClient initialAthletes={athletesList} />;
 }
