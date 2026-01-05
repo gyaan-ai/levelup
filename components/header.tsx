@@ -28,6 +28,10 @@ export function Header() {
               src={tenant.stateOrgLogo} 
               alt={tenant.orgName}
               className="h-8"
+              onError={(e) => {
+                // Hide image if it fails to load
+                (e.target as HTMLImageElement).style.display = 'none';
+              }}
             />
           )}
         </Link>

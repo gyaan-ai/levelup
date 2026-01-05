@@ -29,14 +29,23 @@ export function AuthProvider({
   const supabase = createClient(tenantSlug);
 
   const fetchUserRole = useCallback(async (userId: string) => {
-    const { data, error } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', userId)
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', userId)
+        .single();
 
-    if (!error && data) {
-      setUserRole(data.role as 'parent' | 'athlete' | 'admin');
+      if (!error && data) {
+        setUserRole(data.role as 'parent' | 'athlete' | 'admin');
+      } else {
+        console.error('Error fetching user role:', error);
+        // If user record doesn't exist, default to null
+        setUserRole(null);
+      }
+    } catch (err) {
+      console.error('Error in fetchUserRole:', err);
+      setUserRole(null);
     }
   }, [supabase]);
 

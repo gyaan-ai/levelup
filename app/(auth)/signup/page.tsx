@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import { createClient } from '@/lib/supabase/client';
+import { useTenant } from '@/components/theme-provider';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -51,6 +53,8 @@ type SignupFormValues = z.infer<typeof signupSchema>;
 
 export default function SignupPage() {
   const router = useRouter();
+  const tenant = useTenant();
+  const supabase = createClient(tenant.slug);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -97,28 +101,27 @@ export default function SignupPage() {
         return;
       }
 
-      // Auto-login after signup
-      const loginResponse = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: values.email,
-          password: values.password,
-        }),
+      // Auto-login after signup using Supabase client
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: values.email,
+        password: values.password,
       });
 
-      const loginData = await loginResponse.json();
-
-      if (!loginResponse.ok) {
+      if (authError || !authData.user) {
         // Signup succeeded but login failed - redirect to login page
         router.push('/login?message=signup_success');
         return;
       }
 
+      // Get user role
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', authData.user.id)
+        .single();
+
       // Redirect based on role
-      const role = loginData.user?.role || values.role;
+      const role = userData?.role || values.role;
       if (role === 'athlete') {
         router.push('/dashboard');
       } else if (role === 'admin') {

@@ -9,6 +9,9 @@ import './globals.css';
 export const metadata = {
   title: 'LevelUp - Private Wrestling Lessons',
   description: 'Connect with college wrestlers for private lessons',
+  icons: {
+    icon: '/favicon.ico',
+  },
 };
 
 export default async function RootLayout({
