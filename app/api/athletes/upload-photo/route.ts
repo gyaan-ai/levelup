@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
-import { uploadAthletePhoto } from '@/lib/supabase/storage';
 
 export async function POST(req: NextRequest) {
   try {
@@ -38,10 +37,51 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'File size must be less than 5MB' }, { status: 400 });
     }
 
-    // Upload photo
-    const photoUrl = await uploadAthletePhoto(tenant.slug, user.id, file);
+    // Delete old photo if exists
+    const { data: oldData } = await supabase
+      .from('athletes')
+      .select('photo_url')
+      .eq('id', user.id)
+      .single();
 
-    return NextResponse.json({ photoUrl });
+    if (oldData?.photo_url) {
+      // Extract path from URL
+      const oldUrl = oldData.photo_url;
+      const oldPathMatch = oldUrl.match(/\/storage\/v1\/object\/public\/athlete-photos\/(.+)/);
+      if (oldPathMatch) {
+        await supabase.storage
+          .from('athlete-photos')
+          .remove([oldPathMatch[1]]);
+      }
+    }
+
+    // Create file path: {athleteId}/{timestamp}-{filename}
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Date.now()}.${fileExt}`;
+    const filePath = `${user.id}/${fileName}`;
+
+    // Upload file using server client (has proper auth context for RLS)
+    const { data, error: uploadError } = await supabase.storage
+      .from('athlete-photos')
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: false,
+      });
+
+    if (uploadError) {
+      console.error('Upload error:', uploadError);
+      return NextResponse.json(
+        { error: `Failed to upload photo: ${uploadError.message}` },
+        { status: 500 }
+      );
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from('athlete-photos')
+      .getPublicUrl(data.path);
+
+    return NextResponse.json({ photoUrl: urlData.publicUrl });
   } catch (error: any) {
     console.error('Error uploading photo:', error);
     return NextResponse.json(

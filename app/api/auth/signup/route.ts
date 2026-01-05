@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Validate role
-    if (!['parent', 'athlete', 'admin'].includes(role)) {
+    if (!['parent', 'athlete', 'admin', 'youth_wrestler'].includes(role)) {
       return NextResponse.json(
         { error: 'Invalid role' },
         { status: 400 }
@@ -37,6 +37,14 @@ export async function POST(req: NextRequest) {
     if (role === 'athlete' && (!firstName || !lastName || !school)) {
       return NextResponse.json(
         { error: 'First name, last name, and school are required for athletes' },
+        { status: 400 }
+      );
+    }
+
+    // For youth wrestlers, require name fields
+    if (role === 'youth_wrestler' && (!firstName || !lastName)) {
+      return NextResponse.json(
+        { error: 'First name and last name are required for youth wrestlers' },
         { status: 400 }
       );
     }
@@ -96,6 +104,29 @@ export async function POST(req: NextRequest) {
         await supabaseAdmin.auth.admin.deleteUser(userId);
         return NextResponse.json(
           { error: `Failed to create athlete profile: ${athleteError.message}` },
+          { status: 500 }
+        );
+      }
+    }
+
+    // If youth_wrestler, create entry in youth_wrestlers table (parent_id can be null for self-managed accounts)
+    if (role === 'youth_wrestler') {
+      const { error: youthWrestlerError } = await supabaseAdmin
+        .from('youth_wrestlers')
+        .insert({
+          id: userId, // Use the user ID as the youth_wrestler ID
+          parent_id: null, // Null for self-managed accounts, can be linked to parent later
+          first_name: firstName,
+          last_name: lastName,
+          active: true,
+        });
+
+      if (youthWrestlerError) {
+        // Rollback: delete user and auth user
+        await supabaseAdmin.from('users').delete().eq('id', userId);
+        await supabaseAdmin.auth.admin.deleteUser(userId);
+        return NextResponse.json(
+          { error: `Failed to create youth wrestler profile: ${youthWrestlerError.message}` },
           { status: 500 }
         );
       }

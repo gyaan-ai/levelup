@@ -78,6 +78,8 @@ export default function LoginPage() {
       const role = userData.role;
       if (role === 'athlete') {
         router.push('/athlete-dashboard');
+      } else if (role === 'youth_wrestler') {
+        router.push('/youth-dashboard');
       } else if (role === 'admin') {
         router.push('/admin');
       } else {

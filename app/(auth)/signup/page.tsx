@@ -32,7 +32,7 @@ const signupSchema = z.object({
   email: z.string().email('Invalid email address'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
   confirmPassword: z.string(),
-  role: z.enum(['parent', 'athlete', 'admin']),
+  role: z.enum(['parent', 'athlete', 'admin', 'youth_wrestler']),
   firstName: z.string().optional(),
   lastName: z.string().optional(),
   school: z.string().optional(),
@@ -124,6 +124,8 @@ export default function SignupPage() {
       const role = userData?.role || values.role;
       if (role === 'athlete') {
         router.push('/athlete-dashboard');
+      } else if (role === 'youth_wrestler') {
+        router.push('/youth-dashboard');
       } else if (role === 'admin') {
         router.push('/admin');
       } else {
@@ -170,6 +172,7 @@ export default function SignupPage() {
                       <SelectContent>
                         <SelectItem value="parent">Parent</SelectItem>
                         <SelectItem value="athlete">Athlete (College Wrestler)</SelectItem>
+                        <SelectItem value="youth_wrestler">Youth Wrestler (Student)</SelectItem>
                         <SelectItem value="admin">Admin</SelectItem>
                       </SelectContent>
                     </Select>
@@ -181,7 +184,7 @@ export default function SignupPage() {
                 )}
               />
 
-              {selectedRole === 'athlete' && (
+              {(selectedRole === 'athlete' || selectedRole === 'youth_wrestler') && (
                 <>
                   <FormField
                     control={form.control}
@@ -211,19 +214,21 @@ export default function SignupPage() {
                     )}
                   />
 
-                  <FormField
-                    control={form.control}
-                    name="school"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>School</FormLabel>
-                        <FormControl>
-                          <Input placeholder="UNC" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+                  {selectedRole === 'athlete' && (
+                    <FormField
+                      control={form.control}
+                      name="school"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>School</FormLabel>
+                          <FormControl>
+                            <Input placeholder="UNC" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
                 </>
               )}
 
