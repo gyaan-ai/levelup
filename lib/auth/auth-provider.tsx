@@ -34,13 +34,19 @@ export function AuthProvider({
         .from('users')
         .select('role')
         .eq('id', userId)
-        .single();
+        .maybeSingle(); // Use maybeSingle instead of single to handle missing records gracefully
 
-      if (!error && data) {
+      if (error) {
+        // Log error but don't throw - user might not have a record yet
+        console.error('Error fetching user role:', error);
+        setUserRole(null);
+        return;
+      }
+
+      if (data && data.role) {
         setUserRole(data.role as 'parent' | 'athlete' | 'admin');
       } else {
-        console.error('Error fetching user role:', error);
-        // If user record doesn't exist, default to null
+        // User record doesn't exist yet - this can happen during signup
         setUserRole(null);
       }
     } catch (err) {
