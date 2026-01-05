@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 
 export async function GET(req: NextRequest) {
@@ -81,8 +82,12 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'User is not an athlete' }, { status: 400 });
     }
 
+    // Use admin client to bypass RLS for this operation
+    // We've already verified the user is authenticated and is an athlete
+    const supabaseAdmin = createAdminClient(tenant.slug);
+
     // Get existing athlete data to preserve first_name, last_name, school
-    const { data: existing } = await supabase
+    const { data: existing } = await supabaseAdmin
       .from('athletes')
       .select('first_name, last_name, school')
       .eq('id', user.id)
@@ -96,32 +101,50 @@ export async function PUT(req: NextRequest) {
       facility_id: facilityId || null,
     };
 
-    // Try UPDATE first (record should exist from signup)
-    const { data: updateResult, error: updateError } = await supabase
-      .from('athletes')
-      .update(updateData)
-      .eq('id', user.id)
-      .select();
+    // Check if record exists
+    if (existing) {
+      // Record exists - use UPDATE
+      const { error: updateError } = await supabaseAdmin
+        .from('athletes')
+        .update(updateData)
+        .eq('id', user.id);
 
-    if (updateError) {
-      return NextResponse.json({ error: updateError.message }, { status: 500 });
-    }
+      if (updateError) {
+        return NextResponse.json({ error: updateError.message }, { status: 500 });
+      }
+    } else {
+      // Record doesn't exist - use INSERT (shouldn't happen, but handle it)
+      // Get user info to populate required fields
+      const { data: userInfo } = await supabaseAdmin
+        .from('users')
+        .select('email')
+        .eq('id', user.id)
+        .single();
 
-    // If no rows were updated, the record doesn't exist - try INSERT
-    if (!updateResult || updateResult.length === 0) {
-      // This shouldn't happen if signup worked, but handle it gracefully
-      const { error: insertError } = await supabase
+      const { error: insertError } = await supabaseAdmin
         .from('athletes')
         .insert({
           id: user.id,
-          first_name: existing?.first_name || 'Athlete',
-          last_name: existing?.last_name || 'User',
-          school: existing?.school || '',
+          first_name: 'Athlete', // Fallback - should be set during signup
+          last_name: 'User', // Fallback - should be set during signup
+          school: '', // Fallback - should be set during signup
           ...updateData,
         });
 
       if (insertError) {
-        return NextResponse.json({ error: insertError.message }, { status: 500 });
+        // If insert fails with duplicate key, try update instead (race condition)
+        if (insertError.message?.includes('duplicate key') || insertError.code === '23505') {
+          const { error: updateError } = await supabaseAdmin
+            .from('athletes')
+            .update(updateData)
+            .eq('id', user.id);
+
+          if (updateError) {
+            return NextResponse.json({ error: updateError.message }, { status: 500 });
+          }
+        } else {
+          return NextResponse.json({ error: insertError.message }, { status: 500 });
+        }
       }
     }
 
