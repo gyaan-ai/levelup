@@ -1,0 +1,70 @@
+// User types
+export type UserRole = 'parent' | 'athlete' | 'admin';
+
+export interface User {
+  id: string;
+  email: string;
+  role: UserRole;
+  created_at: string;
+}
+
+// Athlete types
+export interface Athlete {
+  id: string;
+  first_name: string;
+  last_name: string;
+  school: string;
+  facility_id?: string;
+  year?: 'Freshman' | 'Sophomore' | 'Junior' | 'Senior' | '5th Year';
+  weight_class?: string;
+  bio?: string;
+  photo_url?: string;
+  credentials?: Record<string, any>;
+  average_rating: number;
+  total_sessions: number;
+  ytd_earnings: number;
+  commitment_sessions: number;
+  commitment_deadline?: string;
+  commitment_fulfilled: boolean;
+  bank_account_id?: string;
+  usa_wrestling_expiration?: string;
+  safesport_expiration?: string;
+  background_check_expiration?: string;
+  certifications_verified: boolean;
+  active: boolean;
+  created_at: string;
+}
+
+// Session types
+export type SessionType = '1-on-1' | '2-athlete' | 'group';
+export type SessionStatus = 'scheduled' | 'completed' | 'cancelled' | 'no-show';
+
+export interface Session {
+  id: string;
+  parent_id: string;
+  athlete_id: string;
+  facility_id: string;
+  session_type: SessionType;
+  scheduled_datetime: string;
+  duration_minutes: number;
+  total_price: number;
+  athlete_payment: number;
+  org_fee: number;
+  stripe_fee: number;
+  paid_with_credit: boolean;
+  status: SessionStatus;
+  athlete_paid: boolean;
+  athlete_payout_date?: string;
+  created_at: string;
+  completed_at?: string;
+}
+
+// Facility types
+export interface Facility {
+  id: string;
+  name: string;
+  school: string;
+  address?: string;
+  created_at: string;
+}
+
