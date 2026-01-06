@@ -172,15 +172,21 @@ export default function OnboardingPage() {
         throw new Error(data.error || 'Failed to update profile');
       }
 
+      // Verify the save worked by checking the response
+      if (!data.success) {
+        throw new Error('Profile save did not confirm success');
+      }
+
       // Show success message
       setSuccess(true);
       setSubmitting(false);
 
+      // Force a hard refresh to ensure data is loaded
       // Wait a moment to show success message, then redirect
       setTimeout(() => {
-        router.push('/athlete-dashboard');
-        router.refresh();
-      }, 1500);
+        // Use window.location for a hard redirect to ensure fresh data
+        window.location.href = '/athlete-dashboard';
+      }, 2000);
     } catch (err: any) {
       setError(err.message || 'An unexpected error occurred');
       setSubmitting(false);
@@ -380,7 +386,33 @@ export default function OnboardingPage() {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => router.push('/dashboard')}
+                  onClick={async () => {
+                    // Save minimal profile (just bio if provided) then redirect
+                    if (form.getValues('bio')?.trim()) {
+                      try {
+                        const response = await fetch('/api/athletes/profile', {
+                          method: 'PUT',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            bio: form.getValues('bio'),
+                            weightClass: form.getValues('weightClass'),
+                            credentials: {},
+                            photoUrl: photoPreview,
+                            facilityId: form.getValues('facilityId'),
+                          }),
+                        });
+                        if (response.ok) {
+                          window.location.href = '/athlete-dashboard';
+                        } else {
+                          window.location.href = '/athlete-dashboard';
+                        }
+                      } catch {
+                        window.location.href = '/athlete-dashboard';
+                      }
+                    } else {
+                      window.location.href = '/athlete-dashboard';
+                    }
+                  }}
                   disabled={submitting}
                 >
                   Skip for Now

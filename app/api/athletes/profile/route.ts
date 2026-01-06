@@ -127,7 +127,13 @@ export async function PUT(req: NextRequest) {
 
     // If UPDATE succeeded (affected at least 1 row), we're done
     if (updateResult && updateResult.length > 0) {
-      return NextResponse.json({ success: true });
+      console.log('Profile updated successfully for user:', user.id);
+      return NextResponse.json({ success: true, updated: true });
+    }
+
+    // Log if update returned 0 rows
+    if (!updateError && (!updateResult || updateResult.length === 0)) {
+      console.warn('UPDATE returned 0 rows for user:', user.id, 'Attempting INSERT...');
     }
 
     // If UPDATE affected 0 rows, record doesn't exist - try INSERT

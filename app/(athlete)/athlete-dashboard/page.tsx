@@ -44,13 +44,18 @@ export default async function AthleteDashboard() {
   }
 
   // Get athlete profile
-  const { data: athlete } = await supabase
+  const { data: athlete, error: athleteError } = await supabase
     .from('athletes')
     .select('*')
     .eq('id', user.id)
-    .single();
+    .maybeSingle();
 
-  // Check if profile is complete
+  // If no athlete record exists, redirect to onboarding
+  if (!athlete) {
+    redirect('/onboarding');
+  }
+
+  // Check if profile is complete (only requires bio now, photo is optional)
   if (!isProfileComplete(athlete)) {
     redirect('/onboarding');
   }
