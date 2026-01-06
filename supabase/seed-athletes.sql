@@ -1,6 +1,15 @@
 -- Seed script for test college athletes
 -- Run this in Supabase SQL Editor
--- Note: This script creates auth users and athlete profiles
+-- 
+-- IMPORTANT: This script ONLY inserts data - it does NOT create tables
+-- Make sure you've run all migrations first before running this seed script
+-- 
+-- This script will:
+-- 1. Create facilities (if they don't exist)
+-- 2. Insert test athlete data into existing tables
+-- 
+-- You MUST create the auth users first via Supabase Dashboard or Admin API
+-- See instructions at the bottom of this script
 
 -- First, ensure we have facilities (create if they don't exist)
 INSERT INTO public.facilities (id, name, school, address)
