@@ -264,14 +264,17 @@ BEGIN
     updated_at = NOW();
 END $$;
 
--- IMPORTANT: After running this script, you need to create the auth users
--- Go to Supabase Dashboard > Authentication > Users > Add User
--- Create users with these emails and UUIDs:
--- 1. jake.miller@test.levelup.com (UUID: 11111111-1111-1111-1111-111111111111)
--- 2. emma.davis@test.levelup.com (UUID: 22222222-2222-2222-2222-222222222222)
--- 3. marcus.lee@test.levelup.com (UUID: 33333333-3333-3333-3333-333333333333)
+-- IMPORTANT: You MUST create the auth users FIRST before running this script!
 -- 
--- Or use the Supabase Admin API to create them programmatically
+-- Option 1: Run seed-athletes-auth-users.sql first (creates auth users via SQL)
+-- Option 2: Use Supabase Dashboard > Authentication > Users > Add User
+--   Create users with these emails and UUIDs:
+--   1. jake.miller@test.levelup.com (UUID: 11111111-1111-1111-1111-111111111111)
+--   2. emma.davis@test.levelup.com (UUID: 22222222-2222-2222-2222-222222222222)
+--   3. marcus.lee@test.levelup.com (UUID: 33333333-3333-3333-3333-333333333333)
+-- Option 3: Use Supabase Admin API to create them programmatically
+--
+-- The public.users table has a foreign key to auth.users, so auth users must exist first!
 
 -- Verify the seed data
 SELECT 
