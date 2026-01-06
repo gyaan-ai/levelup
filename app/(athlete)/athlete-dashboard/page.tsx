@@ -97,9 +97,9 @@ export default async function AthleteDashboard() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Dashboard</h1>
+        <h1 className="text-3xl font-bold mb-2">Athlete Dashboard</h1>
         <p className="text-muted-foreground">
-          Welcome back, {athlete?.first_name || 'Athlete'}!
+          Welcome{athlete?.first_name ? `, ${athlete.first_name}` : ''}! Manage your profile, view earnings, and track your sessions.
         </p>
       </div>
 

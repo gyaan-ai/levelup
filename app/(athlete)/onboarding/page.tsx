@@ -47,6 +47,7 @@ export default function OnboardingPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
   const [facilities, setFacilities] = useState<Array<{ id: string; name: string; school: string }>>([]);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -171,9 +172,15 @@ export default function OnboardingPage() {
         throw new Error(data.error || 'Failed to update profile');
       }
 
-      // Redirect to dashboard
-      router.push('/athlete-dashboard');
-      router.refresh();
+      // Show success message
+      setSuccess(true);
+      setSubmitting(false);
+
+      // Wait a moment to show success message, then redirect
+      setTimeout(() => {
+        router.push('/athlete-dashboard');
+        router.refresh();
+      }, 1500);
     } catch (err: any) {
       setError(err.message || 'An unexpected error occurred');
       setSubmitting(false);
@@ -203,6 +210,14 @@ export default function OnboardingPage() {
           {error && (
             <div className="mb-4 p-3 bg-destructive/10 border border-destructive rounded-md">
               <p className="text-sm text-destructive">{error}</p>
+            </div>
+          )}
+
+          {success && (
+            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md">
+              <p className="text-sm text-green-800 font-medium">
+                ✓ Profile saved successfully! Redirecting to your dashboard...
+              </p>
             </div>
           )}
 
