@@ -125,10 +125,24 @@ export async function PUT(req: NextRequest) {
       .eq('id', user.id)
       .select('id');
 
-    // If UPDATE succeeded (affected at least 1 row), we're done
+    // If UPDATE succeeded (affected at least 1 row), verify and return
     if (updateResult && updateResult.length > 0) {
       console.log('Profile updated successfully for user:', user.id);
-      return NextResponse.json({ success: true, updated: true });
+      
+      // Verify the update by fetching the record
+      const { data: verified } = await supabaseAdmin
+        .from('athletes')
+        .select('bio, photo_url, weight_class')
+        .eq('id', user.id)
+        .single();
+      
+      console.log('Verified profile data:', verified);
+      
+      return NextResponse.json({ 
+        success: true, 
+        updated: true,
+        athlete: verified 
+      });
     }
 
     // Log if update returned 0 rows

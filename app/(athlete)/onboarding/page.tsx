@@ -70,12 +70,15 @@ export default function OnboardingPage() {
   useEffect(() => {
     async function loadData() {
       try {
-        const response = await fetch('/api/athletes/profile');
+        // Add cache busting to ensure fresh data
+        const response = await fetch('/api/athletes/profile?' + new Date().getTime(), {
+          cache: 'no-store',
+        });
         const data = await response.json();
 
         if (data.athlete) {
           // Pre-fill form if profile exists
-          form.reset({
+          const formData = {
             weightClass: data.athlete.weight_class || '',
             bio: data.athlete.bio || '',
             credentials: (data.athlete.credentials && Object.keys(data.athlete.credentials).length > 0)
@@ -85,15 +88,24 @@ export default function OnboardingPage() {
                 }))
               : [],
             facilityId: data.athlete.facility_id || '',
-          });
+          };
+          
+          form.reset(formData);
 
           if (data.athlete.photo_url) {
             setPhotoPreview(data.athlete.photo_url);
+          }
+          
+          // If profile is complete, redirect to dashboard
+          if (data.athlete.bio && data.athlete.bio.trim().length > 0) {
+            // Profile is complete, but user is on onboarding page
+            // Don't auto-redirect, let them edit if they want
           }
         }
 
         setFacilities(data.facilities || []);
       } catch (err) {
+        console.error('Error loading profile:', err);
         setError('Failed to load profile data');
       } finally {
         setLoading(false);
@@ -103,7 +115,7 @@ export default function OnboardingPage() {
     if (user) {
       loadData();
     }
-  }, [user, form]);
+  }, [user]);
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -177,14 +189,30 @@ export default function OnboardingPage() {
         throw new Error('Profile save did not confirm success');
       }
 
+      // Wait a moment for database to commit, then verify
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // Verify the data was actually saved by fetching it back
+      const verifyResponse = await fetch('/api/athletes/profile?' + Date.now(), {
+        cache: 'no-store',
+      });
+      const verifyData = await verifyResponse.json();
+      
+      if (!verifyData.athlete) {
+        throw new Error('Profile was not found after saving. Please try again.');
+      }
+
+      // Check if bio was saved (required field)
+      if (values.bio && !verifyData.athlete.bio) {
+        throw new Error('Bio was not saved. Please try again.');
+      }
+
       // Show success message
       setSuccess(true);
       setSubmitting(false);
 
-      // Force a hard refresh to ensure data is loaded
-      // Wait a moment to show success message, then redirect
+      // Redirect after showing success message
       setTimeout(() => {
-        // Use window.location for a hard redirect to ensure fresh data
         window.location.href = '/athlete-dashboard';
       }, 2000);
     } catch (err: any) {
