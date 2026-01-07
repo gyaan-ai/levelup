@@ -1,15 +1,16 @@
--- Seed script for test college athletes
+-- Complete seed script for test college athletes
 -- Run this in Supabase SQL Editor
 -- 
--- IMPORTANT: This script ONLY inserts data - it does NOT create tables
--- Make sure you've run all migrations first before running this seed script
--- 
+-- IMPORTANT: This script requires auth users to exist first!
+-- Run seed-athletes-auth-users.sql FIRST, or create auth users via Dashboard
+--
 -- This script will:
 -- 1. Create facilities (if they don't exist)
--- 2. Insert test athlete data into existing tables
--- 
--- You MUST create the auth users first via Supabase Dashboard or Admin API
--- See instructions at the bottom of this script
+-- 2. Insert user entries (requires auth users to exist)
+-- 3. Insert athlete profiles with complete data
+
+-- Enable pgcrypto extension for password hashing (if not already enabled)
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 -- First, ensure we have facilities (create if they don't exist)
 INSERT INTO public.facilities (id, name, school, address)
@@ -22,21 +23,15 @@ VALUES
   ('00000000-0000-0000-0000-000000000002', 'NC State Wrestling Facility', 'NC State', 'Raleigh, NC')
 ON CONFLICT (id) DO NOTHING;
 
--- Create auth users and athlete profiles
--- Note: We'll use Supabase's auth.users table directly
--- These UUIDs are fixed for testing purposes
-
--- Jake Miller (UNC, 157 lbs)
+-- ============================================================================
+-- JAKE MILLER (UNC, 157 lbs, Junior, 5.0 rating)
+-- ============================================================================
 DO $$
 DECLARE
   jake_user_id UUID := '11111111-1111-1111-1111-111111111111';
   jake_email TEXT := 'jake.miller@test.levelup.com';
 BEGIN
-  -- Create auth user (if using Supabase Admin API, create via API first)
-  -- For SQL, we'll insert directly into auth.users (requires superuser)
-  -- Alternatively, create these users via Supabase Dashboard or Admin API first
-  
-  -- Insert into public.users
+  -- Insert into public.users (auth user must exist first!)
   INSERT INTO public.users (id, email, role)
   VALUES (jake_user_id, jake_email, 'athlete')
   ON CONFLICT (id) DO UPDATE SET email = jake_email, role = 'athlete';
@@ -73,11 +68,11 @@ BEGIN
     'Miller',
     'UNC',
     '00000000-0000-0000-0000-000000000001',
-    'Senior',
+    'Junior',
     '157',
-    'Jake Miller is a senior wrestler at UNC with a proven track record of excellence. Known for his technical precision and competitive drive, Jake has competed at the highest levels of collegiate wrestling. He brings years of experience and a passion for teaching the fundamentals of wrestling to athletes of all skill levels.',
-    'https://i.pravatar.cc/400?img=1',
-    '{"NCAA All-American": "2023, 2024", "ACC Champion": "2023, 2024", "Team Captain": "2024"}'::jsonb,
+    '3x state champion. Specializing in technique, scrambling, and hand fighting. Love helping younger wrestlers develop.',
+    'https://i.pravatar.cc/400?img=12',
+    '["2023 NC State Champion - 157 lbs", "2024 All-American", "100+ career wins"]'::jsonb,
     5.0,
     25,
     5000.00,
@@ -108,13 +103,15 @@ BEGIN
     updated_at = NOW();
 END $$;
 
--- Emma Davis (NC State, 133 lbs)
+-- ============================================================================
+-- EMMA DAVIS (NC State, 133 lbs, Senior, 4.8 rating)
+-- ============================================================================
 DO $$
 DECLARE
   emma_user_id UUID := '22222222-2222-2222-2222-222222222222';
   emma_email TEXT := 'emma.davis@test.levelup.com';
 BEGIN
-  -- Insert into public.users
+  -- Insert into public.users (auth user must exist first!)
   INSERT INTO public.users (id, email, role)
   VALUES (emma_user_id, emma_email, 'athlete')
   ON CONFLICT (id) DO UPDATE SET email = emma_email, role = 'athlete';
@@ -151,11 +148,11 @@ BEGIN
     'Davis',
     'NC State',
     '00000000-0000-0000-0000-000000000002',
-    'Junior',
+    'Senior',
     '133',
-    'Emma Davis is a standout junior wrestler at NC State, known for her exceptional technique and dedication to the sport. With multiple years of competitive experience, Emma excels at breaking down complex moves into understandable concepts. She specializes in working with youth athletes, helping them build confidence and develop strong fundamentals.',
-    'https://i.pravatar.cc/400?img=5',
-    '{"NCAA Qualifier": "2023, 2024", "ACC Runner-Up": "2024", "Academic All-ACC": "2023, 2024"}'::jsonb,
+    '2x state finalist. Patient teacher focused on fundamentals, positioning, and mental game.',
+    'https://i.pravatar.cc/400?img=47',
+    '["2024 NC State Runner-Up", "ACC Qualifier", "High School All-American"]'::jsonb,
     4.8,
     18,
     3600.00,
@@ -186,13 +183,15 @@ BEGIN
     updated_at = NOW();
 END $$;
 
--- Marcus Lee (UNC, 174 lbs)
+-- ============================================================================
+-- MARCUS LEE (UNC, 174 lbs, Sophomore, 4.9 rating)
+-- ============================================================================
 DO $$
 DECLARE
   marcus_user_id UUID := '33333333-3333-3333-3333-333333333333';
   marcus_email TEXT := 'marcus.lee@test.levelup.com';
 BEGIN
-  -- Insert into public.users
+  -- Insert into public.users (auth user must exist first!)
   INSERT INTO public.users (id, email, role)
   VALUES (marcus_user_id, marcus_email, 'athlete')
   ON CONFLICT (id) DO UPDATE SET email = marcus_email, role = 'athlete';
@@ -231,9 +230,9 @@ BEGIN
     '00000000-0000-0000-0000-000000000001',
     'Sophomore',
     '174',
-    'Marcus Lee is a rising sophomore at UNC with a strong foundation in wrestling technique and strategy. Known for his patient teaching style and ability to adapt to different learning styles, Marcus focuses on building fundamental skills while introducing advanced concepts when athletes are ready. He has a natural ability to connect with youth wrestlers and help them reach their potential.',
-    'https://i.pravatar.cc/400?img=12',
-    '{"ACC Freshman of the Year": "2023", "NCAA Qualifier": "2024", "Team Most Improved": "2024"}'::jsonb,
+    'D1 wrestler with 3 years experience. Conditioning specialist. Great for all skill levels.',
+    'https://i.pravatar.cc/400?img=33',
+    '["ACC Qualifier", "100+ career wins", "State Champion"]'::jsonb,
     4.9,
     12,
     2400.00,
@@ -264,35 +263,29 @@ BEGIN
     updated_at = NOW();
 END $$;
 
--- IMPORTANT: You MUST create the auth users FIRST before running this script!
--- 
--- Option 1: Run seed-athletes-auth-users.sql first (creates auth users via SQL)
--- Option 2: Use Supabase Dashboard > Authentication > Users > Add User
---   Create users with these emails and UUIDs:
---   1. jake.miller@test.levelup.com (UUID: 11111111-1111-1111-1111-111111111111)
---   2. emma.davis@test.levelup.com (UUID: 22222222-2222-2222-2222-222222222222)
---   3. marcus.lee@test.levelup.com (UUID: 33333333-3333-3333-3333-333333333333)
--- Option 3: Use Supabase Admin API to create them programmatically
---
--- The public.users table has a foreign key to auth.users, so auth users must exist first!
-
--- Verify the seed data
+-- ============================================================================
+-- VERIFICATION QUERY
+-- ============================================================================
+-- Verify the seed data was created successfully
 SELECT 
   a.id,
-  a.first_name,
-  a.last_name,
+  a.first_name || ' ' || a.last_name AS name,
   a.school,
-  a.weight_class,
-  a.average_rating,
+  a.weight_class || ' lbs' AS weight,
+  a.year,
+  a.average_rating AS rating,
   a.active,
   a.certifications_verified,
-  u.email
+  a.bio IS NOT NULL AND a.bio != '' AS has_bio,
+  a.photo_url IS NOT NULL AS has_photo,
+  u.email,
+  f.name AS facility_name
 FROM public.athletes a
 JOIN public.users u ON a.id = u.id
+LEFT JOIN public.facilities f ON a.facility_id = f.id
 WHERE a.id IN (
   '11111111-1111-1111-1111-111111111111',
   '22222222-2222-2222-2222-222222222222',
   '33333333-3333-3333-3333-333333333333'
 )
 ORDER BY a.average_rating DESC;
-
