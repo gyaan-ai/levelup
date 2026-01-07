@@ -183,13 +183,15 @@ export default async function AthleteProfilePage({
               </div>
 
               {/* Book a Session Button */}
-              <Button 
-                size="lg" 
-                className="w-full md:w-auto"
-                style={{ backgroundColor: 'var(--color-levelup-primary)' }}
-              >
-                Book a Session
-              </Button>
+              <Link href={`/book/${athlete.id}`}>
+                <Button 
+                  size="lg" 
+                  className="w-full md:w-auto"
+                  style={{ backgroundColor: 'var(--color-levelup-primary)' }}
+                >
+                  Book a Session
+                </Button>
+              </Link>
             </div>
           </div>
         </CardContent>
