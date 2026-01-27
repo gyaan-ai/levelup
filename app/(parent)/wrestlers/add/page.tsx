@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -45,6 +45,7 @@ type YouthWrestlerFormValues = z.infer<typeof youthWrestlerSchema>;
 
 export default function AddYouthWrestlerPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
@@ -127,7 +128,14 @@ export default function AddYouthWrestlerPage() {
         }
       }
 
-      router.push('/dashboard');
+      // Redirect to booking flow if user came from /book/xxx, else dashboard
+      const redirectTo = searchParams.get('redirect');
+      const safeRedirect =
+        redirectTo &&
+        redirectTo.startsWith('/') &&
+        !redirectTo.startsWith('//') &&
+        !redirectTo.includes(':');
+      router.push(safeRedirect ? redirectTo : '/dashboard');
       router.refresh();
     } catch (err: any) {
       setError(err.message || 'An unexpected error occurred');

@@ -74,19 +74,29 @@ export default function LoginPage() {
         return;
       }
 
-      // Redirect based on role
-      const role = userData.role;
-      if (role === 'athlete') {
-        router.push('/athlete-dashboard');
-      } else if (role === 'youth_wrestler') {
-        router.push('/youth-dashboard');
-      } else if (role === 'admin') {
-        router.push('/admin');
+      // Respect redirect param (e.g. /book/xxx) or redirect based on role
+      const redirectTo = searchParams.get('redirect');
+      const safeRedirect =
+        redirectTo &&
+        redirectTo.startsWith('/') &&
+        !redirectTo.startsWith('//') &&
+        !redirectTo.includes(':');
+
+      if (safeRedirect) {
+        router.push(redirectTo);
       } else {
-        router.push('/dashboard');
+        const role = userData.role;
+        if (role === 'athlete') {
+          router.push('/athlete-dashboard');
+        } else if (role === 'youth_wrestler') {
+          router.push('/youth-dashboard');
+        } else if (role === 'admin') {
+          router.push('/admin');
+        } else {
+          router.push('/dashboard');
+        }
       }
 
-      // Refresh the page to update auth state
       router.refresh();
     } catch (err) {
       setError('An unexpected error occurred');

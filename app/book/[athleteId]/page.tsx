@@ -20,12 +20,22 @@ export default async function BookPage({
 
   const tenantSlug = tenant.slug;
   const supabase = await createClient(tenantSlug);
-  
-  // Check authentication
-  const { data: { user } } = await supabase.auth.getUser();
-  
+  const loginRedirect = '/login?redirect=' + encodeURIComponent('/book/' + athleteId);
+
+  // Check authentication (handle invalid/expired refresh token gracefully)
+  let user;
+  try {
+    const { data, error } = await supabase.auth.getUser();
+    if (error) {
+      redirect(loginRedirect);
+    }
+    user = data?.user ?? null;
+  } catch {
+    redirect(loginRedirect);
+  }
+
   if (!user) {
-    redirect('/login?redirect=/book/' + athleteId);
+    redirect(loginRedirect);
   }
 
   // Check user role
@@ -66,8 +76,7 @@ export default async function BookPage({
     .order('created_at', { ascending: false });
 
   if (!youthWrestlers || youthWrestlers.length === 0) {
-    // Redirect to add wrestler page
-    redirect('/wrestlers/add?redirect=/book/' + athleteId);
+    redirect('/wrestlers/add?redirect=' + encodeURIComponent('/book/' + athleteId));
   }
 
   // Get facility info if available
@@ -90,4 +99,8 @@ export default async function BookPage({
     />
   );
 }
+
+
+
+
 
