@@ -42,3 +42,7 @@ CREATE POLICY "Admins can read all users"
 -- IMPORTANT: Also ensure the users table allows nulls and has proper defaults
 -- This is a safety check - if the table structure is wrong, this will fail gracefully
 
+
+
+
+

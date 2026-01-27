@@ -41,3 +41,7 @@ export function AthleteCard({ athlete }: AthleteCardProps) {
   );
 }
 
+
+
+
+

@@ -30,3 +30,7 @@ CREATE POLICY "authenticated_users_update_own"
 -- For admins reading all users, we'll use a service role check later if needed
 -- For now, the above policies should allow basic operations
 
+
+
+
+

@@ -45,3 +45,7 @@ USING (
 
 -- Public read access is already covered by the existing "Public read access for athlete photos" policy
 
+
+
+
+

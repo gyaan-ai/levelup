@@ -37,7 +37,8 @@ export interface Athlete {
 
 // Session types
 export type SessionType = '1-on-1' | '2-athlete' | 'group';
-export type SessionStatus = 'scheduled' | 'completed' | 'cancelled' | 'no-show';
+export type SessionStatus = 'scheduled' | 'completed' | 'cancelled' | 'no-show' | 'pending_payment';
+export type SessionMode = 'private' | 'sibling' | 'partner-invite' | 'partner-open';
 
 export interface Session {
   id: string;
@@ -46,6 +47,12 @@ export interface Session {
   facility_id: string;
   youth_wrestler_id?: string;
   session_type: SessionType;
+  session_mode?: SessionMode;
+  partner_invite_code?: string;
+  max_participants?: number;
+  current_participants?: number;
+  base_price?: number;
+  price_per_participant?: number;
   scheduled_datetime: string;
   duration_minutes: number;
   total_price: number;
@@ -58,6 +65,38 @@ export interface Session {
   athlete_payout_date?: string;
   created_at: string;
   completed_at?: string;
+}
+
+export interface SessionParticipant {
+  id: string;
+  session_id: string;
+  youth_wrestler_id: string;
+  parent_id: string;
+  paid: boolean;
+  amount_paid?: number;
+  created_at?: string;
+}
+
+export interface SessionJoinRequest {
+  id: string;
+  session_id: string;
+  requesting_parent_id: string;
+  youth_wrestler_id: string;
+  message?: string;
+  status: 'pending' | 'approved' | 'declined';
+  created_at: string;
+  responded_at?: string;
+}
+
+export interface Notification {
+  id: string;
+  user_id: string;
+  type: string;
+  title: string;
+  body?: string;
+  data?: Record<string, unknown>;
+  read_at?: string;
+  created_at: string;
 }
 
 // Facility types

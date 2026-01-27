@@ -9,3 +9,7 @@ ALTER TABLE public.users
 ADD CONSTRAINT users_role_check 
 CHECK (role IN ('parent', 'athlete', 'admin', 'youth_wrestler'));
 
+
+
+
+

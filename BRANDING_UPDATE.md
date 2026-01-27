@@ -54,3 +54,7 @@ You can now use these colors in your components:
 
 The colors are now live and will be applied throughout the application via the theme provider.
 
+
+
+
+

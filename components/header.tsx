@@ -48,6 +48,12 @@ export function Header() {
                   <Link href="/browse">
                     <Button variant="ghost">Browse</Button>
                   </Link>
+                  <Link href="/partner-sessions">
+                    <Button variant="ghost">Partner Sessions</Button>
+                  </Link>
+                  <Link href="/notifications">
+                    <Button variant="ghost">Notifications</Button>
+                  </Link>
                 </>
               )}
               {userRole === 'athlete' && (

@@ -79,3 +79,7 @@ The app will be available at `http://localhost:3000`
 ✅ Project builds successfully
 ⚠️ Some ESLint warnings about `<img>` tags (can be fixed later with Next.js Image component)
 
+
+
+
+

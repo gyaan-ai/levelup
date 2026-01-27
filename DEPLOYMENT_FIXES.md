@@ -49,3 +49,7 @@ Replace `/public/favicon.ico` with an actual favicon file.
 3. Check browser console for any remaining errors
 4. Verify user role is loaded correctly in header
 
+
+
+
+

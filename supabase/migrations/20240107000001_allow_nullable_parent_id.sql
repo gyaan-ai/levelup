@@ -46,3 +46,7 @@ CREATE POLICY "Parents can delete own youth wrestlers"
     (id = auth.uid() AND EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND role = 'youth_wrestler'))
   );
 
+
+
+
+

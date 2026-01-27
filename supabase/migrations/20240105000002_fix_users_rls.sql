@@ -29,3 +29,7 @@ CREATE POLICY "Users can update own record"
   ON public.users FOR UPDATE
   USING (auth.uid() = id);
 
+
+
+
+
