@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -26,7 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus, X, Upload } from 'lucide-react';
+import { Plus, X, Upload, Globe, Lock } from 'lucide-react';
 
 const onboardingSchema = z.object({
   weightClass: z.string().optional(),
@@ -48,9 +48,11 @@ export default function OnboardingPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string>('');
   const [facilities, setFacilities] = useState<Array<{ id: string; name: string; school: string }>>([]);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const visibilityModalRef = useRef<HTMLDialogElement>(null);
 
   const form = useForm<OnboardingFormValues>({
     resolver: zodResolver(onboardingSchema),
@@ -129,14 +131,14 @@ export default function OnboardingPage() {
     }
   };
 
-  const onSubmit = async (values: OnboardingFormValues) => {
+  const doSave = async (makePublic: boolean) => {
     setSubmitting(true);
     setError(null);
 
     try {
+      const values = form.getValues();
       let photoUrl = photoPreview;
 
-      // Upload photo if new file selected
       if (photoFile) {
         const formData = new FormData();
         formData.append('file', photoFile);
@@ -155,7 +157,6 @@ export default function OnboardingPage() {
         photoUrl = uploadData.photoUrl;
       }
 
-      // Convert credentials array to object
       const credentialsObj: Record<string, string> = {};
       (values.credentials || []).forEach((cred) => {
         if (cred.title) {
@@ -163,18 +164,16 @@ export default function OnboardingPage() {
         }
       });
 
-      // Update profile
       const response = await fetch('/api/athletes/profile', {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           weightClass: values.weightClass,
           bio: values.bio,
           credentials: credentialsObj,
           photoUrl,
           facilityId: values.facilityId,
+          active: makePublic,
         }),
       });
 
@@ -184,41 +183,44 @@ export default function OnboardingPage() {
         throw new Error(data.error || 'Failed to update profile');
       }
 
-      // Verify the save worked by checking the response
       if (!data.success) {
         throw new Error('Profile save did not confirm success');
       }
 
-      // Wait a moment for database to commit, then verify
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise((r) => setTimeout(r, 500));
 
-      // Verify the data was actually saved by fetching it back
-      const verifyResponse = await fetch('/api/athletes/profile?' + Date.now(), {
-        cache: 'no-store',
-      });
+      const verifyResponse = await fetch('/api/athletes/profile?' + Date.now(), { cache: 'no-store' });
       const verifyData = await verifyResponse.json();
-      
+
       if (!verifyData.athlete) {
         throw new Error('Profile was not found after saving. Please try again.');
       }
 
-      // Check if bio was saved (required field)
       if (values.bio && !verifyData.athlete.bio) {
         throw new Error('Bio was not saved. Please try again.');
       }
 
-      // Show success message
+      visibilityModalRef.current?.close();
       setSuccess(true);
       setSubmitting(false);
 
-      // Redirect after showing success message
-      setTimeout(() => {
-        window.location.href = '/athlete-dashboard';
-      }, 2000);
+      if (makePublic) {
+        setSuccessMessage('Your profile is live. Start accepting bookings. Redirecting...');
+        setTimeout(() => {
+          window.location.href = '/athlete-dashboard';
+        }, 2000);
+      } else {
+        setSuccessMessage('Profile saved. It stays private—you can keep editing.');
+      }
     } catch (err: any) {
       setError(err.message || 'An unexpected error occurred');
       setSubmitting(false);
     }
+  };
+
+  const onSubmit = () => {
+    setError(null);
+    visibilityModalRef.current?.showModal();
   };
 
   if (loading) {
@@ -250,9 +252,7 @@ export default function OnboardingPage() {
           {success && (
             <div className="mb-4 p-4 bg-accent/10 border-2 border-accent rounded-md text-center">
               <p className="text-lg font-semibold text-primary font-serif mb-1">Welcome to The Guild!</p>
-              <p className="text-sm text-muted-foreground">
-                Your profile is live. Start accepting bookings. Redirecting...
-              </p>
+              <p className="text-sm text-muted-foreground">{successMessage}</p>
             </div>
           )}
 
@@ -416,31 +416,29 @@ export default function OnboardingPage() {
                   type="button"
                   variant="outline"
                   onClick={async () => {
-                    // Save minimal profile (just bio if provided) then redirect
-                    if (form.getValues('bio')?.trim()) {
-                      try {
-                        const response = await fetch('/api/athletes/profile', {
-                          method: 'PUT',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                            bio: form.getValues('bio'),
-                            weightClass: form.getValues('weightClass'),
-                            credentials: {},
-                            photoUrl: photoPreview,
-                            facilityId: form.getValues('facilityId'),
-                          }),
-                        });
-                        if (response.ok) {
-                          window.location.href = '/athlete-dashboard';
-                        } else {
-                          window.location.href = '/athlete-dashboard';
-                        }
-                      } catch {
-                        window.location.href = '/athlete-dashboard';
-                      }
-                    } else {
-                      window.location.href = '/athlete-dashboard';
+                    setSubmitting(true);
+                    try {
+                      const vals = form.getValues();
+                      const credentialsObj: Record<string, string> = {};
+                      (vals.credentials || []).forEach((c) => {
+                        if (c.title) credentialsObj[c.title] = c.description || '';
+                      });
+                      await fetch('/api/athletes/profile', {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          bio: vals.bio || '',
+                          weightClass: vals.weightClass || '',
+                          credentials: credentialsObj,
+                          photoUrl: photoPreview || null,
+                          facilityId: vals.facilityId || null,
+                          active: false,
+                        }),
+                      });
+                    } catch {
+                      /* ignore */
                     }
+                    window.location.href = '/athlete-dashboard';
                   }}
                   disabled={submitting}
                 >
@@ -451,6 +449,42 @@ export default function OnboardingPage() {
           </Form>
         </CardContent>
       </Card>
+
+      <dialog
+        ref={visibilityModalRef}
+        className="rounded-lg border bg-background p-6 shadow-lg max-w-md w-[calc(100%-2rem)]"
+      >
+        <h3 className="font-semibold text-lg mb-2">Save profile</h3>
+        <p className="text-muted-foreground text-sm mb-4">
+          Would you like to make your profile public and ready for bookings, or keep it private to continue editing?
+        </p>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Button
+            type="button"
+            className="flex-1"
+            onClick={() => doSave(true)}
+            disabled={submitting}
+          >
+            <Globe className="h-4 w-4 mr-2" />
+            Make Public
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="flex-1"
+            onClick={() => doSave(false)}
+            disabled={submitting}
+          >
+            <Lock className="h-4 w-4 mr-2" />
+            Keep Private
+          </Button>
+        </div>
+        <form method="dialog" className="mt-3">
+          <Button type="submit" variant="ghost" size="sm">
+            Cancel
+          </Button>
+        </form>
+      </dialog>
     </div>
   );
 }

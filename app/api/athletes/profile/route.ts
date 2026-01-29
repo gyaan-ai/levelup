@@ -69,7 +69,7 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { weightClass, bio, credentials, photoUrl, facilityId } = body;
+    const { weightClass, bio, credentials, photoUrl, facilityId, active } = body;
 
     // Check if user is an athlete
     const { data: userData } = await supabase
@@ -115,6 +115,8 @@ export async function PUT(req: NextRequest) {
       credentials: credentials || {},
       photo_url: photoUrl || null,
       facility_id: facilityId || null,
+      // Public (active) = visible in browse & bookable; Private = hidden, keep editing
+      active: active === true,
     };
 
     // ALWAYS try UPDATE first (record should exist from signup)
@@ -208,8 +210,6 @@ export async function PUT(req: NextRequest) {
     }
 
     // INSERT succeeded
-    return NextResponse.json({ success: true });
-
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error updating athlete profile:', error);

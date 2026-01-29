@@ -46,14 +46,12 @@ export default async function BrowsePage() {
     }
   }
 
-  // Fetch active, verified athletes with photos
+  // Fetch active athletes (profile complete). Photo and certifications optional for now.
   const { data: athletes, error } = await supabase
     .from('athletes')
     .select('*')
     .eq('active', true)
-    .eq('certifications_verified', true)
-    .not('photo_url', 'is', null)
-    .order('average_rating', { ascending: false, nullsFirst: false })
+    .order('average_rating', { ascending: false, nullsFirst: true })
     .order('school', { ascending: true });
 
   if (error) {

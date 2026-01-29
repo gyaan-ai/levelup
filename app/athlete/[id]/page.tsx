@@ -92,7 +92,7 @@ export default async function AthleteProfilePage({
     : [];
 
   const schoolColor = SCHOOL_COLORS[athlete.school] || { bg: 'bg-gray-500', text: 'text-white' };
-  const rating = athlete.average_rating > 0 ? athlete.average_rating.toFixed(1) : 'New';
+  const rating = (athlete.average_rating ?? 0) > 0 ? (athlete.average_rating ?? 0).toFixed(1) : 'New';
   const facility = athlete.facilities as any;
 
   return (

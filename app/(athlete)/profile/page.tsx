@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -26,7 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus, X, ArrowLeft } from 'lucide-react';
+import { Plus, X, ArrowLeft, Globe, Lock } from 'lucide-react';
 import Link from 'next/link';
 
 const profileSchema = z.object({
@@ -48,9 +48,12 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState<string | null>(null);
   const [facilities, setFacilities] = useState<Array<{ id: string; name: string; school: string }>>([]);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [isPublic, setIsPublic] = useState(true);
+  const visibilityModalRef = useRef<HTMLDialogElement>(null);
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -89,6 +92,8 @@ export default function ProfilePage() {
           if (data.athlete.photo_url) {
             setPhotoPreview(data.athlete.photo_url);
           }
+
+          setIsPublic(data.athlete.active === true);
         }
 
         setFacilities(data.facilities || []);
@@ -116,14 +121,15 @@ export default function ProfilePage() {
     }
   };
 
-  const onSubmit = async (values: ProfileFormValues) => {
+  const doSave = async (makePublic: boolean) => {
     setSubmitting(true);
     setError(null);
+    setSaveSuccess(null);
 
     try {
+      const values = form.getValues();
       let photoUrl = photoPreview;
 
-      // Upload photo if new file selected
       if (photoFile) {
         const formData = new FormData();
         formData.append('file', photoFile);
@@ -142,7 +148,6 @@ export default function ProfilePage() {
         photoUrl = uploadData.photoUrl;
       }
 
-      // Convert credentials array to object
       const credentialsObj: Record<string, string> = {};
       (values.credentials || []).forEach((cred) => {
         if (cred.title) {
@@ -150,18 +155,16 @@ export default function ProfilePage() {
         }
       });
 
-      // Update profile
       const response = await fetch('/api/athletes/profile', {
         method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           weightClass: values.weightClass,
           bio: values.bio,
           credentials: credentialsObj,
           photoUrl,
           facilityId: values.facilityId,
+          active: makePublic,
         }),
       });
 
@@ -171,13 +174,27 @@ export default function ProfilePage() {
         throw new Error(data.error || 'Failed to update profile');
       }
 
-      // Redirect to dashboard
-      router.push('/athlete-dashboard');
-      router.refresh();
+      visibilityModalRef.current?.close();
+
+      if (makePublic) {
+        setIsPublic(true);
+        router.push('/athlete-dashboard');
+        router.refresh();
+      } else {
+        setIsPublic(false);
+        setSaveSuccess('Profile saved. It stays private—you can keep editing.');
+        setSubmitting(false);
+      }
     } catch (err: any) {
       setError(err.message || 'An unexpected error occurred');
       setSubmitting(false);
     }
+  };
+
+  const onSubmit = () => {
+    setError(null);
+    setSaveSuccess(null);
+    visibilityModalRef.current?.showModal();
   };
 
   if (loading) {
@@ -192,7 +209,7 @@ export default function ProfilePage() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-2xl">
-      <Link href="/dashboard" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-6">
+      <Link href="/athlete-dashboard" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-6">
         <ArrowLeft className="h-4 w-4 mr-2" />
         Back to Dashboard
       </Link>
@@ -208,6 +225,12 @@ export default function ProfilePage() {
           {error && (
             <div className="mb-4 p-3 bg-destructive/10 border border-destructive rounded-md">
               <p className="text-sm text-destructive">{error}</p>
+            </div>
+          )}
+
+          {saveSuccess && (
+            <div className="mb-4 p-3 bg-accent/10 border border-accent rounded-md">
+              <p className="text-sm text-foreground">{saveSuccess}</p>
             </div>
           )}
 
@@ -281,6 +304,60 @@ export default function ProfilePage() {
                   </FormItem>
                 )}
               />
+
+              {/* Profile visibility: Public (bookable) vs Private (hidden, keep editing) */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium leading-none">Profile visibility</label>
+                <p className="text-sm text-muted-foreground mb-2">
+                  Public profiles appear in Browse and can receive bookings. Private profiles are hidden while you edit.
+                </p>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant={isPublic ? 'default' : 'outline'}
+                    size="sm"
+                    className="flex-1"
+                    onClick={async () => {
+                      if (isPublic) return;
+                      try {
+                        const r = await fetch('/api/athletes/profile/visibility', {
+                          method: 'PUT',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ active: true }),
+                        });
+                        if (r.ok) setIsPublic(true);
+                      } catch {
+                        setError('Failed to update visibility');
+                      }
+                    }}
+                  >
+                    <Globe className="h-4 w-4 mr-1.5" />
+                    Public
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={!isPublic ? 'default' : 'outline'}
+                    size="sm"
+                    className="flex-1"
+                    onClick={async () => {
+                      if (!isPublic) return;
+                      try {
+                        const r = await fetch('/api/athletes/profile/visibility', {
+                          method: 'PUT',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ active: false }),
+                        });
+                        if (r.ok) setIsPublic(false);
+                      } catch {
+                        setError('Failed to update visibility');
+                      }
+                    }}
+                  >
+                    <Lock className="h-4 w-4 mr-1.5" />
+                    Private
+                  </Button>
+                </div>
+              </div>
 
               {/* Facility Selection */}
               {facilities.length > 0 && (
@@ -370,7 +447,7 @@ export default function ProfilePage() {
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => router.push('/dashboard')}
+                  onClick={() => router.push('/athlete-dashboard')}
                   disabled={submitting}
                 >
                   Cancel
@@ -380,6 +457,42 @@ export default function ProfilePage() {
           </Form>
         </CardContent>
       </Card>
+
+      <dialog
+        ref={visibilityModalRef}
+        className="rounded-lg border bg-background p-6 shadow-lg max-w-md w-[calc(100%-2rem)]"
+      >
+        <h3 className="font-semibold text-lg mb-2">Save profile</h3>
+        <p className="text-muted-foreground text-sm mb-4">
+          Would you like to make your profile public and ready for bookings, or keep it private to continue editing?
+        </p>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Button
+            type="button"
+            className="flex-1"
+            onClick={() => doSave(true)}
+            disabled={submitting}
+          >
+            <Globe className="h-4 w-4 mr-2" />
+            Make Public
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            className="flex-1"
+            onClick={() => doSave(false)}
+            disabled={submitting}
+          >
+            <Lock className="h-4 w-4 mr-2" />
+            Keep Private
+          </Button>
+        </div>
+        <form method="dialog" className="mt-3">
+          <Button type="submit" variant="ghost" size="sm">
+            Cancel
+          </Button>
+        </form>
+      </dialog>
     </div>
   );
 }
