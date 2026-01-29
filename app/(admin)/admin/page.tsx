@@ -56,8 +56,10 @@ export default async function AdminPage() {
     redirect('/');
   }
 
+  const admin = createAdminClient(tenant.slug);
+
   const [sessionsRes, usersRes] = await Promise.all([
-    supabase
+    admin
       .from('sessions')
       .select(`
         id,
@@ -74,7 +76,7 @@ export default async function AdminPage() {
         facilities(id, name)
       `)
       .order('scheduled_datetime', { ascending: false }),
-    supabase
+    admin
       .from('users')
       .select('id, email, role, created_at, last_login_at')
       .order('created_at', { ascending: false }),
