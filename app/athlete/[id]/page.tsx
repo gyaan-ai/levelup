@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { ArrowLeft, Star, User, MapPin, Award, Shield, CheckCircle } from 'lucide-react';
 import { SchoolLogo } from '@/components/school-logo';
-import { CrewCoachBadge } from '@/components/crew-coach-badge';
+import { EliteWrestlerBadge } from '@/components/elite-wrestler-badge';
 
 const SCHOOL_COLORS: Record<string, { bg: string; text: string }> = {
   'UNC': { bg: 'bg-blue-600', text: 'text-white' },
@@ -130,9 +130,8 @@ export default async function AthleteProfilePage({
                 {athlete.first_name} {athlete.last_name}
               </h1>
               
-              {/* Crew Coach Badge + School + Year + Weight */}
               <div className="flex items-center gap-3 mb-3 flex-wrap">
-                <CrewCoachBadge size="lg" />
+                <EliteWrestlerBadge size="lg" />
                 <SchoolLogo school={athlete.school} size="md" />
                 <Badge className={`${schoolColor.bg} ${schoolColor.text}`}>
                   {athlete.school}
@@ -190,9 +189,10 @@ export default async function AthleteProfilePage({
               <Link href={`/book/${athlete.id}`}>
                 <Button
                   size="lg"
-                  className="w-full md:w-auto bg-primary text-white hover:bg-primary/90"
+                  variant="premium"
+                  className="w-full md:w-auto"
                 >
-                  Train with This Coach →
+                  Book a Session with {athlete.first_name} →
                 </Button>
               </Link>
             </div>
@@ -204,7 +204,7 @@ export default async function AthleteProfilePage({
       {athlete.bio && (
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle>About This Coach</CardTitle>
+            <CardTitle>About This Wrestler</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground whitespace-pre-wrap leading-relaxed">
@@ -217,7 +217,7 @@ export default async function AthleteProfilePage({
       {/* Credentials Section */}
       <Card className="mb-6">
         <CardHeader>
-            <CardTitle>Coach&apos;s Credentials</CardTitle>
+            <CardTitle>Wrestling Credentials</CardTitle>
         </CardHeader>
         <CardContent>
           {credentialsList.length > 0 ? (

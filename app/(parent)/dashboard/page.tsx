@@ -84,9 +84,9 @@ export default async function ParentDashboard() {
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold mb-2 text-primary">Your Wrestlers</h1>
+          <h1 className="text-3xl font-serif font-bold mb-2 text-primary">Your Wrestlers</h1>
           <p className="text-muted-foreground">
-            Manage profiles and book sessions with Crew Coaches
+            Manage profiles and book sessions with elite wrestlers
           </p>
         </div>
         {youthWrestlers && youthWrestlers.length > 0 && (
@@ -231,7 +231,7 @@ export default async function ParentDashboard() {
                     <Button variant="outline">View bookings</Button>
                   </Link>
                   <Link href="/browse">
-                    <Button>Find a Crew Coach</Button>
+                    <Button variant="premium">Find an Elite Wrestler</Button>
                   </Link>
                 </div>
               </CardContent>
@@ -244,7 +244,7 @@ export default async function ParentDashboard() {
             <User className="h-16 w-16 text-muted-foreground mb-4" />
             <h3 className="text-xl font-semibold mb-2">Add Your First Wrestler</h3>
             <p className="text-muted-foreground mb-6 text-center max-w-md">
-              Create a profile for your youth wrestler to start training with our Crew Coaches.
+              Create a profile for your youth wrestler to start training with elite D1 wrestlers.
             </p>
             <Link href="/wrestlers/add">
               <Button size="lg">

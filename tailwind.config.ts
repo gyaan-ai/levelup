@@ -19,24 +19,24 @@ const config = {
     },
     extend: {
       colors: {
-        crew: {
-          charcoal: "#36454F",
-          orange: "#FF6600",
-          "orange-dark": "#CC5200",
-          "orange-light": "#FF9933",
+        guild: {
+          black: "#000000",
+          gold: "#D4AF37",
+          "gold-dark": "#B8941F",
+          "gold-light": "#F4E5C2",
         },
         primary: {
-          DEFAULT: "#36454F",
+          DEFAULT: "#000000",
           foreground: "#FFFFFF",
         },
         accent: {
-          DEFAULT: "#FF6600",
-          foreground: "#FFFFFF",
-          hover: "#CC5200",
-          light: "#FF9933",
+          DEFAULT: "#D4AF37",
+          foreground: "#000000",
+          hover: "#B8941F",
+          light: "#F4E5C2",
         },
-        "accent-hover": "#CC5200",
-        "accent-light": "#FF9933",
+        "accent-hover": "#B8941F",
+        "accent-light": "#F4E5C2",
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
@@ -63,10 +63,6 @@ const config = {
           foreground: "hsl(var(--card-foreground))",
         },
       },
-      backgroundImage: {
-        "caution-stripes":
-          "repeating-linear-gradient(45deg, #FF6600, #FF6600 10px, #36454F 10px, #36454F 20px)",
-      },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
@@ -74,6 +70,7 @@ const config = {
       },
       fontFamily: {
         sans: ["Inter", "system-ui", "sans-serif"],
+        serif: ["var(--font-playfair)", "Playfair Display", "Georgia", "serif"],
       },
       keyframes: {
         "accordion-down": {
@@ -84,13 +81,17 @@ const config = {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
+        shimmer: {
+          to: { backgroundPosition: "200% center" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        shimmer: "shimmer 3s linear infinite",
       },
       boxShadow: {
-        "accent/50": "0 0 20px rgba(255, 102, 0, 0.5)",
+        "accent/50": "0 0 20px rgba(212, 175, 55, 0.5)",
       },
     },
   },

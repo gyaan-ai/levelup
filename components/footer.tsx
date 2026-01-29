@@ -8,30 +8,32 @@ export function Footer() {
   const tenant = useTenant();
 
   return (
-    <footer className="bg-primary text-white py-12 mt-auto">
+    <footer className="bg-primary text-white py-12 mt-auto border-t border-accent/20">
       <div className="container mx-auto px-4">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
           <div className="md:col-span-1">
             <div className="mb-4">
-            <h3 className="text-3xl font-bold">THE CREW</h3>
-            <div className="h-1 w-16 bg-accent mt-2" />
+              <h3 className="text-3xl font-serif font-bold text-accent">
+                THE GUILD
+              </h3>
+              <div className="h-1 w-16 bg-accent mt-2" />
             </div>
             <p className="text-white/80 text-sm mb-2">
-              NC United Wrestling presents The Crew
+              Elite wrestling technique instruction
             </p>
-            <p className="text-white/60 text-sm">
-              {tenant.tagline}
-            </p>
+            <p className="text-white/60 text-sm">{tenant.tagline}</p>
           </div>
           <div>
-            <h4 className="font-semibold text-lg mb-4">For Parents</h4>
+            <h4 className="font-semibold text-lg mb-4 text-accent">
+              For Parents
+            </h4>
             <ul className="space-y-2 text-sm">
               <li>
                 <Link
                   href="/browse"
                   className="text-white/80 hover:text-accent transition-colors"
                 >
-                  Browse Crew Coaches
+                  Browse Wrestlers
                 </Link>
               </li>
               <li>
@@ -61,14 +63,16 @@ export function Footer() {
             </ul>
           </div>
           <div>
-            <h4 className="font-semibold text-lg mb-4">For Athletes</h4>
+            <h4 className="font-semibold text-lg mb-4 text-accent">
+              For D1 Wrestlers
+            </h4>
             <ul className="space-y-2 text-sm">
               <li>
                 <Link
                   href="/signup"
                   className="text-white/80 hover:text-accent transition-colors"
                 >
-                  Become a Crew Coach
+                  Join The Guild
                 </Link>
               </li>
               <li>
@@ -90,14 +94,14 @@ export function Footer() {
             </ul>
           </div>
           <div>
-            <h4 className="font-semibold text-lg mb-4">Company</h4>
+            <h4 className="font-semibold text-lg mb-4 text-accent">Company</h4>
             <ul className="space-y-2 text-sm mb-6">
               <li>
                 <Link
                   href="/about"
                   className="text-white/80 hover:text-accent transition-colors"
                 >
-                  About The Crew
+                  About The Guild
                 </Link>
               </li>
               <li>
@@ -113,7 +117,7 @@ export function Footer() {
                   href="/privacy"
                   className="text-white/80 hover:text-accent transition-colors"
                 >
-                  Privacy Policy
+                  Privacy
                 </Link>
               </li>
               <li>
@@ -121,22 +125,21 @@ export function Footer() {
                   href="/terms"
                   className="text-white/80 hover:text-accent transition-colors"
                 >
-                  Terms of Service
+                  Terms
                 </Link>
               </li>
             </ul>
             <div className="text-sm">
               <p className="text-white/80 mb-1">{tenant.supportEmail}</p>
               <p className="text-white/80 mb-1">{tenant.phone}</p>
-              <p className="text-white/60">Raleigh, North Carolina</p>
             </div>
           </div>
         </div>
         <div className="border-t border-white/10 pt-8">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <p className="text-sm text-white/60">
-              © {new Date().getFullYear()} The Crew by NC United Wrestling. All
-              rights reserved.
+              © {new Date().getFullYear()} The Guild. Operated by NC United
+              Wrestling.
             </p>
             <div className="flex gap-4">
               <a

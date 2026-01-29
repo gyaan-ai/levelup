@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/select';
 import { ArrowLeft, Star, User } from 'lucide-react';
 import { SchoolLogo } from '@/components/school-logo';
-import { CrewCoachBadge } from '@/components/crew-coach-badge';
+import { EliteWrestlerBadge } from '@/components/elite-wrestler-badge';
 import { Athlete } from '@/types';
 
 interface BrowseAthletesClientProps {
@@ -77,9 +77,9 @@ export function BrowseAthletesClient({ initialAthletes }: BrowseAthletesClientPr
       </Link>
 
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2 text-primary">Browse Crew Coaches</h1>
+        <h1 className="text-3xl font-serif font-bold mb-2 text-primary">Browse Elite Wrestlers</h1>
         <p className="text-muted-foreground">
-          Find your coach and start putting in the work
+          Find the perfect D1 wrestler to refine your technique
         </p>
       </div>
 
@@ -223,7 +223,7 @@ export function BrowseAthletesClient({ initialAthletes }: BrowseAthletesClientPr
                           {athlete.first_name} {athlete.last_name}
                         </h3>
                         <div className="flex items-center gap-2 mt-1 flex-wrap">
-                          <CrewCoachBadge size="sm" />
+                          <EliteWrestlerBadge size="sm" />
                           <SchoolLogo school={athlete.school} size="sm" />
                           <Badge
                             className={`${schoolColors.bg} ${schoolColors.text} text-xs`}
@@ -252,7 +252,7 @@ export function BrowseAthletesClient({ initialAthletes }: BrowseAthletesClientPr
                     </div>
 
                     <Button className="w-full" variant="outline">
-                      View Coach Profile
+                      View Profile
                     </Button>
                   </CardContent>
                 </Card>

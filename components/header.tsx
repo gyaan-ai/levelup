@@ -32,8 +32,8 @@ export function Header() {
             )}
             <div className="h-8 w-px bg-white/20" />
             <Link href="/" className="flex items-center group">
-              <span className="text-2xl font-bold text-white group-hover:text-accent transition-colors">
-                THE CREW
+              <span className="text-2xl font-serif font-bold text-accent group-hover:text-accent-light transition-colors tracking-wide">
+                THE GUILD
               </span>
             </Link>
           </div>
@@ -54,7 +54,7 @@ export function Header() {
                     href="/browse"
                     className="text-white hover:text-accent transition-colors font-medium"
                   >
-                    Browse Coaches
+                    Browse Wrestlers
                   </Link>
                   <Link
                     href="/bookings"
@@ -118,7 +118,7 @@ export function Header() {
                 href="/browse"
                 className="text-white hover:text-accent transition-colors font-medium"
               >
-                Browse Masters
+                Browse Wrestlers
               </Link>
               <Link
                 href="/how-it-works"
@@ -132,8 +132,8 @@ export function Header() {
               >
                 Login
               </Link>
-              <Button asChild size="default">
-                <Link href="/signup">Join The Crew</Link>
+              <Button asChild variant="premium" size="default">
+                <Link href="/signup">Book a Lesson</Link>
               </Button>
             </nav>
           )}

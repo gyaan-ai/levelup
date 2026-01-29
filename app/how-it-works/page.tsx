@@ -1,9 +1,9 @@
 import { redirect } from 'next/navigation';
 
 export const metadata = {
-  title: 'How It Works | The Crew Wrestling',
+  title: 'How It Works | The Guild',
   description:
-    'Three simple steps: Find Your Coach, Book Your Session, Put in the Work. Learn how The Crew works.',
+    'Three steps to elite technique mastery: Browse Elite Wrestlers, Book Private Sessions, Master Your Technique.',
 };
 
 export default function HowItWorksPage() {

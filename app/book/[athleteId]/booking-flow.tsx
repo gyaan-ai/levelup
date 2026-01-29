@@ -10,7 +10,7 @@ import { Calendar } from '@/components/ui/calendar';
 import Link from 'next/link';
 import { ArrowLeft, User, Clock, CheckCircle, Link2, Users, UserCircle } from 'lucide-react';
 import { SchoolLogo } from '@/components/school-logo';
-import { CrewCoachBadge } from '@/components/crew-coach-badge';
+import { EliteWrestlerBadge } from '@/components/elite-wrestler-badge';
 import { format, startOfDay } from 'date-fns';
 import { YouthWrestler } from '@/types';
 import type { SessionMode } from '@/types';
@@ -513,7 +513,7 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing }
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">Coach</p>
+                  <p className="text-sm font-medium text-muted-foreground">Wrestler</p>
                   <div className="flex items-center gap-3 mt-1">
                     {athlete.photo_url ? (
                       <img src={athlete.photo_url} alt="" className="w-12 h-12 rounded-full object-cover" />
@@ -523,7 +523,7 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing }
                       </div>
                     )}
                     <span className="font-medium flex items-center gap-2">
-                      <CrewCoachBadge size="sm" />
+                      <EliteWrestlerBadge size="sm" />
                       {athlete.first_name} {athlete.last_name}
                     </span>
                     <span className="text-muted-foreground flex items-center gap-1">
@@ -598,7 +598,7 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing }
                 )}
                 <div>
                   <p className="font-medium flex items-center gap-2">
-                    <CrewCoachBadge size="sm" />
+                    <EliteWrestlerBadge size="sm" />
                     {athlete.first_name} {athlete.last_name}
                   </p>
                   <p className="text-sm text-muted-foreground flex items-center gap-1">

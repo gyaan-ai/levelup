@@ -1,4 +1,5 @@
 import { headers } from 'next/headers';
+import { Playfair_Display } from 'next/font/google';
 import { getTenantByDomain } from '@/config/tenants';
 import { ThemeProvider } from '@/components/theme-provider';
 import { AuthProvider } from '@/lib/auth/auth-provider';
@@ -6,12 +7,19 @@ import { Header } from '@/components/header';
 import { Footer } from '@/components/footer';
 import './globals.css';
 
+const playfair = Playfair_Display({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-playfair',
+  display: 'swap',
+});
+
 export const metadata = {
-  title: 'The Crew | Outwork Everyone',
+  title: 'The Guild | Elite Wrestling Technique Instruction',
   description:
-    'Train with D1 college wrestlers from UNC and NC State. Private wrestling lessons in Raleigh, NC. No shortcuts. Just real work.',
+    'Train with D1 NCAA wrestlers for private technique instruction. Master your wrestling through elite-level coaching.',
   keywords:
-    'the crew wrestling, wrestling lessons Raleigh, private wrestling coach, D1 coaches, youth wrestling NC',
+    'the guild wrestling, wrestling lessons, D1 NCAA wrestlers, elite technique, private lessons',
   icons: {
     icon: '/favicon.ico',
   },
@@ -28,8 +36,8 @@ export default async function RootLayout({
   
   if (!tenant) {
     return (
-      <html lang="en">
-        <body>
+      <html lang="en" className={playfair.variable}>
+        <body className="font-sans">
           <div className="flex items-center justify-center min-h-screen">
             <div className="text-center">
               <h1 className="text-2xl font-bold">Tenant not found</h1>
@@ -42,8 +50,8 @@ export default async function RootLayout({
   }
   
   return (
-    <html lang="en">
-      <body className="flex flex-col min-h-screen">
+    <html lang="en" className={playfair.variable}>
+      <body className="flex flex-col min-h-screen font-sans">
         <ThemeProvider tenant={tenant}>
           <AuthProvider tenantSlug={tenant.slug}>
             <Header />

@@ -16,10 +16,10 @@ export function ThemeProvider({
     <ThemeContext.Provider value={tenant}>
       <div
         style={{
-          '--crew-charcoal': tenant.brandColors.primary,
-          '--crew-orange': tenant.brandColors.accent,
-          '--crew-orange-dark': tenant.brandColors.accentHover,
-          '--crew-orange-light': tenant.brandColors.accentLight,
+          '--guild-black': tenant.brandColors.primary,
+          '--guild-gold': tenant.brandColors.accent,
+          '--guild-gold-dark': tenant.brandColors.accentHover,
+          '--guild-gold-light': tenant.brandColors.accentLight,
           '--primary': tenant.brandColors.primary,
           '--accent': tenant.brandColors.accent,
           '--accent-hover': tenant.brandColors.accentHover,

@@ -1,15 +1,15 @@
-import { Zap } from "lucide-react";
+import { Award } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-interface CrewCoachBadgeProps {
+interface EliteWrestlerBadgeProps {
   className?: string;
   size?: "sm" | "md" | "lg";
 }
 
-export function CrewCoachBadge({
+export function EliteWrestlerBadge({
   className,
   size = "md",
-}: CrewCoachBadgeProps) {
+}: EliteWrestlerBadgeProps) {
   const sizeClasses = {
     sm: "px-2 py-1 text-xs gap-1",
     md: "px-3 py-1.5 text-sm gap-2",
@@ -30,8 +30,8 @@ export function CrewCoachBadge({
         className
       )}
     >
-      <Zap className={cn("text-accent", iconSizes[size])} />
-      <span>Crew Coach</span>
+      <Award className={cn("text-accent", iconSizes[size])} />
+      <span>Elite Wrestler</span>
     </div>
   );
 }

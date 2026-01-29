@@ -114,9 +114,9 @@ export default async function YouthWrestlerProfilePage({
                 {youthWrestler.weight_class && <span>{youthWrestler.weight_class}</span>}
               </div>
               <Link href={`/browse?youthWrestlerId=${id}`}>
-                <Button>
+                <Button variant="premium">
                   <Calendar className="h-4 w-4 mr-2" />
-                  Find a Crew Coach for {youthWrestler.first_name}
+                  Find an Elite Wrestler for {youthWrestler.first_name}
                 </Button>
               </Link>
             </div>
