@@ -8,7 +8,7 @@ import { Athlete } from '@/types';
 export const metadata = {
   title: 'Browse Elite Wrestlers | The Guild',
   description:
-    'Train with current D1 NCAA wrestlers. View profiles, credentials, and reviews. Book private technique sessions.',
+    'Train with NCAA wrestlers in your community. View profiles, credentials, and reviews. Book private technique sessions.',
 };
 
 export default async function BrowsePage() {

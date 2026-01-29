@@ -171,7 +171,7 @@ export default function SignupPage() {
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="parent">Parent</SelectItem>
-                        <SelectItem value="athlete">D1 Wrestler</SelectItem>
+                        <SelectItem value="athlete">NCAA Wrestler</SelectItem>
                         <SelectItem value="youth_wrestler">Youth Wrestler (Student)</SelectItem>
                         <SelectItem value="admin">Admin</SelectItem>
                       </SelectContent>

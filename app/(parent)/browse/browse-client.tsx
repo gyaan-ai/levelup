@@ -79,7 +79,7 @@ export function BrowseAthletesClient({ initialAthletes }: BrowseAthletesClientPr
       <div className="mb-8">
         <h1 className="text-3xl font-serif font-bold mb-2 text-primary">Browse Elite Wrestlers</h1>
         <p className="text-muted-foreground">
-          Find the perfect D1 wrestler to refine your technique
+          Find the perfect NCAA wrestler to refine your technique
         </p>
       </div>
 

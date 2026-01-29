@@ -7,7 +7,7 @@ import { CheckCircle, Users, Award, Shield } from 'lucide-react';
 export const metadata = {
   title: 'The Guild | Elite Wrestling Technique Instruction',
   description:
-    'Train with D1 NCAA wrestlers for private technique instruction. Master your wrestling through elite-level coaching.',
+    'Train with NCAA wrestlers in your community for private technique instruction. Master your wrestling through elite-level coaching.',
 };
 
 export default function HomePage() {
@@ -30,8 +30,8 @@ export default function HomePage() {
                   Mastery. Technique. Access the Elite.
                 </p>
                 <p className="text-lg text-white/80 mb-12 max-w-xl mx-auto lg:mx-0">
-                  Train with D1 NCAA wrestlers for private technique instruction.
-                  Master the details that separate good from elite.
+                  Train with NCAA wrestlers in your community for private technique
+                  instruction. Master the details that separate good from elite.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
                   <Button
@@ -87,8 +87,8 @@ export default function HomePage() {
                 Browse Elite Wrestlers
               </h3>
               <p className="text-muted-foreground">
-                Current D1 NCAA wrestlers from top programs. View credentials,
-                specialties, and reviews.
+                NCAA wrestlers from top programs. View credentials, specialties,
+                and reviews.
               </p>
             </Card>
             <Card className="p-8 text-center border-2 hover:border-accent transition-all">
@@ -135,8 +135,8 @@ export default function HomePage() {
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
             {[
               {
-                title: 'D1 NCAA Wrestlers',
-                text: 'Train with current Division I NCAA wrestlers. Active competitors who bring real experience to every session.',
+                title: 'NCAA Wrestlers',
+                text: 'Train with current NCAA wrestlers. Active competitors who bring real experience to every session.',
               },
               {
                 title: 'Technical Mastery',
@@ -176,27 +176,27 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* For D1 Wrestlers */}
+      {/* For NCAA Wrestlers */}
       <section className="py-20 bg-black text-white">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto text-center">
             <h2 className="text-4xl md:text-5xl font-serif font-bold mb-6">
-              Are You a D1 Wrestler?
+              Are You an NCAA Wrestler?
             </h2>
             <p className="text-2xl text-accent mb-8">
               Share your expertise. Earn while you compete.
             </p>
             <p className="text-xl text-white/90 mb-8">
-              The Guild connects current D1 NCAA wrestlers with youth athletes
-              for private technique instruction. Earn money, build coaching
-              experience, and give back to the wrestling community.
+              The Guild connects NCAA wrestlers with youth athletes for private
+              technique instruction. Earn money, build coaching experience, and
+              give back to the wrestling community.
             </p>
             <div className="bg-white/10 backdrop-blur-sm rounded-lg p-8 mb-10 max-w-2xl mx-auto text-left">
               <h3 className="text-2xl font-semibold mb-6">Requirements:</h3>
               <ul className="space-y-3 text-lg">
                 <li className="flex items-start gap-3">
                   <CheckCircle className="w-6 h-6 text-accent flex-shrink-0 mt-1" />
-                  <span>Current D1 NCAA wrestler</span>
+                  <span>Current NCAA wrestler</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <CheckCircle className="w-6 h-6 text-accent flex-shrink-0 mt-1" />
@@ -209,9 +209,8 @@ export default function HomePage() {
               </ul>
               <div className="mt-8 pt-6 border-t border-white/20">
                 <p className="text-xl">
-                  Earn{' '}
-                  <span className="text-accent font-bold">$50-65 per session</span>{' '}
-                  with flexible scheduling around your training.
+                  Earn while you train. Flexible scheduling around your
+                  competition calendar.
                 </p>
               </div>
             </div>
@@ -229,8 +228,8 @@ export default function HomePage() {
             Ready to Master Your Technique?
           </h2>
           <p className="text-xl text-black/80 mb-10 max-w-2xl mx-auto">
-            Join The Guild and train with elite D1 NCAA wrestlers. Private
-            lessons starting at $60.
+            Join The Guild and train with NCAA wrestlers in your community.
+            Private technique sessions.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button size="xl" variant="black" asChild>

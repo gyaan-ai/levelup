@@ -244,7 +244,7 @@ export default async function ParentDashboard() {
             <User className="h-16 w-16 text-muted-foreground mb-4" />
             <h3 className="text-xl font-semibold mb-2">Add Your First Wrestler</h3>
             <p className="text-muted-foreground mb-6 text-center max-w-md">
-              Create a profile for your youth wrestler to start training with elite D1 wrestlers.
+              Create a profile for your youth wrestler to start training with elite NCAA wrestlers.
             </p>
             <Link href="/wrestlers/add">
               <Button size="lg">
