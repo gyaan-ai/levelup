@@ -1,14 +1,11 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
-import { useTenant } from './theme-provider';
 import { useAuth } from '@/lib/auth/use-auth';
 import { Button } from './ui/button';
 import { Menu } from 'lucide-react';
 
 export function Header() {
-  const tenant = useTenant();
   const { user, userRole, loading, signOut } = useAuth();
 
   const handleSignOut = async () => {
@@ -21,16 +18,6 @@ export function Header() {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center gap-4">
-            {tenant.stateOrgLogo && (
-              <Image
-                src={tenant.stateOrgLogo}
-                alt={tenant.orgName}
-                width={100}
-                height={40}
-                className="h-10 w-auto"
-              />
-            )}
-            <div className="h-8 w-px bg-white/20" />
             <Link href="/" className="flex items-center group">
               <span className="text-2xl font-serif font-bold text-accent group-hover:text-accent-light transition-colors tracking-wide">
                 THE GUILD
