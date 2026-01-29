@@ -1,15 +1,15 @@
-import { Shield } from "lucide-react";
+import { Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-interface GuildMasterBadgeProps {
+interface CrewCoachBadgeProps {
   className?: string;
   size?: "sm" | "md" | "lg";
 }
 
-export function GuildMasterBadge({
+export function CrewCoachBadge({
   className,
   size = "md",
-}: GuildMasterBadgeProps) {
+}: CrewCoachBadgeProps) {
   const sizeClasses = {
     sm: "px-2 py-1 text-xs gap-1",
     md: "px-3 py-1.5 text-sm gap-2",
@@ -30,8 +30,8 @@ export function GuildMasterBadge({
         className
       )}
     >
-      <Shield className={cn("text-accent", iconSizes[size])} />
-      <span>Guild Master</span>
+      <Zap className={cn("text-accent", iconSizes[size])} />
+      <span>Crew Coach</span>
     </div>
   );
 }

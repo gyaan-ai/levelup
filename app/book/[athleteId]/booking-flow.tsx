@@ -10,6 +10,7 @@ import { Calendar } from '@/components/ui/calendar';
 import Link from 'next/link';
 import { ArrowLeft, User, Clock, CheckCircle, Link2, Users, UserCircle } from 'lucide-react';
 import { SchoolLogo } from '@/components/school-logo';
+import { CrewCoachBadge } from '@/components/crew-coach-badge';
 import { format, startOfDay } from 'date-fns';
 import { YouthWrestler } from '@/types';
 import type { SessionMode } from '@/types';
@@ -250,7 +251,7 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing }
           )}
           <div>
             <h1 className="text-2xl font-bold">
-              Book a Session with Guild Master {athlete.first_name} {athlete.last_name}
+              Book a Session with {athlete.first_name} {athlete.last_name}
             </h1>
             <p className="text-muted-foreground flex items-center gap-2">
               <SchoolLogo school={athlete.school} size="sm" />
@@ -521,7 +522,10 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing }
                         <User className="h-6 w-6 text-muted-foreground" />
                       </div>
                     )}
-                    <span className="font-medium">{athlete.first_name} {athlete.last_name}</span>
+                    <span className="font-medium flex items-center gap-2">
+                      <CrewCoachBadge size="sm" />
+                      {athlete.first_name} {athlete.last_name}
+                    </span>
                     <span className="text-muted-foreground flex items-center gap-1">
                       <SchoolLogo school={athlete.school} size="sm" />
                       ({athlete.school})
@@ -593,7 +597,10 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing }
                   </div>
                 )}
                 <div>
-                  <p className="font-medium">{athlete.first_name} {athlete.last_name}</p>
+                  <p className="font-medium flex items-center gap-2">
+                    <CrewCoachBadge size="sm" />
+                    {athlete.first_name} {athlete.last_name}
+                  </p>
                   <p className="text-sm text-muted-foreground flex items-center gap-1">
                     <SchoolLogo school={athlete.school} size="sm" />
                     {athlete.school}

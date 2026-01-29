@@ -33,7 +33,7 @@ export function Header() {
             <div className="h-8 w-px bg-white/20" />
             <Link href="/" className="flex items-center group">
               <span className="text-2xl font-bold text-white group-hover:text-accent transition-colors">
-                THE GUILD
+                THE CREW
               </span>
             </Link>
           </div>
@@ -54,7 +54,7 @@ export function Header() {
                     href="/browse"
                     className="text-white hover:text-accent transition-colors font-medium"
                   >
-                    Browse Masters
+                    Browse Coaches
                   </Link>
                   <Link
                     href="/bookings"
@@ -133,7 +133,7 @@ export function Header() {
                 Login
               </Link>
               <Button asChild size="default">
-                <Link href="/signup">Join The Guild</Link>
+                <Link href="/signup">Join The Crew</Link>
               </Button>
             </nav>
           )}

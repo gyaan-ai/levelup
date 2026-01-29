@@ -6,9 +6,9 @@ import { BrowseAthletesClient } from './browse-client';
 import { Athlete } from '@/types';
 
 export const metadata = {
-  title: 'Browse Guild Masters | The Guild Wrestling',
+  title: 'Browse Crew Coaches | The Crew Wrestling',
   description:
-    'Train with D1 college athletes from UNC and NC State. Browse our Guild Masters and book your session.',
+    'Train with Crew Coaches—D1 college athletes from UNC and NC State. Browse profiles and book private wrestling lessons.',
 };
 
 export default async function BrowsePage() {

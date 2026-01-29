@@ -4,54 +4,54 @@
 
 @layer base {
   :root {
-    --guild-navy: #0a2540;
-    --guild-neon: #39ff14;
-    --guild-neon-dark: #2dd412;
-    --guild-neon-light: #6fff4d;
+    --crew-charcoal: #36454f;
+    --crew-orange: #ff6600;
+    --crew-orange-dark: #cc5200;
+    --crew-orange-light: #ff9933;
 
-    --primary: var(--guild-navy);
-    --accent: var(--guild-neon);
-    --accent-hover: var(--guild-neon-dark);
+    --primary: var(--crew-charcoal);
+    --accent: var(--crew-orange);
+    --accent-hover: var(--crew-orange-dark);
 
     --background: 0 0% 100%;
-    --foreground: 220 30% 8%;
+    --foreground: 220 10% 25%;
     --card: 0 0% 100%;
-    --card-foreground: 220 30% 8%;
+    --card-foreground: 220 10% 25%;
     --popover: 0 0% 100%;
-    --popover-foreground: 220 30% 8%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 220 30% 8%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    --accent-foreground: 220 30% 8%;
+    --popover-foreground: 220 10% 25%;
+    --secondary: 210 20% 96%;
+    --secondary-foreground: 220 10% 25%;
+    --muted: 210 20% 96%;
+    --muted-foreground: 215 16% 47%;
+    --accent-foreground: 0 0% 100%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 220 30% 8%;
+    --border: 214 20% 90%;
+    --input: 214 20% 90%;
+    --ring: 24 100% 50%;
     --radius: 0.5rem;
   }
 
   .dark {
-    --background: 220 30% 8%;
+    --background: 220 10% 12%;
     --foreground: 210 40% 98%;
-    --card: 220 30% 8%;
+    --card: 220 10% 12%;
     --card-foreground: 210 40% 98%;
-    --popover: 220 30% 8%;
+    --popover: 220 10% 12%;
     --popover-foreground: 210 40% 98%;
     --primary: 210 40% 98%;
-    --primary-foreground: 220 30% 8%;
-    --secondary: 217.2 32.6% 17.5%;
+    --primary-foreground: 220 10% 12%;
+    --secondary: 217 20% 18%;
     --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --muted: 217 20% 18%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 24 100% 50%;
+    --accent-foreground: 0 0% 100%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
+    --border: 217 20% 18%;
+    --input: 217 20% 18%;
+    --ring: 24 100% 50%;
   }
 }
 
@@ -62,19 +62,29 @@
   body {
     @apply bg-background text-foreground;
     font-family: "Inter", system-ui, sans-serif;
-    color: var(--guild-navy);
+    color: var(--crew-charcoal);
   }
 }
 
-.neon-glow {
-  box-shadow: 0 0 10px var(--guild-neon), 0 0 20px var(--guild-neon);
+.orange-glow {
+  box-shadow: 0 0 20px rgba(255, 102, 0, 0.3);
 }
 
-.neon-glow-subtle {
-  box-shadow: 0 0 5px var(--guild-neon);
+.orange-glow-hover:hover {
+  box-shadow: 0 0 30px rgba(255, 102, 0, 0.5);
 }
 
-.guild-badge {
-  background: linear-gradient(135deg, var(--guild-navy) 0%, #1a3a5c 100%);
-  border: 2px solid var(--guild-neon);
+.caution-accent {
+  border-top: 4px solid #ff6600;
+  border-bottom: 4px solid #ff6600;
+}
+
+.caution-stripes {
+  background-image: repeating-linear-gradient(
+    45deg,
+    #ff6600,
+    #ff6600 10px,
+    #36454f 10px,
+    #36454f 20px
+  );
 }

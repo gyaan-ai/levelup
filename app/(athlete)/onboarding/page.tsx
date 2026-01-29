@@ -235,7 +235,7 @@ export default function OnboardingPage() {
     <div className="container mx-auto px-4 py-8 max-w-2xl">
       <Card>
         <CardHeader>
-          <CardTitle className="text-primary">Become a Guild Master</CardTitle>
+          <CardTitle className="text-primary">Become a Crew Coach</CardTitle>
           <CardDescription>
             Complete your profile to start training the next generation
           </CardDescription>
@@ -249,9 +249,9 @@ export default function OnboardingPage() {
 
           {success && (
             <div className="mb-4 p-4 bg-accent/10 border-2 border-accent rounded-md text-center">
-              <p className="text-lg font-semibold text-primary mb-1">Welcome to The Guild!</p>
+              <p className="text-lg font-semibold text-primary mb-1">Welcome to The Crew!</p>
               <p className="text-sm text-muted-foreground">
-                You&apos;re now a Guild Master. Your profile is live. Redirecting...
+                You&apos;re now a Crew Coach. Your profile is live. Redirecting...
               </p>
             </div>
           )}

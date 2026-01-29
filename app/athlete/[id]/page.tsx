@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { ArrowLeft, Star, User, MapPin, Award, Shield, CheckCircle } from 'lucide-react';
 import { SchoolLogo } from '@/components/school-logo';
-import { GuildMasterBadge } from '@/components/guild-master-badge';
+import { CrewCoachBadge } from '@/components/crew-coach-badge';
 
 const SCHOOL_COLORS: Record<string, { bg: string; text: string }> = {
   'UNC': { bg: 'bg-blue-600', text: 'text-white' },
@@ -130,9 +130,9 @@ export default async function AthleteProfilePage({
                 {athlete.first_name} {athlete.last_name}
               </h1>
               
-              {/* Guild Master Badge + School + Year + Weight */}
+              {/* Crew Coach Badge + School + Year + Weight */}
               <div className="flex items-center gap-3 mb-3 flex-wrap">
-                <GuildMasterBadge size="lg" />
+                <CrewCoachBadge size="lg" />
                 <SchoolLogo school={athlete.school} size="md" />
                 <Badge className={`${schoolColor.bg} ${schoolColor.text}`}>
                   {athlete.school}
@@ -149,7 +149,7 @@ export default async function AthleteProfilePage({
 
               {/* Star Rating */}
               <div className="flex items-center gap-2 mb-4">
-                <Star className="h-5 w-5 fill-yellow-400 text-yellow-400" />
+                <Star className="h-5 w-5 fill-accent text-accent" />
                 <span className="text-lg font-semibold">{rating}</span>
                 {totalSessions > 0 && (
                   <span className="text-muted-foreground">
@@ -192,7 +192,7 @@ export default async function AthleteProfilePage({
                   size="lg"
                   className="w-full md:w-auto bg-primary text-white hover:bg-primary/90"
                 >
-                  Train with This Guild Master →
+                  Train with This Coach →
                 </Button>
               </Link>
             </div>
@@ -204,7 +204,7 @@ export default async function AthleteProfilePage({
       {athlete.bio && (
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle>About This Guild Master</CardTitle>
+            <CardTitle>About This Coach</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground whitespace-pre-wrap leading-relaxed">
@@ -217,7 +217,7 @@ export default async function AthleteProfilePage({
       {/* Credentials Section */}
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle>Master&apos;s Credentials</CardTitle>
+            <CardTitle>Coach&apos;s Credentials</CardTitle>
         </CardHeader>
         <CardContent>
           {credentialsList.length > 0 ? (

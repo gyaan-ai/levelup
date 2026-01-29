@@ -143,9 +143,9 @@ export default function SignupPage() {
     <div className="container mx-auto px-4 py-16 flex items-center justify-center min-h-screen">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle className="text-primary">Join The Guild</CardTitle>
+          <CardTitle className="text-primary">Join The Crew</CardTitle>
           <CardDescription>
-            Create your account to get started
+            Create your account to start training
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -171,13 +171,13 @@ export default function SignupPage() {
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="parent">Parent</SelectItem>
-                        <SelectItem value="athlete">Guild Master (College Wrestler)</SelectItem>
+                        <SelectItem value="athlete">Crew Coach (College Wrestler)</SelectItem>
                         <SelectItem value="youth_wrestler">Youth Wrestler (Student)</SelectItem>
                         <SelectItem value="admin">Admin</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormDescription>
-                      Choose how you&apos;ll use The Guild
+                      Choose how you&apos;ll use The Crew
                     </FormDescription>
                     <FormMessage />
                   </FormItem>

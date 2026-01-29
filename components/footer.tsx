@@ -13,11 +13,11 @@ export function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
           <div className="md:col-span-1">
             <div className="mb-4">
-              <h3 className="text-3xl font-bold">THE GUILD</h3>
-              <div className="h-1 w-16 bg-accent mt-2" />
+            <h3 className="text-3xl font-bold">THE CREW</h3>
+            <div className="h-1 w-16 bg-accent mt-2" />
             </div>
             <p className="text-white/80 text-sm mb-2">
-              NC United Wrestling presents The Guild
+              NC United Wrestling presents The Crew
             </p>
             <p className="text-white/60 text-sm">
               {tenant.tagline}
@@ -31,7 +31,7 @@ export function Footer() {
                   href="/browse"
                   className="text-white/80 hover:text-accent transition-colors"
                 >
-                  Browse Guild Masters
+                  Browse Crew Coaches
                 </Link>
               </li>
               <li>
@@ -68,7 +68,7 @@ export function Footer() {
                   href="/signup"
                   className="text-white/80 hover:text-accent transition-colors"
                 >
-                  Become a Guild Master
+                  Become a Crew Coach
                 </Link>
               </li>
               <li>
@@ -97,7 +97,7 @@ export function Footer() {
                   href="/about"
                   className="text-white/80 hover:text-accent transition-colors"
                 >
-                  About The Guild
+                  About The Crew
                 </Link>
               </li>
               <li>
@@ -135,7 +135,7 @@ export function Footer() {
         <div className="border-t border-white/10 pt-8">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4">
             <p className="text-sm text-white/60">
-              © {new Date().getFullYear()} The Guild by NC United Wrestling. All
+              © {new Date().getFullYear()} The Crew by NC United Wrestling. All
               rights reserved.
             </p>
             <div className="flex gap-4">

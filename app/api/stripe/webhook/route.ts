@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
       const session = event.data.object as Stripe.Checkout.Session;
       const sessionId = session.metadata?.session_id;
       const app = session.metadata?.app;
-      if (app !== 'the-guild' || !sessionId) {
+      if (app !== 'the-crew' || !sessionId) {
         return NextResponse.json({ received: true });
       }
 

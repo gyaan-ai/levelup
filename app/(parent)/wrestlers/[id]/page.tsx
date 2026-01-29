@@ -116,7 +116,7 @@ export default async function YouthWrestlerProfilePage({
               <Link href={`/browse?youthWrestlerId=${id}`}>
                 <Button>
                   <Calendar className="h-4 w-4 mr-2" />
-                  Find a Guild Master for {youthWrestler.first_name}
+                  Find a Crew Coach for {youthWrestler.first_name}
                 </Button>
               </Link>
             </div>

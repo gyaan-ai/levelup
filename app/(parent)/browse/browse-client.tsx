@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/select';
 import { ArrowLeft, Star, User } from 'lucide-react';
 import { SchoolLogo } from '@/components/school-logo';
-import { GuildMasterBadge } from '@/components/guild-master-badge';
+import { CrewCoachBadge } from '@/components/crew-coach-badge';
 import { Athlete } from '@/types';
 
 interface BrowseAthletesClientProps {
@@ -77,9 +77,9 @@ export function BrowseAthletesClient({ initialAthletes }: BrowseAthletesClientPr
       </Link>
 
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2 text-primary">Browse Guild Masters</h1>
+        <h1 className="text-3xl font-bold mb-2 text-primary">Browse Crew Coaches</h1>
         <p className="text-muted-foreground">
-          Find the perfect Guild Master for your youth wrestler
+          Find your coach and start putting in the work
         </p>
       </div>
 
@@ -223,7 +223,7 @@ export function BrowseAthletesClient({ initialAthletes }: BrowseAthletesClientPr
                           {athlete.first_name} {athlete.last_name}
                         </h3>
                         <div className="flex items-center gap-2 mt-1 flex-wrap">
-                          <GuildMasterBadge size="sm" />
+                          <CrewCoachBadge size="sm" />
                           <SchoolLogo school={athlete.school} size="sm" />
                           <Badge
                             className={`${schoolColors.bg} ${schoolColors.text} text-xs`}
@@ -242,7 +242,7 @@ export function BrowseAthletesClient({ initialAthletes }: BrowseAthletesClientPr
                     </div>
 
                     <div className="flex items-center gap-1 text-sm">
-                      <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                      <Star className="h-4 w-4 fill-accent text-accent" />
                       <span className="font-medium">{displayRating}</span>
                       {rating > 0 && athlete.total_sessions > 0 && (
                         <span className="text-muted-foreground ml-1">
@@ -252,7 +252,7 @@ export function BrowseAthletesClient({ initialAthletes }: BrowseAthletesClientPr
                     </div>
 
                     <Button className="w-full" variant="outline">
-                      View Master Profile
+                      View Coach Profile
                     </Button>
                   </CardContent>
                 </Card>

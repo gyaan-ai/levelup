@@ -19,24 +19,24 @@ const config = {
     },
     extend: {
       colors: {
-        guild: {
-          navy: "#0A2540",
-          neon: "#39FF14",
-          "neon-dark": "#2DD412",
-          "neon-light": "#6FFF4D",
+        crew: {
+          charcoal: "#36454F",
+          orange: "#FF6600",
+          "orange-dark": "#CC5200",
+          "orange-light": "#FF9933",
         },
         primary: {
-          DEFAULT: "#0A2540",
+          DEFAULT: "#36454F",
           foreground: "#FFFFFF",
         },
         accent: {
-          DEFAULT: "#39FF14",
-          foreground: "#0A2540",
-          hover: "#2DD412",
-          light: "#6FFF4D",
+          DEFAULT: "#FF6600",
+          foreground: "#FFFFFF",
+          hover: "#CC5200",
+          light: "#FF9933",
         },
-        "accent-hover": "#2DD412",
-        "accent-light": "#6FFF4D",
+        "accent-hover": "#CC5200",
+        "accent-light": "#FF9933",
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
@@ -63,6 +63,10 @@ const config = {
           foreground: "hsl(var(--card-foreground))",
         },
       },
+      backgroundImage: {
+        "caution-stripes":
+          "repeating-linear-gradient(45deg, #FF6600, #FF6600 10px, #36454F 10px, #36454F 20px)",
+      },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
@@ -86,7 +90,7 @@ const config = {
         "accordion-up": "accordion-up 0.2s ease-out",
       },
       boxShadow: {
-        "accent/50": "0 0 20px rgba(57, 255, 20, 0.5)",
+        "accent/50": "0 0 20px rgba(255, 102, 0, 0.5)",
       },
     },
   },

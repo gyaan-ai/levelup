@@ -7,11 +7,11 @@ import { Footer } from '@/components/footer';
 import './globals.css';
 
 export const metadata = {
-  title: 'The Guild | Where Masters Train the Next Generation',
+  title: 'The Crew | Outwork Everyone',
   description:
-    'Join The Guild Wrestling. Private lessons with D1 college athletes from UNC and NC State in Raleigh, NC. Book your session today.',
+    'Train with D1 college wrestlers from UNC and NC State. Private wrestling lessons in Raleigh, NC. No shortcuts. Just real work.',
   keywords:
-    'the guild wrestling, wrestling lessons Raleigh, private wrestling coach, D1 coaches, youth wrestling NC',
+    'the crew wrestling, wrestling lessons Raleigh, private wrestling coach, D1 coaches, youth wrestling NC',
   icons: {
     icon: '/favicon.ico',
   },
