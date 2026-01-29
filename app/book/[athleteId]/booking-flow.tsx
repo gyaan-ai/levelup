@@ -513,7 +513,7 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing }
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">Wrestler</p>
+                  <p className="text-sm font-medium text-muted-foreground">Coach</p>
                   <div className="flex items-center gap-3 mt-1">
                     {athlete.photo_url ? (
                       <img src={athlete.photo_url} alt="" className="w-12 h-12 rounded-full object-cover" />

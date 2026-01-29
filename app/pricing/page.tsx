@@ -17,7 +17,7 @@ export default function PricingPage() {
           <p>View wrestler profiles and session options for pricing details.</p>
           <p>
             <Link href="/browse" className="text-accent hover:underline">
-              Browse wrestlers →
+              Browse coaches →
             </Link>
           </p>
           <p>

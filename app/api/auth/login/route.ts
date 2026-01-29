@@ -40,6 +40,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Update last_login_at for admin dashboard reporting
+    await supabase
+      .from('users')
+      .update({ last_login_at: new Date().toISOString() })
+      .eq('id', authData.user.id);
+
     // Get user role from users table
     const { data: userData, error: userError } = await supabase
       .from('users')

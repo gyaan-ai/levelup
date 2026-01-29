@@ -77,9 +77,9 @@ export function BrowseAthletesClient({ initialAthletes }: BrowseAthletesClientPr
       </Link>
 
       <div className="mb-8">
-        <h1 className="text-3xl font-serif font-bold mb-2 text-primary">Browse Elite Wrestlers</h1>
+        <h1 className="text-3xl font-serif font-bold mb-2 text-primary">Browse Elite Coaches</h1>
         <p className="text-muted-foreground">
-          Find the perfect NCAA wrestler to refine your technique
+          Find the perfect NCAA coach to refine your technique
         </p>
       </div>
 
@@ -133,7 +133,7 @@ export function BrowseAthletesClient({ initialAthletes }: BrowseAthletesClientPr
 
         {/* Results Count */}
         <div className="text-sm text-muted-foreground">
-          Showing {filteredAthletes.length} {filteredAthletes.length === 1 ? 'athlete' : 'athletes'}
+          Showing {filteredAthletes.length} {filteredAthletes.length === 1 ? 'coach' : 'coaches'}
         </div>
       </div>
 

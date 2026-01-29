@@ -86,7 +86,7 @@ export default async function ParentDashboard() {
         <div>
           <h1 className="text-3xl font-serif font-bold mb-2 text-primary">Your Wrestlers</h1>
           <p className="text-muted-foreground">
-            Manage profiles and book sessions with elite wrestlers
+            Manage profiles and book sessions with elite coaches
           </p>
         </div>
         {youthWrestlers && youthWrestlers.length > 0 && (
@@ -231,7 +231,7 @@ export default async function ParentDashboard() {
                     <Button variant="outline">View bookings</Button>
                   </Link>
                   <Link href="/browse">
-                    <Button variant="premium">Find an Elite Wrestler</Button>
+                    <Button variant="premium">Find an Elite Coach</Button>
                   </Link>
                 </div>
               </CardContent>

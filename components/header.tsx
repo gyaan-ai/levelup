@@ -41,7 +41,7 @@ export function Header() {
                     href="/browse"
                     className="text-white hover:text-accent transition-colors font-medium"
                   >
-                    Browse Wrestlers
+                    Browse Coaches
                   </Link>
                   <Link
                     href="/bookings"
@@ -105,7 +105,7 @@ export function Header() {
                 href="/browse"
                 className="text-white hover:text-accent transition-colors font-medium"
               >
-                Browse Wrestlers
+                Browse Coaches
               </Link>
               <Link
                 href="/how-it-works"

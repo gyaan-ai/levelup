@@ -22,11 +22,16 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Get user role to redirect appropriately
     const { data: { user } } = await supabase.auth.getUser();
-    
     if (!user) {
       return NextResponse.redirect(new URL('/login', req.url));
+    }
+
+    if (code) {
+      await supabase
+        .from('users')
+        .update({ last_login_at: new Date().toISOString() })
+        .eq('id', user.id);
     }
 
     const { data: userData } = await supabase

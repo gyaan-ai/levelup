@@ -40,7 +40,7 @@ export default function HomePage() {
                     asChild
                     className="gold-glow-hover"
                   >
-                    <Link href="/browse">Browse Elite Wrestlers</Link>
+                    <Link href="/browse">Browse Elite Coaches</Link>
                   </Button>
                   <Button
                     size="xl"
@@ -84,7 +84,7 @@ export default function HomePage() {
                 <Users className="w-8 h-8 text-accent" />
               </div>
               <h3 className="text-2xl font-bold text-black mb-4">
-                Browse Elite Wrestlers
+                Browse Elite Coaches
               </h3>
               <p className="text-muted-foreground">
                 NCAA wrestlers from top programs. View credentials, specialties,
@@ -144,7 +144,7 @@ export default function HomePage() {
               },
               {
                 title: 'Elite Facilities',
-                text: 'Train at college wrestling rooms. Experience the environment where elite wrestlers develop.',
+                text: 'Train at college wrestling rooms. Experience the environment where elite coaches develop.',
               },
               {
                 title: 'Verified & Safe',
@@ -156,7 +156,7 @@ export default function HomePage() {
               },
               {
                 title: 'Track Progress',
-                text: 'Monitor development over time. See technical improvements and get feedback from elite wrestlers.',
+                text: 'Monitor development over time. See technical improvements and get feedback from elite coaches.',
               },
             ].map((item) => (
               <Card key={item.title} className="p-6 border-l-4 border-accent">
@@ -170,7 +170,7 @@ export default function HomePage() {
           </div>
           <div className="text-center mt-12">
             <Button size="lg" variant="premium" asChild>
-              <Link href="/browse">Browse Elite Wrestlers</Link>
+              <Link href="/browse">Browse Elite Coaches</Link>
             </Button>
           </div>
         </div>
@@ -233,7 +233,7 @@ export default function HomePage() {
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button size="xl" variant="black" asChild>
-              <Link href="/browse">Browse Elite Wrestlers</Link>
+              <Link href="/browse">Browse Elite Coaches</Link>
             </Button>
             <Button
               size="xl"

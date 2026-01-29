@@ -204,7 +204,7 @@ export default async function AthleteProfilePage({
       {athlete.bio && (
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle>About This Wrestler</CardTitle>
+            <CardTitle>About This Coach</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground whitespace-pre-wrap leading-relaxed">

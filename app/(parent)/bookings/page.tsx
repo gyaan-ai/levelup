@@ -136,7 +136,7 @@ export default async function MyBookingsPage() {
           {upcoming.length === 0 ? (
             <Card>
               <CardContent className="py-8 text-center text-muted-foreground">
-                No upcoming sessions. <Link href="/browse" className="text-primary underline">Browse wrestlers</Link> to book.
+                No upcoming sessions. <Link href="/browse" className="text-primary underline">Browse coaches</Link> to book.
               </CardContent>
             </Card>
           ) : (

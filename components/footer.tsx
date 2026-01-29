@@ -33,7 +33,7 @@ export function Footer() {
                   href="/browse"
                   className="text-white/80 hover:text-accent transition-colors"
                 >
-                  Browse Wrestlers
+                  Browse Coaches
                 </Link>
               </li>
               <li>

@@ -31,7 +31,7 @@ export function EliteWrestlerBadge({
       )}
     >
       <Award className={cn("text-accent", iconSizes[size])} />
-      <span>Elite Wrestler</span>
+      <span>Elite Coach</span>
     </div>
   );
 }
