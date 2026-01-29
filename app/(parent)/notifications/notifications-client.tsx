@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { format } from 'date-fns';
@@ -34,15 +35,23 @@ export function NotificationsClient({ initialNotifications }: NotificationsClien
 
   return (
     <div className="space-y-2">
-      {notifications.map((n) => (
-        <Card key={n.id} className={n.read_at ? 'opacity-75' : ''}>
-          <CardContent className="py-4">
-            <p className="font-medium">{n.title}</p>
-            {n.body && <p className="text-sm text-muted-foreground mt-1">{n.body}</p>}
-            <p className="text-xs text-muted-foreground mt-2">{format(new Date(n.created_at), 'MMM d, yyyy h:mm a')}</p>
-          </CardContent>
-        </Card>
-      ))}
+      {notifications.map((n) => {
+        const link = typeof n.data?.link === 'string' ? n.data.link : null;
+        return (
+          <Card key={n.id} className={n.read_at ? 'opacity-75' : ''}>
+            <CardContent className="py-4">
+              <p className="font-medium">{n.title}</p>
+              {n.body && <p className="text-sm text-muted-foreground mt-1">{n.body}</p>}
+              <p className="text-xs text-muted-foreground mt-2">{format(new Date(n.created_at), 'MMM d, yyyy h:mm a')}</p>
+              {link && (
+                <Link href={link} className="mt-3 inline-block">
+                  <Button variant="outline" size="sm">View</Button>
+                </Link>
+              )}
+            </CardContent>
+          </Card>
+        );
+      })}
     </div>
   );
 }

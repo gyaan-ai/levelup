@@ -3,6 +3,7 @@ import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
 import { generateInviteCode } from '@/lib/sessions';
+import { getStripeInstance } from '@/lib/stripe/webhooks';
 import type { SessionMode } from '@/types';
 
 export async function POST(req: NextRequest) {
@@ -133,10 +134,47 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Stripe Checkout: enable by setting STRIPE_CHECKOUT_ENABLED=true (and keys + webhook).
+    // When disabled, booking creates session as pending_payment and we redirect to confirmed without payment.
+    let checkoutUrl: string | undefined;
+    if (process.env.STRIPE_CHECKOUT_ENABLED === 'true') {
+      try {
+        const stripe = getStripeInstance(tenant.slug);
+        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (host.startsWith('localhost') ? `http://${host}` : `https://${host}`);
+        const successParams = new URLSearchParams({ sessionId: session.id });
+        if (session.partner_invite_code) successParams.set('code', session.partner_invite_code);
+        if (session.session_mode) successParams.set('mode', session.session_mode);
+        const stripeSession = await stripe.checkout.sessions.create({
+          mode: 'payment',
+          payment_method_types: ['card'],
+          line_items: [{
+            quantity: 1,
+            price_data: {
+              currency: 'usd',
+              unit_amount: Math.round(totalPrice * 100),
+              product_data: {
+                name: 'LevelUp – Wrestling Session',
+                description: `Session on ${scheduledDate} at ${scheduledTime}`,
+                metadata: { app: 'levelup' },
+              },
+            },
+          }],
+          metadata: { session_id: session.id, app: 'levelup' },
+          success_url: `${baseUrl}/book/${athleteId}/confirmed?${successParams.toString()}`,
+          cancel_url: `${baseUrl}/book/${athleteId}`,
+          customer_email: user.email ?? undefined,
+        });
+        checkoutUrl = stripeSession.url ?? undefined;
+      } catch (stripeErr) {
+        console.warn('Stripe Checkout not created (keys or error):', stripeErr);
+      }
+    }
+
     return NextResponse.json({
       sessionId: session.id,
       partnerInviteCode: session.partner_invite_code ?? undefined,
       sessionMode: session.session_mode,
+      ...(checkoutUrl && { url: checkoutUrl }),
     });
   } catch (e) {
     console.error('Bookings API error:', e);

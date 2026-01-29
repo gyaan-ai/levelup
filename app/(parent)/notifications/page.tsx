@@ -18,6 +18,9 @@ export default async function NotificationsPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/login?redirect=/notifications');
 
+  const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
+  const isAthlete = userData?.role === 'athlete';
+
   const { data: notifications } = await supabase
     .from('notifications')
     .select('id, type, title, body, data, read_at, created_at')
@@ -27,7 +30,10 @@ export default async function NotificationsPage() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-2xl">
-      <Link href="/dashboard" className="text-sm text-muted-foreground hover:text-foreground mb-4 inline-block">
+      <Link
+        href={isAthlete ? '/athlete-dashboard' : '/dashboard'}
+        className="text-sm text-muted-foreground hover:text-foreground mb-4 inline-block"
+      >
         ← Back to Dashboard
       </Link>
       <h1 className="text-2xl font-bold mb-6 flex items-center gap-2">

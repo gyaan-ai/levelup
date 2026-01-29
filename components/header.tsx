@@ -45,6 +45,9 @@ export function Header() {
                   <Link href="/dashboard">
                     <Button variant="ghost">Dashboard</Button>
                   </Link>
+                  <Link href="/bookings">
+                    <Button variant="ghost">Bookings</Button>
+                  </Link>
                   <Link href="/browse">
                     <Button variant="ghost">Browse</Button>
                   </Link>
@@ -57,9 +60,14 @@ export function Header() {
                 </>
               )}
               {userRole === 'athlete' && (
-                <Link href="/athlete-dashboard">
-                  <Button variant="ghost">Dashboard</Button>
-                </Link>
+                <>
+                  <Link href="/athlete-dashboard">
+                    <Button variant="ghost">Dashboard</Button>
+                  </Link>
+                  <Link href="/notifications">
+                    <Button variant="ghost">Notifications</Button>
+                  </Link>
+                </>
               )}
               {userRole === 'admin' && (
                 <Link href="/admin">

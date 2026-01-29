@@ -49,33 +49,36 @@ export default async function ParentDashboard() {
     .eq('parent_id', user.id)
     .order('created_at', { ascending: false });
 
-  // Get completed sessions count for each wrestler
-  const youthWrestlerIds = youthWrestlers?.map(yw => yw.id) || [];
-  const { data: completedSessions } = youthWrestlerIds.length > 0
-    ? await supabase
-        .from('sessions')
-        .select('youth_wrestler_id')
-        .in('youth_wrestler_id', youthWrestlerIds)
-        .eq('status', 'completed')
-    : { data: [] };
+  const youthWrestlerIds = youthWrestlers?.map((yw) => yw.id) || [];
 
-  // Count sessions per wrestler
+  const { data: completedSessions } = await supabase
+    .from('sessions')
+    .select('id')
+    .eq('parent_id', user.id)
+    .eq('status', 'completed');
+  const completedIds = (completedSessions ?? []).map((s: { id: string }) => s.id);
+
   const sessionCounts: Record<string, number> = {};
-  completedSessions?.forEach((s: any) => {
-    sessionCounts[s.youth_wrestler_id] = (sessionCounts[s.youth_wrestler_id] || 0) + 1;
-  });
+  if (youthWrestlerIds.length > 0 && completedIds.length > 0) {
+    const { data: participantRows } = await supabase
+      .from('session_participants')
+      .select('session_id, youth_wrestler_id')
+      .in('session_id', completedIds)
+      .in('youth_wrestler_id', youthWrestlerIds);
+    for (const p of participantRows ?? []) {
+      const yid = (p as { youth_wrestler_id: string }).youth_wrestler_id;
+      sessionCounts[yid] = (sessionCounts[yid] || 0) + 1;
+    }
+  }
 
-  // Get upcoming sessions for all youth wrestlers
-  const { data: upcomingSessions } = youthWrestlerIds.length > 0
-    ? await supabase
-        .from('sessions')
-        .select('*, youth_wrestlers(id, first_name, last_name)')
-        .in('youth_wrestler_id', youthWrestlerIds)
-        .eq('status', 'scheduled')
-        .gte('scheduled_datetime', new Date().toISOString())
-        .order('scheduled_datetime', { ascending: true })
-        .limit(10)
-    : { data: [] };
+  const { data: upcomingSessions } = await supabase
+    .from('sessions')
+    .select('*, athletes(id, first_name, last_name), facilities(id, name)')
+    .eq('parent_id', user.id)
+    .in('status', ['scheduled', 'pending_payment'])
+    .gte('scheduled_datetime', new Date().toISOString())
+    .order('scheduled_datetime', { ascending: true })
+    .limit(10);
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -159,45 +162,77 @@ export default async function ParentDashboard() {
           </div>
 
           {/* Upcoming Sessions */}
-          {upcomingSessions && upcomingSessions.length > 0 && (
+          {upcomingSessions && upcomingSessions.length > 0 ? (
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>Upcoming Sessions</CardTitle>
+                  <CardDescription>
+                    Sessions you&apos;ve booked
+                  </CardDescription>
+                </div>
+                <Link href="/bookings">
+                  <Button variant="outline" size="sm">View all</Button>
+                </Link>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {upcomingSessions.map((session: { id: string; scheduled_datetime: string; total_price?: number; session_type?: string; athletes?: { first_name?: string; last_name?: string } | { first_name?: string; last_name?: string }[]; facilities?: { name?: string } | { name?: string }[] }) => {
+                    const a = session.athletes;
+                    const coach = Array.isArray(a) ? a[0] : a;
+                    const f = session.facilities;
+                    const fac = Array.isArray(f) ? f[0] : f;
+                    return (
+                      <div
+                        key={session.id}
+                        className="flex items-center justify-between p-4 border rounded-lg"
+                      >
+                        <div>
+                          <p className="font-medium">
+                            {coach?.first_name} {coach?.last_name}
+                            {fac?.name && ` · ${fac.name}`}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {new Date(session.scheduled_datetime).toLocaleDateString('en-US', {
+                              weekday: 'long',
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric',
+                            })}
+                            {' · '}
+                            {new Date(session.scheduled_datetime).toLocaleTimeString('en-US', {
+                              hour: 'numeric',
+                              minute: '2-digit',
+                            })}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-medium">${Number(session.total_price ?? 0).toFixed(2)}</p>
+                          <p className="text-xs text-muted-foreground">{session.session_type ?? '—'}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
             <Card>
               <CardHeader>
                 <CardTitle>Upcoming Sessions</CardTitle>
                 <CardDescription>
-                  Sessions scheduled for all your wrestlers
+                  Sessions you&apos;ve booked will appear here.
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {upcomingSessions.map((session: any) => (
-                    <div
-                      key={session.id}
-                      className="flex items-center justify-between p-4 border rounded-lg"
-                    >
-                      <div>
-                        <p className="font-medium">
-                          {session.youth_wrestlers?.first_name} {session.youth_wrestlers?.last_name}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {new Date(session.scheduled_datetime).toLocaleDateString('en-US', {
-                            weekday: 'long',
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric',
-                          })}
-                          {' • '}
-                          {new Date(session.scheduled_datetime).toLocaleTimeString('en-US', {
-                            hour: 'numeric',
-                            minute: '2-digit',
-                          })}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-medium">${Number(session.total_price).toFixed(2)}</p>
-                        <p className="text-xs text-muted-foreground">{session.session_type}</p>
-                      </div>
-                    </div>
-                  ))}
+                <p className="text-muted-foreground mb-4">No upcoming sessions.</p>
+                <div className="flex flex-wrap gap-3">
+                  <Link href="/bookings">
+                    <Button variant="outline">View bookings</Button>
+                  </Link>
+                  <Link href="/browse">
+                    <Button>Browse coaches</Button>
+                  </Link>
                 </div>
               </CardContent>
             </Card>

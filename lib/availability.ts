@@ -1,0 +1,73 @@
+/**
+ * Helpers for coach availability (athlete_availability) and slot expansion.
+ * Slots are 1-hour increments; times in 24h "HH:mm" format.
+ */
+
+export interface AvailabilitySlot {
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+}
+
+/** Parse DB TIME "HH:MM:SS" or "HH:MM" to "HH:mm" */
+export function timeToHHmm(t: string | null | undefined): string {
+  if (!t || typeof t !== 'string') return '00:00';
+  const part = t.split(':').slice(0, 2).join(':');
+  return part.length >= 5 ? part : `${part.padStart(2, '0')}:00`;
+}
+
+/** Expand [start, end) into 1-hour slots. E.g. "08:00"–"10:00" → ["08:00", "09:00"] */
+export function expandToSlots(start: string, end: string): string[] {
+  const [sh, sm] = start.split(':').map((x) => parseInt(x, 10) || 0);
+  const [eh, em] = end.split(':').map((x) => parseInt(x, 10) || 0);
+  let startM = sh * 60 + sm;
+  let endM = eh * 60 + em;
+  if (endM <= startM) return [];
+  const out: string[] = [];
+  for (let m = startM; m < endM; m += 60) {
+    const h = Math.floor(m / 60) % 24;
+    const mm = m % 60;
+    out.push(`${String(h).padStart(2, '0')}:${String(mm).padStart(2, '0')}`);
+  }
+  return out;
+}
+
+/** 24h "HH:mm" to display "h:mm AM/PM" */
+export function formatSlotDisplay(s: string): string {
+  const [h, m] = s.split(':').map((x) => parseInt(x, 10) || 0);
+  const h12 = h % 12 || 12;
+  const ampm = h < 12 ? 'AM' : 'PM';
+  return `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
+}
+
+/** Display "8:00 AM" etc. to 24h "HH:mm" */
+export function displayTo24h(s: string): string {
+  const match = s.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+  if (!match) return '09:00';
+  let h = parseInt(match[1], 10);
+  const mm = match[2];
+  const pm = (match[3] || '').toUpperCase() === 'PM';
+  if (pm && h !== 12) h += 12;
+  if (!pm && h === 12) h = 0;
+  return `${String(h).padStart(2, '0')}:${mm}`;
+}
+
+/** Get day_of_week (0–6) for a Date. Sunday = 0. */
+export function getDayOfWeek(d: Date): number {
+  return d.getDay();
+}
+
+/** Get all 1-hour slots for a day from availability rows */
+export function slotsForDay(
+  availability: AvailabilitySlot[],
+  dayOfWeek: number
+): string[] {
+  const dayRows = availability.filter((a) => a.day_of_week === dayOfWeek);
+  const set = new Set<string>();
+  for (const row of dayRows) {
+    const start = timeToHHmm(row.start_time);
+    const end = timeToHHmm(row.end_time);
+    for (const slot of expandToSlots(start, end)) set.add(slot);
+  }
+  return [...set].sort();
+}

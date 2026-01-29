@@ -13,12 +13,12 @@ import { format, startOfDay } from 'date-fns';
 import { YouthWrestler } from '@/types';
 import type { SessionMode } from '@/types';
 import { getSessionPrice } from '@/lib/sessions';
+import { formatSlotDisplay, getDayOfWeek } from '@/lib/availability';
 
-/** 8am–9pm in 1-hour increments */
-const TIME_SLOTS = [
-  '8:00 AM', '9:00 AM', '10:00 AM', '11:00 AM', '12:00 PM',
-  '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM',
-  '6:00 PM', '7:00 PM', '8:00 PM', '9:00 PM',
+/** 8am–9pm fallback when coach has no availability */
+const TIME_SLOTS_24H = [
+  '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00',
+  '16:00', '17:00', '18:00', '19:00', '20:00', '21:00',
 ];
 
 function timeTo24h(s: string): string {
@@ -29,6 +29,10 @@ function timeTo24h(s: string): string {
   if (isPm && h !== 12) h += 12;
   if (!isPm && h === 12) h = 0;
   return `${String(h).padStart(2, '0')}:${m[2]}`;
+}
+
+function is24h(s: string): boolean {
+  return /^\d{1,2}:\d{2}$/.test(s) && !s.match(/\s*(AM|PM)/i);
 }
 
 interface Athlete {
@@ -53,6 +57,8 @@ interface BookingFlowProps {
   tenantPricing: { oneOnOne: number; twoAthlete: number; groupRate: number };
 }
 
+type AvailabilityByDay = { day_of_week: number; start_time: string; end_time: string }[];
+
 export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing }: BookingFlowProps) {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
@@ -62,6 +68,9 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing }
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [availability, setAvailability] = useState<AvailabilityByDay | null>(null);
+  const [slots, setSlots] = useState<string[]>([]);
+  const [slotsLoading, setSlotsLoading] = useState(false);
 
   const sessionMode: SessionMode | null =
     sessionChoice === '1-on-1' ? 'private'
@@ -89,6 +98,60 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing }
       setCurrentStep(2);
     }
   }, [youthWrestlers]);
+
+  useEffect(() => {
+    let ok = true;
+    (async () => {
+      try {
+        const r = await fetch(`/api/availability?athleteId=${encodeURIComponent(athlete.id)}`);
+        if (!ok) return;
+        const data = await r.json();
+        if (r.ok && Array.isArray(data.availability)) setAvailability(data.availability);
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => { ok = false; };
+  }, [athlete.id]);
+
+  const hasAvailability = (availability?.length ?? 0) > 0;
+  const daysWithSlots = new Set(availability?.map((a) => a.day_of_week) ?? []);
+
+  useEffect(() => {
+    if (!selectedDate) {
+      setSlots([]);
+      setSelectedTime(null);
+      return;
+    }
+    setSelectedTime(null);
+    if (!hasAvailability) {
+      const now = new Date();
+      const isToday =
+        selectedDate.getFullYear() === now.getFullYear() &&
+        selectedDate.getMonth() === now.getMonth() &&
+        selectedDate.getDate() === now.getDate();
+      const currentHHmm = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+      const fallback = isToday ? TIME_SLOTS_24H.filter((s) => s > currentHHmm) : TIME_SLOTS_24H;
+      setSlots(fallback);
+      return;
+    }
+    let ok = true;
+    setSlotsLoading(true);
+    const dateStr = format(selectedDate, 'yyyy-MM-dd');
+    fetch(`/api/availability/slots?athleteId=${encodeURIComponent(athlete.id)}&date=${dateStr}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (!ok) return;
+        setSlots(Array.isArray(data.slots) ? data.slots : []);
+      })
+      .catch(() => {
+        if (ok) setSlots([]);
+      })
+      .finally(() => {
+        if (ok) setSlotsLoading(false);
+      });
+    return () => { ok = false; };
+  }, [athlete.id, selectedDate, hasAvailability]);
 
   const toggleWrestler = (w: YouthWrestler) => {
     setSelectedWrestlers((prev) =>
@@ -136,13 +199,17 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing }
           youthWrestlerIds: selectedWrestlers.map((w) => w.id),
           sessionMode,
           scheduledDate: dateStr,
-          scheduledTime: timeTo24h(selectedTime),
+          scheduledTime: is24h(selectedTime) ? selectedTime : timeTo24h(selectedTime),
           totalPrice,
           pricePerParticipant: pricePerParticipant ?? undefined,
         }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Booking failed');
+      if (data.url) {
+        window.location.href = data.url;
+        return;
+      }
       const params = new URLSearchParams({
         sessionId: data.sessionId,
         ...(data.partnerInviteCode && { code: data.partnerInviteCode }),
@@ -329,8 +396,8 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing }
                   <div className="pt-4 border-t space-y-3">
                     <h4 className="font-semibold">How would you like to find a partner?</h4>
                     {[
-                      { id: 'invite' as const, Icon: Link2, title: 'Invite a Specific Family', desc: 'Share a private link with someone you know.', sub: "They'll pay $40 when they join." },
-                      { id: 'open' as const, Icon: Users, title: 'Leave Open for Others', desc: 'Other families can request to join.', sub: "You'll approve who trains with your wrestler." },
+                      { id: 'invite' as const, Icon: Link2, title: 'Invite a Workout Partner', desc: 'Share a private link with someone you know.', sub: "They'll pay $40 when they join." },
+                      { id: 'open' as const, Icon: Users, title: 'Leave Open for Others', desc: 'Others can request to join as your partner.', sub: "You'll approve who trains with your wrestler." },
                       { id: 'solo' as const, Icon: UserCircle, title: 'Train Solo if No Partner', desc: 'Convert to 1-on-1 ($60) if spot doesn\'t fill.', sub: "You'll only pay the extra $20 if no partner joins." },
                     ].map(({ id, Icon, title, desc, sub }) => (
                       <Card
@@ -380,32 +447,46 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing }
                     mode="single"
                     selected={selectedDate}
                     onSelect={setSelectedDate}
-                    disabled={(date) => date < startOfDay(new Date())}
+                    disabled={(date) => {
+                      const day = date < startOfDay(new Date());
+                      if (day) return true;
+                      if (hasAvailability) {
+                        const dow = getDayOfWeek(date);
+                        return !daysWithSlots.has(dow);
+                      }
+                      return false;
+                    }}
                     className="rounded-md border"
                   />
                 </div>
                 {selectedDate && (
                   <div>
                     <h3 className="font-semibold mb-3">Time</h3>
-                    <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
-                      {TIME_SLOTS.map((t) => (
-                        <button
-                          key={t}
-                          type="button"
-                          onClick={() => setSelectedTime(t)}
-                          className={`p-2 rounded-lg border text-sm transition-all ${
-                            selectedTime === t ? 'border-levelup-primary bg-levelup-primary text-white' : 'border-border hover:border-levelup-primary/50'
-                          }`}
-                        >
-                          {t}
-                        </button>
-                      ))}
-                    </div>
+                    {slotsLoading ? (
+                      <p className="text-sm text-muted-foreground">Loading slots…</p>
+                    ) : slots.length === 0 ? (
+                      <p className="text-sm text-muted-foreground">No times available this day.</p>
+                    ) : (
+                      <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
+                        {slots.map((t) => (
+                          <button
+                            key={t}
+                            type="button"
+                            onClick={() => setSelectedTime(t)}
+                            className={`p-2 rounded-lg border text-sm transition-all ${
+                              selectedTime === t ? 'border-levelup-primary bg-levelup-primary text-white' : 'border-border hover:border-levelup-primary/50'
+                            }`}
+                          >
+                            {formatSlotDisplay(t)}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
                 {selectedDate && selectedTime && (
                   <p className="text-sm text-muted-foreground">
-                    Selected: {format(selectedDate, 'EEEE, MMMM d, yyyy')} at {selectedTime}
+                    Selected: {format(selectedDate, 'EEEE, MMMM d, yyyy')} at {formatSlotDisplay(selectedTime)}
                   </p>
                 )}
                 <div className="flex gap-4 mt-6">
@@ -456,7 +537,7 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing }
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Date & Time</p>
                   <p className="mt-1">
-                    {selectedDate && selectedTime && `${format(selectedDate, 'EEEE, MMMM d, yyyy')} at ${selectedTime}`}
+                    {selectedDate && selectedTime && `${format(selectedDate, 'EEEE, MMMM d, yyyy')} at ${formatSlotDisplay(selectedTime)}`}
                   </p>
                 </div>
                 {facility && (
@@ -482,7 +563,7 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing }
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground text-center">
-                  Payment uses Stripe. For now, session is saved as &quot;pending payment&quot; and Stripe will be connected next.
+                  Session is saved as &quot;pending payment&quot;. Stripe can be enabled later for real payments.
                 </p>
               </CardContent>
             </Card>
@@ -539,7 +620,7 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing }
                 {selectedDate && selectedTime ? (
                   <p className="text-sm flex items-center gap-1">
                     <Clock className="h-3 w-3" />
-                    {format(selectedDate, 'MMM d, yyyy')} at {selectedTime}
+                    {format(selectedDate, 'MMM d, yyyy')} at {formatSlotDisplay(selectedTime)}
                   </p>
                 ) : (
                   <p className="text-sm text-muted-foreground">Not selected</p>

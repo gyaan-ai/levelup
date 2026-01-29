@@ -57,7 +57,7 @@ export default async function PartnerSessionsPage() {
         </Link>
         <h1 className="text-3xl font-bold">Open Partner Sessions</h1>
         <p className="text-muted-foreground">
-          Sessions where another family is looking for a partner. Request to join and train together.
+          Sessions where someone else is looking for a workout partner. Request to join and train together.
         </p>
       </div>
       <PartnerSessionsClient
