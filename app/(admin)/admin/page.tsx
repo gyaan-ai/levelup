@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import {
   AdminDashboardClient,
@@ -9,6 +10,13 @@ import {
   type BillingSummary,
   type AthleteReport,
 } from './admin-dashboard-client';
+
+function getAdminEmails(): Set<string> {
+  const raw = process.env.ADMIN_EMAILS || '';
+  return new Set(
+    raw.split(',').map((e) => e.trim().toLowerCase()).filter(Boolean)
+  );
+}
 
 export default async function AdminPage() {
   const headersList = await headers();
@@ -29,6 +37,20 @@ export default async function AdminPage() {
     .single();
 
   if (userData?.role !== 'admin') {
+    const adminEmails = getAdminEmails();
+    const emailLower = (user.email ?? '').toLowerCase();
+    if (adminEmails.has(emailLower)) {
+      try {
+        const admin = createAdminClient(tenant.slug);
+        const { error } = await admin
+          .from('users')
+          .update({ role: 'admin' })
+          .eq('id', user.id);
+        if (!error) redirect('/admin');
+      } catch {
+        /* ignore */
+      }
+    }
     if (userData?.role === 'parent') redirect('/browse');
     if (userData?.role === 'athlete') redirect('/athlete-dashboard');
     redirect('/');

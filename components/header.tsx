@@ -120,7 +120,7 @@ export function Header() {
                 Login
               </Link>
               <Button asChild variant="premium" size="default">
-                <Link href="/signup">Book a Lesson</Link>
+                <Link href="/signup">Book Training</Link>
               </Button>
             </nav>
           )}
