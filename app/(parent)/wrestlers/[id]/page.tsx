@@ -88,10 +88,10 @@ export default async function YouthWrestlerProfilePage({
               <img
                 src={youthWrestler.photo_url}
                 alt={`${youthWrestler.first_name} ${youthWrestler.last_name}`}
-                className="w-32 h-32 rounded-full object-cover border-4 border-levelup-primary/20"
+                className="w-32 h-32 rounded-full object-cover border-4 border-primary/20"
               />
             ) : (
-              <div className="w-32 h-32 rounded-full bg-muted flex items-center justify-center border-4 border-levelup-primary/20">
+              <div className="w-32 h-32 rounded-full bg-muted flex items-center justify-center border-4 border-primary/20">
                 <User className="h-16 w-16 text-muted-foreground" />
               </div>
             )}
@@ -116,7 +116,7 @@ export default async function YouthWrestlerProfilePage({
               <Link href={`/browse?youthWrestlerId=${id}`}>
                 <Button>
                   <Calendar className="h-4 w-4 mr-2" />
-                  Book a Session
+                  Find a Guild Master for {youthWrestler.first_name}
                 </Button>
               </Link>
             </div>

@@ -108,7 +108,7 @@ export default function LoginPage() {
     <div className="container mx-auto px-4 py-16 flex items-center justify-center min-h-screen">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>Sign In</CardTitle>
+          <CardTitle className="text-primary">Welcome Back to The Guild</CardTitle>
           <CardDescription>
             Enter your email and password to access your account
           </CardDescription>
@@ -161,7 +161,7 @@ export default function LoginPage() {
           <div className="mt-4 text-center text-sm">
             <p className="text-muted-foreground">
               Don&apos;t have an account?{' '}
-              <Link href="/signup" className="text-levelup-primary hover:underline">
+              <Link href="/signup" className="text-primary hover:underline">
                 Sign up
               </Link>
             </p>

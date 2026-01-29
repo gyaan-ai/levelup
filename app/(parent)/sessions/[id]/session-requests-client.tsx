@@ -130,7 +130,7 @@ export function SessionRequestsClient({
                   size="sm"
                   onClick={() => handleResponse(r.id, 'approve')}
                   disabled={!!loadingId}
-                  style={{ backgroundColor: 'var(--color-levelup-primary)' }}
+                  className="bg-primary text-white"
                 >
                   {loadingId === r.id ? '…' : 'Approve'}
                 </Button>

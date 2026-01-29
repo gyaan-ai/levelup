@@ -2,44 +2,43 @@ export interface TenantConfig {
   slug: string;
   orgName: string;
   orgType: string;
-  
+  productName: string;
+
   brandColors: {
-    levelup: {
-      primary: string;
-      secondary: string;
-      accent: string;
-    };
-    stateOrg: {
-      primary: string;
-      secondary: string;
-      accent: string;
-    };
+    primary: string;
+    accent: string;
+    accentHover: string;
+    accentLight: string;
+    background: string;
+    textPrimary: string;
+    textSecondary: string;
   };
-  
+
   stateOrgLogo: string;
   favicon: string;
   tagline: string;
-  
+  secondaryTagline?: string;
+
   domain: string;
   supportEmail: string;
   phone: string;
-  
+
   supabaseUrl: string;
   supabaseAnonKey: string;
-  
+
   stripePublishableKey: string;
-  
+
   facilities: Array<{
     name: string;
     school: string;
   }>;
-  
+
   features: {
     creditPools: boolean;
     groupSessions: boolean;
     videoSessions: boolean;
   };
-  
+
   pricing: {
     oneOnOne: number;
     twoAthlete: number;
@@ -50,7 +49,7 @@ export interface TenantConfig {
       twenty: number;
     };
   };
-  
+
   certificationRequirements: {
     usaWrestling: boolean;
     safeSport: boolean;
@@ -64,44 +63,43 @@ export const tenants: Record<string, TenantConfig> = {
     slug: "nc-united",
     orgName: "NC United Wrestling",
     orgType: "501c3",
-    
+    productName: "The Guild",
+
     brandColors: {
-      levelup: {
-        primary: "#1E40AF",     // Blue 700
-        secondary: "#7C3AED",   // Purple 600
-        accent: "#F59E0B"       // Amber 500
-      },
-      stateOrg: {
-        primary: "#0D1A4D",     // NC United navy (nc-navy-950)
-        secondary: "#B31B1B",   // NC United red (nc-red-800)
-        accent: "#D3B574"       // NC United gold (nc-gold-400)
-      }
+      primary: "#0A2540",
+      accent: "#39FF14",
+      accentHover: "#2DD412",
+      accentLight: "#6FFF4D",
+      background: "#FFFFFF",
+      textPrimary: "#0A2540",
+      textSecondary: "#64748B",
     },
-    
+
     stateOrgLogo: "/logos/nc-united.png",
-    favicon: "/favicons/levelup.ico",
-    tagline: "Train with Carolina's Best College Wrestlers",
-    
-    domain: "levelup.ncunitedwrestling.com",
+    favicon: "/favicons/guild.ico",
+    tagline: "Where masters train the next generation",
+    secondaryTagline: "Learn the craft. Master the art.",
+
+    domain: "guild.ncunitedwrestling.com",
     supportEmail: "support@ncunitedwrestling.com",
     phone: "(919) 555-0100",
-    
+
     supabaseUrl: process.env.NEXT_PUBLIC_NC_UNITED_SUPABASE_URL!,
     supabaseAnonKey: process.env.NEXT_PUBLIC_NC_UNITED_SUPABASE_ANON_KEY!,
-    
+
     stripePublishableKey: process.env.NEXT_PUBLIC_NC_UNITED_STRIPE_KEY!,
-    
+
     facilities: [
       { name: "UNC Wrestling Room", school: "UNC" },
-      { name: "NC State Wrestling Room", school: "NC State" }
+      { name: "NC State Wrestling Room", school: "NC State" },
     ],
-    
+
     features: {
       creditPools: true,
       groupSessions: true,
-      videoSessions: false
+      videoSessions: false,
     },
-    
+
     pricing: {
       oneOnOne: 60,
       twoAthlete: 80,
@@ -109,23 +107,20 @@ export const tenants: Record<string, TenantConfig> = {
       pools: {
         five: 375,
         ten: 700,
-        twenty: 1300
-      }
+        twenty: 1300,
+      },
     },
-    
+
     certificationRequirements: {
       usaWrestling: true,
       safeSport: true,
       backgroundCheck: true,
-      cpr: false
-    }
-  }
+      cpr: false,
+    },
+  },
 };
 
-// Helper functions
 export function getTenantByDomain(hostname: string): TenantConfig | null {
-  // Extract subdomain: levelup.ncunitedwrestling.com → nc-united
-  // For now, just return nc-united (add more logic later)
   return tenants["nc-united"];
 }
 
@@ -136,4 +131,3 @@ export function getTenantConfig(slug: string): TenantConfig {
   }
   return tenant;
 }
-

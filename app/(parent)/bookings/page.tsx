@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Calendar, User, MapPin, MessageCircle } from 'lucide-react';
+import { SchoolLogo } from '@/components/school-logo';
 
 export default async function MyBookingsPage() {
   const headersList = await headers();
@@ -166,7 +167,12 @@ export default async function MyBookingsPage() {
                         <p className="text-sm flex items-center gap-1">
                           <User className="h-4 w-4" />
                           {coach(s).name}
-                          {coach(s).school && ` (${coach(s).school})`}
+                          {coach(s).school && (
+                            <span className="flex items-center gap-1">
+                              <SchoolLogo school={coach(s).school} size="sm" />
+                              ({coach(s).school})
+                            </span>
+                          )}
                         </p>
                         {wrestlers(s).length > 0 && (
                           <p className="text-sm text-muted-foreground">

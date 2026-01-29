@@ -235,9 +235,9 @@ export default function OnboardingPage() {
     <div className="container mx-auto px-4 py-8 max-w-2xl">
       <Card>
         <CardHeader>
-          <CardTitle>Complete Your Profile</CardTitle>
+          <CardTitle className="text-primary">Become a Guild Master</CardTitle>
           <CardDescription>
-            Add your information to start receiving booking requests
+            Complete your profile to start training the next generation
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -248,9 +248,10 @@ export default function OnboardingPage() {
           )}
 
           {success && (
-            <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-md">
-              <p className="text-sm text-green-800 font-medium">
-                ✓ Profile saved successfully! Redirecting to your dashboard...
+            <div className="mb-4 p-4 bg-accent/10 border-2 border-accent rounded-md text-center">
+              <p className="text-lg font-semibold text-primary mb-1">Welcome to The Guild!</p>
+              <p className="text-sm text-muted-foreground">
+                You&apos;re now a Guild Master. Your profile is live. Redirecting...
               </p>
             </div>
           )}

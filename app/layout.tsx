@@ -7,8 +7,11 @@ import { Footer } from '@/components/footer';
 import './globals.css';
 
 export const metadata = {
-  title: 'LevelUp - Private Wrestling Lessons',
-  description: 'Connect with college wrestlers for private lessons',
+  title: 'The Guild | Where Masters Train the Next Generation',
+  description:
+    'Join The Guild Wrestling. Private lessons with D1 college athletes from UNC and NC State in Raleigh, NC. Book your session today.',
+  keywords:
+    'the guild wrestling, wrestling lessons Raleigh, private wrestling coach, D1 coaches, youth wrestling NC',
   icons: {
     icon: '/favicon.ico',
   },

@@ -15,6 +15,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ArrowLeft, Star, User } from 'lucide-react';
+import { SchoolLogo } from '@/components/school-logo';
+import { GuildMasterBadge } from '@/components/guild-master-badge';
 import { Athlete } from '@/types';
 
 interface BrowseAthletesClientProps {
@@ -75,9 +77,9 @@ export function BrowseAthletesClient({ initialAthletes }: BrowseAthletesClientPr
       </Link>
 
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Browse Athletes</h1>
+        <h1 className="text-3xl font-bold mb-2 text-primary">Browse Guild Masters</h1>
         <p className="text-muted-foreground">
-          Find the perfect college athlete for your youth wrestler
+          Find the perfect Guild Master for your youth wrestler
         </p>
       </div>
 
@@ -209,10 +211,10 @@ export function BrowseAthletesClient({ initialAthletes }: BrowseAthletesClientPr
                         <img
                           src={athlete.photo_url}
                           alt={`${athlete.first_name} ${athlete.last_name}`}
-                          className="w-24 h-24 rounded-full object-cover border-2 border-levelup-primary/20"
+                          className="w-24 h-24 rounded-full object-cover border-2 border-primary/20"
                         />
                       ) : (
-                        <div className="w-24 h-24 rounded-full bg-muted flex items-center justify-center border-2 border-levelup-primary/20">
+                        <div className="w-24 h-24 rounded-full bg-muted flex items-center justify-center border-2 border-primary/20">
                           <User className="h-12 w-12 text-muted-foreground" />
                         </div>
                       )}
@@ -220,7 +222,9 @@ export function BrowseAthletesClient({ initialAthletes }: BrowseAthletesClientPr
                         <h3 className="text-lg font-semibold truncate">
                           {athlete.first_name} {athlete.last_name}
                         </h3>
-                        <div className="flex items-center gap-2 mt-1">
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                          <GuildMasterBadge size="sm" />
+                          <SchoolLogo school={athlete.school} size="sm" />
                           <Badge
                             className={`${schoolColors.bg} ${schoolColors.text} text-xs`}
                           >
@@ -248,7 +252,7 @@ export function BrowseAthletesClient({ initialAthletes }: BrowseAthletesClientPr
                     </div>
 
                     <Button className="w-full" variant="outline">
-                      View Profile
+                      View Master Profile
                     </Button>
                   </CardContent>
                 </Card>

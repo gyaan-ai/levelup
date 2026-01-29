@@ -9,6 +9,7 @@ import { Progress } from '@/components/ui/progress';
 import { Calendar } from '@/components/ui/calendar';
 import Link from 'next/link';
 import { ArrowLeft, User, Clock, CheckCircle, Link2, Users, UserCircle } from 'lucide-react';
+import { SchoolLogo } from '@/components/school-logo';
 import { format, startOfDay } from 'date-fns';
 import { YouthWrestler } from '@/types';
 import type { SessionMode } from '@/types';
@@ -249,9 +250,12 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing }
           )}
           <div>
             <h1 className="text-2xl font-bold">
-              Book a Session with {athlete.first_name} {athlete.last_name}
+              Book a Session with Guild Master {athlete.first_name} {athlete.last_name}
             </h1>
-            <p className="text-muted-foreground">{athlete.school}</p>
+            <p className="text-muted-foreground flex items-center gap-2">
+              <SchoolLogo school={athlete.school} size="sm" />
+              {athlete.school}
+            </p>
           </div>
         </div>
       </div>
@@ -289,7 +293,7 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing }
                         onClick={() => toggleWrestler(w)}
                         onKeyDown={(e) => e.key === 'Enter' && toggleWrestler(w)}
                         className={`cursor-pointer transition-all hover:shadow-md ${
-                          sel ? 'ring-2 ring-levelup-primary border-levelup-primary bg-levelup-primary/5' : 'border-border hover:border-levelup-primary/50'
+                          sel ? 'ring-2 ring-primary border-primary bg-primary/5' : 'border-border hover:border-primary/50'
                         }`}
                       >
                         <CardContent className="p-4 flex items-center gap-4">
@@ -306,7 +310,7 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing }
                               {w.age != null ? `${w.age} yrs` : '—'} • {w.weight_class ? `${w.weight_class} lbs` : '—'} • {skillLabel(w)}
                             </p>
                           </div>
-                          {sel && <CheckCircle className="h-5 w-5 text-levelup-primary shrink-0" />}
+                          {sel && <CheckCircle className="h-5 w-5 text-primary shrink-0" />}
                         </CardContent>
                       </Card>
                     );
@@ -344,7 +348,7 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing }
                       onClick={() => { setSessionChoice('1-on-1'); setPartnerOption(null); }}
                       onKeyDown={(e) => e.key === 'Enter' && (setSessionChoice('1-on-1'), setPartnerOption(null))}
                       className={`cursor-pointer transition-all hover:shadow-md ${
-                        sessionChoice === '1-on-1' ? 'ring-2 ring-levelup-primary border-levelup-primary bg-levelup-primary/5' : 'border-border'
+                        sessionChoice === '1-on-1' ? 'ring-2 ring-primary border-primary bg-primary/5' : 'border-border'
                       }`}
                     >
                       <CardContent className="p-5">
@@ -359,10 +363,10 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing }
                       onClick={() => setSessionChoice('partner')}
                       onKeyDown={(e) => e.key === 'Enter' && setSessionChoice('partner')}
                       className={`relative cursor-pointer transition-all hover:shadow-md ${
-                        sessionChoice === 'partner' ? 'ring-2 ring-levelup-primary border-levelup-primary bg-levelup-primary/5' : 'border-border'
+                        sessionChoice === 'partner' ? 'ring-2 ring-primary border-primary bg-primary/5' : 'border-border'
                       }`}
                     >
-                      <Badge className="absolute top-4 right-4 bg-levelup-primary text-xs">BEST VALUE</Badge>
+                      <Badge className="absolute top-4 right-4 bg-primary text-xs">BEST VALUE</Badge>
                       <CardContent className="p-5 pr-24">
                         <h3 className="font-semibold text-lg">Partner Session</h3>
                         <p className="text-muted-foreground text-sm mb-2">Share the session with another wrestler</p>
@@ -378,7 +382,7 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing }
                     onClick={() => { setSessionChoice('sibling'); setPartnerOption(null); }}
                     onKeyDown={(e) => e.key === 'Enter' && (setSessionChoice('sibling'), setPartnerOption(null))}
                     className={`cursor-pointer transition-all hover:shadow-md ${
-                      sessionChoice === 'sibling' ? 'ring-2 ring-levelup-primary border-levelup-primary bg-levelup-primary/5' : 'border-border'
+                      sessionChoice === 'sibling' ? 'ring-2 ring-primary border-primary bg-primary/5' : 'border-border'
                     }`}
                   >
                     <CardContent className="p-5">
@@ -407,7 +411,7 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing }
                         onClick={() => setPartnerOption(id)}
                         onKeyDown={(e) => e.key === 'Enter' && setPartnerOption(id)}
                         className={`cursor-pointer transition-all hover:shadow-md ${
-                          partnerOption === id ? 'ring-2 ring-levelup-primary border-levelup-primary bg-levelup-primary/5' : 'border-border'
+                          partnerOption === id ? 'ring-2 ring-primary border-primary bg-primary/5' : 'border-border'
                         }`}
                       >
                         <CardContent className="p-4 flex items-start gap-4">
@@ -417,7 +421,7 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing }
                             <p className="text-sm text-muted-foreground">{desc}</p>
                             <p className="text-xs text-muted-foreground mt-1">{sub}</p>
                           </div>
-                          {partnerOption === id && <CheckCircle className="h-5 w-5 text-levelup-primary shrink-0" />}
+                          {partnerOption === id && <CheckCircle className="h-5 w-5 text-primary shrink-0" />}
                         </CardContent>
                       </Card>
                     ))}
@@ -474,7 +478,7 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing }
                             type="button"
                             onClick={() => setSelectedTime(t)}
                             className={`p-2 rounded-lg border text-sm transition-all ${
-                              selectedTime === t ? 'border-levelup-primary bg-levelup-primary text-white' : 'border-border hover:border-levelup-primary/50'
+                              selectedTime === t ? 'border-primary bg-primary text-white' : 'border-border hover:border-primary/50'
                             }`}
                           >
                             {formatSlotDisplay(t)}
@@ -518,7 +522,10 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing }
                       </div>
                     )}
                     <span className="font-medium">{athlete.first_name} {athlete.last_name}</span>
-                    <span className="text-muted-foreground">({athlete.school})</span>
+                    <span className="text-muted-foreground flex items-center gap-1">
+                      <SchoolLogo school={athlete.school} size="sm" />
+                      ({athlete.school})
+                    </span>
                   </div>
                 </div>
                 <div>
@@ -587,7 +594,10 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing }
                 )}
                 <div>
                   <p className="font-medium">{athlete.first_name} {athlete.last_name}</p>
-                  <p className="text-sm text-muted-foreground">{athlete.school}</p>
+                  <p className="text-sm text-muted-foreground flex items-center gap-1">
+                    <SchoolLogo school={athlete.school} size="sm" />
+                    {athlete.school}
+                  </p>
                 </div>
               </div>
               <div>

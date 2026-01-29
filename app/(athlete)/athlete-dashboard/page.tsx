@@ -143,9 +143,9 @@ export default async function AthleteDashboard() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">Athlete Dashboard</h1>
+        <h1 className="text-3xl font-bold mb-2 text-primary">Guild Master Dashboard</h1>
         <p className="text-muted-foreground">
-          Welcome{athlete?.first_name ? `, ${athlete.first_name}` : ''}! Manage your profile, view earnings, and track your sessions.
+          Welcome, Guild Master{athlete?.first_name ? ` ${athlete.first_name}` : ''}! Manage your profile, view earnings, and track your sessions.
         </p>
       </div>
 
@@ -213,7 +213,7 @@ export default async function AthleteDashboard() {
       {athlete && athlete.commitment_sessions > 0 && (
         <Card className="mb-8">
           <CardHeader>
-            <CardTitle>Commitment Progress</CardTitle>
+            <CardTitle>Your Guild Commitment</CardTitle>
             <CardDescription>
               {athlete.commitment_sessions} sessions completed
               {athlete.commitment_deadline && (

@@ -1,12 +1,12 @@
-import type { Config } from "tailwindcss"
+import type { Config } from "tailwindcss";
 
 const config = {
   darkMode: ["class"],
   content: [
-    './pages/**/*.{ts,tsx}',
-    './components/**/*.{ts,tsx}',
-    './app/**/*.{ts,tsx}',
-    './src/**/*.{ts,tsx}',
+    "./pages/**/*.{ts,tsx}",
+    "./components/**/*.{ts,tsx}",
+    "./app/**/*.{ts,tsx}",
+    "./src/**/*.{ts,tsx}",
   ],
   prefix: "",
   theme: {
@@ -19,34 +19,29 @@ const config = {
     },
     extend: {
       colors: {
-        // LevelUp brand colors (consistent across all tenants)
-        'levelup-primary': 'var(--color-levelup-primary)',
-        'levelup-secondary': 'var(--color-levelup-secondary)',
-        'levelup-accent': 'var(--color-levelup-accent)',
-        // State org colors (local accent)
-        'org-primary': 'var(--color-org-primary)',
-        'org-secondary': 'var(--color-org-secondary)',
-        'org-accent': 'var(--color-org-accent)',
-        // NC United specific colors
-        'nc-navy': {
-          950: '#0D1A4D',
+        guild: {
+          navy: "#0A2540",
+          neon: "#39FF14",
+          "neon-dark": "#2DD412",
+          "neon-light": "#6FFF4D",
         },
-        'nc-red': {
-          800: '#B31B1B',
+        primary: {
+          DEFAULT: "#0A2540",
+          foreground: "#FFFFFF",
         },
-        'nc-gold': {
-          400: '#D3B574',
-          500: '#CBAF5D',
+        accent: {
+          DEFAULT: "#39FF14",
+          foreground: "#0A2540",
+          hover: "#2DD412",
+          light: "#6FFF4D",
         },
+        "accent-hover": "#2DD412",
+        "accent-light": "#6FFF4D",
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
         background: "hsl(var(--background))",
         foreground: "hsl(var(--foreground))",
-        primary: {
-          DEFAULT: "hsl(var(--primary))",
-          foreground: "hsl(var(--primary-foreground))",
-        },
         secondary: {
           DEFAULT: "hsl(var(--secondary))",
           foreground: "hsl(var(--secondary-foreground))",
@@ -58,10 +53,6 @@ const config = {
         muted: {
           DEFAULT: "hsl(var(--muted))",
           foreground: "hsl(var(--muted-foreground))",
-        },
-        accent: {
-          DEFAULT: "hsl(var(--accent))",
-          foreground: "hsl(var(--accent-foreground))",
         },
         popover: {
           DEFAULT: "hsl(var(--popover))",
@@ -77,6 +68,9 @@ const config = {
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
       },
+      fontFamily: {
+        sans: ["Inter", "system-ui", "sans-serif"],
+      },
       keyframes: {
         "accordion-down": {
           from: { height: "0" },
@@ -91,10 +85,12 @@ const config = {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
       },
+      boxShadow: {
+        "accent/50": "0 0 20px rgba(57, 255, 20, 0.5)",
+      },
     },
   },
   plugins: [require("tailwindcss-animate")],
-} satisfies Config
+} satisfies Config;
 
-export default config
-
+export default config;

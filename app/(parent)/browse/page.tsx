@@ -5,6 +5,12 @@ import { getTenantByDomain } from '@/config/tenants';
 import { BrowseAthletesClient } from './browse-client';
 import { Athlete } from '@/types';
 
+export const metadata = {
+  title: 'Browse Guild Masters | The Guild Wrestling',
+  description:
+    'Train with D1 college athletes from UNC and NC State. Browse our Guild Masters and book your session.',
+};
+
 export default async function BrowsePage() {
   const headersList = await headers();
   const host = headersList.get('host') || '';

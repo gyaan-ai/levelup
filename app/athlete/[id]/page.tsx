@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { ArrowLeft, Star, User, MapPin, Award, Shield, CheckCircle } from 'lucide-react';
+import { SchoolLogo } from '@/components/school-logo';
+import { GuildMasterBadge } from '@/components/guild-master-badge';
 
 const SCHOOL_COLORS: Record<string, { bg: string; text: string }> = {
   'UNC': { bg: 'bg-blue-600', text: 'text-white' },
@@ -113,10 +115,10 @@ export default async function AthleteProfilePage({
                 <img
                   src={athlete.photo_url}
                   alt={`${athlete.first_name} ${athlete.last_name}`}
-                  className="w-32 h-32 md:w-40 md:h-40 rounded-full object-cover border-4 border-levelup-primary/20"
+                  className="w-32 h-32 md:w-40 md:h-40 rounded-full object-cover border-4 border-primary/20"
                 />
               ) : (
-                <div className="w-32 h-32 md:w-40 md:h-40 rounded-full bg-muted flex items-center justify-center border-4 border-levelup-primary/20">
+                <div className="w-32 h-32 md:w-40 md:h-40 rounded-full bg-muted flex items-center justify-center border-4 border-primary/20">
                   <User className="h-16 w-16 md:h-20 md:w-20 text-muted-foreground" />
                 </div>
               )}
@@ -128,8 +130,10 @@ export default async function AthleteProfilePage({
                 {athlete.first_name} {athlete.last_name}
               </h1>
               
-              {/* School Badge + Year + Weight */}
+              {/* Guild Master Badge + School + Year + Weight */}
               <div className="flex items-center gap-3 mb-3 flex-wrap">
+                <GuildMasterBadge size="lg" />
+                <SchoolLogo school={athlete.school} size="md" />
                 <Badge className={`${schoolColor.bg} ${schoolColor.text}`}>
                   {athlete.school}
                 </Badge>
@@ -184,12 +188,11 @@ export default async function AthleteProfilePage({
 
               {/* Book a Session Button */}
               <Link href={`/book/${athlete.id}`}>
-                <Button 
-                  size="lg" 
-                  className="w-full md:w-auto"
-                  style={{ backgroundColor: 'var(--color-levelup-primary)' }}
+                <Button
+                  size="lg"
+                  className="w-full md:w-auto bg-primary text-white hover:bg-primary/90"
                 >
-                  Book a Session
+                  Train with This Guild Master →
                 </Button>
               </Link>
             </div>
@@ -201,7 +204,7 @@ export default async function AthleteProfilePage({
       {athlete.bio && (
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle>About</CardTitle>
+            <CardTitle>About This Guild Master</CardTitle>
           </CardHeader>
           <CardContent>
             <p className="text-muted-foreground whitespace-pre-wrap leading-relaxed">
@@ -214,14 +217,14 @@ export default async function AthleteProfilePage({
       {/* Credentials Section */}
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle>Achievements & Credentials</CardTitle>
+          <CardTitle>Master&apos;s Credentials</CardTitle>
         </CardHeader>
         <CardContent>
           {credentialsList.length > 0 ? (
             <ul className="space-y-2">
               {credentialsList.map((credential, index) => (
                 <li key={index} className="flex items-start gap-2">
-                  <Award className="h-5 w-5 text-levelup-primary mt-0.5 flex-shrink-0" />
+                  <Award className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
                   <span className="text-muted-foreground">{String(credential)}</span>
                 </li>
               ))}

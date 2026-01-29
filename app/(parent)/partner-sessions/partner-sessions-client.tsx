@@ -109,7 +109,7 @@ export function PartnerSessionsClient({
   return (
     <div className="space-y-6">
       {requestingSessionId && (
-        <Card className="border-levelup-primary/50">
+        <Card className="border-primary/50">
           <CardHeader className="pb-2 flex flex-row items-center justify-between">
             <CardTitle className="text-lg">Request to Join Session</CardTitle>
             <Button variant="ghost" size="icon" onClick={() => { setRequestingSessionId(null); setSelectedWrestlerId(''); setMessage(''); }}>

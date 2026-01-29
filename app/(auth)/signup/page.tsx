@@ -143,9 +143,9 @@ export default function SignupPage() {
     <div className="container mx-auto px-4 py-16 flex items-center justify-center min-h-screen">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle>Create Account</CardTitle>
+          <CardTitle className="text-primary">Join The Guild</CardTitle>
           <CardDescription>
-            Sign up to get started with LevelUp
+            Create your account to get started
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -171,13 +171,13 @@ export default function SignupPage() {
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="parent">Parent</SelectItem>
-                        <SelectItem value="athlete">Athlete (College Wrestler)</SelectItem>
+                        <SelectItem value="athlete">Guild Master (College Wrestler)</SelectItem>
                         <SelectItem value="youth_wrestler">Youth Wrestler (Student)</SelectItem>
                         <SelectItem value="admin">Admin</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormDescription>
-                      Choose how you&apos;ll use LevelUp
+                      Choose how you&apos;ll use The Guild
                     </FormDescription>
                     <FormMessage />
                   </FormItem>
@@ -283,7 +283,7 @@ export default function SignupPage() {
           <div className="mt-4 text-center text-sm">
             <p className="text-muted-foreground">
               Already have an account?{' '}
-              <Link href="/login" className="text-levelup-primary hover:underline">
+              <Link href="/login" className="text-primary hover:underline">
                 Sign in
               </Link>
             </p>

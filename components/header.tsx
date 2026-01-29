@@ -1,100 +1,152 @@
 'use client';
 
+import Link from 'next/link';
+import Image from 'next/image';
 import { useTenant } from './theme-provider';
 import { useAuth } from '@/lib/auth/use-auth';
 import { Button } from './ui/button';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { Menu } from 'lucide-react';
 
 export function Header() {
   const tenant = useTenant();
   const { user, userRole, loading, signOut } = useAuth();
-  const router = useRouter();
 
   const handleSignOut = async () => {
     await signOut();
-    router.push('/login');
+    window.location.href = '/login';
   };
 
   return (
-    <header className="border-b">
-      <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-        <Link href="/" className="flex items-center gap-4">
-          <h1 className="text-2xl font-bold" style={{ color: 'var(--color-levelup-primary)' }}>
-            LevelUp
-          </h1>
-          {tenant.stateOrgLogo && (
-            <img 
-              src={tenant.stateOrgLogo} 
-              alt={tenant.orgName}
-              className="h-8"
-              onError={(e) => {
-                // Hide image if it fails to load
-                (e.target as HTMLImageElement).style.display = 'none';
-              }}
-            />
-          )}
-        </Link>
-        <nav className="flex items-center gap-4">
+    <header className="bg-primary text-white border-b border-accent/20 sticky top-0 z-50">
+      <div className="container mx-auto px-4">
+        <div className="flex items-center justify-between h-16">
+          <div className="flex items-center gap-4">
+            {tenant.stateOrgLogo && (
+              <Image
+                src={tenant.stateOrgLogo}
+                alt={tenant.orgName}
+                width={100}
+                height={40}
+                className="h-10 w-auto"
+              />
+            )}
+            <div className="h-8 w-px bg-white/20" />
+            <Link href="/" className="flex items-center group">
+              <span className="text-2xl font-bold text-white group-hover:text-accent transition-colors">
+                THE GUILD
+              </span>
+            </Link>
+          </div>
+
           {loading ? (
-            <div className="text-sm text-muted-foreground">Loading...</div>
+            <div className="text-sm text-white/70">Loading...</div>
           ) : user ? (
-            <>
+            <nav className="hidden md:flex items-center gap-6">
               {userRole === 'parent' && (
                 <>
-                  <Link href="/dashboard">
-                    <Button variant="ghost">Dashboard</Button>
+                  <Link
+                    href="/dashboard"
+                    className="text-white hover:text-accent transition-colors font-medium"
+                  >
+                    Dashboard
                   </Link>
-                  <Link href="/bookings">
-                    <Button variant="ghost">Bookings</Button>
+                  <Link
+                    href="/browse"
+                    className="text-white hover:text-accent transition-colors font-medium"
+                  >
+                    Browse Masters
                   </Link>
-                  <Link href="/browse">
-                    <Button variant="ghost">Browse</Button>
+                  <Link
+                    href="/bookings"
+                    className="text-white hover:text-accent transition-colors font-medium"
+                  >
+                    My Bookings
                   </Link>
-                  <Link href="/partner-sessions">
-                    <Button variant="ghost">Partner Sessions</Button>
+                  <Link
+                    href="/partner-sessions"
+                    className="text-white hover:text-accent transition-colors font-medium"
+                  >
+                    Partner Sessions
                   </Link>
-                  <Link href="/notifications">
-                    <Button variant="ghost">Notifications</Button>
+                  <Link
+                    href="/notifications"
+                    className="text-white hover:text-accent transition-colors font-medium"
+                  >
+                    Notifications
                   </Link>
                 </>
               )}
               {userRole === 'athlete' && (
                 <>
-                  <Link href="/athlete-dashboard">
-                    <Button variant="ghost">Dashboard</Button>
+                  <Link
+                    href="/athlete-dashboard"
+                    className="text-white hover:text-accent transition-colors font-medium"
+                  >
+                    Dashboard
                   </Link>
-                  <Link href="/notifications">
-                    <Button variant="ghost">Notifications</Button>
+                  <Link
+                    href="/notifications"
+                    className="text-white hover:text-accent transition-colors font-medium"
+                  >
+                    Notifications
                   </Link>
                 </>
               )}
               {userRole === 'admin' && (
-                <Link href="/admin">
-                  <Button variant="ghost">Admin</Button>
+                <Link
+                  href="/admin"
+                  className="text-white hover:text-accent transition-colors font-medium"
+                >
+                  Admin
                 </Link>
               )}
-              <span className="text-sm text-muted-foreground">{user.email}</span>
-              <Button variant="outline" onClick={handleSignOut}>
-                Sign Out
-              </Button>
-            </>
+              <div className="flex items-center gap-3 pl-4 border-l border-white/20">
+                <span className="text-white/80 text-sm">{user.email}</span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-white hover:text-accent hover:bg-white/10"
+                  onClick={handleSignOut}
+                >
+                  Sign Out
+                </Button>
+              </div>
+            </nav>
           ) : (
-            <>
-              <Link href="/browse">
-                <Button variant="ghost">Browse</Button>
+            <nav className="hidden md:flex items-center gap-6">
+              <Link
+                href="/browse"
+                className="text-white hover:text-accent transition-colors font-medium"
+              >
+                Browse Masters
               </Link>
-              <Link href="/login">
-                <Button variant="ghost">Sign In</Button>
+              <Link
+                href="/how-it-works"
+                className="text-white hover:text-accent transition-colors font-medium"
+              >
+                How It Works
               </Link>
-              <Link href="/signup">
-                <Button>Sign Up</Button>
+              <Link
+                href="/login"
+                className="text-white hover:text-accent transition-colors font-medium"
+              >
+                Login
               </Link>
-            </>
+              <Button asChild size="default">
+                <Link href="/signup">Join The Guild</Link>
+              </Button>
+            </nav>
           )}
-        </nav>
+
+          <button
+            type="button"
+            className="md:hidden text-white p-2"
+            aria-label="Open menu"
+          >
+            <Menu className="w-6 h-6" />
+          </button>
+        </div>
       </div>
     </header>
   );
 }
-

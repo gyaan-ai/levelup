@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { format } from 'date-fns';
 import { CheckCircle, User, Calendar, MapPin, Copy, Share2 } from 'lucide-react';
+import { SchoolLogo } from '@/components/school-logo';
 import { BookingConfirmedClient } from '../booking-confirmed-client';
 
 export default async function BookingConfirmedPage({
@@ -89,7 +90,14 @@ export default async function BookingConfirmedPage({
                   )}
                   <div>
                     <p className="font-semibold">{athlete?.first_name} {athlete?.last_name}</p>
-                    <p className="text-sm text-muted-foreground">{athlete?.school}</p>
+                    <p className="text-sm text-muted-foreground flex items-center gap-1">
+                      {athlete?.school && (
+                        <>
+                          <SchoolLogo school={athlete.school} size="sm" />
+                          {athlete.school}
+                        </>
+                      )}
+                    </p>
                   </div>
                 </div>
                 <p className="flex items-center gap-2 text-sm">
@@ -109,7 +117,7 @@ export default async function BookingConfirmedPage({
                 <Button asChild variant="outline" className="flex-1">
                   <Link href="/dashboard">View My Sessions</Link>
                 </Button>
-                <Button asChild className="flex-1" style={{ backgroundColor: 'var(--color-levelup-primary)' }}>
+                <Button asChild className="flex-1 bg-primary text-white hover:bg-primary/90">
                   <a href={`https://calendar.google.com/calendar/render?action=TEMPLATE&text=Wrestling+Session&dates=${scheduledAt?.toISOString().replace(/[-:]/g, '').slice(0, 15)}/${scheduledAt?.toISOString().replace(/[-:]/g, '').slice(0, 15)}`} target="_blank" rel="noopener noreferrer">
                     Add to Calendar
                   </a>

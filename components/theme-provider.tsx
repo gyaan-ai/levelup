@@ -5,23 +5,24 @@ import { TenantConfig } from '@/config/tenants';
 
 const ThemeContext = createContext<TenantConfig | null>(null);
 
-export function ThemeProvider({ 
-  tenant, 
-  children 
-}: { 
-  tenant: TenantConfig; 
+export function ThemeProvider({
+  tenant,
+  children,
+}: {
+  tenant: TenantConfig;
   children: ReactNode;
 }) {
   return (
     <ThemeContext.Provider value={tenant}>
       <div
         style={{
-          '--color-levelup-primary': tenant.brandColors.levelup.primary,
-          '--color-levelup-secondary': tenant.brandColors.levelup.secondary,
-          '--color-levelup-accent': tenant.brandColors.levelup.accent,
-          '--color-org-primary': tenant.brandColors.stateOrg.primary,
-          '--color-org-secondary': tenant.brandColors.stateOrg.secondary,
-          '--color-org-accent': tenant.brandColors.stateOrg.accent,
+          '--guild-navy': tenant.brandColors.primary,
+          '--guild-neon': tenant.brandColors.accent,
+          '--guild-neon-dark': tenant.brandColors.accentHover,
+          '--guild-neon-light': tenant.brandColors.accentLight,
+          '--primary': tenant.brandColors.primary,
+          '--accent': tenant.brandColors.accent,
+          '--accent-hover': tenant.brandColors.accentHover,
         } as React.CSSProperties}
         className="min-h-screen"
       >
@@ -38,8 +39,3 @@ export function useTenant() {
   }
   return context;
 }
-
-
-
-
-
