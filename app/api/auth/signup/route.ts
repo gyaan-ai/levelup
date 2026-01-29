@@ -25,8 +25,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Validate role
-    if (!['parent', 'athlete', 'admin', 'youth_wrestler'].includes(role)) {
+    // Validate role (admin cannot be self-assigned via signup)
+    if (!['parent', 'athlete', 'youth_wrestler'].includes(role)) {
       return NextResponse.json(
         { error: 'Invalid role' },
         { status: 400 }

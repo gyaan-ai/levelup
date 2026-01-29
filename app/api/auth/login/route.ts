@@ -1,12 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
+
+/** Comma-separated emails that should have admin role. Set ADMIN_EMAILS in env. */
+function getAdminEmails(): Set<string> {
+  const raw = process.env.ADMIN_EMAILS || '';
+  return new Set(
+    raw
+      .split(',')
+      .map((e) => e.trim().toLowerCase())
+      .filter(Boolean)
+  );
+}
 
 export async function POST(req: NextRequest) {
   try {
     const hostname = req.headers.get('host') || '';
     const tenant = getTenantByDomain(hostname);
-    
+
     if (!tenant) {
       return NextResponse.json(
         { error: 'Tenant not found' },
@@ -24,10 +36,8 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Create Supabase client
     const supabase = await createClient(tenant.slug);
 
-    // Sign in user
     const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -40,13 +50,25 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Update last_login_at for admin dashboard reporting
     await supabase
       .from('users')
       .update({ last_login_at: new Date().toISOString() })
       .eq('id', authData.user.id);
 
-    // Get user role from users table
+    const adminEmails = getAdminEmails();
+    const emailLower = (authData.user.email ?? '').toLowerCase();
+    if (adminEmails.has(emailLower)) {
+      try {
+        const admin = createAdminClient(tenant.slug);
+        await admin
+          .from('users')
+          .update({ role: 'admin' })
+          .eq('id', authData.user.id);
+      } catch (e) {
+        console.warn('Admin promotion skip (admin client unavailable):', e);
+      }
+    }
+
     const { data: userData, error: userError } = await supabase
       .from('users')
       .select('role')

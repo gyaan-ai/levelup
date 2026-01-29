@@ -1,12 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
+
+function getAdminEmails(): Set<string> {
+  const raw = process.env.ADMIN_EMAILS || '';
+  return new Set(
+    raw.split(',').map((e) => e.trim().toLowerCase()).filter(Boolean)
+  );
+}
 
 export async function GET(req: NextRequest) {
   try {
     const hostname = req.headers.get('host') || '';
     const tenant = getTenantByDomain(hostname);
-    
+
     if (!tenant) {
       return NextResponse.redirect(new URL('/404', req.url));
     }
@@ -32,6 +40,17 @@ export async function GET(req: NextRequest) {
         .from('users')
         .update({ last_login_at: new Date().toISOString() })
         .eq('id', user.id);
+    }
+
+    const adminEmails = getAdminEmails();
+    const emailLower = (user.email ?? '').toLowerCase();
+    if (adminEmails.has(emailLower)) {
+      try {
+        const admin = createAdminClient(tenant.slug);
+        await admin.from('users').update({ role: 'admin' }).eq('id', user.id);
+      } catch {
+        /* ignore */
+      }
     }
 
     const { data: userData } = await supabase

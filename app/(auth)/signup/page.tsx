@@ -32,7 +32,7 @@ const signupSchema = z.object({
   email: z.string().email('Invalid email address'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
   confirmPassword: z.string(),
-  role: z.enum(['parent', 'athlete', 'admin', 'youth_wrestler']),
+  role: z.enum(['parent', 'athlete', 'youth_wrestler']),
   firstName: z.string().optional(),
   lastName: z.string().optional(),
   school: z.string().optional(),
@@ -173,7 +173,6 @@ export default function SignupPage() {
                         <SelectItem value="parent">Parent</SelectItem>
                         <SelectItem value="athlete">NCAA Wrestler</SelectItem>
                         <SelectItem value="youth_wrestler">Youth Wrestler (Student)</SelectItem>
-                        <SelectItem value="admin">Admin</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormDescription>
