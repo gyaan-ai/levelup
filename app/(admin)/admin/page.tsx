@@ -90,7 +90,11 @@ export default async function AdminPage() {
   }
   if (sessionsRes.error) {
     console.error('Admin sessions fetch error:', sessionsRes.error);
+    console.error('Admin sessions error details:', JSON.stringify(sessionsRes.error, null, 2));
   }
+  
+  console.log('[Admin] Sessions fetched:', sessionsRes.data?.length ?? 0, 'rows');
+  console.log('[Admin] Users fetched:', usersRes.data?.length ?? 0, 'rows');
 
   const sessionsRows = (sessionsRes.data ?? []) as Array<{
     id: string;
