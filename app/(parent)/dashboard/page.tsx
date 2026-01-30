@@ -34,13 +34,10 @@ export default async function ParentDashboard() {
     .eq('id', user.id)
     .single();
 
-  if (userData?.role !== 'parent') {
-    if (userData?.role === 'athlete') {
-      redirect('/athlete-dashboard');
-    } else if (userData?.role === 'admin') {
-      redirect('/admin');
-    }
+  if (userData?.role === 'athlete') {
+    redirect('/athlete-dashboard');
   }
+  // parent and admin can both access dashboard (admin can switch to product view)
 
   // Get youth wrestlers
   const { data: youthWrestlers } = await supabase

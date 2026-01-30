@@ -26,11 +26,8 @@ export default async function MyBookingsPage() {
     .eq('id', user.id)
     .single();
 
-  if (userData?.role !== 'parent') {
-    if (userData?.role === 'athlete') redirect('/athlete-dashboard');
-    if (userData?.role === 'admin') redirect('/admin');
-    redirect('/browse');
-  }
+  if (userData?.role === 'athlete') redirect('/athlete-dashboard');
+  // parent and admin can both access (admin sees empty state if no bookings)
 
   const { data: sessions, error } = await supabase
     .from('sessions')

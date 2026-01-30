@@ -38,13 +38,10 @@ export default async function YouthWrestlerProfilePage({
     .eq('id', user.id)
     .single();
 
-  if (userData?.role !== 'parent') {
-    if (userData?.role === 'athlete') {
-      redirect('/dashboard');
-    } else if (userData?.role === 'admin') {
-      redirect('/admin');
-    }
+  if (userData?.role === 'athlete') {
+    redirect('/athlete-dashboard');
   }
+  // parent and admin can both access (admin redirected to dashboard if no matching wrestler)
 
   // Get youth wrestler
   const { data: youthWrestler, error } = await supabase

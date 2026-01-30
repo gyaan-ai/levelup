@@ -34,13 +34,10 @@ export default async function ParentDashboard() {
     .eq('id', user.id)
     .single();
 
-  if (userData?.role !== 'parent') {
-    if (userData?.role === 'athlete') {
-      redirect('/dashboard');
-    } else if (userData?.role === 'admin') {
-      redirect('/admin');
-    }
+  if (userData?.role === 'athlete') {
+    redirect('/athlete-dashboard');
   }
+  // parent and admin can both access (admin sees empty state if no wrestlers)
 
   // Get youth wrestlers
   const { data: youthWrestlers } = await supabase

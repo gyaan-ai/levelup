@@ -127,7 +127,7 @@ export default function SignupPage() {
       } else if (role === 'youth_wrestler') {
         router.push('/youth-dashboard');
       } else if (role === 'admin') {
-        router.push('/admin');
+        router.push('/dashboard');
       } else {
         router.push('/dashboard');
       }

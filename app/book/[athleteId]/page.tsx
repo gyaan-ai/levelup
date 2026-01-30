@@ -45,15 +45,9 @@ export default async function BookPage({
     .eq('id', user.id)
     .single();
 
-  if (userData?.role !== 'parent') {
-    if (userData?.role === 'athlete') {
-      redirect('/athlete-dashboard');
-    } else if (userData?.role === 'admin') {
-      redirect('/admin');
-    } else {
-      redirect('/browse');
-    }
-  }
+  if (userData?.role === 'athlete') redirect('/athlete-dashboard');
+  if (userData?.role !== 'parent' && userData?.role !== 'admin') redirect('/browse');
+  // parent and admin can both book (admin can test flow)
 
   // Fetch athlete data
   const { data: athlete, error: athleteError } = await supabase

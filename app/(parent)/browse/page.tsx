@@ -37,14 +37,10 @@ export default async function BrowsePage() {
     .eq('id', user.id)
     .single();
 
-  if (userData?.role !== 'parent') {
-    // Redirect based on role
-    if (userData?.role === 'athlete') {
-      redirect('/athlete-dashboard');
-    } else if (userData?.role === 'admin') {
-      redirect('/admin');
-    }
+  if (userData?.role === 'athlete') {
+    redirect('/athlete-dashboard');
   }
+  // parent and admin can both access browse (admin can switch to product view)
 
   // Fetch active athletes (profile complete). Photo and certifications optional for now.
   const { data: athletes, error } = await supabase

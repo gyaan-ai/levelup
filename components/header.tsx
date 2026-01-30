@@ -29,7 +29,23 @@ export function Header() {
             <div className="text-sm text-white/70">Loading...</div>
           ) : user ? (
             <nav className="hidden md:flex items-center gap-6">
-              {userRole === 'parent' && (
+              {userRole === 'athlete' && (
+                <>
+                  <Link
+                    href="/athlete-dashboard"
+                    className="text-white hover:text-accent transition-colors font-medium"
+                  >
+                    Dashboard
+                  </Link>
+                  <Link
+                    href="/notifications"
+                    className="text-white hover:text-accent transition-colors font-medium"
+                  >
+                    Notifications
+                  </Link>
+                </>
+              )}
+              {(userRole === 'admin' || userRole === 'parent') && (
                 <>
                   <Link
                     href="/dashboard"
@@ -67,31 +83,15 @@ export function Header() {
                   >
                     Notifications
                   </Link>
+                  {userRole === 'admin' && (
+                    <Link
+                      href="/admin"
+                      className="text-white hover:text-accent transition-colors font-medium border-l border-white/20 pl-4 ml-2"
+                    >
+                      Admin
+                    </Link>
+                  )}
                 </>
-              )}
-              {userRole === 'athlete' && (
-                <>
-                  <Link
-                    href="/athlete-dashboard"
-                    className="text-white hover:text-accent transition-colors font-medium"
-                  >
-                    Dashboard
-                  </Link>
-                  <Link
-                    href="/notifications"
-                    className="text-white hover:text-accent transition-colors font-medium"
-                  >
-                    Notifications
-                  </Link>
-                </>
-              )}
-              {userRole === 'admin' && (
-                <Link
-                  href="/admin"
-                  className="text-white hover:text-accent transition-colors font-medium"
-                >
-                  Admin
-                </Link>
               )}
               <div className="flex items-center gap-3 pl-4 border-l border-white/20">
                 <span className="text-white/80 text-sm">{user.email}</span>
