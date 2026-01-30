@@ -151,9 +151,9 @@ export async function POST(req: NextRequest) {
         if (session.partner_invite_code) successParams.set('code', session.partner_invite_code);
         if (session.session_mode) successParams.set('mode', session.session_mode);
         
-        // Use penny pricing for testing if enabled
+        // Use minimum pricing for testing if enabled (Stripe minimum is $0.50 USD)
         const testModePenny = process.env.TEST_MODE_PENNY_PRICING === 'true';
-        const chargeAmount = testModePenny ? 0.01 : totalPrice;
+        const chargeAmount = testModePenny ? 0.50 : totalPrice;
         console.log('[Bookings API] Charge amount:', chargeAmount, '(test mode:', testModePenny, ')');
         
         const stripeSession = await stripe.checkout.sessions.create({
