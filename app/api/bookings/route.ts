@@ -138,8 +138,13 @@ export async function POST(req: NextRequest) {
     // When disabled, booking creates session as pending_payment and we redirect to confirmed without payment.
     // TEST_MODE_PENNY_PRICING: Set to 'true' to charge $0.01 instead of full price (for testing live Stripe with minimal cost)
     let checkoutUrl: string | undefined;
+    console.log('[Bookings API] STRIPE_CHECKOUT_ENABLED:', process.env.STRIPE_CHECKOUT_ENABLED);
+    console.log('[Bookings API] TEST_MODE_PENNY_PRICING:', process.env.TEST_MODE_PENNY_PRICING);
+    console.log('[Bookings API] Tenant slug:', tenant.slug);
+    
     if (process.env.STRIPE_CHECKOUT_ENABLED === 'true') {
       try {
+        console.log('[Bookings API] Attempting to create Stripe checkout session...');
         const stripe = getStripeInstance(tenant.slug);
         const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (host.startsWith('localhost') ? `http://${host}` : `https://${host}`);
         const successParams = new URLSearchParams({ sessionId: session.id });
@@ -149,6 +154,7 @@ export async function POST(req: NextRequest) {
         // Use penny pricing for testing if enabled
         const testModePenny = process.env.TEST_MODE_PENNY_PRICING === 'true';
         const chargeAmount = testModePenny ? 0.01 : totalPrice;
+        console.log('[Bookings API] Charge amount:', chargeAmount, '(test mode:', testModePenny, ')');
         
         const stripeSession = await stripe.checkout.sessions.create({
           mode: 'payment',
@@ -173,9 +179,13 @@ export async function POST(req: NextRequest) {
           customer_email: user.email ?? undefined,
         });
         checkoutUrl = stripeSession.url ?? undefined;
+        console.log('[Bookings API] Stripe checkout URL created:', checkoutUrl);
       } catch (stripeErr) {
-        console.warn('Stripe Checkout not created (keys or error):', stripeErr);
+        console.error('[Bookings API] Stripe Checkout ERROR:', stripeErr);
+        console.error('[Bookings API] Error details:', JSON.stringify(stripeErr, null, 2));
       }
+    } else {
+      console.log('[Bookings API] Stripe checkout is DISABLED');
     }
 
     return NextResponse.json({
