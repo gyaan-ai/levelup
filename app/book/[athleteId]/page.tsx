@@ -1,6 +1,7 @@
 import { redirect, notFound } from 'next/navigation';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import { BookingFlow } from './booking-flow';
 
@@ -84,12 +85,38 @@ export default async function BookPage({
     facility = facilityData;
   }
 
+  // Fetch products that this athlete offers
+  const admin = createAdminClient(tenantSlug);
+  
+  // Get all active products
+  const { data: allProducts } = await admin
+    .from('products')
+    .select('*')
+    .eq('active', true)
+    .order('display_order', { ascending: true });
+
+  // Get athlete's product selections
+  const { data: athleteProducts } = await admin
+    .from('athlete_products')
+    .select('product_id, enabled')
+    .eq('athlete_id', athleteId);
+
+  // Filter to only enabled products (default to enabled if no record exists)
+  const disabledProductIds = new Set(
+    (athleteProducts || [])
+      .filter(ap => ap.enabled === false)
+      .map(ap => ap.product_id)
+  );
+  
+  const products = (allProducts || []).filter(p => !disabledProductIds.has(p.id));
+
   return (
     <BookingFlow
       athlete={athlete}
       facility={facility}
       youthWrestlers={youthWrestlers || []}
       tenantPricing={tenant.pricing}
+      products={products}
     />
   );
 }

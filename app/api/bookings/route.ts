@@ -36,6 +36,7 @@ export async function POST(req: NextRequest) {
       totalPrice: number;
       pricePerParticipant?: number;
       useCredits?: boolean;
+      productId?: string;
     };
     const {
       athleteId,
@@ -47,6 +48,7 @@ export async function POST(req: NextRequest) {
       totalPrice,
       pricePerParticipant,
       useCredits = true, // Default to using credits if available
+      productId,
     } = body;
 
     if (!athleteId || !youthWrestlerIds?.length || !scheduledDate || !scheduledTime || totalPrice == null) {
@@ -141,6 +143,7 @@ export async function POST(req: NextRequest) {
         parent_id: user.id,
         athlete_id: athleteId,
         facility_id,
+        product_id: productId ?? undefined,
         session_type: sessionType,
         session_mode: sessionMode,
         partner_invite_code: partner_invite_code ?? undefined,

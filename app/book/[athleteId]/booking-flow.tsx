@@ -52,16 +52,28 @@ interface Facility {
   school: string;
 }
 
+export interface Product {
+  id: string;
+  slug: string;
+  name: string;
+  description?: string;
+  parent_price: number;
+  athlete_payout: number;
+  min_participants: number;
+  max_participants: number;
+}
+
 interface BookingFlowProps {
   athlete: Athlete;
   facility: Facility | null;
   youthWrestlers: YouthWrestler[];
   tenantPricing: { oneOnOne: number; twoAthlete: number; groupRate: number };
+  products?: Product[];
 }
 
 type AvailabilityByDay = { day_of_week: number; start_time: string; end_time: string }[];
 
-export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing }: BookingFlowProps) {
+export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, products = [] }: BookingFlowProps) {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedWrestlers, setSelectedWrestlers] = useState<YouthWrestler[]>([]);
@@ -73,6 +85,7 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing }
   const [availability, setAvailability] = useState<AvailabilityByDay | null>(null);
   const [slots, setSlots] = useState<string[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
 
   const sessionMode: SessionMode | null =
     sessionChoice === '1-on-1' ? 'private'
@@ -82,11 +95,48 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing }
     : sessionChoice === 'partner' && partnerOption === 'solo' ? 'partner-invite' // same as invite for now
     : null;
 
-  const priceInfo = sessionMode
-    ? getSessionPrice(sessionMode, selectedWrestlers.length, tenantPricing)
-    : null;
+  // Use product pricing if available, fall back to tenant pricing
+  const getProductPrice = () => {
+    if (selectedProduct) {
+      const participants = selectedWrestlers.length;
+      return {
+        total: selectedProduct.parent_price * participants,
+        pricePerParticipant: selectedProduct.parent_price,
+        athletePayout: selectedProduct.athlete_payout * participants,
+      };
+    }
+    // Fall back to legacy tenant pricing
+    const priceInfo = sessionMode
+      ? getSessionPrice(sessionMode, selectedWrestlers.length, tenantPricing)
+      : null;
+    return priceInfo ? { 
+      total: priceInfo.total, 
+      pricePerParticipant: priceInfo.pricePerParticipant,
+      athletePayout: priceInfo.total * 0.83, // ~83% to athlete as estimate
+    } : null;
+  };
+
+  const priceInfo = getProductPrice();
   const totalPrice = priceInfo?.total ?? 0;
   const pricePerParticipant = priceInfo?.pricePerParticipant;
+
+  // Auto-select product based on session type if products available
+  useEffect(() => {
+    if (products.length > 0 && sessionMode) {
+      const numParticipants = selectedWrestlers.length;
+      // Find matching product
+      let product: Product | undefined;
+      if (sessionMode === 'private') {
+        product = products.find(p => p.slug === 'private' || (p.min_participants === 1 && p.max_participants === 1));
+      } else if (sessionMode === 'partner-invite' || sessionMode === 'partner-open') {
+        product = products.find(p => p.slug === 'partner' || (p.min_participants <= 2 && p.max_participants >= 2));
+      } else if (sessionMode === 'sibling') {
+        // Sibling uses partner pricing for 2 people
+        product = products.find(p => p.slug === 'partner' || (p.min_participants <= numParticipants && p.max_participants >= numParticipants));
+      }
+      setSelectedProduct(product || null);
+    }
+  }, [sessionMode, selectedWrestlers.length, products]);
 
   const numSelected = selectedWrestlers.length;
   const oneWrestler = numSelected === 1;
@@ -204,6 +254,7 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing }
           scheduledTime: is24h(selectedTime) ? selectedTime : timeTo24h(selectedTime),
           totalPrice,
           pricePerParticipant: pricePerParticipant ?? undefined,
+          productId: selectedProduct?.id ?? undefined,
         }),
       });
       const data = await res.json();

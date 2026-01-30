@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/select';
 import { Plus, X, ArrowLeft, Globe, Lock } from 'lucide-react';
 import Link from 'next/link';
+import { AthleteProductSelection } from '@/components/athlete-product-selection';
 
 const profileSchema = z.object({
   weightClass: z.string().optional(),
@@ -501,6 +502,11 @@ export default function ProfilePage() {
           </Form>
         </CardContent>
       </Card>
+
+      {/* Product/Session Type Selection */}
+      <div className="mt-6">
+        <AthleteProductSelection />
+      </div>
 
       <dialog
         ref={visibilityModalRef}
