@@ -10,6 +10,7 @@ import {
   type BillingSummary,
   type AthleteReport,
   type CoachPayout,
+  type CreditRecord,
 } from './admin-dashboard-client';
 
 function getAdminEmails(): Set<string> {
@@ -59,7 +60,7 @@ export default async function AdminPage() {
 
   const admin = createAdminClient(tenant.slug);
 
-  const [sessionsRes, usersRes] = await Promise.all([
+  const [sessionsRes, usersRes, creditsRes] = await Promise.all([
     admin
       .from('sessions')
       .select(`
@@ -83,6 +84,10 @@ export default async function AdminPage() {
       .from('users')
       .select('id, email, role, created_at')
       .order('created_at', { ascending: false }),
+    admin
+      .from('credits')
+      .select('id, parent_id, amount, remaining, source, description, created_at, expires_at')
+      .order('created_at', { ascending: false }),
   ]);
 
   if (usersRes.error) {
@@ -92,9 +97,13 @@ export default async function AdminPage() {
     console.error('Admin sessions fetch error:', sessionsRes.error);
     console.error('Admin sessions error details:', JSON.stringify(sessionsRes.error, null, 2));
   }
+  if (creditsRes.error) {
+    console.error('Admin credits fetch error:', creditsRes.error);
+  }
   
   console.log('[Admin] Sessions fetched:', sessionsRes.data?.length ?? 0, 'rows');
   console.log('[Admin] Users fetched:', usersRes.data?.length ?? 0, 'rows');
+  console.log('[Admin] Credits fetched:', creditsRes.data?.length ?? 0, 'rows');
 
   const sessionsRows = (sessionsRes.data ?? []) as Array<{
     id: string;
@@ -215,6 +224,19 @@ export default async function AdminPage() {
     .map(([athlete_id, data]) => ({ athlete_id, ...data }))
     .sort((a, b) => b.amount - a.amount);
 
+  // Credits with parent email
+  const credits: CreditRecord[] = (creditsRes.data ?? []).map((c) => ({
+    id: c.id,
+    parent_id: c.parent_id,
+    parent_email: emailByUserId.get(c.parent_id) ?? '—',
+    amount: Number(c.amount),
+    remaining: Number(c.remaining),
+    source: c.source,
+    description: c.description,
+    created_at: c.created_at,
+    expires_at: c.expires_at,
+  }));
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
@@ -229,6 +251,7 @@ export default async function AdminPage() {
         billing={billing}
         athleteReports={athleteReports}
         coachPayouts={coachPayouts}
+        credits={credits}
         usersError={usersRes.error?.message ?? null}
       />
     </div>

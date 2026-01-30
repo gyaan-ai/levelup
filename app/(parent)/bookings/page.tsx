@@ -2,12 +2,10 @@ import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent } from '@/components/ui/card';
 import Link from 'next/link';
-import { Button } from '@/components/ui/button';
-import { Calendar, User, MapPin, MessageCircle } from 'lucide-react';
-import { SchoolLogo } from '@/components/school-logo';
+import { Wallet } from 'lucide-react';
+import { BookingCard, type BookingSession } from './booking-card';
 
 export default async function MyBookingsPage() {
   const headersList = await headers();
@@ -29,26 +27,43 @@ export default async function MyBookingsPage() {
   if (userData?.role === 'athlete') redirect('/athlete-dashboard');
   // parent and admin can both access (admin sees empty state if no bookings)
 
-  const { data: sessions, error } = await supabase
-    .from('sessions')
-    .select(`
-      id,
-      scheduled_datetime,
-      status,
-      total_price,
-      session_type,
-      session_mode,
-      partner_invite_code,
-      athletes(id, first_name, last_name, school, photo_url),
-      facilities(id, name, address),
-      session_participants(youth_wrestler_id, youth_wrestlers(id, first_name, last_name))
-    `)
-    .eq('parent_id', user.id)
-    .order('scheduled_datetime', { ascending: false });
+  const [sessionsRes, creditsRes] = await Promise.all([
+    supabase
+      .from('sessions')
+      .select(`
+        id,
+        scheduled_datetime,
+        status,
+        total_price,
+        session_type,
+        session_mode,
+        partner_invite_code,
+        athletes(id, first_name, last_name, school, photo_url),
+        facilities(id, name, address),
+        session_participants(youth_wrestler_id, youth_wrestlers(id, first_name, last_name))
+      `)
+      .eq('parent_id', user.id)
+      .order('scheduled_datetime', { ascending: false }),
+    supabase
+      .from('credits')
+      .select('remaining, expires_at')
+      .eq('parent_id', user.id)
+      .gt('remaining', 0),
+  ]);
+
+  const sessions = sessionsRes.data;
+  const error = sessionsRes.error;
 
   if (error) {
     console.error('Bookings fetch error:', error);
   }
+
+  // Calculate credit balance
+  const now = new Date();
+  const availableCredits = (creditsRes.data || []).filter(c => 
+    c.remaining > 0 && (!c.expires_at || new Date(c.expires_at) > now)
+  );
+  const creditBalance = availableCredits.reduce((sum, c) => sum + Number(c.remaining), 0);
 
   const all = (sessions || []) as Array<{
     id: string;
@@ -109,22 +124,40 @@ export default async function MyBookingsPage() {
       .filter(Boolean) as string[];
   };
 
-  const statusBadge = (status: string) => {
-    if (status === 'scheduled') return <Badge>Scheduled</Badge>;
-    if (status === 'pending_payment') return <Badge variant="secondary">Pending payment</Badge>;
-    if (status === 'completed') return <Badge variant="default">Completed</Badge>;
-    if (status === 'cancelled') return <Badge variant="secondary">Cancelled</Badge>;
-    if (status === 'no-show') return <Badge variant="secondary">No-show</Badge>;
-    return <Badge variant="outline">{status}</Badge>;
-  };
+  // Transform sessions for BookingCard
+  const transformSession = (s: (typeof all)[0]): BookingSession => ({
+    id: s.id,
+    scheduled_datetime: s.scheduled_datetime,
+    status: s.status,
+    total_price: s.total_price,
+    session_type: s.session_type,
+    session_mode: s.session_mode,
+    partner_invite_code: s.partner_invite_code,
+    coach: coach(s),
+    facility: facility(s),
+    wrestlers: wrestlers(s),
+  });
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">My Bookings</h1>
-        <p className="text-muted-foreground">
-          Upcoming and past sessions for your wrestlers
-        </p>
+      <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold mb-2">My Bookings</h1>
+          <p className="text-muted-foreground">
+            Upcoming and past sessions for your wrestlers
+          </p>
+        </div>
+        {creditBalance > 0 && (
+          <Card className="bg-primary/5 border-primary/20">
+            <CardContent className="py-3 px-4 flex items-center gap-2">
+              <Wallet className="h-5 w-5 text-primary" />
+              <div>
+                <p className="text-sm text-muted-foreground">Credit Balance</p>
+                <p className="text-xl font-bold text-primary">${creditBalance.toFixed(2)}</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       <div className="space-y-8">
@@ -139,65 +172,7 @@ export default async function MyBookingsPage() {
           ) : (
             <div className="space-y-4">
               {upcoming.map((s) => (
-                <Card key={s.id}>
-                  <CardContent className="p-4 sm:p-6">
-                    <div className="flex flex-wrap items-start justify-between gap-4">
-                      <div className="space-y-1">
-                        <p className="font-medium">
-                          {new Date(s.scheduled_datetime).toLocaleDateString('en-US', {
-                            weekday: 'long',
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric',
-                          })}
-                        </p>
-                        <p className="text-sm text-muted-foreground flex items-center gap-1">
-                          <Calendar className="h-4 w-4" />
-                          {new Date(s.scheduled_datetime).toLocaleTimeString('en-US', {
-                            hour: 'numeric',
-                            minute: '2-digit',
-                          })}
-                          {' · '}
-                          <MapPin className="h-4 w-4 inline" />
-                          {facility(s)}
-                        </p>
-                        <p className="text-sm flex items-center gap-1">
-                          <User className="h-4 w-4" />
-                          {coach(s).name}
-                          {coach(s).school && (
-                            <span className="flex items-center gap-1">
-                              <SchoolLogo school={coach(s).school} size="sm" />
-                              ({coach(s).school})
-                            </span>
-                          )}
-                        </p>
-                        {wrestlers(s).length > 0 && (
-                          <p className="text-sm text-muted-foreground">
-                            Wrestler(s): {wrestlers(s).join(', ')}
-                          </p>
-                        )}
-                        <div className="pt-2">{statusBadge(s.status)}</div>
-                      </div>
-                      <div className="text-right flex flex-col items-end gap-2">
-                        <p className="text-xl font-bold">${Number(s.total_price).toFixed(2)}</p>
-                        <p className="text-xs text-muted-foreground">{s.session_type ?? '—'}</p>
-                        <div className="flex gap-2">
-                          <Link href={`/messages/${s.id}`}>
-                            <Button variant="outline" size="sm">
-                              <MessageCircle className="h-4 w-4 mr-1" />
-                              Message
-                            </Button>
-                          </Link>
-                          {coach(s).id && (
-                            <Link href={`/book/${coach(s).id}`}>
-                              <Button variant="outline" size="sm">Book again</Button>
-                            </Link>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                <BookingCard key={s.id} session={transformSession(s)} />
               ))}
             </div>
           )}
@@ -210,46 +185,7 @@ export default async function MyBookingsPage() {
           ) : (
             <div className="space-y-4">
               {past.map((s) => (
-                <Card key={s.id} className="bg-muted/20">
-                  <CardContent className="p-4 sm:p-6">
-                    <div className="flex flex-wrap items-start justify-between gap-4">
-                      <div className="space-y-1">
-                        <p className="font-medium">
-                          {new Date(s.scheduled_datetime).toLocaleDateString('en-US', {
-                            weekday: 'short',
-                            month: 'short',
-                            day: 'numeric',
-                            year: 'numeric',
-                          })}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {new Date(s.scheduled_datetime).toLocaleTimeString('en-US', {
-                            hour: 'numeric',
-                            minute: '2-digit',
-                          })}
-                          {' · '}
-                          {facility(s)} · {coach(s).name}
-                        </p>
-                        {wrestlers(s).length > 0 && (
-                          <p className="text-sm text-muted-foreground">
-                            Wrestler(s): {wrestlers(s).join(', ')}
-                          </p>
-                        )}
-                        <div className="pt-2">{statusBadge(s.status)}</div>
-                      </div>
-                      <div className="text-right flex flex-col items-end gap-2">
-                        <p className="font-bold">${Number(s.total_price).toFixed(2)}</p>
-                        <p className="text-xs text-muted-foreground">{s.session_type ?? '—'}</p>
-                        <Link href={`/messages/${s.id}`}>
-                          <Button variant="outline" size="sm">
-                            <MessageCircle className="h-4 w-4 mr-1" />
-                            Message
-                          </Button>
-                        </Link>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                <BookingCard key={s.id} session={transformSession(s)} isPast />
               ))}
             </div>
           )}

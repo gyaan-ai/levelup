@@ -20,6 +20,7 @@ import {
   BarChart3,
   Search,
   Wallet,
+  CreditCard,
 } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
@@ -77,7 +78,19 @@ export type CoachPayout = {
   zelle_email?: string | null;
 };
 
-type TabId = 'sessions' | 'users' | 'billing' | 'athletes' | 'payouts';
+export type CreditRecord = {
+  id: string;
+  parent_id: string;
+  parent_email: string;
+  amount: number;
+  remaining: number;
+  source: string;
+  description?: string | null;
+  created_at: string;
+  expires_at?: string | null;
+};
+
+type TabId = 'sessions' | 'users' | 'billing' | 'athletes' | 'payouts' | 'credits';
 
 type Props = {
   sessions: AdminSession[];
@@ -85,6 +98,7 @@ type Props = {
   billing: BillingSummary;
   athleteReports: AthleteReport[];
   coachPayouts: CoachPayout[];
+  credits: CreditRecord[];
   usersError?: string | null;
 };
 
@@ -94,6 +108,7 @@ export function AdminDashboardClient({
   billing,
   athleteReports,
   coachPayouts,
+  credits,
   usersError,
 }: Props) {
   const router = useRouter();
@@ -150,6 +165,7 @@ export function AdminDashboardClient({
     { id: 'users', label: 'Users', icon: <Users className="h-4 w-4" /> },
     { id: 'billing', label: 'Billing', icon: <DollarSign className="h-4 w-4" /> },
     { id: 'payouts', label: 'Coach payouts', icon: <Wallet className="h-4 w-4" /> },
+    { id: 'credits', label: 'Credits', icon: <CreditCard className="h-4 w-4" /> },
     { id: 'athletes', label: 'Athlete reports', icon: <BarChart3 className="h-4 w-4" /> },
   ];
 
@@ -476,6 +492,92 @@ export function AdminDashboardClient({
                 </tbody>
               </table>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {tab === 'credits' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Account Credits</CardTitle>
+            <CardDescription>
+              Credits issued from cancellations or promotions. Parents can use these for future bookings.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-2 font-medium">Parent</th>
+                    <th className="text-left py-2 font-medium">Source</th>
+                    <th className="text-right py-2 font-medium">Original</th>
+                    <th className="text-right py-2 font-medium">Remaining</th>
+                    <th className="text-left py-2 font-medium">Created</th>
+                    <th className="text-left py-2 font-medium">Description</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {credits.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-8 text-center text-muted-foreground">
+                        No credits issued yet.
+                      </td>
+                    </tr>
+                  ) : (
+                    credits.map((c) => (
+                      <tr key={c.id} className="border-b last:border-0">
+                        <td className="py-2">
+                          <a
+                            href={`mailto:${c.parent_email}`}
+                            className="text-primary hover:underline"
+                          >
+                            {c.parent_email}
+                          </a>
+                        </td>
+                        <td className="py-2">
+                          <Badge variant="outline">
+                            {c.source === 'cancellation' && 'Cancellation'}
+                            {c.source === 'coach_cancellation' && 'Coach cancelled'}
+                            {c.source === 'admin_grant' && 'Admin grant'}
+                            {c.source === 'promotion' && 'Promotion'}
+                          </Badge>
+                        </td>
+                        <td className="py-2 text-right">${Number(c.amount).toFixed(2)}</td>
+                        <td className="py-2 text-right font-medium">
+                          ${Number(c.remaining).toFixed(2)}
+                          {c.remaining === 0 && (
+                            <span className="text-muted-foreground ml-1">(used)</span>
+                          )}
+                        </td>
+                        <td className="py-2 text-muted-foreground">
+                          {format(new Date(c.created_at), 'MMM d, yyyy')}
+                        </td>
+                        <td className="py-2 text-muted-foreground text-xs max-w-xs truncate">
+                          {c.description ?? '—'}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {credits.length > 0 && (
+              <div className="mt-4 pt-4 border-t flex gap-8">
+                <div>
+                  <p className="text-sm text-muted-foreground">Total issued</p>
+                  <p className="text-xl font-bold">
+                    ${credits.reduce((sum, c) => sum + Number(c.amount), 0).toFixed(2)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Outstanding</p>
+                  <p className="text-xl font-bold text-primary">
+                    ${credits.reduce((sum, c) => sum + Number(c.remaining), 0).toFixed(2)}
+                  </p>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

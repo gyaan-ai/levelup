@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import { generateInviteCode } from '@/lib/sessions';
 import { getStripeInstance } from '@/lib/stripe/webhooks';
@@ -34,6 +35,7 @@ export async function POST(req: NextRequest) {
       scheduledTime: string;
       totalPrice: number;
       pricePerParticipant?: number;
+      useCredits?: boolean;
     };
     const {
       athleteId,
@@ -44,6 +46,7 @@ export async function POST(req: NextRequest) {
       scheduledTime,
       totalPrice,
       pricePerParticipant,
+      useCredits = true, // Default to using credits if available
     } = body;
 
     if (!athleteId || !youthWrestlerIds?.length || !scheduledDate || !scheduledTime || totalPrice == null) {
@@ -64,6 +67,44 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Facility required' }, { status: 400 });
     }
 
+    // Calculate credits and remaining amount
+    const admin = createAdminClient(tenant.slug);
+    let creditBalance = 0;
+    let creditsToUse = 0;
+    let amountToCharge = totalPrice;
+    const creditUsageRecords: { creditId: string; amount: number }[] = [];
+
+    if (useCredits) {
+      // Fetch available credits (non-expired, with remaining balance)
+      const { data: credits } = await admin
+        .from('credits')
+        .select('id, remaining, expires_at')
+        .eq('parent_id', user.id)
+        .gt('remaining', 0)
+        .order('created_at', { ascending: true }); // Use oldest first (FIFO)
+
+      const now = new Date();
+      const validCredits = (credits || []).filter(c => 
+        c.remaining > 0 && (!c.expires_at || new Date(c.expires_at) > now)
+      );
+      creditBalance = validCredits.reduce((sum, c) => sum + Number(c.remaining), 0);
+
+      // Apply test mode pricing if enabled
+      const testModePenny = process.env.TEST_MODE_PENNY_PRICING === 'true';
+      const priceToUse = testModePenny ? 0.50 : totalPrice;
+
+      // Allocate credits (FIFO)
+      let remaining = priceToUse;
+      for (const credit of validCredits) {
+        if (remaining <= 0) break;
+        const useAmount = Math.min(Number(credit.remaining), remaining);
+        creditsToUse += useAmount;
+        remaining -= useAmount;
+        creditUsageRecords.push({ creditId: credit.id, amount: useAmount });
+      }
+      amountToCharge = remaining; // What's left after credits
+    }
+
     const numParticipants = youthWrestlerIds.length;
     const isPartner = sessionMode === 'partner-invite' || sessionMode === 'partner-open';
     const maxParticipants = isPartner ? 2 : Math.max(1, numParticipants);
@@ -72,12 +113,15 @@ export async function POST(req: NextRequest) {
     const [datePart] = scheduledDate.split('T');
     const scheduledDatetime = `${datePart}T${scheduledTime}`;
     
-    // Use test mode pricing if enabled (Stripe minimum is $0.50 USD)
+    // Actual charge amount (after credits applied)
     const testModePenny = process.env.TEST_MODE_PENNY_PRICING === 'true';
-    const actualChargeAmount = testModePenny ? 0.50 : totalPrice;
-    const athletePayment = actualChargeAmount;
+    const basePrice = testModePenny ? 0.50 : totalPrice;
+    const creditUsed = creditsToUse;
+    const stripeChargeAmount = Math.max(0, basePrice - creditUsed);
+    const athletePayment = basePrice;
     const orgFee = 0;
     const stripeFee = 0;
+    const fullyPaidWithCredit = stripeChargeAmount === 0 && creditUsed > 0;
 
     let partner_invite_code: string | null = null;
     if (sessionMode === 'partner-invite') {
@@ -102,17 +146,17 @@ export async function POST(req: NextRequest) {
         partner_invite_code: partner_invite_code ?? undefined,
         max_participants: maxParticipants,
         current_participants: numParticipants,
-        base_price: actualChargeAmount,
+        base_price: basePrice,
         price_per_participant: testModePenny ? 0.50 : (pricePerParticipant ?? undefined),
         scheduled_datetime: scheduledDatetime,
         duration_minutes: 60,
-        total_price: actualChargeAmount,
+        total_price: basePrice,
         athlete_payment: athletePayment,
         org_fee: orgFee,
         stripe_fee: stripeFee,
-        paid_with_credit: false,
-        status: 'pending_payment',
-        athlete_paid: false,
+        paid_with_credit: fullyPaidWithCredit,
+        status: fullyPaidWithCredit ? 'scheduled' : 'pending_payment',
+        athlete_paid: fullyPaidWithCredit,
       })
       .select('id, partner_invite_code, session_mode')
       .single();
@@ -129,7 +173,7 @@ export async function POST(req: NextRequest) {
         session_id: session.id,
         youth_wrestler_id: ywId,
         parent_id: user.id,
-        paid: false,
+        paid: fullyPaidWithCredit,
         amount_paid: testModePenny ? (0.50 / numParticipants) : (pricePerParticipant ?? totalPrice / numParticipants),
       });
       if (partError) {
@@ -138,15 +182,49 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Apply credit usage if credits were used
+    if (creditUsageRecords.length > 0) {
+      for (const record of creditUsageRecords) {
+        // Insert credit_usage record
+        await admin.from('credit_usage').insert({
+          credit_id: record.creditId,
+          session_id: session.id,
+          amount: record.amount,
+        });
+        // Deduct from credit remaining
+        const { data: credit } = await admin
+          .from('credits')
+          .select('remaining')
+          .eq('id', record.creditId)
+          .single();
+        if (credit) {
+          await admin
+            .from('credits')
+            .update({ remaining: Number(credit.remaining) - record.amount, updated_at: new Date().toISOString() })
+            .eq('id', record.creditId);
+        }
+      }
+    }
+
+    // If fully paid with credit, skip Stripe and return success
+    if (fullyPaidWithCredit) {
+      return NextResponse.json({
+        sessionId: session.id,
+        partnerInviteCode: session.partner_invite_code ?? undefined,
+        sessionMode: session.session_mode,
+        paidWithCredit: true,
+        creditUsed: creditUsed,
+      });
+    }
+
     // Stripe Checkout: enable by setting STRIPE_CHECKOUT_ENABLED=true (and keys + webhook).
     // When disabled, booking creates session as pending_payment and we redirect to confirmed without payment.
-    // TEST_MODE_PENNY_PRICING: Set to 'true' to charge $0.01 instead of full price (for testing live Stripe with minimal cost)
     let checkoutUrl: string | undefined;
     console.log('[Bookings API] STRIPE_CHECKOUT_ENABLED:', process.env.STRIPE_CHECKOUT_ENABLED);
-    console.log('[Bookings API] TEST_MODE_PENNY_PRICING:', process.env.TEST_MODE_PENNY_PRICING);
+    console.log('[Bookings API] Credits used:', creditUsed, 'Remaining to charge:', stripeChargeAmount);
     console.log('[Bookings API] Tenant slug:', tenant.slug);
     
-    if (process.env.STRIPE_CHECKOUT_ENABLED === 'true') {
+    if (process.env.STRIPE_CHECKOUT_ENABLED === 'true' && stripeChargeAmount >= 0.50) {
       try {
         console.log('[Bookings API] Attempting to create Stripe checkout session...');
         const stripe = getStripeInstance(tenant.slug);
@@ -155,8 +233,8 @@ export async function POST(req: NextRequest) {
         if (session.partner_invite_code) successParams.set('code', session.partner_invite_code);
         if (session.session_mode) successParams.set('mode', session.session_mode);
         
-        // Use the actual charge amount (test mode pricing already applied above)
-        console.log('[Bookings API] Charge amount:', actualChargeAmount, '(test mode:', testModePenny, ')');
+        // Charge the remaining amount after credits
+        console.log('[Bookings API] Stripe charge amount:', stripeChargeAmount);
         
         const stripeSession = await stripe.checkout.sessions.create({
           mode: 'payment',
@@ -165,9 +243,9 @@ export async function POST(req: NextRequest) {
             quantity: 1,
             price_data: {
               currency: 'usd',
-              unit_amount: Math.round(actualChargeAmount * 100),
+              unit_amount: Math.round(stripeChargeAmount * 100),
               product_data: {
-                name: 'The Guild – Wrestling Session',
+                name: creditUsed > 0 ? 'The Guild – Session (partial credit applied)' : 'The Guild – Wrestling Session',
                 description: testModePenny 
                   ? `TEST MODE: Session on ${scheduledDate} at ${scheduledTime} (actual price: $${totalPrice.toFixed(2)})`
                   : `Session on ${scheduledDate} at ${scheduledTime}`,
@@ -186,14 +264,34 @@ export async function POST(req: NextRequest) {
         console.error('[Bookings API] Stripe Checkout ERROR:', stripeErr);
         console.error('[Bookings API] Error details:', JSON.stringify(stripeErr, null, 2));
       }
+    } else if (stripeChargeAmount < 0.50 && stripeChargeAmount > 0) {
+      // Amount too small for Stripe, treat as fully paid with credits
+      await admin
+        .from('sessions')
+        .update({ status: 'scheduled', athlete_paid: true, paid_with_credit: true })
+        .eq('id', session.id);
+      await admin
+        .from('session_participants')
+        .update({ paid: true })
+        .eq('session_id', session.id);
+      
+      return NextResponse.json({
+        sessionId: session.id,
+        partnerInviteCode: session.partner_invite_code ?? undefined,
+        sessionMode: session.session_mode,
+        paidWithCredit: true,
+        creditUsed: creditUsed,
+        message: `Session booked! $${creditUsed.toFixed(2)} credit applied, $${stripeChargeAmount.toFixed(2)} remaining amount waived.`,
+      });
     } else {
-      console.log('[Bookings API] Stripe checkout is DISABLED');
+      console.log('[Bookings API] Stripe checkout is DISABLED or no charge needed');
     }
 
     return NextResponse.json({
       sessionId: session.id,
       partnerInviteCode: session.partner_invite_code ?? undefined,
       sessionMode: session.session_mode,
+      creditUsed: creditUsed,
       ...(checkoutUrl && { url: checkoutUrl }),
     });
   } catch (e) {
