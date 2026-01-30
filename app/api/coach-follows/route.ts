@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
-    if (userData?.role !== 'parent') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    if (userData?.role !== 'parent' && userData?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
     const { data, error } = await supabase
       .from('coach_follows')
@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
-    if (userData?.role !== 'parent') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    if (userData?.role !== 'parent' && userData?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
     const body = (await req.json()) as { coachId?: string };
     const coachId = body?.coachId;
@@ -89,7 +89,7 @@ export async function DELETE(req: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
-    if (userData?.role !== 'parent') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    if (userData?.role !== 'parent' && userData?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
     const { searchParams } = new URL(req.url);
     const coachId = searchParams.get('coachId');

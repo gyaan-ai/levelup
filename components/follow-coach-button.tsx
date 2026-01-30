@@ -13,8 +13,11 @@ export function FollowCoachButton({ coachId, className }: Props) {
   const [checkLoading, setCheckLoading] = useState(true);
   const [toggleLoading, setToggleLoading] = useState(false);
 
+  const canFollow = userRole === 'parent' || userRole === 'admin';
+  const hideButton = userRole === 'athlete' || !user;
+
   useEffect(() => {
-    if (!user || userRole !== 'parent') {
+    if (!user || !canFollow) {
       setCheckLoading(false);
       return;
     }
@@ -30,7 +33,7 @@ export function FollowCoachButton({ coachId, className }: Props) {
         if (!cancelled) setCheckLoading(false);
       });
     return () => { cancelled = true; };
-  }, [user, userRole, coachId]);
+  }, [user, canFollow, coachId]);
 
   const onToggle = async () => {
     if (toggleLoading || !user) return;
@@ -54,10 +57,21 @@ export function FollowCoachButton({ coachId, className }: Props) {
     }
   };
 
-  if (authLoading || !user || userRole !== 'parent') return null;
+  if (hideButton) return null;
+
+  if (authLoading || !canFollow) {
+    return (
+      <Button variant="outline" size="sm" className={className} disabled>
+        <Heart className="h-4 w-4 mr-1.5" />
+        Follow
+      </Button>
+    );
+  }
+
   if (checkLoading) {
     return (
       <Button variant="outline" size="sm" className={className} disabled>
+        <Heart className="h-4 w-4 mr-1.5" />
         Follow
       </Button>
     );
