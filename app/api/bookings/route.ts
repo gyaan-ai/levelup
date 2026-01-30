@@ -136,6 +136,7 @@ export async function POST(req: NextRequest) {
 
     // Stripe Checkout: enable by setting STRIPE_CHECKOUT_ENABLED=true (and keys + webhook).
     // When disabled, booking creates session as pending_payment and we redirect to confirmed without payment.
+    // TEST_MODE_PENNY_PRICING: Set to 'true' to charge $0.01 instead of full price (for testing live Stripe with minimal cost)
     let checkoutUrl: string | undefined;
     if (process.env.STRIPE_CHECKOUT_ENABLED === 'true') {
       try {
@@ -144,6 +145,11 @@ export async function POST(req: NextRequest) {
         const successParams = new URLSearchParams({ sessionId: session.id });
         if (session.partner_invite_code) successParams.set('code', session.partner_invite_code);
         if (session.session_mode) successParams.set('mode', session.session_mode);
+        
+        // Use penny pricing for testing if enabled
+        const testModePenny = process.env.TEST_MODE_PENNY_PRICING === 'true';
+        const chargeAmount = testModePenny ? 0.01 : totalPrice;
+        
         const stripeSession = await stripe.checkout.sessions.create({
           mode: 'payment',
           payment_method_types: ['card'],
@@ -151,15 +157,17 @@ export async function POST(req: NextRequest) {
             quantity: 1,
             price_data: {
               currency: 'usd',
-              unit_amount: Math.round(totalPrice * 100),
+              unit_amount: Math.round(chargeAmount * 100),
               product_data: {
                 name: 'The Guild – Wrestling Session',
-                description: `Session on ${scheduledDate} at ${scheduledTime}`,
-                metadata: { app: 'the-guild' },
+                description: testModePenny 
+                  ? `TEST MODE: Session on ${scheduledDate} at ${scheduledTime} (actual price: $${totalPrice.toFixed(2)})`
+                  : `Session on ${scheduledDate} at ${scheduledTime}`,
+                metadata: { app: 'the-guild', test_mode: testModePenny ? 'true' : 'false' },
               },
             },
           }],
-          metadata: { session_id: session.id, app: 'the-guild' },
+          metadata: { session_id: session.id, app: 'the-guild', test_mode: testModePenny ? 'true' : 'false' },
           success_url: `${baseUrl}/book/${athleteId}/confirmed?${successParams.toString()}`,
           cancel_url: `${baseUrl}/book/${athleteId}`,
           customer_email: user.email ?? undefined,
