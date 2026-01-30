@@ -31,7 +31,7 @@ export default async function BookingConfirmedPage({
   if (!user) redirect('/login?redirect=/book/' + athleteId + '/confirmed');
 
   const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
-  if (userData?.role !== 'parent') redirect('/dashboard');
+  if (userData?.role !== 'parent' && userData?.role !== 'admin') redirect('/dashboard');
 
   if (!sessionId) {
     redirect('/dashboard');

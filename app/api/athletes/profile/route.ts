@@ -69,7 +69,7 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { weightClass, bio, credentials, photoUrl, facilityId, active } = body;
+    const { weightClass, bio, credentials, photoUrl, facilityId, active, venmoHandle, zelleEmail } = body;
 
     // Check if user is an athlete
     const { data: userData } = await supabase
@@ -118,6 +118,8 @@ export async function PUT(req: NextRequest) {
       // Public (active) = visible in browse & bookable; Private = hidden, keep editing
       active: active === true,
     };
+    if (venmoHandle !== undefined) updateData.venmo_handle = venmoHandle === '' ? null : String(venmoHandle).trim();
+    if (zelleEmail !== undefined) updateData.zelle_email = zelleEmail === '' ? null : String(zelleEmail).trim();
 
     // ALWAYS try UPDATE first (record should exist from signup)
     // Admin client bypasses RLS, so this should work

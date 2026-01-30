@@ -36,6 +36,8 @@ const onboardingSchema = z.object({
     description: z.string().optional(),
   })).optional(),
   facilityId: z.string().optional(),
+  venmoHandle: z.string().max(30).optional(),
+  zelleEmail: z.union([z.string().email('Use a valid email for Zelle'), z.literal('')]).optional(),
   photo: z.instanceof(File).optional(),
 });
 
@@ -61,6 +63,8 @@ export default function OnboardingPage() {
       bio: '',
       credentials: [],
       facilityId: '',
+      venmoHandle: '',
+      zelleEmail: '',
     },
   });
 
@@ -90,6 +94,8 @@ export default function OnboardingPage() {
                 }))
               : [],
             facilityId: data.athlete.facility_id || '',
+            venmoHandle: data.athlete.venmo_handle || '',
+            zelleEmail: data.athlete.zelle_email || '',
           };
           
           form.reset(formData);
@@ -173,6 +179,8 @@ export default function OnboardingPage() {
           credentials: credentialsObj,
           photoUrl,
           facilityId: values.facilityId,
+          venmoHandle: values.venmoHandle?.trim() || undefined,
+          zelleEmail: values.zelleEmail?.trim() || undefined,
           active: makePublic,
         }),
       });
@@ -355,6 +363,42 @@ export default function OnboardingPage() {
                 />
               )}
 
+              {/* Payout: Venmo / Zelle */}
+              <div className="space-y-4 rounded-lg border p-4">
+                <p className="text-sm font-medium text-primary">How you get paid</p>
+                <p className="text-sm text-muted-foreground">
+                  We pay coaches via Venmo or Zelle. Add at least one so we can send your earnings.
+                </p>
+                <FormField
+                  control={form.control}
+                  name="venmoHandle"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Venmo username</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g. jake-miller" {...field} />
+                      </FormControl>
+                      <FormDescription>Your Venmo handle (without @)</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="zelleEmail"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Zelle (email or phone)</FormLabel>
+                      <FormControl>
+                        <Input placeholder="email@example.com or 5551234567" {...field} />
+                      </FormControl>
+                      <FormDescription>Email or phone linked to your Zelle account</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
               {/* Credentials */}
               <div>
                 <FormLabel className="mb-2 block">Credentials & Achievements</FormLabel>
@@ -432,6 +476,8 @@ export default function OnboardingPage() {
                           credentials: credentialsObj,
                           photoUrl: photoPreview || null,
                           facilityId: vals.facilityId || null,
+                          venmoHandle: vals.venmoHandle?.trim() || undefined,
+                          zelleEmail: vals.zelleEmail?.trim() || undefined,
                           active: false,
                         }),
                       });

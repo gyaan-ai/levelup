@@ -9,6 +9,7 @@ import {
   type AdminUser,
   type BillingSummary,
   type AthleteReport,
+  type CoachPayout,
 } from './admin-dashboard-client';
 
 function getAdminEmails(): Set<string> {
@@ -64,15 +65,17 @@ export default async function AdminPage() {
       .select(`
         id,
         parent_id,
+        athlete_id,
         scheduled_datetime,
         status,
         total_price,
         athlete_payment,
+        athlete_payout_date,
         org_fee,
         stripe_fee,
         session_type,
         session_mode,
-        athletes(id, first_name, last_name, school),
+        athletes(id, first_name, last_name, school, venmo_handle, zelle_email),
         facilities(id, name)
       `)
       .order('scheduled_datetime', { ascending: false }),
@@ -92,15 +95,17 @@ export default async function AdminPage() {
   const sessionsRows = (sessionsRes.data ?? []) as Array<{
     id: string;
     parent_id: string;
+    athlete_id?: string;
     scheduled_datetime: string;
     status: string;
     total_price: number;
     athlete_payment: number;
+    athlete_payout_date?: string | null;
     org_fee: number;
     stripe_fee: number;
     session_type?: string;
     session_mode?: string;
-    athletes?: { id: string; first_name: string; last_name: string; school: string } | { id: string; first_name: string; last_name: string; school: string }[];
+    athletes?: { id: string; first_name: string; last_name: string; school: string; venmo_handle?: string | null; zelle_email?: string | null } | { id: string; first_name: string; last_name: string; school: string; venmo_handle?: string | null; zelle_email?: string | null }[];
     facilities?: { id: string; name: string } | { id: string; name: string }[];
   }>;
 
@@ -181,6 +186,31 @@ export default async function AdminPage() {
     (a, b) => b.total_earnings - a.total_earnings
   );
 
+  // Coach payouts: completed sessions not yet paid (athlete_payout_date IS NULL)
+  const payoutOwedByAthlete = new Map<string, { amount: number; venmo_handle?: string | null; zelle_email?: string | null; name: string; school: string }>();
+  for (const s of sessionsRows) {
+    if (s.status !== 'completed' || s.athlete_payout_date != null) continue;
+    const a = s.athletes;
+    const o = Array.isArray(a) ? a[0] : a;
+    if (!o?.id) continue;
+    const existing = payoutOwedByAthlete.get(o.id);
+    const payment = Number(s.athlete_payment ?? 0);
+    if (existing) {
+      existing.amount += payment;
+    } else {
+      payoutOwedByAthlete.set(o.id, {
+        amount: payment,
+        venmo_handle: o.venmo_handle ?? null,
+        zelle_email: o.zelle_email ?? null,
+        name: `${o.first_name} ${o.last_name}`,
+        school: o.school ?? '',
+      });
+    }
+  }
+  const coachPayouts = Array.from(payoutOwedByAthlete.entries())
+    .map(([athlete_id, data]) => ({ athlete_id, ...data }))
+    .sort((a, b) => b.amount - a.amount);
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
@@ -194,6 +224,7 @@ export default async function AdminPage() {
         users={users}
         billing={billing}
         athleteReports={athleteReports}
+        coachPayouts={coachPayouts}
         usersError={usersRes.error?.message ?? null}
       />
     </div>

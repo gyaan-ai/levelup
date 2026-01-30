@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -18,6 +19,7 @@ import {
   DollarSign,
   BarChart3,
   Search,
+  Wallet,
 } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
@@ -66,13 +68,23 @@ export type AthleteReport = {
   completed_count: number;
 };
 
-type TabId = 'sessions' | 'users' | 'billing' | 'athletes';
+export type CoachPayout = {
+  athlete_id: string;
+  name: string;
+  school: string;
+  amount: number;
+  venmo_handle?: string | null;
+  zelle_email?: string | null;
+};
+
+type TabId = 'sessions' | 'users' | 'billing' | 'athletes' | 'payouts';
 
 type Props = {
   sessions: AdminSession[];
   users: AdminUser[];
   billing: BillingSummary;
   athleteReports: AthleteReport[];
+  coachPayouts: CoachPayout[];
   usersError?: string | null;
 };
 
@@ -81,9 +93,12 @@ export function AdminDashboardClient({
   users,
   billing,
   athleteReports,
+  coachPayouts,
   usersError,
 }: Props) {
+  const router = useRouter();
   const [tab, setTab] = useState<TabId>('sessions');
+  const [markingAthleteId, setMarkingAthleteId] = useState<string | null>(null);
   const [sessionDateFrom, setSessionDateFrom] = useState('');
   const [sessionDateTo, setSessionDateTo] = useState('');
   const [userRoleFilter, setUserRoleFilter] = useState<string>('all');
@@ -134,6 +149,7 @@ export function AdminDashboardClient({
     { id: 'sessions', label: 'Sessions', icon: <Calendar className="h-4 w-4" /> },
     { id: 'users', label: 'Users', icon: <Users className="h-4 w-4" /> },
     { id: 'billing', label: 'Billing', icon: <DollarSign className="h-4 w-4" /> },
+    { id: 'payouts', label: 'Coach payouts', icon: <Wallet className="h-4 w-4" /> },
     { id: 'athletes', label: 'Athlete reports', icon: <BarChart3 className="h-4 w-4" /> },
   ];
 
@@ -376,6 +392,92 @@ export function AdminDashboardClient({
             </CardHeader>
           </Card>
         </div>
+      )}
+
+      {tab === 'payouts' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Coach payouts (manual)</CardTitle>
+            <CardDescription>
+              Completed sessions not yet paid. Pay via Venmo or Zelle, then click Mark paid.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left py-2 font-medium">Coach</th>
+                    <th className="text-left py-2 font-medium">School</th>
+                    <th className="text-right py-2 font-medium">Amount owed</th>
+                    <th className="text-left py-2 font-medium">Venmo</th>
+                    <th className="text-left py-2 font-medium">Zelle</th>
+                    <th className="text-right py-2 font-medium">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {coachPayouts.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-8 text-center text-muted-foreground">
+                        No unpaid completed sessions.
+                      </td>
+                    </tr>
+                  ) : (
+                    coachPayouts.map((p) => (
+                      <tr key={p.athlete_id} className="border-b last:border-0">
+                        <td className="py-2">
+                          <Link
+                            href={`/athlete/${p.athlete_id}`}
+                            className="text-primary hover:underline font-medium"
+                          >
+                            {p.name}
+                          </Link>
+                        </td>
+                        <td className="py-2 text-muted-foreground">{p.school}</td>
+                        <td className="py-2 text-right font-medium">
+                          ${p.amount.toFixed(2)}
+                        </td>
+                        <td className="py-2 text-muted-foreground">
+                          {p.venmo_handle ? `@${p.venmo_handle}` : '—'}
+                        </td>
+                        <td className="py-2 text-muted-foreground">
+                          {p.zelle_email ?? '—'}
+                        </td>
+                        <td className="py-2 text-right">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={markingAthleteId === p.athlete_id}
+                            onClick={async () => {
+                              setMarkingAthleteId(p.athlete_id);
+                              try {
+                                const r = await fetch('/api/admin/mark-payout-paid', {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ athleteId: p.athlete_id }),
+                                });
+                                const data = await r.json().catch(() => ({}));
+                                if (r.ok && data.success) {
+                                  router.refresh();
+                                } else {
+                                  console.error('Mark paid failed:', data.error ?? r.statusText);
+                                }
+                              } finally {
+                                setMarkingAthleteId(null);
+                              }
+                            }}
+                          >
+                            {markingAthleteId === p.athlete_id ? 'Marking…' : 'Mark paid'}
+                          </Button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
       )}
 
       {tab === 'athletes' && (

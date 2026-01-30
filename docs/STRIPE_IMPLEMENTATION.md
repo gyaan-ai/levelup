@@ -1,23 +1,34 @@
 # Stripe Implementation Plan (Test Mode)
 
-Use **Stripe test mode** for all development and QA. No real charges; you can use test cards and keep building with test data.
+Use **Stripe test mode** for all development and QA. No real charges; use test card `4242 4242 4242 4242`.
 
 ---
 
-## Stripe is off by default (deferred)
+## Enable Stripe in 4 steps
 
-Booking works **without Stripe**: "Pay and Book" creates a session with `status: 'pending_payment'` and redirects to the confirmed page. No payment is collected.
+1. **Env vars** (in `.env.local` and in Vercel):
+   - `NEXT_PUBLIC_NC_UNITED_STRIPE_KEY` = your Stripe **publishable** key (`pk_test_...`)
+   - `NC_UNITED_STRIPE_SECRET_KEY` = your Stripe **secret** key (`sk_test_...`)
+   - `NC_UNITED_STRIPE_WEBHOOK_SECRET` = webhook signing secret (`whsec_...`) — see step 3
+   - `STRIPE_CHECKOUT_ENABLED=true` to turn on payment at checkout
+   - Optional: `NEXT_PUBLIC_APP_URL=https://your-app.vercel.app` so Stripe redirects work in production
 
-**To enable Stripe later:**
+2. **Stripe Dashboard (test mode):** Developers → API keys. Copy publishable and secret into env.
 
-1. Set **`STRIPE_CHECKOUT_ENABLED=true`** in your environment (e.g. Vercel env vars).
-2. Ensure **`NEXT_PUBLIC_NC_UNITED_STRIPE_KEY`** and **`NC_UNITED_STRIPE_SECRET_KEY`** are set (you already have these).
-3. Add a **webhook** in Stripe Dashboard → Developers → Webhooks:  
-   `https://your-app.vercel.app/api/stripe/webhook`  
-   Subscribe to **`checkout.session.completed`**. Copy the **Signing secret** and set **`NC_UNITED_STRIPE_WEBHOOK_SECRET`** in Vercel.
-4. Redeploy. "Pay and Book" will then redirect to Stripe Checkout; after payment, the webhook marks the session as `scheduled` and `athlete_paid`.
+3. **Webhook:** Stripe Dashboard → Developers → Webhooks → Add endpoint:
+   - **URL:** `https://your-domain.com/api/stripe/webhook` (e.g. `https://your-app.vercel.app/api/stripe/webhook`)
+   - **Events:** `checkout.session.completed`
+   - Copy the **Signing secret** → set as `NC_UNITED_STRIPE_WEBHOOK_SECRET`
 
-No Stripe CLI or local webhook setup required for production.
+4. **Redeploy** (or restart dev server). When a parent clicks "Pay and Book", they are redirected to Stripe Checkout; after payment, Stripe redirects back to the confirmed page and the webhook sets the session to `scheduled`.
+
+**Local testing:** For localhost, use [Stripe CLI](https://stripe.com/docs/stripe-cli): `stripe listen --forward-to localhost:3000/api/stripe/webhook` and use the CLI-printed `whsec_...` as `NC_UNITED_STRIPE_WEBHOOK_SECRET`.
+
+---
+
+## Stripe off by default
+
+Booking works **without Stripe**: if `STRIPE_CHECKOUT_ENABLED` is not set or is `false`, "Pay and Book" creates a session with `status: 'pending_payment'` and redirects to the confirmed page without collecting payment.
 
 ---
 
