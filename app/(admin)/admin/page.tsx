@@ -78,9 +78,16 @@ export default async function AdminPage() {
       .order('scheduled_datetime', { ascending: false }),
     admin
       .from('users')
-      .select('id, email, role, created_at, last_login_at')
+      .select('id, email, role, created_at')
       .order('created_at', { ascending: false }),
   ]);
+
+  if (usersRes.error) {
+    console.error('Admin users fetch error:', usersRes.error);
+  }
+  if (sessionsRes.error) {
+    console.error('Admin sessions fetch error:', sessionsRes.error);
+  }
 
   const sessionsRows = (sessionsRes.data ?? []) as Array<{
     id: string;
@@ -102,7 +109,7 @@ export default async function AdminPage() {
     email: string;
     role: string;
     created_at: string;
-    last_login_at: string | null;
+    last_login_at?: string | null;
   }>;
 
   const emailByUserId = new Map(usersRows.map((u) => [u.id, u.email]));
@@ -135,7 +142,7 @@ export default async function AdminPage() {
     email: u.email,
     role: u.role,
     created_at: u.created_at,
-    last_login_at: u.last_login_at,
+    last_login_at: u.last_login_at ?? null,
   }));
 
   const billing: BillingSummary = {
@@ -187,6 +194,7 @@ export default async function AdminPage() {
         users={users}
         billing={billing}
         athleteReports={athleteReports}
+        usersError={usersRes.error?.message ?? null}
       />
     </div>
   );

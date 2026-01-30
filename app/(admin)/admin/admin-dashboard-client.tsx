@@ -73,6 +73,7 @@ type Props = {
   users: AdminUser[];
   billing: BillingSummary;
   athleteReports: AthleteReport[];
+  usersError?: string | null;
 };
 
 export function AdminDashboardClient({
@@ -80,6 +81,7 @@ export function AdminDashboardClient({
   users,
   billing,
   athleteReports,
+  usersError,
 }: Props) {
   const [tab, setTab] = useState<TabId>('sessions');
   const [sessionDateFrom, setSessionDateFrom] = useState('');
@@ -288,8 +290,14 @@ export function AdminDashboardClient({
                 <tbody>
                   {filteredUsers.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="py-8 text-center text-muted-foreground">
-                        No users match filters.
+                      <td colSpan={4} className="py-8 text-center">
+                        {usersError ? (
+                          <span className="text-destructive">{usersError}</span>
+                        ) : users.length === 0 ? (
+                          <span className="text-muted-foreground">No users in database.</span>
+                        ) : (
+                          <span className="text-muted-foreground">No users match filters.</span>
+                        )}
                       </td>
                     </tr>
                   ) : (
