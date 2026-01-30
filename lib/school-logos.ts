@@ -1,32 +1,26 @@
 /**
  * Official school logos for coaches (athletes).
- * Logo files live in public/logos/schools/ — add unc.png, nc-state.png, etc.
- * See public/logos/schools/README.md for how to add or upload logos.
+ * Logos are hosted on Vercel blob storage.
  */
 
-const SCHOOL_LOGO_SLUGS: Record<string, string> = {
-  'UNC': 'unc',
-  'NC State': 'nc-state',
-  'NCSU': 'nc-state',
-  'North Carolina State': 'nc-state',
+const SCHOOL_LOGO_URLS: Record<string, string> = {
+  'UNC': 'https://w8v0puzioqkz0xzh.public.blob.vercel-storage.com/college/Uigu95m8-1745952038636.png',
+  'NC State': 'https://w8v0puzioqkz0xzh.public.blob.vercel-storage.com/college/fe5ixmej-1745958547259.png',
+  'NCSU': 'https://w8v0puzioqkz0xzh.public.blob.vercel-storage.com/college/fe5ixmej-1745958547259.png',
+  'North Carolina State': 'https://w8v0puzioqkz0xzh.public.blob.vercel-storage.com/college/fe5ixmej-1745958547259.png',
 };
 
-export function getSchoolLogoSlug(school: string): string | null {
+/**
+ * Returns the URL to a school's logo image, or null if no logo is configured.
+ */
+export function getSchoolLogoUrl(school: string): string | null {
   if (!school || typeof school !== 'string') return null;
   const normalized = school.trim();
-  return SCHOOL_LOGO_SLUGS[normalized] ?? null;
-}
-
-/**
- * Returns the public path to a school's logo image, or null if no logo is configured.
- * Use this for img src; the file must exist in public/logos/schools/{slug}.png (or .svg).
- */
-export function getSchoolLogoUrl(school: string, ext: 'png' | 'svg' = 'png'): string | null {
-  const slug = getSchoolLogoSlug(school);
-  if (!slug) return null;
-  return `/logos/schools/${slug}.${ext}`;
+  return SCHOOL_LOGO_URLS[normalized] ?? null;
 }
 
 export function hasSchoolLogo(school: string): boolean {
-  return getSchoolLogoSlug(school) != null;
+  if (!school || typeof school !== 'string') return false;
+  const normalized = school.trim();
+  return normalized in SCHOOL_LOGO_URLS;
 }
