@@ -3,6 +3,7 @@ import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
 import { timeToHHmm } from '@/lib/availability';
+import { notifyAvailabilityFollowers } from '@/lib/notify-availability-followers';
 
 export async function GET() {
   try {
@@ -90,6 +91,8 @@ export async function POST(req: NextRequest) {
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
+    notifyAvailabilityFollowers(tenant.slug, user.id);
+
     return NextResponse.json({
       availability: {
         id: row.id,
@@ -129,6 +132,8 @@ export async function DELETE(req: NextRequest) {
       .eq('athlete_id', user.id);
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    notifyAvailabilityFollowers(tenant.slug, user.id);
 
     return NextResponse.json({ ok: true });
   } catch (e) {

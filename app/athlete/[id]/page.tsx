@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { ArrowLeft, Star, User, MapPin, Award, Shield, CheckCircle } from 'lucide-react';
 import { SchoolLogo } from '@/components/school-logo';
 import { EliteWrestlerBadge } from '@/components/elite-wrestler-badge';
+import { FollowCoachButton } from '@/components/follow-coach-button';
 
 const SCHOOL_COLORS: Record<string, { bg: string; text: string }> = {
   'UNC': { bg: 'bg-blue-600', text: 'text-white' },
@@ -185,16 +186,19 @@ export default async function AthleteProfilePage({
                 )}
               </div>
 
-              {/* Book a Session Button */}
-              <Link href={`/book/${athlete.id}`}>
-                <Button
-                  size="lg"
-                  variant="premium"
-                  className="w-full md:w-auto"
-                >
-                  Book a Session with {athlete.first_name} →
-                </Button>
-              </Link>
+              {/* Book + Follow */}
+              <div className="flex flex-wrap items-center gap-3">
+                <Link href={`/book/${athlete.id}`}>
+                  <Button
+                    size="lg"
+                    variant="premium"
+                    className="w-full md:w-auto"
+                  >
+                    Book a Session with {athlete.first_name} →
+                  </Button>
+                </Link>
+                <FollowCoachButton coachId={athlete.id} />
+              </div>
             </div>
           </div>
         </CardContent>

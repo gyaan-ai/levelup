@@ -44,6 +44,12 @@ export function Header() {
                     Browse Coaches
                   </Link>
                   <Link
+                    href="/my-coaches"
+                    className="text-white hover:text-accent transition-colors font-medium"
+                  >
+                    My Coaches
+                  </Link>
+                  <Link
                     href="/bookings"
                     className="text-white hover:text-accent transition-colors font-medium"
                   >
