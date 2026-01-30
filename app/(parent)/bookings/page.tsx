@@ -81,18 +81,18 @@ export default async function MyBookingsPage() {
     }>;
   }>;
 
-  const now = new Date().toISOString();
+  const nowISO = new Date().toISOString();
   const upcoming = all.filter(
     (s) =>
       (s.status === 'scheduled' || s.status === 'pending_payment') &&
-      s.scheduled_datetime >= now
+      s.scheduled_datetime >= nowISO
   );
   const past = all.filter(
     (s) =>
       s.status === 'completed' ||
       s.status === 'cancelled' ||
       s.status === 'no-show' ||
-      s.scheduled_datetime < now
+      s.scheduled_datetime < nowISO
   );
 
   const coach = (s: (typeof all)[0]) => {
