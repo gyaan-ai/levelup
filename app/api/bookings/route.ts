@@ -71,7 +71,11 @@ export async function POST(req: NextRequest) {
 
     const [datePart] = scheduledDate.split('T');
     const scheduledDatetime = `${datePart}T${scheduledTime}`;
-    const athletePayment = totalPrice;
+    
+    // Use test mode pricing if enabled (Stripe minimum is $0.50 USD)
+    const testModePenny = process.env.TEST_MODE_PENNY_PRICING === 'true';
+    const actualChargeAmount = testModePenny ? 0.50 : totalPrice;
+    const athletePayment = actualChargeAmount;
     const orgFee = 0;
     const stripeFee = 0;
 
@@ -98,11 +102,11 @@ export async function POST(req: NextRequest) {
         partner_invite_code: partner_invite_code ?? undefined,
         max_participants: maxParticipants,
         current_participants: numParticipants,
-        base_price: totalPrice,
-        price_per_participant: pricePerParticipant ?? undefined,
+        base_price: actualChargeAmount,
+        price_per_participant: testModePenny ? 0.50 : (pricePerParticipant ?? undefined),
         scheduled_datetime: scheduledDatetime,
         duration_minutes: 60,
-        total_price: totalPrice,
+        total_price: actualChargeAmount,
         athlete_payment: athletePayment,
         org_fee: orgFee,
         stripe_fee: stripeFee,
@@ -126,7 +130,7 @@ export async function POST(req: NextRequest) {
         youth_wrestler_id: ywId,
         parent_id: user.id,
         paid: false,
-        amount_paid: pricePerParticipant ?? totalPrice / numParticipants,
+        amount_paid: testModePenny ? (0.50 / numParticipants) : (pricePerParticipant ?? totalPrice / numParticipants),
       });
       if (partError) {
         await supabase.from('sessions').delete().eq('id', session.id);
@@ -151,10 +155,8 @@ export async function POST(req: NextRequest) {
         if (session.partner_invite_code) successParams.set('code', session.partner_invite_code);
         if (session.session_mode) successParams.set('mode', session.session_mode);
         
-        // Use minimum pricing for testing if enabled (Stripe minimum is $0.50 USD)
-        const testModePenny = process.env.TEST_MODE_PENNY_PRICING === 'true';
-        const chargeAmount = testModePenny ? 0.50 : totalPrice;
-        console.log('[Bookings API] Charge amount:', chargeAmount, '(test mode:', testModePenny, ')');
+        // Use the actual charge amount (test mode pricing already applied above)
+        console.log('[Bookings API] Charge amount:', actualChargeAmount, '(test mode:', testModePenny, ')');
         
         const stripeSession = await stripe.checkout.sessions.create({
           mode: 'payment',
@@ -163,7 +165,7 @@ export async function POST(req: NextRequest) {
             quantity: 1,
             price_data: {
               currency: 'usd',
-              unit_amount: Math.round(chargeAmount * 100),
+              unit_amount: Math.round(actualChargeAmount * 100),
               product_data: {
                 name: 'The Guild – Wrestling Session',
                 description: testModePenny 
