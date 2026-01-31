@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -25,8 +25,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ArrowLeft, Upload } from 'lucide-react';
-import Link from 'next/link';
+import { OnboardingWizard } from '@/components/onboarding-wizard';
+import { Camera } from 'lucide-react';
 
 const youthWrestlerSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
@@ -43,10 +43,13 @@ const youthWrestlerSchema = z.object({
 
 type YouthWrestlerFormValues = z.infer<typeof youthWrestlerSchema>;
 
+const TOTAL_STEPS = 4;
+
 export default function AddYouthWrestlerPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
+  const [step, setStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -60,7 +63,7 @@ export default function AddYouthWrestlerPage() {
       school: '',
       grade: '',
       weightClass: '',
-      skillLevel: '' as any,
+      skillLevel: undefined,
       wrestlingExperience: '',
       goals: '',
       medicalNotes: '',
@@ -72,24 +75,35 @@ export default function AddYouthWrestlerPage() {
     if (file) {
       setPhotoFile(file);
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setPhotoPreview(reader.result as string);
-      };
+      reader.onloadend = () => setPhotoPreview(reader.result as string);
       reader.readAsDataURL(file);
     }
   };
 
-  const onSubmit = async (values: YouthWrestlerFormValues) => {
-    setLoading(true);
+  const handleNext = async () => {
     setError(null);
 
+    if (step < TOTAL_STEPS - 1) {
+      if (step === 0) {
+        const ok = await form.trigger(['firstName', 'lastName']);
+        if (!ok) {
+          setError('First and last name are required.');
+          return;
+        }
+      }
+      setStep((s) => s + 1);
+      return;
+    }
+
+    const ok = await form.trigger();
+    if (!ok) return;
+
+    setLoading(true);
     try {
-      // Create wrestler first (without photo)
+      const values = form.getValues();
       const createResponse = await fetch('/api/youth-wrestlers', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(values),
       });
 
@@ -100,35 +114,24 @@ export default function AddYouthWrestlerPage() {
 
       const { youthWrestler } = await createResponse.json();
 
-      // Upload photo if provided
       if (photoFile) {
         const formData = new FormData();
         formData.append('file', photoFile);
         formData.append('youthWrestlerId', youthWrestler.id);
-
         const uploadResponse = await fetch('/api/youth-wrestlers/upload-photo', {
           method: 'POST',
           body: formData,
         });
-
         if (uploadResponse.ok) {
           const uploadData = await uploadResponse.json();
-          
-          // Update wrestler with photo URL
           await fetch(`/api/youth-wrestlers/${youthWrestler.id}`, {
             method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              ...values,
-              photoUrl: uploadData.photoUrl,
-            }),
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...values, photoUrl: uploadData.photoUrl }),
           });
         }
       }
 
-      // Redirect to booking flow if user came from /book/xxx, else dashboard
       const redirectTo = searchParams.get('redirect');
       const safeRedirect =
         redirectTo &&
@@ -137,262 +140,238 @@ export default function AddYouthWrestlerPage() {
         !redirectTo.includes(':');
       router.push(safeRedirect ? redirectTo : '/dashboard');
       router.refresh();
-    } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred');
       setLoading(false);
     }
   };
 
-  return (
-    <div className="container mx-auto px-4 py-8 max-w-2xl">
-      <Link href="/dashboard" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-6">
-        <ArrowLeft className="h-4 w-4 mr-2" />
-        Back to Dashboard
-      </Link>
+  const handleBack = () => setStep((s) => Math.max(0, s - 1));
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Add Youth Wrestler</CardTitle>
-          <CardDescription>
-            Create a profile for your youth wrestler
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {error && (
-            <div className="mb-4 p-3 bg-destructive/10 border border-destructive rounded-md">
-              <p className="text-sm text-destructive">{error}</p>
-            </div>
+  const handleSkip = () => {
+    if (step < TOTAL_STEPS - 1) setStep((s) => s + 1);
+  };
+
+  const canGoNext = (() => {
+    if (step === 0) {
+      const v = form.watch();
+      return !!(v.firstName?.trim() && v.lastName?.trim());
+    }
+    return true;
+  })();
+
+  const redirectTo = searchParams.get('redirect');
+  const safeRedirect =
+    redirectTo &&
+    redirectTo.startsWith('/') &&
+    !redirectTo.startsWith('//') &&
+    !redirectTo.includes(':');
+
+  return (
+    <div className="container mx-auto px-4 py-6 sm:py-8">
+      <OnboardingWizard
+        currentStep={step}
+        totalSteps={TOTAL_STEPS}
+        onNext={handleNext}
+        onBack={handleBack}
+        onSkip={handleSkip}
+        canGoNext={canGoNext}
+        isLoading={loading}
+        nextLabel={step === TOTAL_STEPS - 1 ? 'Done' : 'Continue'}
+        showSkip={step === 1}
+        skipLabel="Skip"
+        wizardTitle="Add wrestler"
+        wizardDescription="Quick profile for your athlete"
+      >
+        {error && (
+          <div className="mb-4 p-3 bg-destructive/10 border border-destructive rounded-md">
+            <p className="text-sm text-destructive">{error}</p>
+          </div>
+        )}
+
+        <Form {...form}>
+          {/* Step 0: Name */}
+          {step === 0 && (
+            <Card className="border-0 shadow-none">
+              <CardContent className="p-0">
+                <p className="text-muted-foreground mb-4">
+                  What&apos;s their name?
+                </p>
+                <div className="grid grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="firstName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>First Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="John" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="lastName"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Last Name</FormLabel>
+                        <FormControl>
+                          <Input placeholder="Doe" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </CardContent>
+            </Card>
           )}
 
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              {/* Photo Upload */}
-              <div>
-                <label className="text-sm font-medium mb-2 block">Profile Photo (Optional)</label>
-                <div className="flex items-center gap-4">
-                  {photoPreview && (
-                    <img
-                      src={photoPreview}
-                      alt="Preview"
-                      className="w-24 h-24 rounded-full object-cover border"
-                    />
-                  )}
-                  <div>
-                    <Input
+          {/* Step 1: Photo */}
+          {step === 1 && (
+            <Card className="border-0 shadow-none">
+              <CardContent className="p-0">
+                <p className="text-muted-foreground mb-4">
+                  Add a photo so coaches recognize them.
+                </p>
+                <div className="flex flex-col sm:flex-row items-center gap-6">
+                  <label className="relative cursor-pointer group">
+                    <div className="w-32 h-32 rounded-full border-4 border-dashed border-muted-foreground/30 flex items-center justify-center overflow-hidden group-hover:border-accent/50 transition-colors bg-muted/30">
+                      {photoPreview ? (
+                        <img src={photoPreview} alt="Preview" className="w-full h-full object-cover" />
+                      ) : (
+                        <Camera className="h-12 w-12 text-muted-foreground" />
+                      )}
+                    </div>
+                    <input
                       type="file"
                       accept="image/*"
                       onChange={handlePhotoChange}
-                      className="cursor-pointer"
+                      className="absolute inset-0 w-full h-full opacity-0"
                     />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Upload a photo (max 5MB)
-                    </p>
+                  </label>
+                  <div className="text-center sm:text-left">
+                    <p className="text-sm font-medium mb-1">Profile Photo</p>
+                    <p className="text-xs text-muted-foreground">Tap to upload (max 5MB)</p>
                   </div>
                 </div>
-              </div>
+              </CardContent>
+            </Card>
+          )}
 
-              {/* Name Fields */}
-              <div className="grid grid-cols-2 gap-4">
+          {/* Step 2: Basics */}
+          {step === 2 && (
+            <Card className="border-0 shadow-none">
+              <CardContent className="p-0 space-y-4">
+                <p className="text-muted-foreground mb-4">
+                  Age, weight, skill level.
+                </p>
                 <FormField
                   control={form.control}
-                  name="firstName"
+                  name="dateOfBirth"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>First Name *</FormLabel>
+                      <FormLabel>Date of Birth</FormLabel>
                       <FormControl>
-                        <Input placeholder="John" {...field} />
+                        <Input type="date" {...field} />
                       </FormControl>
+                      <FormDescription>Optional</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-
-                <FormField
-                  control={form.control}
-                  name="lastName"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Last Name *</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Doe" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              {/* Date of Birth */}
-              <FormField
-                control={form.control}
-                name="dateOfBirth"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Date of Birth</FormLabel>
-                    <FormControl>
-                      <Input type="date" {...field} />
-                    </FormControl>
-                    <FormDescription>
-                      Age will be calculated automatically
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* School and Grade */}
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="school"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>School</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Elementary School" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="grade"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Grade</FormLabel>
-                      <FormControl>
-                        <Input placeholder="5th" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </div>
-
-              {/* Weight Class and Skill Level */}
-              <div className="grid grid-cols-2 gap-4">
-                <FormField
-                  control={form.control}
-                  name="weightClass"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Weight Class</FormLabel>
-                      <FormControl>
-                        <Input placeholder="75 lbs" {...field} />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
+                <div className="grid grid-cols-2 gap-4">
                   <FormField
+                    control={form.control}
+                    name="weightClass"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Weight Class</FormLabel>
+                        <FormControl>
+                          <Input placeholder="75 lbs" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="skillLevel"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Skill Level</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value || ''}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="beginner">Beginner</SelectItem>
+                            <SelectItem value="intermediate">Intermediate</SelectItem>
+                            <SelectItem value="advanced">Advanced</SelectItem>
+                            <SelectItem value="elite">Elite</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Step 3: Goals + Medical */}
+          {step === 3 && (
+            <Card className="border-0 shadow-none">
+              <CardContent className="p-0 space-y-4">
+                <p className="text-muted-foreground mb-4">
+                  Anything else coaches should know?
+                </p>
+                <FormField
                   control={form.control}
-                  name="skillLevel"
+                  name="goals"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Skill Level</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value || ''}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select skill level" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="beginner">Beginner</SelectItem>
-                          <SelectItem value="intermediate">Intermediate</SelectItem>
-                          <SelectItem value="advanced">Advanced</SelectItem>
-                          <SelectItem value="elite">Elite</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <FormLabel>Goals</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="e.g., takedowns, conditioning"
+                          rows={2}
+                          className="resize-none"
+                          {...field}
+                        />
+                      </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-              </div>
-
-              {/* Wrestling Experience */}
-              <FormField
-                control={form.control}
-                name="wrestlingExperience"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Wrestling Experience</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="e.g., 3 years, first year, etc."
-                        rows={3}
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Goals */}
-              <FormField
-                control={form.control}
-                name="goals"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Goals</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="What do you want to work on? (e.g., takedowns, escapes, conditioning)"
-                        rows={4}
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      Help the athlete understand what to focus on during sessions
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Medical Notes */}
-              <FormField
-                control={form.control}
-                name="medicalNotes"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Medical Notes</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Any injuries, allergies, or health information we should know?"
-                        rows={3}
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      This information will be shared with athletes for safety
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              <div className="flex gap-4 pt-4">
-                <Button type="submit" className="flex-1" disabled={loading}>
-                  {loading ? 'Creating...' : 'Create Profile'}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => router.push('/dashboard')}
-                  disabled={loading}
-                >
-                  Cancel
-                </Button>
-              </div>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
+                <FormField
+                  control={form.control}
+                  name="medicalNotes"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Medical notes</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Injuries, allergies – shared with coaches"
+                          rows={2}
+                          className="resize-none"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </CardContent>
+            </Card>
+          )}
+        </Form>
+      </OnboardingWizard>
     </div>
   );
 }
-

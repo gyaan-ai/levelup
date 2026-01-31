@@ -31,7 +31,7 @@ export function Footer() {
               <li>
                 <Link
                   href="/browse"
-                  className="text-white/80 hover:text-accent transition-colors"
+                  className="block py-2.5 text-white/80 hover:text-accent transition-colors min-h-[44px] flex items-center"
                 >
                   Browse Coaches
                 </Link>
@@ -39,7 +39,7 @@ export function Footer() {
               <li>
                 <Link
                   href="/how-it-works"
-                  className="text-white/80 hover:text-accent transition-colors"
+                  className="block py-2.5 text-white/80 hover:text-accent transition-colors min-h-[44px] flex items-center"
                 >
                   How It Works
                 </Link>
@@ -47,7 +47,7 @@ export function Footer() {
               <li>
                 <Link
                   href="/pricing"
-                  className="text-white/80 hover:text-accent transition-colors"
+                  className="block py-2.5 text-white/80 hover:text-accent transition-colors min-h-[44px] flex items-center"
                 >
                   Pricing
                 </Link>
@@ -55,7 +55,7 @@ export function Footer() {
               <li>
                 <Link
                   href="/faqs"
-                  className="text-white/80 hover:text-accent transition-colors"
+                  className="block py-2.5 text-white/80 hover:text-accent transition-colors min-h-[44px] flex items-center"
                 >
                   FAQs
                 </Link>
@@ -70,7 +70,7 @@ export function Footer() {
               <li>
                 <Link
                   href="/signup"
-                  className="text-white/80 hover:text-accent transition-colors"
+                  className="block py-2.5 text-white/80 hover:text-accent transition-colors min-h-[44px] flex items-center"
                 >
                   Join The Guild
                 </Link>
@@ -78,7 +78,7 @@ export function Footer() {
               <li>
                 <Link
                   href="/requirements"
-                  className="text-white/80 hover:text-accent transition-colors"
+                  className="block py-2.5 text-white/80 hover:text-accent transition-colors min-h-[44px] flex items-center"
                 >
                   Requirements
                 </Link>
@@ -86,7 +86,7 @@ export function Footer() {
               <li>
                 <Link
                   href="/earnings"
-                  className="text-white/80 hover:text-accent transition-colors"
+                  className="block py-2.5 text-white/80 hover:text-accent transition-colors min-h-[44px] flex items-center"
                 >
                   Earnings
                 </Link>
@@ -135,8 +135,8 @@ export function Footer() {
             </div>
           </div>
         </div>
-        <div className="border-t border-white/10 pt-8">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+        <div className="border-t border-white/10 pt-6 sm:pt-8">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-center md:text-left">
             <p className="text-sm text-white/60">
               © {new Date().getFullYear()} The Guild. Operated by NC United
               Wrestling.
@@ -144,21 +144,21 @@ export function Footer() {
             <div className="flex gap-4">
               <a
                 href="#"
-                className="text-accent hover:text-accent-hover transition-colors"
+                className="p-3 -m-3 text-accent hover:text-accent-hover transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
                 aria-label="Instagram"
               >
                 <Instagram className="w-5 h-5" />
               </a>
               <a
                 href="#"
-                className="text-accent hover:text-accent-hover transition-colors"
+                className="p-3 -m-3 text-accent hover:text-accent-hover transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
                 aria-label="Facebook"
               >
                 <Facebook className="w-5 h-5" />
               </a>
               <a
                 href="#"
-                className="text-accent hover:text-accent-hover transition-colors"
+                className="p-3 -m-3 text-accent hover:text-accent-hover transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
                 aria-label="Twitter"
               >
                 <Twitter className="w-5 h-5" />

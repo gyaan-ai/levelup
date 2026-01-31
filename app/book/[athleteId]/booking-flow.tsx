@@ -283,7 +283,7 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
   const progressPct = (currentStep / totalSteps) * 100;
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-7xl">
+    <div className="container mx-auto px-4 py-6 sm:py-8 max-w-7xl">
       <div className="mb-6">
         <Link
           href={`/athlete/${athlete.id}`}
@@ -523,13 +523,13 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
                     ) : slots.length === 0 ? (
                       <p className="text-sm text-muted-foreground">No times available this day.</p>
                     ) : (
-                      <div className="grid grid-cols-4 sm:grid-cols-5 gap-2">
+                      <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
                         {slots.map((t) => (
                           <button
                             key={t}
                             type="button"
                             onClick={() => setSelectedTime(t)}
-                            className={`p-2 rounded-lg border text-sm transition-all ${
+                            className={`min-h-[44px] p-2 rounded-lg border text-sm transition-all touch-manipulation ${
                               selectedTime === t ? 'border-primary bg-primary text-white' : 'border-border hover:border-primary/50'
                             }`}
                           >

@@ -29,11 +29,11 @@ export default function HomePage() {
                 <p className="text-xl md:text-2xl text-white font-light tracking-wide mb-10 uppercase">
                   Mastery. Technique. Access the Elite.
                 </p>
-                <p className="text-lg text-white/80 mb-12 max-w-xl mx-auto lg:mx-0">
+                <p className="text-base sm:text-lg text-white/80 mb-8 sm:mb-12 max-w-xl mx-auto lg:mx-0">
                   Train with NCAA wrestlers in your community for private technique
                   instruction. Master the details that separate good from elite.
                 </p>
-                <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start">
+                <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center lg:justify-start">
                   <Button
                     size="xl"
                     variant="premium"
@@ -68,18 +68,18 @@ export default function HomePage() {
       </section>
 
       {/* How The Guild Works */}
-      <section id="how-it-works" className="py-20 bg-white">
+      <section id="how-it-works" className="py-12 sm:py-16 md:py-20 bg-white">
         <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-serif font-bold text-black mb-4">
+          <div className="text-center mb-10 sm:mb-16">
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-serif font-bold text-black mb-4">
               How The Guild Works
             </h2>
             <p className="text-xl text-muted-foreground">
               Three steps to elite technique mastery
             </p>
           </div>
-          <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-            <Card className="p-8 text-center border-2 hover:border-accent transition-all">
+          <div className="grid md:grid-cols-3 gap-6 sm:gap-8 max-w-6xl mx-auto">
+            <Card className="p-6 sm:p-8 text-center border-2 hover:border-accent transition-all">
               <div className="w-16 h-16 bg-accent/10 rounded-full flex items-center justify-center mx-auto mb-6">
                 <Users className="w-8 h-8 text-accent" />
               </div>
@@ -91,7 +91,7 @@ export default function HomePage() {
                 and reviews.
               </p>
             </Card>
-            <Card className="p-8 text-center border-2 hover:border-accent transition-all">
+            <Card className="p-6 sm:p-8 text-center border-2 hover:border-accent transition-all">
               <div className="w-16 h-16 bg-accent/10 rounded-full flex items-center justify-center mx-auto mb-6">
                 <Award className="w-8 h-8 text-accent" />
               </div>
@@ -103,7 +103,7 @@ export default function HomePage() {
                 scheduling.
               </p>
             </Card>
-            <Card className="p-8 text-center border-2 hover:border-accent transition-all">
+            <Card className="p-6 sm:p-8 text-center border-2 hover:border-accent transition-all">
               <div className="w-16 h-16 bg-accent/10 rounded-full flex items-center justify-center mx-auto mb-6">
                 <Shield className="w-8 h-8 text-accent" />
               </div>
@@ -132,7 +132,7 @@ export default function HomePage() {
               Why Choose The Guild
             </h2>
           </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 max-w-6xl mx-auto">
             {[
               {
                 title: 'NCAA Wrestlers',
@@ -183,10 +183,10 @@ export default function HomePage() {
             <h2 className="text-4xl md:text-5xl font-serif font-bold mb-6">
               Are You an NCAA Wrestler?
             </h2>
-            <p className="text-2xl text-accent mb-8">
+            <p className="text-xl sm:text-2xl text-accent mb-6 sm:mb-8">
               Share your expertise. Earn while you compete.
             </p>
-            <p className="text-xl text-white/90 mb-8">
+            <p className="text-base sm:text-xl text-white/90 mb-6 sm:mb-8">
               The Guild connects NCAA wrestlers with youth athletes for private
               technique instruction. Earn money, build coaching experience, and
               give back to the wrestling community.
@@ -222,16 +222,16 @@ export default function HomePage() {
       </section>
 
       {/* Final CTA */}
-      <section className="py-20 bg-gradient-to-r from-accent to-accent-hover">
+      <section className="py-12 sm:py-16 md:py-20 bg-gradient-to-r from-accent to-accent-hover">
         <div className="container mx-auto px-4 text-center">
-          <h2 className="text-4xl md:text-5xl font-serif font-bold text-black mb-6">
+          <h2 className="text-3xl sm:text-4xl md:text-5xl font-serif font-bold text-black mb-6">
             Ready to Master Your Technique?
           </h2>
           <p className="text-xl text-black/80 mb-10 max-w-2xl mx-auto">
             Join The Guild and train with NCAA wrestlers in your community.
             Private technique sessions.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">
             <Button size="xl" variant="black" asChild>
               <Link href="/browse">Browse Elite Coaches</Link>
             </Button>

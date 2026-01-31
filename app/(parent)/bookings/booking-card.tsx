@@ -82,8 +82,8 @@ export function BookingCard({ session, isPast = false }: BookingCardProps) {
   return (
     <Card className={isPast ? 'bg-muted/20' : ''}>
       <CardContent className="p-4 sm:p-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="space-y-1">
+        <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-start sm:justify-between gap-4">
+          <div className="space-y-1 flex-1 min-w-0">
             <p className="font-medium">
               {scheduledTime.toLocaleDateString('en-US', {
                 weekday: isPast ? 'short' : 'long',
@@ -119,27 +119,27 @@ export function BookingCard({ session, isPast = false }: BookingCardProps) {
             )}
             <div className="pt-2">{statusBadge(session.status)}</div>
           </div>
-          <div className="text-right flex flex-col items-end gap-2">
+          <div className="text-left sm:text-right flex flex-col sm:items-end gap-2 shrink-0">
             <p className={isPast ? 'font-bold' : 'text-xl font-bold'}>
               ${Number(session.total_price).toFixed(2)}
             </p>
             <p className="text-xs text-muted-foreground">{session.session_type ?? '—'}</p>
-            <div className="flex flex-wrap gap-2 justify-end">
-              <Link href={`/workspaces/from-session/${session.id}`}>
-                <Button variant="outline" size="sm">
-                  <FolderOpen className="h-4 w-4 mr-1" />
+            <div className="flex flex-wrap gap-2 sm:justify-end">
+              <Link href={`/workspaces/from-session/${session.id}`} className="min-h-[44px] inline-flex">
+                <Button variant="outline" size="sm" className="min-h-[44px] px-4">
+                  <FolderOpen className="h-4 w-4 mr-1 shrink-0" />
                   Workspace
                 </Button>
               </Link>
-              <Link href={`/messages/${session.id}`}>
-                <Button variant="outline" size="sm">
-                  <MessageCircle className="h-4 w-4 mr-1" />
+              <Link href={`/messages/${session.id}`} className="min-h-[44px] inline-flex">
+                <Button variant="outline" size="sm" className="min-h-[44px] px-4">
+                  <MessageCircle className="h-4 w-4 mr-1 shrink-0" />
                   Message
                 </Button>
               </Link>
               {!isPast && session.coach.id && (
-                <Link href={`/book/${session.coach.id}`}>
-                  <Button variant="outline" size="sm">Reschedule</Button>
+                <Link href={`/book/${session.coach.id}`} className="min-h-[44px] inline-flex">
+                  <Button variant="outline" size="sm" className="min-h-[44px] px-4">Reschedule</Button>
                 </Link>
               )}
               {canCancel && !showConfirm && (
@@ -147,9 +147,9 @@ export function BookingCard({ session, isPast = false }: BookingCardProps) {
                   variant="outline" 
                   size="sm" 
                   onClick={() => setShowConfirm(true)}
-                  className="text-destructive border-destructive hover:bg-destructive hover:text-destructive-foreground"
+                  className="min-h-[44px] px-4 text-destructive border-destructive hover:bg-destructive hover:text-destructive-foreground"
                 >
-                  <X className="h-4 w-4 mr-1" />
+                  <X className="h-4 w-4 mr-1 shrink-0" />
                   Cancel
                 </Button>
               )}

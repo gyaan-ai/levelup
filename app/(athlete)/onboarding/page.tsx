@@ -6,7 +6,7 @@ import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useAuth } from '@/lib/auth/use-auth';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -26,15 +26,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Plus, X, Upload, Globe, Lock } from 'lucide-react';
+import { OnboardingWizard } from '@/components/onboarding-wizard';
+import { Camera, Globe, Lock } from 'lucide-react';
 
 const onboardingSchema = z.object({
-  weightClass: z.string().optional(),
   bio: z.string().max(500, 'Bio must be 500 characters or less').optional(),
-  credentials: z.array(z.object({
-    title: z.string().min(1, 'Title is required'),
-    description: z.string().optional(),
-  })).optional(),
   facilityId: z.string().optional(),
   venmoHandle: z.string().max(30).optional(),
   zelleEmail: z.union([z.string().email('Use a valid email for Zelle'), z.literal('')]).optional(),
@@ -43,11 +39,14 @@ const onboardingSchema = z.object({
 
 type OnboardingFormValues = z.infer<typeof onboardingSchema>;
 
+const TOTAL_STEPS = 4;
+
 export default function OnboardingPage() {
   const router = useRouter();
   const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [step, setStep] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string>('');
@@ -59,58 +58,30 @@ export default function OnboardingPage() {
   const form = useForm<OnboardingFormValues>({
     resolver: zodResolver(onboardingSchema),
     defaultValues: {
-      weightClass: '',
       bio: '',
-      credentials: [],
       facilityId: '',
       venmoHandle: '',
       zelleEmail: '',
     },
   });
 
-  const { fields, append, remove } = useFieldArray({
-    control: form.control,
-    name: 'credentials',
-  });
-
   useEffect(() => {
     async function loadData() {
       try {
-        // Add cache busting to ensure fresh data
         const response = await fetch('/api/athletes/profile?' + new Date().getTime(), {
           cache: 'no-store',
         });
         const data = await response.json();
 
         if (data.athlete) {
-          // Pre-fill form if profile exists
-          const formData = {
-            weightClass: data.athlete.weight_class || '',
+          form.reset({
             bio: data.athlete.bio || '',
-            credentials: (data.athlete.credentials && Object.keys(data.athlete.credentials).length > 0)
-              ? Object.entries(data.athlete.credentials).map(([title, desc]: [string, any]) => ({
-                  title,
-                  description: desc || '',
-                }))
-              : [],
             facilityId: data.athlete.facility_id || '',
             venmoHandle: data.athlete.venmo_handle || '',
             zelleEmail: data.athlete.zelle_email || '',
-          };
-          
-          form.reset(formData);
-
-          if (data.athlete.photo_url) {
-            setPhotoPreview(data.athlete.photo_url);
-          }
-          
-          // If profile is complete, redirect to dashboard
-          if (data.athlete.bio && data.athlete.bio.trim().length > 0) {
-            // Profile is complete, but user is on onboarding page
-            // Don't auto-redirect, let them edit if they want
-          }
+          });
+          if (data.athlete.photo_url) setPhotoPreview(data.athlete.photo_url);
         }
-
         setFacilities(data.facilities || []);
       } catch (err) {
         console.error('Error loading profile:', err);
@@ -119,266 +90,310 @@ export default function OnboardingPage() {
         setLoading(false);
       }
     }
-
-    if (user) {
-      loadData();
-    }
-  }, [user]);
+    if (user) loadData();
+  }, [user, form]);
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       setPhotoFile(file);
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setPhotoPreview(reader.result as string);
-      };
+      reader.onloadend = () => setPhotoPreview(reader.result as string);
       reader.readAsDataURL(file);
     }
+  };
+
+  const savePartial = async (values: OnboardingFormValues, active: boolean) => {
+    let photoUrl = photoPreview;
+    if (photoFile) {
+      const formData = new FormData();
+      formData.append('file', photoFile);
+      const uploadResponse = await fetch('/api/athletes/upload-photo', {
+        method: 'POST',
+        body: formData,
+      });
+      if (!uploadResponse.ok) {
+        const uploadData = await uploadResponse.json();
+        throw new Error(uploadData.error || 'Failed to upload photo');
+      }
+      const uploadData = await uploadResponse.json();
+      photoUrl = uploadData.photoUrl;
+    }
+
+    const response = await fetch('/api/athletes/profile', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        bio: values.bio,
+        photoUrl,
+        facilityId: values.facilityId,
+        venmoHandle: values.venmoHandle?.trim() || undefined,
+        zelleEmail: values.zelleEmail?.trim() || undefined,
+        active,
+      }),
+    });
+
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to update profile');
+    if (!data.success) throw new Error('Profile save did not confirm success');
   };
 
   const doSave = async (makePublic: boolean) => {
     setSubmitting(true);
     setError(null);
-
     try {
       const values = form.getValues();
-      let photoUrl = photoPreview;
-
-      if (photoFile) {
-        const formData = new FormData();
-        formData.append('file', photoFile);
-
-        const uploadResponse = await fetch('/api/athletes/upload-photo', {
-          method: 'POST',
-          body: formData,
-        });
-
-        if (!uploadResponse.ok) {
-          const uploadData = await uploadResponse.json();
-          throw new Error(uploadData.error || 'Failed to upload photo');
-        }
-
-        const uploadData = await uploadResponse.json();
-        photoUrl = uploadData.photoUrl;
-      }
-
-      const credentialsObj: Record<string, string> = {};
-      (values.credentials || []).forEach((cred) => {
-        if (cred.title) {
-          credentialsObj[cred.title] = cred.description || '';
-        }
-      });
-
-      const response = await fetch('/api/athletes/profile', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          weightClass: values.weightClass,
-          bio: values.bio,
-          credentials: credentialsObj,
-          photoUrl,
-          facilityId: values.facilityId,
-          venmoHandle: values.venmoHandle?.trim() || undefined,
-          zelleEmail: values.zelleEmail?.trim() || undefined,
-          active: makePublic,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to update profile');
-      }
-
-      if (!data.success) {
-        throw new Error('Profile save did not confirm success');
-      }
-
-      await new Promise((r) => setTimeout(r, 500));
-
-      const verifyResponse = await fetch('/api/athletes/profile?' + Date.now(), { cache: 'no-store' });
-      const verifyData = await verifyResponse.json();
-
-      if (!verifyData.athlete) {
-        throw new Error('Profile was not found after saving. Please try again.');
-      }
-
-      if (values.bio && !verifyData.athlete.bio) {
-        throw new Error('Bio was not saved. Please try again.');
-      }
-
+      await savePartial(values, makePublic);
       visibilityModalRef.current?.close();
       setSuccess(true);
       setSubmitting(false);
-
       if (makePublic) {
-        setSuccessMessage('Your profile is live. Start accepting bookings. Redirecting...');
-        setTimeout(() => {
-          window.location.href = '/athlete-dashboard';
-        }, 2000);
+        setSuccessMessage('Your profile is live. Redirecting to dashboard...');
+        setTimeout(() => { window.location.href = '/athlete-dashboard'; }, 2000);
       } else {
-        setSuccessMessage('Profile saved. It stays private—you can keep editing.');
+        setSuccessMessage('Profile saved. You can keep editing or go to dashboard.');
       }
-    } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred');
       setSubmitting(false);
     }
   };
 
-  const onSubmit = () => {
+  const handleNext = async () => {
     setError(null);
-    visibilityModalRef.current?.showModal();
+    const values = form.getValues();
+
+    if (step === 0) {
+      setStep(1);
+      return;
+    }
+
+    if (step === 1) {
+      if (!values.bio?.trim()) {
+        setError('Please add a bio so parents can learn about you.');
+        return;
+      }
+      setSubmitting(true);
+      try {
+        await savePartial(values, false);
+        setStep(2);
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'Failed to save');
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
+    if (step === 2 && facilities.length > 0) {
+      if (!values.facilityId) {
+        setError('Please select a training facility.');
+        return;
+      }
+    }
+
+    if (step === 3) {
+      const hasVenmo = values.venmoHandle?.trim();
+      const hasZelle = values.zelleEmail?.trim();
+      if (!hasVenmo && !hasZelle) {
+        setError('Add at least one payout method (Venmo or Zelle) so we can pay you.');
+        return;
+      }
+      if (values.zelleEmail?.trim() && !values.zelleEmail.includes('@') && !/^\d{10}$/.test(values.zelleEmail.replace(/\D/g, ''))) {
+        setError('Enter a valid Zelle email or 10-digit phone number.');
+        return;
+      }
+      setSubmitting(true);
+      try {
+        await savePartial(values, false);
+        visibilityModalRef.current?.showModal();
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'Failed to save');
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
+    setStep((s) => Math.min(s + 1, TOTAL_STEPS - 1));
   };
+
+  const handleBack = () => setStep((s) => Math.max(0, s - 1));
+
+  const handleSkip = () => {
+    if (step === 0) setStep(1);
+    else if (step === 2 && facilities.length > 0) setStep(3);
+    else if (step === 3) setError('Add Venmo or Zelle to receive payments.');
+  };
+
+  const canGoNext = (() => {
+    if (step === 1) return !!form.watch('bio')?.trim();
+    if (step === 2 && facilities.length > 0) return !!form.watch('facilityId');
+    if (step === 3) {
+      const v = form.watch();
+      return !!(v.venmoHandle?.trim() || v.zelleEmail?.trim());
+    }
+    return true;
+  })();
+
+  const showSkip = step === 0 || (step === 2 && facilities.length > 0);
 
   if (loading) {
     return (
       <div className="container mx-auto px-4 py-16 flex items-center justify-center min-h-screen">
-        <div className="text-center">
-          <p className="text-muted-foreground">Loading...</p>
-        </div>
+        <p className="text-muted-foreground">Loading...</p>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-2xl">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-primary font-serif">Join The Guild</CardTitle>
-          <CardDescription>
-            Complete your profile to start teaching technique
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {error && (
-            <div className="mb-4 p-3 bg-destructive/10 border border-destructive rounded-md">
-              <p className="text-sm text-destructive">{error}</p>
-            </div>
-          )}
+    <>
+      <OnboardingWizard
+        currentStep={step}
+        totalSteps={TOTAL_STEPS}
+        onNext={handleNext}
+        onBack={handleBack}
+        onSkip={handleSkip}
+        canGoNext={canGoNext}
+        isLoading={submitting}
+        nextLabel={step === TOTAL_STEPS - 1 ? 'Finish' : 'Continue'}
+        showSkip={showSkip}
+        skipLabel="Skip for now"
+        wizardTitle="Coach profile"
+        wizardDescription="A few steps to get you set up"
+      >
+        {error && (
+          <div className="mb-4 p-3 bg-destructive/10 border border-destructive rounded-md">
+            <p className="text-sm text-destructive">{error}</p>
+          </div>
+        )}
+        {success && (
+          <div className="mb-4 p-4 bg-accent/10 border-2 border-accent rounded-md">
+            <p className="font-semibold text-primary">Welcome to The Guild!</p>
+            <p className="text-sm text-muted-foreground mt-1">{successMessage}</p>
+          </div>
+        )}
 
-          {success && (
-            <div className="mb-4 p-4 bg-accent/10 border-2 border-accent rounded-md text-center">
-              <p className="text-lg font-semibold text-primary font-serif mb-1">Welcome to The Guild!</p>
-              <p className="text-sm text-muted-foreground">{successMessage}</p>
-            </div>
-          )}
-
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-              {/* Photo Upload */}
-              <FormField
-                control={form.control}
-                name="photo"
-                render={() => (
-                  <FormItem>
-                    <FormLabel>Profile Photo</FormLabel>
-                    <div className="flex items-center gap-4">
-                      {photoPreview && (
-                        <img
-                          src={photoPreview}
-                          alt="Profile preview"
-                          className="w-24 h-24 rounded-full object-cover border"
-                        />
+        <Form {...form}>
+          {/* Step 0: Photo */}
+          {step === 0 && (
+            <Card className="border-0 shadow-none">
+              <CardContent className="p-0">
+                <p className="text-muted-foreground mb-4">
+                  Add a photo so parents recognize you.
+                </p>
+                <div className="flex flex-col sm:flex-row items-center gap-6">
+                  <label className="relative cursor-pointer group">
+                    <div className="w-32 h-32 rounded-full border-4 border-dashed border-muted-foreground/30 flex items-center justify-center overflow-hidden group-hover:border-accent/50 transition-colors bg-muted/30">
+                      {photoPreview ? (
+                        <img src={photoPreview} alt="Preview" className="w-full h-full object-cover" />
+                      ) : (
+                        <Camera className="h-12 w-12 text-muted-foreground" />
                       )}
-                      <div>
-                        <Input
-                          type="file"
-                          accept="image/*"
-                          onChange={handlePhotoChange}
-                          className="cursor-pointer"
-                        />
-                        <FormDescription>
-                          Upload a professional photo (max 5MB)
-                        </FormDescription>
-                      </div>
                     </div>
-                  </FormItem>
-                )}
-              />
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handlePhotoChange}
+                      className="absolute inset-0 w-full h-full opacity-0"
+                    />
+                  </label>
+                  <div className="text-center sm:text-left">
+                    <p className="text-sm font-medium mb-1">Profile Photo</p>
+                    <p className="text-xs text-muted-foreground">Tap to upload (max 5MB)</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
 
-              {/* Weight Class */}
-              <FormField
-                control={form.control}
-                name="weightClass"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Weight Class</FormLabel>
-                    <FormControl>
-                      <Input placeholder="e.g., 157 lbs" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Bio */}
-              <FormField
-                control={form.control}
-                name="bio"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Bio</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Tell parents about your wrestling experience, achievements, and coaching style..."
-                        maxLength={500}
-                        rows={5}
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormDescription>
-                      {field.value?.length || 0}/500 characters
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {/* Facility Selection */}
-              {facilities.length > 0 && (
+          {/* Step 1: Bio */}
+          {step === 1 && (
+            <Card className="border-0 shadow-none">
+              <CardContent className="p-0">
+                <p className="text-muted-foreground mb-4">
+                  Tell parents about your background. What makes you a great coach?
+                </p>
                 <FormField
                   control={form.control}
-                  name="facilityId"
+                  name="bio"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Primary Facility</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a facility" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {facilities.map((facility) => (
-                            <SelectItem key={facility.id} value={facility.id}>
-                              {facility.name} - {facility.school}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <FormControl>
+                        <Textarea
+                          placeholder="e.g., NCAA qualifier, 3x state champ. I focus on technique fundamentals and conditioning..."
+                          maxLength={500}
+                          rows={5}
+                          className="resize-none"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription>{field.value?.length || 0}/500</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-              )}
+              </CardContent>
+            </Card>
+          )}
 
-              {/* Payout: Venmo / Zelle */}
-              <div className="space-y-4 rounded-lg border p-4">
-                <p className="text-sm font-medium text-primary">How you get paid</p>
-                <p className="text-sm text-muted-foreground">
-                  We pay coaches via Venmo or Zelle. Add at least one so we can send your earnings.
+          {/* Step 2: Facility */}
+          {step === 2 && (
+            <Card className="border-0 shadow-none">
+              <CardContent className="p-0">
+                {facilities.length > 0 ? (
+                  <>
+                    <p className="text-muted-foreground mb-4">
+                      Where will you train?
+                    </p>
+                    <FormField
+                      control={form.control}
+                      name="facilityId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select a facility" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {facilities.map((f) => (
+                                <SelectItem key={f.id} value={f.id}>
+                                  {f.name} – {f.school}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </>
+                ) : (
+                  <p className="text-muted-foreground">No facilities set up yet. Add one in your profile later.</p>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Step 3: Payout */}
+          {step === 3 && (
+            <Card className="border-0 shadow-none">
+              <CardContent className="p-0 space-y-4">
+                <p className="text-muted-foreground">
+                  How should we pay you? Add Venmo or Zelle.
                 </p>
                 <FormField
                   control={form.control}
                   name="venmoHandle"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Venmo username</FormLabel>
+                      <FormLabel>Venmo</FormLabel>
                       <FormControl>
                         <Input placeholder="e.g. jake-miller" {...field} />
                       </FormControl>
-                      <FormDescription>Your Venmo handle (without @)</FormDescription>
+                      <FormDescription>Handle without @</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -388,139 +403,32 @@ export default function OnboardingPage() {
                   name="zelleEmail"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Zelle (email or phone)</FormLabel>
+                      <FormLabel>Zelle</FormLabel>
                       <FormControl>
                         <Input placeholder="email@example.com or 5551234567" {...field} />
                       </FormControl>
-                      <FormDescription>Email or phone linked to your Zelle account</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-              </div>
+                <p className="text-sm text-muted-foreground pt-2">Almost done. Choose whether to go live next.</p>
+              </CardContent>
+            </Card>
+          )}
+        </Form>
+      </OnboardingWizard>
 
-              {/* Credentials */}
-              <div>
-                <FormLabel className="mb-2 block">Credentials & Achievements</FormLabel>
-                <FormDescription className="mb-4">
-                  Add your wrestling achievements, awards, and credentials
-                </FormDescription>
-                {fields.map((field, index) => (
-                  <div key={field.id} className="flex gap-2 mb-2">
-                    <FormField
-                      control={form.control}
-                      name={`credentials.${index}.title`}
-                      render={({ field }) => (
-                        <FormItem className="flex-1">
-                          <FormControl>
-                            <Input placeholder="Title (e.g., NCAA Qualifier)" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name={`credentials.${index}.description`}
-                      render={({ field }) => (
-                        <FormItem className="flex-1">
-                          <FormControl>
-                            <Input placeholder="Description (optional)" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      onClick={() => remove(index)}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => append({ title: '', description: '' })}
-                  className="w-full"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Credential
-                </Button>
-              </div>
-
-              <div className="flex gap-4 pt-4">
-                <Button type="submit" className="flex-1" disabled={submitting}>
-                  {submitting ? 'Saving...' : 'Complete Profile'}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={async () => {
-                    setSubmitting(true);
-                    try {
-                      const vals = form.getValues();
-                      const credentialsObj: Record<string, string> = {};
-                      (vals.credentials || []).forEach((c) => {
-                        if (c.title) credentialsObj[c.title] = c.description || '';
-                      });
-                      await fetch('/api/athletes/profile', {
-                        method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                          bio: vals.bio || '',
-                          weightClass: vals.weightClass || '',
-                          credentials: credentialsObj,
-                          photoUrl: photoPreview || null,
-                          facilityId: vals.facilityId || null,
-                          venmoHandle: vals.venmoHandle?.trim() || undefined,
-                          zelleEmail: vals.zelleEmail?.trim() || undefined,
-                          active: false,
-                        }),
-                      });
-                    } catch {
-                      /* ignore */
-                    }
-                    window.location.href = '/athlete-dashboard';
-                  }}
-                  disabled={submitting}
-                >
-                  Skip for Now
-                </Button>
-              </div>
-            </form>
-          </Form>
-        </CardContent>
-      </Card>
-
-      <dialog
-        ref={visibilityModalRef}
-        className="rounded-lg border bg-background p-6 shadow-lg max-w-md w-[calc(100%-2rem)]"
-      >
-        <h3 className="font-semibold text-lg mb-2">Save profile</h3>
+      <dialog ref={visibilityModalRef} className="rounded-lg border bg-background p-6 shadow-lg max-w-md w-[calc(100%-2rem)]">
+        <h3 className="font-semibold text-lg mb-2">Go live?</h3>
         <p className="text-muted-foreground text-sm mb-4">
-          Would you like to make your profile public and ready for bookings, or keep it private to continue editing?
+          Public = parents can book you. Private = keep editing.
         </p>
-        <div className="flex flex-col sm:flex-row gap-2">
-          <Button
-            type="button"
-            className="flex-1"
-            onClick={() => doSave(true)}
-            disabled={submitting}
-          >
+        <div className="flex flex-col sm:flex-row gap-3">
+          <Button type="button" className="flex-1" onClick={() => doSave(true)} disabled={submitting}>
             <Globe className="h-4 w-4 mr-2" />
             Make Public
           </Button>
-          <Button
-            type="button"
-            variant="outline"
-            className="flex-1"
-            onClick={() => doSave(false)}
-            disabled={submitting}
-          >
+          <Button type="button" variant="outline" className="flex-1" onClick={() => doSave(false)} disabled={submitting}>
             <Lock className="h-4 w-4 mr-2" />
             Keep Private
           </Button>
@@ -531,7 +439,6 @@ export default function OnboardingPage() {
           </Button>
         </form>
       </dialog>
-    </div>
+    </>
   );
 }
-

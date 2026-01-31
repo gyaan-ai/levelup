@@ -23,6 +23,12 @@ export const metadata = {
   icons: {
     icon: '/favicon.ico',
   },
+  viewport: {
+    width: 'device-width',
+    initialScale: 1,
+    maximumScale: 5,
+    viewportFit: 'cover',
+  },
 };
 
 export default async function RootLayout({
