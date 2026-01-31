@@ -72,6 +72,12 @@ export function Header() {
                     My Bookings
                   </Link>
                   <Link
+                    href="/workspaces"
+                    className="text-white hover:text-accent transition-colors font-medium"
+                  >
+                    Workspaces
+                  </Link>
+                  <Link
                     href="/partner-sessions"
                     className="text-white hover:text-accent transition-colors font-medium"
                   >

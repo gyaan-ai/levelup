@@ -5,7 +5,7 @@ import { getTenantByDomain } from '@/config/tenants';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { Plus, Edit, User, Calendar } from 'lucide-react';
+import { Plus, Edit, User, Calendar, Wallet } from 'lucide-react';
 import { YouthWrestler } from '@/types';
 import { BookingCard, type BookingSession } from '@/app/(parent)/bookings/booking-card';
 
@@ -49,6 +49,18 @@ export default async function ParentDashboard() {
 
   const youthWrestlerIds = youthWrestlers?.map((yw) => yw.id) || [];
 
+  // Fetch credit balance for parents
+  const { data: creditsData } = await supabase
+    .from('credits')
+    .select('remaining, expires_at')
+    .eq('parent_id', user.id)
+    .gt('remaining', 0);
+  const now = new Date();
+  const availableCredits = (creditsData || []).filter(
+    (c) => c.remaining > 0 && (!c.expires_at || new Date(c.expires_at) > now)
+  );
+  const creditBalance = availableCredits.reduce((sum, c) => sum + Number(c.remaining), 0);
+
   const { data: completedSessions } = await supabase
     .from('sessions')
     .select('id')
@@ -91,21 +103,34 @@ export default async function ParentDashboard() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-serif font-bold mb-2 text-primary">Your Wrestlers</h1>
           <p className="text-muted-foreground">
             Manage profiles and book sessions with elite coaches
           </p>
         </div>
-        {youthWrestlers && youthWrestlers.length > 0 && (
-          <Link href="/wrestlers/add">
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Add Another Wrestler
-            </Button>
-          </Link>
-        )}
+        <div className="flex items-center gap-4">
+          {creditBalance > 0 && (
+            <Card className="bg-primary/5 border-primary/20">
+              <CardContent className="py-3 px-4 flex items-center gap-2">
+                <Wallet className="h-5 w-5 text-primary" />
+                <div>
+                  <p className="text-sm text-muted-foreground">Credit Balance</p>
+                  <p className="text-xl font-bold text-primary">${creditBalance.toFixed(2)}</p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          {youthWrestlers && youthWrestlers.length > 0 && (
+            <Link href="/wrestlers/add">
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Another Wrestler
+              </Button>
+            </Link>
+          )}
+        </div>
       </div>
 
       {youthWrestlers && youthWrestlers.length > 0 ? (

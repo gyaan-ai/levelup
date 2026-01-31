@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { Calendar, User, MapPin, MessageCircle, X } from 'lucide-react';
+import { Calendar, User, MapPin, MessageCircle, X, FolderOpen } from 'lucide-react';
 import { SchoolLogo } from '@/components/school-logo';
 import { differenceInHours } from 'date-fns';
 
@@ -125,6 +125,12 @@ export function BookingCard({ session, isPast = false }: BookingCardProps) {
             </p>
             <p className="text-xs text-muted-foreground">{session.session_type ?? '—'}</p>
             <div className="flex flex-wrap gap-2 justify-end">
+              <Link href={`/workspaces/from-session/${session.id}`}>
+                <Button variant="outline" size="sm">
+                  <FolderOpen className="h-4 w-4 mr-1" />
+                  Workspace
+                </Button>
+              </Link>
               <Link href={`/messages/${session.id}`}>
                 <Button variant="outline" size="sm">
                   <MessageCircle className="h-4 w-4 mr-1" />
