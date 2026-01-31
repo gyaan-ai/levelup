@@ -80,7 +80,7 @@ CREATE POLICY "Athletes can view own products"
   ON public.athlete_products FOR SELECT
   USING (
     athlete_id IN (
-      SELECT id FROM public.athletes WHERE user_id = auth.uid()
+      SELECT id FROM public.athletes WHERE id = auth.uid()
     )
   );
 
@@ -89,7 +89,7 @@ CREATE POLICY "Athletes can manage own products"
   ON public.athlete_products FOR ALL
   USING (
     athlete_id IN (
-      SELECT id FROM public.athletes WHERE user_id = auth.uid()
+      SELECT id FROM public.athletes WHERE id = auth.uid()
     )
   );
 

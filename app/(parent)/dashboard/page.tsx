@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Plus, Edit, User, Calendar } from 'lucide-react';
 import { YouthWrestler } from '@/types';
+import { BookingCard, type BookingSession } from '@/app/(parent)/bookings/booking-card';
 
 export default async function ParentDashboard() {
   const headersList = await headers();
@@ -70,7 +71,18 @@ export default async function ParentDashboard() {
 
   const { data: upcomingSessions } = await supabase
     .from('sessions')
-    .select('*, athletes(id, first_name, last_name), facilities(id, name)')
+    .select(`
+      id,
+      scheduled_datetime,
+      status,
+      total_price,
+      session_type,
+      session_mode,
+      partner_invite_code,
+      athletes(id, first_name, last_name, school),
+      facilities(id, name, address),
+      session_participants(youth_wrestler_id, youth_wrestlers(id, first_name, last_name))
+    `)
     .eq('parent_id', user.id)
     .in('status', ['scheduled', 'pending_payment'])
     .gte('scheduled_datetime', new Date().toISOString())
@@ -174,41 +186,33 @@ export default async function ParentDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {upcomingSessions.map((session: { id: string; scheduled_datetime: string; total_price?: number; session_type?: string; athletes?: { first_name?: string; last_name?: string } | { first_name?: string; last_name?: string }[]; facilities?: { name?: string } | { name?: string }[] }) => {
-                    const a = session.athletes;
+                  {upcomingSessions.map((s: { id: string; scheduled_datetime: string; status: string; total_price?: number; session_type?: string; session_mode?: string; partner_invite_code?: string | null; athletes?: { id: string; first_name?: string; last_name?: string; school?: string } | { id: string; first_name?: string; last_name?: string; school?: string }[]; facilities?: { id: string; name?: string; address?: string } | { id: string; name?: string; address?: string }[]; session_participants?: Array<{ youth_wrestlers?: { first_name?: string; last_name?: string } | { first_name?: string; last_name?: string }[] }> }) => {
+                    const a = s.athletes;
                     const coach = Array.isArray(a) ? a[0] : a;
-                    const f = session.facilities;
+                    const f = s.facilities;
                     const fac = Array.isArray(f) ? f[0] : f;
-                    return (
-                      <div
-                        key={session.id}
-                        className="flex items-center justify-between p-4 border rounded-lg"
-                      >
-                        <div>
-                          <p className="font-medium">
-                            {coach?.first_name} {coach?.last_name}
-                            {fac?.name && ` · ${fac.name}`}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            {new Date(session.scheduled_datetime).toLocaleDateString('en-US', {
-                              weekday: 'long',
-                              year: 'numeric',
-                              month: 'long',
-                              day: 'numeric',
-                            })}
-                            {' · '}
-                            {new Date(session.scheduled_datetime).toLocaleTimeString('en-US', {
-                              hour: 'numeric',
-                              minute: '2-digit',
-                            })}
-                          </p>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-medium">${Number(session.total_price ?? 0).toFixed(2)}</p>
-                          <p className="text-xs text-muted-foreground">{session.session_type ?? '—'}</p>
-                        </div>
-                      </div>
-                    );
+                    const wrestlers = (s.session_participants ?? []).map((p) => {
+                      const yw = p.youth_wrestlers;
+                      const o = Array.isArray(yw) ? yw[0] : yw;
+                      return o ? `${o.first_name ?? ''} ${o.last_name ?? ''}`.trim() : null;
+                    }).filter(Boolean) as string[];
+                    const sessionForCard: BookingSession = {
+                      id: s.id,
+                      scheduled_datetime: s.scheduled_datetime,
+                      status: s.status,
+                      total_price: s.total_price ?? 0,
+                      session_type: s.session_type,
+                      session_mode: s.session_mode,
+                      partner_invite_code: s.partner_invite_code ?? null,
+                      coach: {
+                        name: coach ? `${coach.first_name ?? ''} ${coach.last_name ?? ''}`.trim() : '—',
+                        school: coach?.school ?? '',
+                        id: coach?.id ?? '',
+                      },
+                      facility: fac?.name ?? '—',
+                      wrestlers,
+                    };
+                    return <BookingCard key={s.id} session={sessionForCard} />;
                   })}
                 </div>
               </CardContent>
