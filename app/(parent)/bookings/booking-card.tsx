@@ -139,7 +139,7 @@ export function BookingCard({ session, isPast = false }: BookingCardProps) {
               </Link>
               {!isPast && session.coach.id && (
                 <Link href={`/book/${session.coach.id}`}>
-                  <Button variant="outline" size="sm">Book again</Button>
+                  <Button variant="outline" size="sm">Reschedule</Button>
                 </Link>
               )}
               {canCancel && !showConfirm && (
