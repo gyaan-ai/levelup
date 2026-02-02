@@ -25,6 +25,7 @@ type Goal = { id: string; content: string; created_at: string };
 type Media = { id: string; file_name: string; media_type: string; description?: string; viewUrl?: string; created_at: string };
 type Note = { id: string; summary: string; highlights?: string; focus_areas?: string; created_at: string; sessions?: { scheduled_datetime: string } };
 type Action = { id: string; content: string; completed: boolean; created_at: string };
+type Message = { id: string; content: string; author_id: string; authorLabel: string; created_at: string };
 
 export function WorkspaceClient({ workspaceId, isCoach = false }: { workspaceId: string; isCoach?: boolean }) {
   const router = useRouter();
