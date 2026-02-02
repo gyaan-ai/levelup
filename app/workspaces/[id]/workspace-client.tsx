@@ -45,6 +45,8 @@ export function WorkspaceClient({ workspaceId, isCoach = false }: { workspaceId:
   const [addingAction, setAddingAction] = useState(false);
   const [newAction, setNewAction] = useState('');
   const [uploading, setUploading] = useState(false);
+  const [newMessage, setNewMessage] = useState('');
+  const [sendingMessage, setSendingMessage] = useState(false);
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/workspaces/${workspaceId}`);
