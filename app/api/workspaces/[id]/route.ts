@@ -47,13 +47,21 @@ export async function GET(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const [goalsRes, mediaRes, notesRes, actionsRes, messagesRes] = await Promise.all([
+    const [goalsRes, mediaRes, notesRes, actionsRes] = await Promise.all([
       admin.from('workspace_goals').select('*').eq('workspace_id', id).order('created_at', { ascending: false }),
       admin.from('workspace_media').select('*').eq('workspace_id', id).order('created_at', { ascending: false }),
       admin.from('workspace_session_notes').select('*, sessions(scheduled_datetime)').eq('workspace_id', id).order('created_at', { ascending: false }),
       admin.from('workspace_actions').select('*').eq('workspace_id', id).order('created_at', { ascending: false }),
-      admin.from('workspace_messages').select('*').eq('workspace_id', id).order('created_at', { ascending: true }),
     ]);
+
+    // Fetch messages separately - table may not exist if migration not run yet
+    let messagesRes: { data: Array<{ id: string; author_id: string; content: string; created_at: string }> | null } = { data: [] };
+    try {
+      const res = await admin.from('workspace_messages').select('*').eq('workspace_id', id).order('created_at', { ascending: true });
+      messagesRes = res.error ? { data: [] } : res;
+    } catch {
+      messagesRes = { data: [] };
+    }
 
     const media = (mediaRes.data || []) as Array<{ id: string; storage_path: string; [k: string]: unknown }>;
     const mediaWithUrls = await Promise.all(

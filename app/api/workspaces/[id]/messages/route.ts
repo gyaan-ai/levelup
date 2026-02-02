@@ -49,7 +49,12 @@ export async function POST(
       .select()
       .single();
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) {
+      const msg = error.message?.includes('workspace_messages') || error.message?.includes('schema cache')
+        ? 'Collaboration not set up yet. Run the workspace_messages migration on your Supabase database.'
+        : error.message;
+      return NextResponse.json({ error: msg }, { status: 500 });
+    }
     return NextResponse.json({ message: msg });
   } catch (e) {
     console.error('Workspace messages POST error:', e);
