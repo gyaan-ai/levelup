@@ -3,6 +3,7 @@ import Image from 'next/image';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, Users, Award, Shield } from 'lucide-react';
+import { AddToHomeScreen } from '@/components/add-to-home-screen';
 
 export const metadata = {
   title: 'The Guild | Elite Wrestling Technique Instruction',
