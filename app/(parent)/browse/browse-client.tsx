@@ -23,12 +23,12 @@ interface BrowseAthletesClientProps {
   initialAthletes: Athlete[];
 }
 
-const WEIGHT_RANGES = [
-  { id: 'all', label: 'All weights', classes: [] as string[] },
+const WEIGHT_RANGES: { id: string; label: string; classes: readonly string[] }[] = [
+  { id: 'all', label: 'All weights', classes: [] },
   { id: 'light', label: 'Light', classes: ['125', '133', '141', '149', '157'] },
   { id: 'middle', label: 'Middle', classes: ['165', '174', '184'] },
   { id: 'heavy', label: 'Heavy', classes: ['197', '285'] },
-] as const;
+];
 
 function weightMatchesRanges(weightClass: string | undefined, selectedIds: string[]): boolean {
   if (!selectedIds.length || selectedIds.includes('all')) return true;
@@ -36,7 +36,7 @@ function weightMatchesRanges(weightClass: string | undefined, selectedIds: strin
   const w = String(weightClass).trim();
   return selectedIds.some(id => {
     const range = WEIGHT_RANGES.find(r => r.id === id);
-    return range?.classes.includes(w);
+    return range ? range.classes.includes(w) : false;
   });
 }
 
