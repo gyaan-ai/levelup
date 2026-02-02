@@ -26,7 +26,7 @@ export function AddToHomeScreen() {
   useEffect(() => {
     const handler = (e: Event) => {
       e.preventDefault();
-      setDeferredPrompt(e as { prompt: () => Promise<{ outcome: string }> });
+      setDeferredPrompt(e as unknown as { prompt: () => Promise<{ outcome: string }> });
       setState('installable');
     };
 
