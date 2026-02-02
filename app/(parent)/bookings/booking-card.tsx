@@ -137,8 +137,8 @@ export function BookingCard({ session, isPast = false }: BookingCardProps) {
                   Message
                 </Button>
               </Link>
-              {!isPast && session.coach.id && (
-                <Link href={`/book/${session.coach.id}`} className="min-h-[44px] inline-flex">
+              {!isPast && (
+                <Link href={`/sessions/${session.id}/reschedule`} className="min-h-[44px] inline-flex">
                   <Button variant="outline" size="sm" className="min-h-[44px] px-4">Reschedule</Button>
                 </Link>
               )}

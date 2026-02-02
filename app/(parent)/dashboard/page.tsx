@@ -1,5 +1,7 @@
 import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
+
+export const dynamic = 'force-dynamic';
 import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -135,6 +137,55 @@ export default async function ParentDashboard() {
 
       {youthWrestlers && youthWrestlers.length > 0 ? (
         <>
+          {/* Upcoming Sessions - shown first on mobile so booked sessions are visible without scrolling */}
+          {upcomingSessions && upcomingSessions.length > 0 ? (
+            <Card className="mb-6">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <div>
+                  <CardTitle>Upcoming Sessions</CardTitle>
+                  <CardDescription>
+                    Sessions you&apos;ve booked
+                  </CardDescription>
+                </div>
+                <Link href="/bookings">
+                  <Button variant="outline" size="sm">View all</Button>
+                </Link>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {upcomingSessions.map((s: { id: string; scheduled_datetime: string; status: string; total_price?: number; session_type?: string; session_mode?: string; partner_invite_code?: string | null; athletes?: { id: string; first_name?: string; last_name?: string; school?: string } | { id: string; first_name?: string; last_name?: string; school?: string }[]; facilities?: { id: string; name?: string; address?: string } | { id: string; name?: string; address?: string }[]; session_participants?: Array<{ youth_wrestlers?: { first_name?: string; last_name?: string } | { first_name?: string; last_name?: string }[] }> }) => {
+                    const a = s.athletes;
+                    const coach = Array.isArray(a) ? a[0] : a;
+                    const f = s.facilities;
+                    const fac = Array.isArray(f) ? f[0] : f;
+                    const wrestlers = (s.session_participants ?? []).map((p) => {
+                      const yw = p.youth_wrestlers;
+                      const o = Array.isArray(yw) ? yw[0] : yw;
+                      return o ? `${o.first_name ?? ''} ${o.last_name ?? ''}`.trim() : null;
+                    }).filter(Boolean) as string[];
+                    const sessionForCard: BookingSession = {
+                      id: s.id,
+                      scheduled_datetime: s.scheduled_datetime,
+                      status: s.status,
+                      total_price: s.total_price ?? 0,
+                      session_type: s.session_type,
+                      session_mode: s.session_mode,
+                      partner_invite_code: s.partner_invite_code ?? null,
+                      coach: {
+                        name: coach ? `${coach.first_name ?? ''} ${coach.last_name ?? ''}`.trim() : '—',
+                        school: coach?.school ?? '',
+                        id: coach?.id ?? '',
+                      },
+                      facility: fac?.name ?? '—',
+                      wrestlers,
+                    };
+                    return <BookingCard key={s.id} session={sessionForCard} />;
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          ) : null}
+
           {/* Youth Wrestler Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
             {youthWrestlers.map((wrestler: YouthWrestler) => {
@@ -195,54 +246,8 @@ export default async function ParentDashboard() {
             })}
           </div>
 
-          {/* Upcoming Sessions */}
-          {upcomingSessions && upcomingSessions.length > 0 ? (
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <div>
-                  <CardTitle>Upcoming Sessions</CardTitle>
-                  <CardDescription>
-                    Sessions you&apos;ve booked
-                  </CardDescription>
-                </div>
-                <Link href="/bookings">
-                  <Button variant="outline" size="sm">View all</Button>
-                </Link>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {upcomingSessions.map((s: { id: string; scheduled_datetime: string; status: string; total_price?: number; session_type?: string; session_mode?: string; partner_invite_code?: string | null; athletes?: { id: string; first_name?: string; last_name?: string; school?: string } | { id: string; first_name?: string; last_name?: string; school?: string }[]; facilities?: { id: string; name?: string; address?: string } | { id: string; name?: string; address?: string }[]; session_participants?: Array<{ youth_wrestlers?: { first_name?: string; last_name?: string } | { first_name?: string; last_name?: string }[] }> }) => {
-                    const a = s.athletes;
-                    const coach = Array.isArray(a) ? a[0] : a;
-                    const f = s.facilities;
-                    const fac = Array.isArray(f) ? f[0] : f;
-                    const wrestlers = (s.session_participants ?? []).map((p) => {
-                      const yw = p.youth_wrestlers;
-                      const o = Array.isArray(yw) ? yw[0] : yw;
-                      return o ? `${o.first_name ?? ''} ${o.last_name ?? ''}`.trim() : null;
-                    }).filter(Boolean) as string[];
-                    const sessionForCard: BookingSession = {
-                      id: s.id,
-                      scheduled_datetime: s.scheduled_datetime,
-                      status: s.status,
-                      total_price: s.total_price ?? 0,
-                      session_type: s.session_type,
-                      session_mode: s.session_mode,
-                      partner_invite_code: s.partner_invite_code ?? null,
-                      coach: {
-                        name: coach ? `${coach.first_name ?? ''} ${coach.last_name ?? ''}`.trim() : '—',
-                        school: coach?.school ?? '',
-                        id: coach?.id ?? '',
-                      },
-                      facility: fac?.name ?? '—',
-                      wrestlers,
-                    };
-                    return <BookingCard key={s.id} session={sessionForCard} />;
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
+          {/* Upcoming Sessions empty state - only show when no sessions */}
+          {(!upcomingSessions || upcomingSessions.length === 0) && (
             <Card>
               <CardHeader>
                 <CardTitle>Upcoming Sessions</CardTitle>

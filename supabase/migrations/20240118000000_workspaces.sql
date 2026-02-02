@@ -78,16 +78,19 @@ ALTER TABLE public.workspace_session_notes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.workspace_actions ENABLE ROW LEVEL SECURITY;
 
 -- Workspaces: parent and coach can view/edit
+DROP POLICY IF EXISTS "Parent can manage own workspaces" ON public.workspaces;
 CREATE POLICY "Parent can manage own workspaces"
   ON public.workspaces FOR ALL
   USING (parent_id = auth.uid());
 
+DROP POLICY IF EXISTS "Coach can manage workspaces" ON public.workspaces;
 CREATE POLICY "Coach can manage workspaces"
   ON public.workspaces FOR ALL
   USING (
     athlete_id IN (SELECT id FROM public.athletes WHERE id = auth.uid())
   );
 
+DROP POLICY IF EXISTS "Admin can manage workspaces" ON public.workspaces;
 CREATE POLICY "Admin can manage workspaces"
   ON public.workspaces FOR ALL
   USING (
@@ -95,6 +98,7 @@ CREATE POLICY "Admin can manage workspaces"
   );
 
 -- Goals: workspace members can manage
+DROP POLICY IF EXISTS "Workspace members can manage goals" ON public.workspace_goals;
 CREATE POLICY "Workspace members can manage goals"
   ON public.workspace_goals FOR ALL
   USING (
@@ -107,6 +111,7 @@ CREATE POLICY "Workspace members can manage goals"
   );
 
 -- Media: same
+DROP POLICY IF EXISTS "Workspace members can manage media" ON public.workspace_media;
 CREATE POLICY "Workspace members can manage media"
   ON public.workspace_media FOR ALL
   USING (
@@ -119,6 +124,7 @@ CREATE POLICY "Workspace members can manage media"
   );
 
 -- Session notes: coach creates, all can read
+DROP POLICY IF EXISTS "Workspace members can manage session notes" ON public.workspace_session_notes;
 CREATE POLICY "Workspace members can manage session notes"
   ON public.workspace_session_notes FOR ALL
   USING (
@@ -131,6 +137,7 @@ CREATE POLICY "Workspace members can manage session notes"
   );
 
 -- Actions: same
+DROP POLICY IF EXISTS "Workspace members can manage actions" ON public.workspace_actions;
 CREATE POLICY "Workspace members can manage actions"
   ON public.workspace_actions FOR ALL
   USING (
@@ -156,6 +163,7 @@ ON CONFLICT (id) DO UPDATE SET
   allowed_mime_types = ARRAY['video/mp4', 'video/quicktime', 'video/webm', 'image/jpeg', 'image/png', 'image/webp'];
 
 -- Storage policies: workspace participants can upload/read
+DROP POLICY IF EXISTS "Workspace members can upload media" ON storage.objects;
 CREATE POLICY "Workspace members can upload media"
 ON storage.objects FOR INSERT
 TO authenticated
@@ -168,6 +176,7 @@ WITH CHECK (
   )
 );
 
+DROP POLICY IF EXISTS "Workspace members can read media" ON storage.objects;
 CREATE POLICY "Workspace members can read media"
 ON storage.objects FOR SELECT
 TO authenticated
@@ -180,6 +189,7 @@ USING (
   )
 );
 
+DROP POLICY IF EXISTS "Workspace members can delete media" ON storage.objects;
 CREATE POLICY "Workspace members can delete media"
 ON storage.objects FOR DELETE
 TO authenticated

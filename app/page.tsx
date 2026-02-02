@@ -33,7 +33,7 @@ export default function HomePage() {
                   Train with NCAA wrestlers in your community for private technique
                   instruction. Master the details that separate good from elite.
                 </p>
-                <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center lg:justify-start">
+                <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4 justify-center lg:justify-start">
                   <Button
                     size="xl"
                     variant="premium"
@@ -50,6 +50,7 @@ export default function HomePage() {
                   >
                     <Link href="/#how-it-works">How It Works</Link>
                   </Button>
+                  <AddToHomeScreen />
                 </div>
               </div>
               <div className="relative flex items-center justify-center min-h-[280px] lg:min-h-[360px]">

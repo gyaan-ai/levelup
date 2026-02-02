@@ -22,7 +22,14 @@ export const metadata = {
     'the guild wrestling, wrestling lessons, NCAA wrestlers, elite technique, private lessons',
   icons: {
     icon: '/favicon.ico',
+    apple: '/apple-touch-icon.png',
   },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: 'The Guild',
+  },
+  manifest: '/manifest.json',
   viewport: {
     width: 'device-width',
     initialScale: 1,

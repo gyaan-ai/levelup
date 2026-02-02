@@ -618,14 +618,14 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
                     Second spot: partner will pay $40 when they join.
                   </p>
                 )}
-                <div className="flex gap-4 mt-4">
-                  <Button variant="outline" onClick={handleBack} className="flex-1">Back</Button>
-                  <Button onClick={handlePay} disabled={loading} className="flex-1">
-                    {loading ? 'Booking…' : `Pay $${totalPrice.toFixed(2)} and Book Session`}
+                <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mt-4">
+                  <Button variant="outline" onClick={handleBack} className="flex-1 w-full sm:w-auto">Back</Button>
+                  <Button onClick={handlePay} disabled={loading} className="flex-1 w-full sm:w-auto">
+                    {loading ? 'Booking…' : `Book Session ($${totalPrice.toFixed(2)})`}
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground text-center">
-                  Session is saved as &quot;pending payment&quot;. Stripe can be enabled later for real payments.
+                  Payment is arranged directly with your coach.
                 </p>
               </CardContent>
             </Card>

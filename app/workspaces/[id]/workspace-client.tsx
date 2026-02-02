@@ -17,8 +17,7 @@ import {
   Plus,
   Loader2,
   Upload,
-  Play,
-  Image as ImageIcon,
+  MessageCircle,
 } from 'lucide-react';
 import { SchoolLogo } from '@/components/school-logo';
 
@@ -35,6 +34,7 @@ export function WorkspaceClient({ workspaceId, isCoach = false }: { workspaceId:
     media: Media[];
     notes: Note[];
     actions: Action[];
+    messages: Message[];
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [addingGoal, setAddingGoal] = useState(false);
@@ -127,6 +127,27 @@ export function WorkspaceClient({ workspaceId, isCoach = false }: { workspaceId:
     }
   };
 
+  const sendMessage = async () => {
+    if (!newMessage.trim()) return;
+    setSendingMessage(true);
+    try {
+      const res = await fetch(`/api/workspaces/${workspaceId}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: newMessage.trim() }),
+      });
+      if (res.ok) {
+        setNewMessage('');
+        load();
+      } else {
+        const err = await res.json();
+        alert(err.error || 'Failed to send message');
+      }
+    } finally {
+      setSendingMessage(false);
+    }
+  };
+
   const toggleAction = async (actionId: string, completed: boolean) => {
     const res = await fetch(`/api/workspaces/${workspaceId}/actions/${actionId}`, {
       method: 'PATCH',
@@ -191,6 +212,61 @@ export function WorkspaceClient({ workspaceId, isCoach = false }: { workspaceId:
           )}
         </p>
       </div>
+
+      {/* Collaboration - back and forth with timestamps */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <MessageCircle className="h-5 w-5" />
+            Collaboration
+          </CardTitle>
+          <CardDescription>
+            Parent, coach, and athlete can message back and forth
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
+            {(data.messages || []).map((msg) => (
+              <div key={msg.id} className="flex flex-col gap-0.5 p-3 rounded-lg bg-muted/50">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-medium">{msg.authorLabel}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {new Date(msg.created_at).toLocaleString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                      hour: 'numeric',
+                      minute: '2-digit',
+                    })}
+                  </span>
+                </div>
+                <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+              </div>
+            ))}
+            {(data?.messages ?? []).length === 0 && (
+              <p className="text-sm text-muted-foreground py-4">No messages yet. Start the conversation!</p>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Textarea
+              placeholder="Add a message..."
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  sendMessage();
+                }
+              }}
+              rows={2}
+              className="resize-none"
+            />
+            <Button onClick={sendMessage} disabled={sendingMessage || !newMessage.trim()} title="Send message">
+              {sendingMessage ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Send'}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Goals */}

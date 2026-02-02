@@ -45,15 +45,17 @@ export async function POST(
 
     const storagePath = `${workspaceId}/${crypto.randomUUID()}.${ext}`;
 
-    const { data: uploadData, error: uploadError } = await supabase.storage
+    // Use admin client for storage to bypass RLS (we've already verified workspace access above)
+    const { data: uploadData, error: uploadError } = await admin.storage
       .from('workspace-media')
       .upload(storagePath, file, { cacheControl: '3600', upsert: false });
 
     if (uploadError) {
+      console.error('Workspace media upload error:', uploadError);
       return NextResponse.json({ error: `Upload failed: ${uploadError.message}` }, { status: 500 });
     }
 
-    const { data: signedUrl } = await supabase.storage
+    const { data: signedUrl } = await admin.storage
       .from('workspace-media')
       .createSignedUrl(uploadData.path, 60 * 60 * 24 * 7);
 

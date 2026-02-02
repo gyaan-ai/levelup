@@ -47,11 +47,12 @@ export async function GET(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const [goalsRes, mediaRes, notesRes, actionsRes] = await Promise.all([
+    const [goalsRes, mediaRes, notesRes, actionsRes, messagesRes] = await Promise.all([
       admin.from('workspace_goals').select('*').eq('workspace_id', id).order('created_at', { ascending: false }),
       admin.from('workspace_media').select('*').eq('workspace_id', id).order('created_at', { ascending: false }),
       admin.from('workspace_session_notes').select('*, sessions(scheduled_datetime)').eq('workspace_id', id).order('created_at', { ascending: false }),
       admin.from('workspace_actions').select('*').eq('workspace_id', id).order('created_at', { ascending: false }),
+      admin.from('workspace_messages').select('*').eq('workspace_id', id).order('created_at', { ascending: true }),
     ]);
 
     const media = (mediaRes.data || []) as Array<{ id: string; storage_path: string; [k: string]: unknown }>;
@@ -62,12 +63,37 @@ export async function GET(
       })
     );
 
+    // Resolve author names for messages: coach (athlete), parent, or admin
+    const messages = (messagesRes.data || []) as Array<{ id: string; author_id: string; content: string; created_at: string }>;
+    const authorIds = [...new Set(messages.map((m) => m.author_id))];
+    const authorMap = new Map<string, string>();
+
+    if (authorIds.length > 0) {
+      const { data: athleteRows } = await admin.from('athletes').select('id, first_name, last_name').in('id', authorIds);
+      for (const a of athleteRows || []) {
+        const ar = a as { id: string; first_name?: string; last_name?: string };
+        const name = `${ar.first_name || ''} ${ar.last_name || ''}`.trim();
+        if (name) authorMap.set(ar.id, name);
+      }
+      const { data: userRows } = await admin.from('users').select('id, email').in('id', authorIds);
+      for (const u of userRows || []) {
+        const ur = u as { id: string; email?: string };
+        if (!authorMap.has(ur.id)) authorMap.set(ur.id, ur.email || 'Parent');
+      }
+    }
+
+    const messagesWithAuthors = messages.map((m) => ({
+      ...m,
+      authorLabel: authorMap.get(m.author_id) || (m.author_id === workspace.parent_id ? 'Parent' : m.author_id === workspace.athlete_id ? 'Coach' : 'User'),
+    }));
+
     return NextResponse.json({
       workspace,
       goals: goalsRes.data || [],
       media: mediaWithUrls,
       notes: notesRes.data || [],
       actions: actionsRes.data || [],
+      messages: messagesWithAuthors,
     });
   } catch (e) {
     console.error('Workspace GET error:', e);

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { useAuth } from '@/lib/auth/use-auth';
 import { Button } from './ui/button';
 import { Menu, X } from 'lucide-react';
@@ -23,9 +24,13 @@ export function Header() {
         <div className="flex items-center justify-between h-14 sm:h-16">
           <div className="flex items-center gap-4 min-w-0">
             <Link href="/" className="flex items-center group shrink-0" onClick={() => setMobileOpen(false)}>
-              <span className="text-xl sm:text-2xl font-serif font-bold text-accent group-hover:text-accent-light transition-colors tracking-wide truncate">
-                THE GUILD
-              </span>
+              <Image
+                src="/logos/guild-g.png"
+                alt="The Guild"
+                width={40}
+                height={40}
+                className="h-9 w-9 sm:h-10 sm:w-10 object-contain"
+              />
             </Link>
           </div>
 
@@ -195,7 +200,14 @@ export function Header() {
               </Button>
             </nav>
 
-            <div className="md:hidden flex items-center">
+            <div className="md:hidden flex items-center gap-1">
+              <Link
+                href="/login"
+                className="py-2 px-3 min-h-[44px] flex items-center text-white hover:text-accent hover:bg-white/10 rounded font-medium text-sm"
+                onClick={() => setMobileOpen(false)}
+              >
+                Sign in
+              </Link>
               <button
                 type="button"
                 className="p-2 -mr-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-white hover:bg-white/10 rounded"
@@ -211,7 +223,6 @@ export function Header() {
                 <div className="container mx-auto px-0 py-2">
                   <Link href="/browse" className={navLinkClass} onClick={() => setMobileOpen(false)}>Browse Coaches</Link>
                   <Link href="/how-it-works" className={navLinkClass} onClick={() => setMobileOpen(false)}>How It Works</Link>
-                  <Link href="/login" className={navLinkClass} onClick={() => setMobileOpen(false)}>Login</Link>
                   <Link href="/signup" className={navLinkClass} onClick={() => setMobileOpen(false)}>
                     <span className="font-semibold text-accent">Book Training</span>
                   </Link>

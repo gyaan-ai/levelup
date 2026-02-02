@@ -9,6 +9,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const athleteId = searchParams.get('athleteId');
     const dateParam = searchParams.get('date');
+    const excludeSessionId = searchParams.get('excludeSessionId'); // e.g. when rescheduling, exclude current session
     if (!athleteId || !dateParam) {
       return NextResponse.json({ error: 'Missing athleteId or date' }, { status: 400 });
     }
@@ -57,7 +58,7 @@ export async function GET(req: NextRequest) {
 
     const { data: sessions } = await supabase
       .from('sessions')
-      .select('scheduled_datetime')
+      .select('id, scheduled_datetime')
       .eq('athlete_id', athleteId)
       .in('status', ['scheduled', 'pending_payment', 'completed'])
       .gte('scheduled_datetime', dayStart)
@@ -65,7 +66,9 @@ export async function GET(req: NextRequest) {
 
     const booked = new Set<string>();
     for (const s of sessions || []) {
-      const t = (s as { scheduled_datetime: string }).scheduled_datetime;
+      const row = s as { id?: string; scheduled_datetime: string };
+      if (excludeSessionId && row.id === excludeSessionId) continue;
+      const t = row.scheduled_datetime;
       const [, timePart] = t.split('T');
       const [h, m] = (timePart || '').split(':').map((x) => parseInt(x, 10) || 0);
       booked.add(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);

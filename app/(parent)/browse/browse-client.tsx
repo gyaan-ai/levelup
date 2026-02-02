@@ -23,7 +23,22 @@ interface BrowseAthletesClientProps {
   initialAthletes: Athlete[];
 }
 
-const WEIGHT_CLASSES = ['125', '133', '141', '149', '157', '165', '174', '184', '197', '285'];
+const WEIGHT_RANGES = [
+  { id: 'all', label: 'All weights', classes: [] as string[] },
+  { id: 'light', label: 'Light', classes: ['125', '133', '141', '149', '157'] },
+  { id: 'middle', label: 'Middle', classes: ['165', '174', '184'] },
+  { id: 'heavy', label: 'Heavy', classes: ['197', '285'] },
+] as const;
+
+function weightMatchesRanges(weightClass: string | undefined, selectedIds: string[]): boolean {
+  if (!selectedIds.length || selectedIds.includes('all')) return true;
+  if (!weightClass) return false;
+  const w = String(weightClass).trim();
+  return selectedIds.some(id => {
+    const range = WEIGHT_RANGES.find(r => r.id === id);
+    return range?.classes.includes(w);
+  });
+}
 
 const SCHOOL_COLORS: Record<string, { bg: string; text: string }> = {
   'UNC': { bg: 'bg-blue-600', text: 'text-white' },
@@ -35,8 +50,20 @@ const SCHOOL_COLORS: Record<string, { bg: string; text: string }> = {
 export function BrowseAthletesClient({ initialAthletes }: BrowseAthletesClientProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSchool, setSelectedSchool] = useState<string>('all');
-  const [selectedWeight, setSelectedWeight] = useState<string>('all');
+  const [selectedWeightRanges, setSelectedWeightRanges] = useState<string[]>(['all']);
   const [loading, setLoading] = useState(false);
+
+  const toggleWeightRange = (id: string) => {
+    setSelectedWeightRanges(prev => {
+      if (id === 'all') return ['all'];
+      const next = prev.filter(x => x !== 'all');
+      if (next.includes(id)) {
+        const filtered = next.filter(x => x !== id);
+        return filtered.length ? filtered : ['all'];
+      }
+      return [...next, id];
+    });
+  };
 
   // Get unique schools from athletes
   const schools = useMemo(() => {
@@ -54,12 +81,12 @@ export function BrowseAthletesClient({ initialAthletes }: BrowseAthletesClientPr
       // School filter
       const matchesSchool = selectedSchool === 'all' || athlete.school === selectedSchool;
 
-      // Weight class filter
-      const matchesWeight = selectedWeight === 'all' || athlete.weight_class === selectedWeight;
+      // Weight range filter
+      const matchesWeight = weightMatchesRanges(athlete.weight_class, selectedWeightRanges);
 
       return matchesSearch && matchesSchool && matchesWeight;
     });
-  }, [initialAthletes, searchQuery, selectedSchool, selectedWeight]);
+  }, [initialAthletes, searchQuery, selectedSchool, selectedWeightRanges]);
 
   const getSchoolBadgeColor = (school: string) => {
     const normalizedSchool = school.trim();
@@ -103,21 +130,23 @@ export function BrowseAthletesClient({ initialAthletes }: BrowseAthletesClientPr
             </Select>
           </div>
 
-          {/* Weight Class Filter */}
-          <div className="flex-1">
-            <Select value={selectedWeight} onValueChange={setSelectedWeight}>
-              <SelectTrigger>
-                <SelectValue placeholder="All Weights" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Weights</SelectItem>
-                {WEIGHT_CLASSES.map(weight => (
-                  <SelectItem key={weight} value={weight}>
-                    {weight} lbs
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+          {/* Weight Range Filter - multi-select */}
+          <div className="flex-1 flex flex-wrap items-center gap-2">
+            <span className="text-sm font-medium text-muted-foreground shrink-0">Weight:</span>
+            {WEIGHT_RANGES.map(({ id, label }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => toggleWeightRange(id)}
+                className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                  selectedWeightRanges.includes(id)
+                    ? 'bg-accent text-black'
+                    : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
           </div>
 
           {/* Search */}
@@ -185,7 +214,7 @@ export function BrowseAthletesClient({ initialAthletes }: BrowseAthletesClientPr
               onClick={() => {
                 setSearchQuery('');
                 setSelectedSchool('all');
-                setSelectedWeight('all');
+                setSelectedWeightRanges(['all']);
               }}
             >
               Clear Filters

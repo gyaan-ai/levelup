@@ -40,7 +40,7 @@ export function JoinSessionClient({
       alert('Please select a youth wrestler.');
       return;
     }
-    alert('Stripe integration coming next! You\'ll be able to pay and join this session.');
+    alert('Contact the session organizer to join. Payment is arranged directly with the coach.');
   };
 
   if (youthWrestlers.length === 0) {
