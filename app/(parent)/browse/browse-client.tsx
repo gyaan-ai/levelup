@@ -14,13 +14,27 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ArrowLeft, Star, User } from 'lucide-react';
+import { ArrowLeft, Star, User, Calendar } from 'lucide-react';
 import { SchoolLogo } from '@/components/school-logo';
 import { EliteWrestlerBadge } from '@/components/elite-wrestler-badge';
 import { Athlete } from '@/types';
 
+interface AthleteWithNext extends Athlete {
+  nextAvailable?: { slot_date: string; start_time: string } | null;
+}
+
 interface BrowseAthletesClientProps {
-  initialAthletes: Athlete[];
+  initialAthletes: AthleteWithNext[];
+}
+
+function formatNextAvailable(slot_date: string, start_time: string): string {
+  const [h, m] = start_time.split(':').map((x) => parseInt(x, 10) || 0);
+  const h12 = h % 12 || 12;
+  const ampm = h < 12 ? 'AM' : 'PM';
+  const timeStr = `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
+  const d = new Date(slot_date + 'T12:00:00');
+  const dateStr = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  return `${dateStr} · ${timeStr}`;
 }
 
 const WEIGHT_RANGES: { id: string; label: string; classes: readonly string[] }[] = [
@@ -279,6 +293,13 @@ export function BrowseAthletesClient({ initialAthletes }: BrowseAthletesClientPr
                         </span>
                       )}
                     </div>
+
+                    {athlete.nextAvailable && (
+                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                        <Calendar className="h-4 w-4 shrink-0" />
+                        <span>Next: {formatNextAvailable(athlete.nextAvailable.slot_date, athlete.nextAvailable.start_time)}</span>
+                      </div>
+                    )}
 
                     <Button className="w-full" variant="outline">
                       View Profile

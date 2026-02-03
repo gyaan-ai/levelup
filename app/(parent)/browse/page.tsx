@@ -55,6 +55,32 @@ export default async function BrowsePage() {
   }
 
   const athletesList = (athletes || []) as Athlete[];
+  const athleteIds = athletesList.map((a) => a.id);
 
-  return <BrowseAthletesClient initialAthletes={athletesList} />;
+  // Fetch next available slot per coach (earliest slot_date >= today)
+  const today = new Date().toISOString().slice(0, 10);
+  const { data: slots } = athleteIds.length
+    ? await supabase
+        .from('athlete_availability_slots')
+        .select('athlete_id, slot_date, start_time')
+        .in('athlete_id', athleteIds)
+        .gte('slot_date', today)
+        .order('slot_date', { ascending: true })
+        .order('start_time', { ascending: true })
+    : { data: [] };
+
+  const nextByAthlete = new Map<string, { slot_date: string; start_time: string }>();
+  for (const row of slots || []) {
+    const r = row as { athlete_id: string; slot_date: string; start_time: string };
+    if (!nextByAthlete.has(r.athlete_id)) {
+      nextByAthlete.set(r.athlete_id, { slot_date: r.slot_date, start_time: r.start_time });
+    }
+  }
+
+  const athletesWithNext = athletesList.map((a) => ({
+    ...a,
+    nextAvailable: nextByAthlete.get(a.id) ?? null,
+  }));
+
+  return <BrowseAthletesClient initialAthletes={athletesWithNext} />;
 }
