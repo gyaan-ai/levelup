@@ -92,7 +92,7 @@ export function SessionsSection({
                     Cancel
                   </Button>
                 </div>
-              ) : hasSummary ? (
+              ) : hasSummary && session.summary ? (
                 <SessionSummaryDisplay
                   summary={session.summary}
                   sessionDate={session.scheduled_datetime}
