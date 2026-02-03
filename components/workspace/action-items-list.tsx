@@ -10,9 +10,14 @@ import { CheckCircle2, Circle, Loader2, Calendar } from 'lucide-react';
 interface ActionItemsListProps {
   workspaceId: string;
   canComplete?: boolean;
+  onStatusChange?: () => void;
 }
 
-export function ActionItemsList({ workspaceId, canComplete = false }: ActionItemsListProps) {
+export function ActionItemsList({
+  workspaceId,
+  canComplete = false,
+  onStatusChange,
+}: ActionItemsListProps) {
   const { items, loading, error } = useActionItems(workspaceId);
   const [completingId, setCompletingId] = useState<string | null>(null);
 
@@ -26,6 +31,7 @@ export function ActionItemsList({ workspaceId, canComplete = false }: ActionItem
         body: JSON.stringify({ status: currentStatus === 'completed' ? 'pending' : 'completed' }),
       });
       if (!res.ok) throw new Error();
+      onStatusChange?.();
     } catch {
       alert('Failed to update action item');
     } finally {
