@@ -26,19 +26,17 @@ interface Session {
   summary: SessionSummary | null;
 }
 
-interface SessionsSectionProps {
-  workspaceId: string;
-  sessions: Session[];
-  isCoach: boolean;
-  onRefresh?: () => void;
-}
-
 export function SessionsSection({
   workspaceId,
   sessions,
   isCoach,
   onRefresh,
-}: SessionsSectionProps) {
+}: {
+  workspaceId: string;
+  sessions: Array<Session>;
+  isCoach: boolean;
+  onRefresh?: () => void;
+}) {
   const [writingSummaryFor, setWritingSummaryFor] = useState<string | null>(null);
 
   if (!sessions.length) {
