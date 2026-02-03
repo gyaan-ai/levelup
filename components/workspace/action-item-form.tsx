@@ -6,12 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Calendar } from '@/components/ui/calendar';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { CalendarIcon, Loader2 } from 'lucide-react';
+import { CalendarIcon, Loader2, X } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface ActionItemFormProps {
@@ -25,6 +20,7 @@ export function ActionItemForm({ workspaceId, onSaved, onCancel }: ActionItemFor
   const [description, setDescription] = useState('');
   const [dueDate, setDueDate] = useState<Date | undefined>(undefined);
   const [saving, setSaving] = useState(false);
+  const [showCalendar, setShowCalendar] = useState(false);
 
   async function handleSubmit() {
     if (!task.trim() || task.trim().length < 3) {
@@ -83,22 +79,39 @@ export function ActionItemForm({ workspaceId, onSaved, onCancel }: ActionItemFor
 
       <div>
         <Label>Due Date (optional)</Label>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="w-full justify-start mt-2">
-              <CalendarIcon className="mr-2 h-4 w-4" />
-              {dueDate ? format(dueDate, 'PPP') : 'Pick a date'}
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent className="p-0">
+        <Button
+          variant="outline"
+          className="w-full justify-start mt-2"
+          type="button"
+          onClick={() => setShowCalendar((prev) => !prev)}
+        >
+          <CalendarIcon className="mr-2 h-4 w-4" />
+          {dueDate ? format(dueDate, 'PPP') : 'Pick a date'}
+        </Button>
+        {showCalendar && (
+          <div className="mt-2 rounded-lg border bg-background p-3">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-medium text-muted-foreground">Select due date</p>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowCalendar(false)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
             <Calendar
               mode="single"
               selected={dueDate}
-              onSelect={setDueDate}
+              onSelect={(date) => {
+                setDueDate(date);
+                setShowCalendar(false);
+              }}
               initialFocus
             />
-          </DropdownMenuContent>
-        </DropdownMenu>
+          </div>
+        )}
       </div>
 
       <div className="flex gap-2">
