@@ -10,7 +10,7 @@ import { Calendar } from '@/components/ui/calendar';
 import Link from 'next/link';
 import { ArrowLeft, User, Clock, CheckCircle, Link2, Users, UserCircle } from 'lucide-react';
 import { SchoolLogo } from '@/components/school-logo';
-import { EliteWrestlerBadge } from '@/components/elite-wrestler-badge';
+import { CoachSessionBadge } from '@/components/coach-session-badge';
 import { format, startOfDay } from 'date-fns';
 import { YouthWrestler } from '@/types';
 import type { SessionMode } from '@/types';
@@ -43,6 +43,7 @@ interface Athlete {
   last_name: string;
   school: string;
   photo_url?: string;
+  total_sessions?: number;
 }
 
 interface Facility {
@@ -577,7 +578,7 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
                       </div>
                     )}
                     <span className="font-medium flex items-center gap-2">
-                      <EliteWrestlerBadge size="sm" />
+                      <CoachSessionBadge totalSessions={athlete.total_sessions ?? 0} size="sm" />
                       {athlete.first_name} {athlete.last_name}
                     </span>
                     <span className="text-muted-foreground flex items-center gap-1">
@@ -652,7 +653,7 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
                 )}
                 <div>
                   <p className="font-medium flex items-center gap-2">
-                    <EliteWrestlerBadge size="sm" />
+                    <CoachSessionBadge totalSessions={athlete.total_sessions ?? 0} size="sm" />
                     {athlete.first_name} {athlete.last_name}
                   </p>
                   <p className="text-sm text-muted-foreground flex items-center gap-1">

@@ -1,7 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { SchoolLogo } from '@/components/school-logo';
-import { EliteWrestlerBadge } from '@/components/elite-wrestler-badge';
+import { CoachSessionBadge } from '@/components/coach-session-badge';
 import { Athlete } from '@/types';
 
 interface AthleteCardProps {
@@ -21,7 +21,7 @@ export function AthleteCard({ athlete }: AthleteCardProps) {
         )}
         <CardTitle>{athlete.first_name} {athlete.last_name}</CardTitle>
         <CardDescription className="flex items-center gap-2 flex-wrap">
-          <EliteWrestlerBadge size="sm" />
+          <CoachSessionBadge totalSessions={athlete.total_sessions ?? 0} size="sm" />
           <SchoolLogo school={athlete.school} size="sm" />
           {athlete.school} • {athlete.year || 'College Wrestler'}
         </CardDescription>

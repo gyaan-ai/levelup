@@ -53,7 +53,7 @@ export default async function BookPage({
   // Fetch athlete data
   const { data: athlete, error: athleteError } = await supabase
     .from('athletes')
-    .select('id, first_name, last_name, school, photo_url, facility_id')
+    .select('id, first_name, last_name, school, photo_url, facility_id, total_sessions')
     .eq('id', athleteId)
     .eq('active', true)
     .single();

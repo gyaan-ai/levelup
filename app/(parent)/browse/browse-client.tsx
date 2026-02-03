@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/select';
 import { ArrowLeft, Star, User, Calendar } from 'lucide-react';
 import { SchoolLogo } from '@/components/school-logo';
-import { EliteWrestlerBadge } from '@/components/elite-wrestler-badge';
+import { CoachSessionBadge } from '@/components/coach-session-badge';
 import { Athlete } from '@/types';
 
 interface AthleteWithNext extends Athlete {
@@ -266,7 +266,7 @@ export function BrowseAthletesClient({ initialAthletes }: BrowseAthletesClientPr
                           {athlete.first_name} {athlete.last_name}
                         </h3>
                         <div className="flex items-center gap-2 mt-1 flex-wrap">
-                          <EliteWrestlerBadge size="sm" />
+                          <CoachSessionBadge totalSessions={athlete.total_sessions ?? 0} size="sm" />
                           <SchoolLogo school={athlete.school} size="sm" />
                           <Badge
                             className={`${schoolColors.bg} ${schoolColors.text} text-xs`}
@@ -297,7 +297,7 @@ export function BrowseAthletesClient({ initialAthletes }: BrowseAthletesClientPr
                     {athlete.nextAvailable && (
                       <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
                         <Calendar className="h-4 w-4 shrink-0" />
-                        <span>Next: {formatNextAvailable(athlete.nextAvailable.slot_date, athlete.nextAvailable.start_time)}</span>
+                        <span>Next available: {formatNextAvailable(athlete.nextAvailable.slot_date, athlete.nextAvailable.start_time)}</span>
                       </div>
                     )}
 

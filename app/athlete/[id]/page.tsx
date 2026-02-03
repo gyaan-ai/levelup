@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { ArrowLeft, Star, User, MapPin, Award, Shield, CheckCircle } from 'lucide-react';
 import { SchoolLogo } from '@/components/school-logo';
-import { EliteWrestlerBadge } from '@/components/elite-wrestler-badge';
+import { CoachSessionBadge } from '@/components/coach-session-badge';
 import { FollowCoachButton } from '@/components/follow-coach-button';
 
 const SCHOOL_COLORS: Record<string, { bg: string; text: string }> = {
@@ -132,7 +132,7 @@ export default async function AthleteProfilePage({
               </h1>
               
               <div className="flex items-center gap-3 mb-3 flex-wrap">
-                <EliteWrestlerBadge size="lg" />
+                <CoachSessionBadge totalSessions={totalSessions} size="lg" />
                 <SchoolLogo school={athlete.school} size="md" />
                 <Badge className={`${schoolColor.bg} ${schoolColor.text}`}>
                   {athlete.school}
