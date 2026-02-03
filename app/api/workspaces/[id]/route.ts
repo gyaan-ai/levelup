@@ -47,11 +47,10 @@ export async function GET(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const [goalsRes, mediaRes, notesRes, actionsRes] = await Promise.all([
+    const [goalsRes, mediaRes, notesRes] = await Promise.all([
       admin.from('workspace_goals').select('*').eq('workspace_id', id).order('created_at', { ascending: false }),
       admin.from('workspace_media').select('*').eq('workspace_id', id).order('created_at', { ascending: false }),
       admin.from('workspace_session_notes').select('*, sessions(scheduled_datetime)').eq('workspace_id', id).order('created_at', { ascending: false }),
-      admin.from('workspace_actions').select('*').eq('workspace_id', id).order('created_at', { ascending: false }),
     ]);
 
     // Fetch messages separately - table may not exist if migration not run yet
@@ -125,14 +124,55 @@ export async function GET(
       };
     });
 
+    const { data: sessionsData } = await admin
+      .from('sessions')
+      .select(`
+        id,
+        scheduled_datetime,
+        duration_minutes,
+        status,
+        athlete_id,
+        parent_id,
+        youth_wrestler_id,
+        session_participants!inner(
+          id,
+          session_id,
+          parent_id,
+          youth_wrestler_id
+        )
+      `)
+      .eq('athlete_id', workspace.athlete_id)
+      .eq('session_participants.parent_id', workspace.parent_id)
+      .order('scheduled_datetime', { ascending: false });
+
+    const sessionIds = (sessionsData || []).map((s) => s.id);
+    const { data: summariesData } = sessionIds.length
+      ? await admin.from('session_summaries').select('*').in('session_id', sessionIds)
+      : { data: [] as Array<Record<string, unknown>> };
+
+    const sessionsWithSummaries = (sessionsData || []).map((session) => ({
+      id: session.id,
+      scheduled_datetime: session.scheduled_datetime,
+      duration_minutes: session.duration_minutes,
+      status: session.status,
+      summary: (summariesData || []).find((s) => s.session_id === session.id) || null,
+    }));
+    const { data: actionItems } = await admin
+      .from('workspace_actions')
+      .select('*')
+      .eq('workspace_id', id)
+      .order('created_at', { ascending: false });
+
     return NextResponse.json({
       workspace,
       currentUserId: user.id,
       goals: goalsRes.data || [],
       media: mediaWithUrls,
       notes: notesRes.data || [],
-      actions: actionsRes.data || [],
+      actions: actionItems || [],
+      sessions: sessionsWithSummaries,
       messages: messagesWithAuthors,
+      currentUserRole: userData?.role || null,
     });
   } catch (e) {
     console.error('Workspace GET error:', e);

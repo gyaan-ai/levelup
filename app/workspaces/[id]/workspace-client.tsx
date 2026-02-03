@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -8,7 +8,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Badge } from '@/components/ui/badge';
 import {
   ArrowLeft,
   Target,
@@ -19,13 +18,14 @@ import {
   Loader2,
   Upload,
   MessageCircle,
-  Pencil,
   Trash2,
   X,
   Check,
-  Smile,
 } from 'lucide-react';
 import { SchoolLogo } from '@/components/school-logo';
+import { MessagesSection } from '@/components/workspace/messages-section';
+import { SessionsSection } from '@/components/workspace/sessions-section';
+import { ActionItemsSection } from '@/components/workspace/action-items-section';
 
 type Goal = { id: string; content: string; created_at: string };
 type Media = { id: string; file_name: string; media_type: string; description?: string; viewUrl?: string; created_at: string };
@@ -44,32 +44,30 @@ type Message = {
   reactions: Reaction[];
 };
 
-const EMOJI_OPTIONS = ['👍', '🎯', '💪', '🔥', '👏', '❤️'];
+type SessionItem = {
+  id: string;
+  scheduled_datetime: string;
+  status: string;
+};
 
-function relativeTime(dateStr: string): string {
-  const now = Date.now();
-  const then = new Date(dateStr).getTime();
-  const diff = now - then;
-  const mins = Math.floor(diff / 60000);
-  if (mins < 1) return 'Just now';
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  const days = Math.floor(hrs / 24);
-  if (days < 7) return `${days}d ago`;
-  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
 
 export function WorkspaceClient({ workspaceId, isCoach = false }: { workspaceId: string; isCoach?: boolean }) {
   const router = useRouter();
   const [data, setData] = useState<{
-    workspace: { youth_wrestlers?: { first_name?: string; last_name?: string }; athletes?: { first_name?: string; last_name?: string; school?: string } };
+    workspace: {
+      parent_id?: string;
+      athlete_id?: string;
+      youth_wrestlers?: { first_name?: string; last_name?: string };
+      athletes?: { first_name?: string; last_name?: string; school?: string };
+    };
     currentUserId?: string;
     goals: Goal[];
     media: Media[];
     notes: Note[];
     actions: Action[];
     messages: Message[];
+    sessions: SessionItem[];
+    currentUserRole?: string;
   } | null>(null);
   const [loading, setLoading] = useState(true);
   const [addingGoal, setAddingGoal] = useState(false);
@@ -79,12 +77,10 @@ export function WorkspaceClient({ workspaceId, isCoach = false }: { workspaceId:
   const [addingAction, setAddingAction] = useState(false);
   const [newAction, setNewAction] = useState('');
   const [uploading, setUploading] = useState(false);
-  const [newMessage, setNewMessage] = useState('');
-  const [sendingMessage, setSendingMessage] = useState(false);
-  const [editingId, setEditingId] = useState<string | null>(null);
-  const [editContent, setEditContent] = useState('');
-  const [showEmojiPicker, setShowEmojiPicker] = useState<string | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [editingMediaId, setEditingMediaId] = useState<string | null>(null);
+  const [mediaNoteDraft, setMediaNoteDraft] = useState('');
+  const [savingMediaNote, setSavingMediaNote] = useState(false);
+  const [deletingMediaId, setDeletingMediaId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/workspaces/${workspaceId}`);
@@ -94,6 +90,9 @@ export function WorkspaceClient({ workspaceId, isCoach = false }: { workspaceId:
     }
     const json = await res.json();
     setData(json);
+    setEditingMediaId(null);
+    setMediaNoteDraft('');
+    setDeletingMediaId(null);
   }, [workspaceId, router]);
 
   useEffect(() => {
@@ -147,87 +146,47 @@ export function WorkspaceClient({ workspaceId, isCoach = false }: { workspaceId:
     }
   };
 
-  const addAction = async () => {
-    if (!newAction.trim()) return;
-    setAddingAction(true);
+  const beginEditMediaNote = (media: Media) => {
+    setEditingMediaId(media.id);
+    setMediaNoteDraft(media.description || '');
+  };
+
+  const saveMediaNote = async (mediaId: string) => {
+    if (savingMediaNote) return;
+    setSavingMediaNote(true);
     try {
-      const res = await fetch(`/api/workspaces/${workspaceId}/actions`, {
-        method: 'POST',
+      const res = await fetch(`/api/workspaces/${workspaceId}/media/${mediaId}`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: newAction.trim() }),
+        body: JSON.stringify({ description: mediaNoteDraft }),
       });
-      if (res.ok) {
-        setNewAction('');
-        load();
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || 'Failed to save notes');
       } else {
-        const err = await res.json();
-        alert(err.error || 'Failed to add action');
+        setEditingMediaId(null);
+        setMediaNoteDraft('');
+        load();
       }
     } finally {
-      setAddingAction(false);
+      setSavingMediaNote(false);
     }
   };
 
-  const sendMessage = async () => {
-    if (!newMessage.trim()) return;
-    setSendingMessage(true);
+  const deleteMedia = async (mediaId: string) => {
+    if (!confirm('Delete this media item?')) return;
+    setDeletingMediaId(mediaId);
     try {
-      const res = await fetch(`/api/workspaces/${workspaceId}/messages`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: newMessage.trim() }),
-      });
-      if (res.ok) {
-        setNewMessage('');
-        load();
-        setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
+      const res = await fetch(`/api/workspaces/${workspaceId}/media/${mediaId}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        alert(err.error || 'Failed to delete media');
       } else {
-        const err = await res.json();
-        alert(err.error || 'Failed to send message');
+        load();
       }
     } finally {
-      setSendingMessage(false);
+      setDeletingMediaId(null);
     }
-  };
-
-  const editMessage = async (msgId: string) => {
-    if (!editContent.trim()) return;
-    const res = await fetch(`/api/workspaces/${workspaceId}/messages/${msgId}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content: editContent.trim() }),
-    });
-    if (res.ok) {
-      setEditingId(null);
-      setEditContent('');
-      load();
-    } else {
-      const err = await res.json();
-      alert(err.error || 'Failed to edit');
-    }
-  };
-
-  const deleteMessage = async (msgId: string) => {
-    if (!confirm('Delete this message?')) return;
-    const res = await fetch(`/api/workspaces/${workspaceId}/messages/${msgId}`, { method: 'DELETE' });
-    if (res.ok) load();
-    else alert('Failed to delete');
-  };
-
-  const toggleReaction = async (msgId: string, emoji: string) => {
-    const msg = data?.messages.find((m) => m.id === msgId);
-    const hasReacted = msg?.reactions.some((r) => r.emoji === emoji && r.userIds.includes(data?.currentUserId || ''));
-    if (hasReacted) {
-      await fetch(`/api/workspaces/${workspaceId}/messages/${msgId}/reactions?emoji=${encodeURIComponent(emoji)}`, { method: 'DELETE' });
-    } else {
-      await fetch(`/api/workspaces/${workspaceId}/messages/${msgId}/reactions`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ emoji }),
-      });
-    }
-    setShowEmojiPicker(null);
-    load();
   };
 
   const toggleAction = async (actionId: string, completed: boolean) => {
@@ -282,6 +241,7 @@ export function WorkspaceClient({ workspaceId, isCoach = false }: { workspaceId:
   const coach = Array.isArray(data.workspace.athletes) ? data.workspace.athletes[0] : data.workspace.athletes;
   const wrestlerName = yw ? `${yw.first_name || ''} ${yw.last_name || ''}`.trim() : 'Wrestler';
   const coachName = coach ? `${coach.first_name || ''} ${coach.last_name || ''}`.trim() : 'Coach';
+  const userRole = data.currentUserRole;
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -303,123 +263,26 @@ export function WorkspaceClient({ workspaceId, isCoach = false }: { workspaceId:
         </p>
       </div>
 
-      {/* Collaboration - modern messaging */}
-      <Card className="mb-6">
+      {/* Collaboration - real-time messaging */}
+      <Card className="mb-6 overflow-hidden">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <MessageCircle className="h-5 w-5" />
             Collaboration
           </CardTitle>
           <CardDescription>
-            Parent, coach, and athlete can message back and forth
+            Parent, coach, and athlete can message back and forth. Updates in real time.
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-3 max-h-80 overflow-y-auto pr-2">
-            {(data.messages || []).map((msg) => {
-              const isOwn = msg.author_id === data?.currentUserId;
-              const isEditing = editingId === msg.id;
-              return (
-                <div key={msg.id} className="group flex gap-3">
-                  {/* Avatar */}
-                  <div className="shrink-0">
-                    {msg.authorPhoto ? (
-                      <Image src={msg.authorPhoto} alt="" width={36} height={36} className="rounded-full object-cover" />
-                    ) : (
-                      <div className="w-9 h-9 rounded-full bg-accent/20 flex items-center justify-center text-sm font-medium">
-                        {msg.authorName.charAt(0).toUpperCase()}
-                      </div>
-                    )}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    {/* Header: name + time + actions */}
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <span className="text-sm font-semibold">{msg.authorName}</span>
-                      <span className="text-xs text-muted-foreground">{relativeTime(msg.created_at)}</span>
-                      {msg.isEdited && <span className="text-xs text-muted-foreground">(edited)</span>}
-                      {isOwn && !isEditing && (
-                        <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 ml-auto">
-                          <button onClick={() => { setEditingId(msg.id); setEditContent(msg.content); }} className="p-1 hover:bg-muted rounded" title="Edit">
-                            <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
-                          </button>
-                          <button onClick={() => deleteMessage(msg.id)} className="p-1 hover:bg-muted rounded" title="Delete">
-                            <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                    {/* Content / Edit mode */}
-                    {isEditing ? (
-                      <div className="flex gap-2 items-start">
-                        <Textarea value={editContent} onChange={(e) => setEditContent(e.target.value)} rows={2} className="text-sm resize-none" autoFocus />
-                        <Button size="sm" onClick={() => editMessage(msg.id)} disabled={!editContent.trim()}><Check className="h-4 w-4" /></Button>
-                        <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}><X className="h-4 w-4" /></Button>
-                      </div>
-                    ) : (
-                      <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
-                    )}
-                    {/* Reactions */}
-                    {!isEditing && (
-                      <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-                        {msg.reactions.map((r) => (
-                          <button
-                            key={r.emoji}
-                            onClick={() => toggleReaction(msg.id, r.emoji)}
-                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border transition-colors ${
-                              r.userIds.includes(data?.currentUserId || '') ? 'bg-accent/20 border-accent' : 'bg-muted/50 border-transparent hover:border-muted-foreground/30'
-                            }`}
-                          >
-                            <span>{r.emoji}</span>
-                            <span className="font-medium">{r.userIds.length}</span>
-                          </button>
-                        ))}
-                        {/* Add reaction button */}
-                        <div className="relative">
-                          <button onClick={() => setShowEmojiPicker(showEmojiPicker === msg.id ? null : msg.id)} className="p-1 hover:bg-muted rounded opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Smile className="h-4 w-4 text-muted-foreground" />
-                          </button>
-                          {showEmojiPicker === msg.id && (
-                            <div className="absolute bottom-full left-0 mb-1 flex gap-1 p-1.5 bg-background border rounded-lg shadow-lg z-10">
-                              {EMOJI_OPTIONS.map((e) => (
-                                <button key={e} onClick={() => toggleReaction(msg.id, e)} className="p-1 hover:bg-muted rounded text-lg">
-                                  {e}
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
-            {(data?.messages ?? []).length === 0 && (
-              <p className="text-sm text-muted-foreground py-4 text-center">No messages yet. Start the conversation!</p>
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-          {/* Composer */}
-          <div className="flex gap-2 pt-2 border-t">
-            <Textarea
-              placeholder="Type a message..."
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  sendMessage();
-                }
-              }}
-              rows={2}
-              className="resize-none"
-            />
-            <Button onClick={sendMessage} disabled={sendingMessage || !newMessage.trim()}>
-              {sendingMessage ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Send'}
-            </Button>
-          </div>
+        <CardContent className="p-0 h-[600px] min-h-[400px]">
+          <MessagesSection
+            workspaceId={workspaceId}
+            currentUserId={data.currentUserId ?? ''}
+          />
         </CardContent>
       </Card>
+
+      <ActionItemsSection workspaceId={workspaceId} isCoach={userRole === 'athlete'} />
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Goals */}
@@ -463,14 +326,53 @@ export function WorkspaceClient({ workspaceId, isCoach = false }: { workspaceId:
           </CardHeader>
           <CardContent className="space-y-4">
             {data.media.map((m) => (
-              <div key={m.id} className="rounded-lg border overflow-hidden">
+              <div key={m.id} className="rounded-lg border overflow-hidden group/media">
                 {m.media_type === 'video' && m.viewUrl && (
                   <video src={m.viewUrl} controls className="w-full max-h-48" />
                 )}
                 {m.media_type === 'image' && m.viewUrl && (
                   <img src={m.viewUrl} alt={m.file_name} className="w-full max-h-48 object-cover" />
                 )}
-                <div className="p-2 text-sm text-muted-foreground">{m.file_name}</div>
+                <div className="p-3 space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm text-muted-foreground truncate">{m.file_name}</span>
+                    <button
+                      onClick={() => deleteMedia(m.id)}
+                      disabled={deletingMediaId === m.id}
+                      className="shrink-0 p-1.5 rounded hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                      title="Delete"
+                    >
+                      {deletingMediaId === m.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                    </button>
+                  </div>
+                  {editingMediaId === m.id ? (
+                    <div className="flex gap-2">
+                      <Textarea
+                        value={mediaNoteDraft}
+                        onChange={(e) => setMediaNoteDraft(e.target.value)}
+                        placeholder="Add notes..."
+                        rows={2}
+                        className="text-sm resize-none"
+                        autoFocus
+                      />
+                      <div className="flex flex-col gap-1">
+                        <Button size="sm" onClick={() => saveMediaNote(m.id)} disabled={savingMediaNote}>
+                          {savingMediaNote ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => { setEditingMediaId(null); setMediaNoteDraft(''); }}>
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div
+                      onClick={() => beginEditMediaNote(m)}
+                      className="text-sm text-muted-foreground min-h-[2rem] py-1 px-2 -mx-2 rounded hover:bg-muted/50 cursor-text"
+                    >
+                      {m.description ? m.description : <span className="italic">Tap to add notes...</span>}
+                    </div>
+                  )}
+                </div>
               </div>
             ))}
             <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50">
@@ -517,44 +419,25 @@ export function WorkspaceClient({ workspaceId, isCoach = false }: { workspaceId:
             )}
           </CardContent>
         </Card>
+      {/* Sessions & Summaries */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <FileText className="h-5 w-5" />
+            Session History
+          </CardTitle>
+          <CardDescription>Summaries from your private sessions</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <SessionsSection
+            workspaceId={workspaceId}
+            sessions={data.sessions || []}
+            isCoach={isCoach}
+            onRefresh={load}
+          />
+        </CardContent>
+      </Card>
 
-        {/* Action Items */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CheckSquare className="h-5 w-5" />
-              Action Items
-            </CardTitle>
-            <CardDescription>Coach-assigned homework before next session</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {data.actions.map((a) => (
-              <div key={a.id} className="flex items-center gap-3 p-3 rounded-lg border">
-                <button
-                  onClick={() => toggleAction(a.id, !a.completed)}
-                  className={`w-5 h-5 rounded border flex items-center justify-center shrink-0 ${a.completed ? 'bg-primary border-primary text-primary-foreground' : 'hover:bg-muted'}`}
-                >
-                  {a.completed && <span className="text-xs font-bold">✓</span>}
-                </button>
-                <span className={a.completed ? 'line-through text-muted-foreground' : ''}>{a.content}</span>
-              </div>
-            ))}
-            {isCoach && (
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Add action for next session..."
-                  value={newAction}
-                  onChange={(e) => setNewAction(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && addAction()}
-                  disabled={addingAction}
-                />
-                <Button onClick={addAction} disabled={addingAction || !newAction.trim()}>
-                  {addingAction ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
-                </Button>
-              </div>
-            )}
-          </CardContent>
-        </Card>
       </div>
     </div>
   );

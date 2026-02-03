@@ -29,9 +29,9 @@ export async function POST(
     }
 
     const body = await req.json();
-    const { content, sessionNoteId, dueBeforeSessionId } = body;
-    if (!content || typeof content !== 'string') {
-      return NextResponse.json({ error: 'Content required' }, { status: 400 });
+    const { content, description, due_date } = body;
+    if (!content || typeof content !== 'string' || content.trim().length < 3) {
+      return NextResponse.json({ error: 'Task is required (min 3 characters)' }, { status: 400 });
     }
 
     const { data: action, error } = await admin
@@ -39,15 +39,15 @@ export async function POST(
       .insert({
         workspace_id: workspaceId,
         content: content.trim(),
-        session_note_id: sessionNoteId || null,
-        due_before_session_id: dueBeforeSessionId || null,
-        created_by: user.id,
+        description: description?.trim() || null,
+        due_date: due_date || null,
+        status: 'pending',
       })
       .select()
       .single();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    return NextResponse.json({ action });
+    return NextResponse.json(action);
   } catch (e) {
     console.error('Actions POST error:', e);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
