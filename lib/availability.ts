@@ -71,3 +71,21 @@ export function slotsForDay(
   }
   return [...set].sort();
 }
+
+/** Date-specific slot row */
+export interface AvailabilitySlotDate {
+  slot_date: string;
+  start_time: string;
+  end_time: string;
+}
+
+/** Get all 1-hour slots for a date from date-specific rows */
+export function slotsForDate(rows: AvailabilitySlotDate[]): string[] {
+  const set = new Set<string>();
+  for (const row of rows) {
+    const start = timeToHHmm(row.start_time);
+    const end = timeToHHmm(row.end_time);
+    for (const slot of expandToSlots(start, end)) set.add(slot);
+  }
+  return [...set].sort();
+}

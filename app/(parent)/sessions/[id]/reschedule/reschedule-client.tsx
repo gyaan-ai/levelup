@@ -38,10 +38,11 @@ export function RescheduleClient({
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [availability, setAvailability] = useState<{ day_of_week: number }[]>([]);
+  const [availabilityDates, setAvailabilityDates] = useState<Set<string>>(new Set());
   const [slots, setSlots] = useState<string[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
 
-  const hasAvailability = availability.length > 0;
+  const hasAvailability = availability.length > 0 || availabilityDates.size > 0;
   const daysWithSlots = new Set(availability.map((a) => a.day_of_week));
 
   useEffect(() => {
@@ -51,8 +52,9 @@ export function RescheduleClient({
         const r = await fetch(`/api/availability?athleteId=${encodeURIComponent(athleteId)}`);
         if (!ok) return;
         const data = await r.json();
-        if (r.ok && Array.isArray(data.availability)) {
-          setAvailability(data.availability);
+        if (r.ok) {
+          if (Array.isArray(data.availability)) setAvailability(data.availability);
+          if (Array.isArray(data.availabilityDates)) setAvailabilityDates(new Set(data.availabilityDates));
         }
       } catch {
         /* ignore */
@@ -179,11 +181,10 @@ export function RescheduleClient({
               onSelect={setSelectedDate}
               disabled={(date) => {
                 if (date < startOfDay(new Date())) return true;
-                if (hasAvailability) {
-                  const dow = getDayOfWeek(date);
-                  return !daysWithSlots.has(dow);
-                }
-                return false;
+                const dateStr = format(date, 'yyyy-MM-dd');
+                if (availabilityDates.has(dateStr)) return false;
+                if (daysWithSlots.has(getDayOfWeek(date))) return false;
+                return hasAvailability;
               }}
               className="rounded-md border"
             />

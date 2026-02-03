@@ -35,5 +35,7 @@ Replace `[PASSWORD]` and `[HOST]` with your Supabase project credentials (Projec
 
 - `20240118000000_workspaces.sql` – Workspaces, goals, media, session notes, actions, workspace-media storage bucket
 - `20240120000000_workspace_messages.sql` – Collaboration messages table
+- `20240121000000_workspace_media_mime_types.sql` – Adds HEIC, M4V, etc. for mobile photo/video uploads
+- `20240122000000_workspace_messages_modern.sql` – Edit/delete messages, emoji reactions
 
-If workspace features or video upload fail, ensure both migrations have been run on production.
+If workspace features or video/photo upload fail, ensure all migrations have been run on production.

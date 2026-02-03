@@ -83,6 +83,7 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [availability, setAvailability] = useState<AvailabilityByDay | null>(null);
+  const [availabilityDates, setAvailabilityDates] = useState<Set<string>>(new Set());
   const [slots, setSlots] = useState<string[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -158,7 +159,10 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
         const r = await fetch(`/api/availability?athleteId=${encodeURIComponent(athlete.id)}`);
         if (!ok) return;
         const data = await r.json();
-        if (r.ok && Array.isArray(data.availability)) setAvailability(data.availability);
+        if (r.ok) {
+          if (Array.isArray(data.availability)) setAvailability(data.availability);
+          if (Array.isArray(data.availabilityDates)) setAvailabilityDates(new Set(data.availabilityDates));
+        }
       } catch {
         /* ignore */
       }
@@ -166,7 +170,8 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
     return () => { ok = false; };
   }, [athlete.id]);
 
-  const hasAvailability = (availability?.length ?? 0) > 0;
+  const hasAvailability =
+    (availability?.length ?? 0) > 0 || (availabilityDates?.size ?? 0) > 0;
   const daysWithSlots = new Set(availability?.map((a) => a.day_of_week) ?? []);
 
   useEffect(() => {
@@ -504,13 +509,11 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
                     selected={selectedDate}
                     onSelect={setSelectedDate}
                     disabled={(date) => {
-                      const day = date < startOfDay(new Date());
-                      if (day) return true;
-                      if (hasAvailability) {
-                        const dow = getDayOfWeek(date);
-                        return !daysWithSlots.has(dow);
-                      }
-                      return false;
+                      if (date < startOfDay(new Date())) return true;
+                      const dateStr = format(date, 'yyyy-MM-dd');
+                      if (availabilityDates.has(dateStr)) return false;
+                      if (daysWithSlots.has(getDayOfWeek(date))) return false;
+                      return hasAvailability;
                     }}
                     className="rounded-md border"
                   />

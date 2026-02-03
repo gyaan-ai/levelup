@@ -3,6 +3,7 @@ import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
+import { normalizeZelleInput } from '@/lib/zelle';
 
 export async function GET(req: NextRequest) {
   try {
@@ -119,7 +120,9 @@ export async function PUT(req: NextRequest) {
       active: active === true,
     };
     if (venmoHandle !== undefined) updateData.venmo_handle = venmoHandle === '' ? null : String(venmoHandle).trim();
-    if (zelleEmail !== undefined) updateData.zelle_email = zelleEmail === '' ? null : String(zelleEmail).trim();
+    if (zelleEmail !== undefined) {
+      updateData.zelle_email = zelleEmail === '' ? null : normalizeZelleInput(String(zelleEmail).trim()) ?? null;
+    }
 
     // ALWAYS try UPDATE first (record should exist from signup)
     // Admin client bypasses RLS, so this should work

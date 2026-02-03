@@ -33,7 +33,7 @@ const onboardingSchema = z.object({
   bio: z.string().max(500, 'Bio must be 500 characters or less').optional(),
   facilityId: z.string().optional(),
   venmoHandle: z.string().max(30).optional(),
-  zelleEmail: z.union([z.string().email('Use a valid email for Zelle'), z.literal('')]).optional(),
+  zelleEmail: z.string().optional().refine((v) => !v || v.trim() === '' || (v.includes('@') ? /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim()) : v.replace(/\D/g, '').length >= 7), 'Use a valid email or phone (7+ digits) for Zelle'),
   photo: z.instanceof(File).optional(),
 });
 
@@ -199,8 +199,8 @@ export default function OnboardingPage() {
         setError('Add at least one payout method (Venmo or Zelle) so we can pay you.');
         return;
       }
-      if (values.zelleEmail?.trim() && !values.zelleEmail.includes('@') && !/^\d{10}$/.test(values.zelleEmail.replace(/\D/g, ''))) {
-        setError('Enter a valid Zelle email or 10-digit phone number.');
+      if (values.zelleEmail?.trim() && !values.zelleEmail.includes('@') && values.zelleEmail.replace(/\D/g, '').length < 7) {
+        setError('Enter a valid Zelle email or phone (7+ digits).');
         return;
       }
       setSubmitting(true);

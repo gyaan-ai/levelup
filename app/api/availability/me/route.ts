@@ -20,17 +20,23 @@ export async function GET() {
     if (userData?.role !== 'athlete') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
     const { data: rows, error } = await supabase
-      .from('athlete_availability')
-      .select('id, day_of_week, start_time, end_time')
+      .from('athlete_availability_slots')
+      .select('id, slot_date, start_time, end_time')
       .eq('athlete_id', user.id)
-      .order('day_of_week')
-      .order('start_time');
+      .gte('slot_date', new Date().toISOString().slice(0, 10))
+      .order('slot_date', { ascending: true })
+      .order('start_time', { ascending: true });
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) {
+      if (error.message?.includes('does not exist') || error.code === '42P01') {
+        return NextResponse.json({ availability: [] });
+      }
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
 
-    const availability = (rows || []).map((r: { id: string; day_of_week: number; start_time: string; end_time: string }) => ({
+    const availability = (rows || []).map((r: { id: string; slot_date: string; start_time: string; end_time: string }) => ({
       id: r.id,
-      day_of_week: r.day_of_week,
+      slot_date: r.slot_date,
       start_time: timeToHHmm(r.start_time),
       end_time: timeToHHmm(r.end_time),
     }));
@@ -56,11 +62,20 @@ export async function POST(req: NextRequest) {
     const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
     if (userData?.role !== 'athlete') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-    const body = (await req.json()) as { day_of_week: number; start_time: string; end_time: string };
-    const { day_of_week, start_time, end_time } = body;
+    const body = (await req.json()) as { slot_date: string; start_time: string; end_time: string };
+    const { slot_date, start_time, end_time } = body;
 
-    if (typeof day_of_week !== 'number' || day_of_week < 0 || day_of_week > 6) {
-      return NextResponse.json({ error: 'Invalid day_of_week' }, { status: 400 });
+    if (!slot_date || typeof slot_date !== 'string') {
+      return NextResponse.json({ error: 'Invalid slot_date' }, { status: 400 });
+    }
+    const slotDate = slot_date.slice(0, 10);
+    const d = new Date(slotDate);
+    if (Number.isNaN(d.getTime())) {
+      return NextResponse.json({ error: 'Invalid slot_date' }, { status: 400 });
+    }
+    const today = new Date().toISOString().slice(0, 10);
+    if (slotDate < today) {
+      return NextResponse.json({ error: 'slot_date must be today or in the future' }, { status: 400 });
     }
     if (!start_time || !end_time || typeof start_time !== 'string' || typeof end_time !== 'string') {
       return NextResponse.json({ error: 'Invalid start_time or end_time' }, { status: 400 });
@@ -79,14 +94,14 @@ export async function POST(req: NextRequest) {
     const end = pad(end_time);
 
     const { data: row, error } = await supabase
-      .from('athlete_availability')
+      .from('athlete_availability_slots')
       .insert({
         athlete_id: user.id,
-        day_of_week,
+        slot_date: slotDate,
         start_time: start,
         end_time: end,
       })
-      .select('id, day_of_week, start_time, end_time')
+      .select('id, slot_date, start_time, end_time')
       .single();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -96,7 +111,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       availability: {
         id: row.id,
-        day_of_week: row.day_of_week,
+        slot_date: row.slot_date,
         start_time: timeToHHmm(row.start_time),
         end_time: timeToHHmm(row.end_time),
       },
@@ -126,7 +141,7 @@ export async function DELETE(req: NextRequest) {
     if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
 
     const { error } = await supabase
-      .from('athlete_availability')
+      .from('athlete_availability_slots')
       .delete()
       .eq('id', id)
       .eq('athlete_id', user.id);

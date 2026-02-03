@@ -57,26 +57,12 @@ export function AddToHomeScreen() {
     }
   };
 
-  const handleShare = async () => {
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: document.title || 'The Guild',
-          url: window.location.href,
-          text: 'Check out The Guild',
-        });
-        setShowIosModal(false);
-      } catch (err) {
-        // User cancelled or share failed - ignore
-      }
-    } else {
-      // Fallback: copy URL and instruct user
-      try {
-        await navigator.clipboard.writeText(window.location.href);
-        alert('Link copied! Open Safari, paste in the address bar, then tap the Share button and choose Add to Home Screen.');
-      } catch {
-        alert('Tap the Share button in Safari (bottom or top of screen), then choose Add to Home Screen.');
-      }
+  const handleCopyLink = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      alert('Link copied! Open Safari, paste the link, then tap the Share button (square with arrow) and choose Add to Home Screen.');
+    } catch {
+      alert('Open this page in Safari, then tap the Share button (square with arrow at the bottom) and choose Add to Home Screen.');
     }
   };
 
@@ -111,17 +97,20 @@ export function AddToHomeScreen() {
               <Image src="/apple-touch-icon.png" alt="" width={64} height={64} className="rounded-xl" />
             </div>
             <h3 className="text-xl font-bold text-white mb-2">Add to Home Screen</h3>
-            <p className="text-white/80 text-sm mb-6">
-              Tap Share below to open the share sheet, then scroll and tap &quot;Add to Home Screen&quot;.
+            <p className="text-white/80 text-sm mb-4">
+              In Safari, tap the <strong>Share</strong> button (square with an arrow at the bottom center of the screen), then tap <strong>&quot;Add to Home Screen&quot;</strong>.
+            </p>
+            <p className="text-white/60 text-xs mb-6">
+              If you&apos;re in another browser, copy the link below and open it in Safari first.
             </p>
             <button
-              onClick={handleShare}
+              onClick={handleCopyLink}
               className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-accent text-black font-semibold hover:opacity-90 transition-opacity"
             >
-              <svg className="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M16 5l-1.42 1.42-1.59-1.59V16h-2V4.83L9.42 6.42 8 5l4-4 4 4zm4 5v11c0 1.1-.9 2-2 2H6c-1.11 0-2-.9-2-2V10c0-1.11.89-2 2-2h3v2H6v11h12V10h-3V8h3c1.1 0 2 .89 2 2z" />
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
               </svg>
-              Share
+              Copy link (for Safari)
             </button>
           </div>
         </div>

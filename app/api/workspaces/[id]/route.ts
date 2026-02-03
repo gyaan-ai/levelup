@@ -55,10 +55,17 @@ export async function GET(
     ]);
 
     // Fetch messages separately - table may not exist if migration not run yet
-    let messagesRes: { data: Array<{ id: string; author_id: string; content: string; created_at: string }> | null } = { data: [] };
+    let messagesRes: { data: Array<{ id: string; author_id: string; content: string; created_at: string; updated_at?: string }> | null } = { data: [] };
+    let reactionsRes: { data: Array<{ message_id: string; user_id: string; emoji: string }> | null } = { data: [] };
     try {
       const res = await admin.from('workspace_messages').select('*').eq('workspace_id', id).order('created_at', { ascending: true });
       messagesRes = res.error ? { data: [] } : res;
+      // Fetch reactions for all messages in this workspace
+      const msgIds = (res.data || []).map((m: { id: string }) => m.id);
+      if (msgIds.length > 0) {
+        const rRes = await admin.from('workspace_message_reactions').select('*').in('message_id', msgIds);
+        reactionsRes = rRes.error ? { data: [] } : rRes;
+      }
     } catch {
       messagesRes = { data: [] };
     }
@@ -71,32 +78,56 @@ export async function GET(
       })
     );
 
-    // Resolve author names for messages: coach (athlete), parent, or admin
-    const messages = (messagesRes.data || []) as Array<{ id: string; author_id: string; content: string; created_at: string }>;
+    // Resolve author info for messages: name and photo
+    const messages = (messagesRes.data || []) as Array<{ id: string; author_id: string; content: string; created_at: string; updated_at?: string }>;
     const authorIds = [...new Set(messages.map((m) => m.author_id))];
-    const authorMap = new Map<string, string>();
+    const authorMap = new Map<string, { name: string; photo?: string }>();
 
     if (authorIds.length > 0) {
-      const { data: athleteRows } = await admin.from('athletes').select('id, first_name, last_name').in('id', authorIds);
+      const { data: athleteRows } = await admin.from('athletes').select('id, first_name, last_name, photo_url').in('id', authorIds);
       for (const a of athleteRows || []) {
-        const ar = a as { id: string; first_name?: string; last_name?: string };
+        const ar = a as { id: string; first_name?: string; last_name?: string; photo_url?: string };
         const name = `${ar.first_name || ''} ${ar.last_name || ''}`.trim();
-        if (name) authorMap.set(ar.id, name);
+        if (name) authorMap.set(ar.id, { name, photo: ar.photo_url || undefined });
+      }
+      const { data: ywRows } = await admin.from('youth_wrestlers').select('id, first_name, last_name, photo_url').in('id', authorIds);
+      for (const y of ywRows || []) {
+        const yr = y as { id: string; first_name?: string; last_name?: string; photo_url?: string };
+        const name = `${yr.first_name || ''} ${yr.last_name || ''}`.trim();
+        if (name && !authorMap.has(yr.id)) authorMap.set(yr.id, { name, photo: yr.photo_url || undefined });
       }
       const { data: userRows } = await admin.from('users').select('id, email').in('id', authorIds);
       for (const u of userRows || []) {
         const ur = u as { id: string; email?: string };
-        if (!authorMap.has(ur.id)) authorMap.set(ur.id, ur.email || 'Parent');
+        if (!authorMap.has(ur.id)) authorMap.set(ur.id, { name: ur.email?.split('@')[0] || 'User', photo: undefined });
       }
     }
 
-    const messagesWithAuthors = messages.map((m) => ({
-      ...m,
-      authorLabel: authorMap.get(m.author_id) || (m.author_id === workspace.parent_id ? 'Parent' : m.author_id === workspace.athlete_id ? 'Coach' : 'User'),
-    }));
+    // Group reactions by message
+    const reactionsByMsg = new Map<string, Array<{ emoji: string; userIds: string[] }>>();
+    for (const r of reactionsRes.data || []) {
+      const rr = r as { message_id: string; user_id: string; emoji: string };
+      if (!reactionsByMsg.has(rr.message_id)) reactionsByMsg.set(rr.message_id, []);
+      const msgReactions = reactionsByMsg.get(rr.message_id)!;
+      const existing = msgReactions.find((x) => x.emoji === rr.emoji);
+      if (existing) existing.userIds.push(rr.user_id);
+      else msgReactions.push({ emoji: rr.emoji, userIds: [rr.user_id] });
+    }
+
+    const messagesWithAuthors = messages.map((m) => {
+      const author = authorMap.get(m.author_id);
+      return {
+        ...m,
+        authorName: author?.name || 'User',
+        authorPhoto: author?.photo || null,
+        reactions: reactionsByMsg.get(m.id) || [],
+        isEdited: m.updated_at && m.updated_at !== m.created_at,
+      };
+    });
 
     return NextResponse.json({
       workspace,
+      currentUserId: user.id,
       goals: goalsRes.data || [],
       media: mediaWithUrls,
       notes: notesRes.data || [],

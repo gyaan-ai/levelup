@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
-import { slotsForDay, type AvailabilitySlot } from '@/lib/availability';
+import { slotsForDay, slotsForDate, type AvailabilitySlot } from '@/lib/availability';
 
 export async function GET(req: NextRequest) {
   try {
@@ -27,15 +27,22 @@ export async function GET(req: NextRequest) {
     }
 
     const supabase = await createClient(tenant.slug);
+    const dateOnly = dateParam.split('T')[0];
 
-    const { data: availRows, error: availErr } = await supabase
+    // Date-specific slots for this date
+    const { data: dateRows } = await supabase
+      .from('athlete_availability_slots')
+      .select('slot_date, start_time, end_time')
+      .eq('athlete_id', athleteId)
+      .eq('slot_date', dateOnly);
+
+    const dateSlots = slotsForDate((dateRows || []) as { slot_date: string; start_time: string; end_time: string }[]);
+
+    // Legacy recurring slots
+    const { data: availRows } = await supabase
       .from('athlete_availability')
       .select('day_of_week, start_time, end_time')
       .eq('athlete_id', athleteId);
-
-    if (availErr) {
-      return NextResponse.json({ error: availErr.message }, { status: 500 });
-    }
 
     const availability: AvailabilitySlot[] = (availRows || []).map(
       (r: { day_of_week: number; start_time: string; end_time: string }) => ({
@@ -46,13 +53,14 @@ export async function GET(req: NextRequest) {
     );
 
     const dayOfWeek = d.getDay();
-    const allSlots = slotsForDay(availability, dayOfWeek);
+    const recurSlots = slotsForDay(availability, dayOfWeek);
+
+    const allSlots = [...new Set([...dateSlots, ...recurSlots])].sort();
 
     if (allSlots.length === 0) {
       return NextResponse.json({ slots: [] });
     }
 
-    const dateOnly = dateParam.split('T')[0];
     const dayStart = `${dateOnly}T00:00:00`;
     const dayEnd = `${dateOnly}T23:59:59`;
 

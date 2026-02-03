@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,6 +19,11 @@ import {
   Loader2,
   Upload,
   MessageCircle,
+  Pencil,
+  Trash2,
+  X,
+  Check,
+  Smile,
 } from 'lucide-react';
 import { SchoolLogo } from '@/components/school-logo';
 
@@ -25,12 +31,40 @@ type Goal = { id: string; content: string; created_at: string };
 type Media = { id: string; file_name: string; media_type: string; description?: string; viewUrl?: string; created_at: string };
 type Note = { id: string; summary: string; highlights?: string; focus_areas?: string; created_at: string; sessions?: { scheduled_datetime: string } };
 type Action = { id: string; content: string; completed: boolean; created_at: string };
-type Message = { id: string; content: string; author_id: string; authorLabel: string; created_at: string };
+type Reaction = { emoji: string; userIds: string[] };
+type Message = {
+  id: string;
+  content: string;
+  author_id: string;
+  authorName: string;
+  authorPhoto: string | null;
+  created_at: string;
+  updated_at?: string;
+  isEdited?: boolean;
+  reactions: Reaction[];
+};
+
+const EMOJI_OPTIONS = ['👍', '🎯', '💪', '🔥', '👏', '❤️'];
+
+function relativeTime(dateStr: string): string {
+  const now = Date.now();
+  const then = new Date(dateStr).getTime();
+  const diff = now - then;
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'Just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 7) return `${days}d ago`;
+  return new Date(dateStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
 
 export function WorkspaceClient({ workspaceId, isCoach = false }: { workspaceId: string; isCoach?: boolean }) {
   const router = useRouter();
   const [data, setData] = useState<{
     workspace: { youth_wrestlers?: { first_name?: string; last_name?: string }; athletes?: { first_name?: string; last_name?: string; school?: string } };
+    currentUserId?: string;
     goals: Goal[];
     media: Media[];
     notes: Note[];
@@ -47,6 +81,10 @@ export function WorkspaceClient({ workspaceId, isCoach = false }: { workspaceId:
   const [uploading, setUploading] = useState(false);
   const [newMessage, setNewMessage] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editContent, setEditContent] = useState('');
+  const [showEmojiPicker, setShowEmojiPicker] = useState<string | null>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/workspaces/${workspaceId}`);
@@ -142,6 +180,7 @@ export function WorkspaceClient({ workspaceId, isCoach = false }: { workspaceId:
       if (res.ok) {
         setNewMessage('');
         load();
+        setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
       } else {
         const err = await res.json();
         alert(err.error || 'Failed to send message');
@@ -149,6 +188,46 @@ export function WorkspaceClient({ workspaceId, isCoach = false }: { workspaceId:
     } finally {
       setSendingMessage(false);
     }
+  };
+
+  const editMessage = async (msgId: string) => {
+    if (!editContent.trim()) return;
+    const res = await fetch(`/api/workspaces/${workspaceId}/messages/${msgId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content: editContent.trim() }),
+    });
+    if (res.ok) {
+      setEditingId(null);
+      setEditContent('');
+      load();
+    } else {
+      const err = await res.json();
+      alert(err.error || 'Failed to edit');
+    }
+  };
+
+  const deleteMessage = async (msgId: string) => {
+    if (!confirm('Delete this message?')) return;
+    const res = await fetch(`/api/workspaces/${workspaceId}/messages/${msgId}`, { method: 'DELETE' });
+    if (res.ok) load();
+    else alert('Failed to delete');
+  };
+
+  const toggleReaction = async (msgId: string, emoji: string) => {
+    const msg = data?.messages.find((m) => m.id === msgId);
+    const hasReacted = msg?.reactions.some((r) => r.emoji === emoji && r.userIds.includes(data?.currentUserId || ''));
+    if (hasReacted) {
+      await fetch(`/api/workspaces/${workspaceId}/messages/${msgId}/reactions?emoji=${encodeURIComponent(emoji)}`, { method: 'DELETE' });
+    } else {
+      await fetch(`/api/workspaces/${workspaceId}/messages/${msgId}/reactions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ emoji }),
+      });
+    }
+    setShowEmojiPicker(null);
+    load();
   };
 
   const toggleAction = async (actionId: string, completed: boolean) => {
@@ -172,11 +251,19 @@ export function WorkspaceClient({ workspaceId, isCoach = false }: { workspaceId:
         method: 'POST',
         body: formData,
       });
-      if (res.ok) load();
-      else {
-        const err = await res.json();
-        alert(err.error || 'Upload failed');
+      const text = await res.text();
+      if (res.ok) {
+        load();
+      } else {
+        try {
+          const err = JSON.parse(text);
+          alert(err.error || 'Upload failed');
+        } catch {
+          alert(text || 'Upload failed');
+        }
       }
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Upload failed');
     } finally {
       setUploading(false);
       e.target.value = '';
@@ -216,7 +303,7 @@ export function WorkspaceClient({ workspaceId, isCoach = false }: { workspaceId:
         </p>
       </div>
 
-      {/* Collaboration - back and forth with timestamps */}
+      {/* Collaboration - modern messaging */}
       <Card className="mb-6">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -228,31 +315,94 @@ export function WorkspaceClient({ workspaceId, isCoach = false }: { workspaceId:
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
-            {(data.messages || []).map((msg) => (
-              <div key={msg.id} className="flex flex-col gap-0.5 p-3 rounded-lg bg-muted/50">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-medium">{msg.authorLabel}</span>
-                  <span className="text-xs text-muted-foreground">
-                    {new Date(msg.created_at).toLocaleString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                      year: 'numeric',
-                      hour: 'numeric',
-                      minute: '2-digit',
-                    })}
-                  </span>
+          <div className="space-y-3 max-h-80 overflow-y-auto pr-2">
+            {(data.messages || []).map((msg) => {
+              const isOwn = msg.author_id === data?.currentUserId;
+              const isEditing = editingId === msg.id;
+              return (
+                <div key={msg.id} className="group flex gap-3">
+                  {/* Avatar */}
+                  <div className="shrink-0">
+                    {msg.authorPhoto ? (
+                      <Image src={msg.authorPhoto} alt="" width={36} height={36} className="rounded-full object-cover" />
+                    ) : (
+                      <div className="w-9 h-9 rounded-full bg-accent/20 flex items-center justify-center text-sm font-medium">
+                        {msg.authorName.charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    {/* Header: name + time + actions */}
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="text-sm font-semibold">{msg.authorName}</span>
+                      <span className="text-xs text-muted-foreground">{relativeTime(msg.created_at)}</span>
+                      {msg.isEdited && <span className="text-xs text-muted-foreground">(edited)</span>}
+                      {isOwn && !isEditing && (
+                        <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 ml-auto">
+                          <button onClick={() => { setEditingId(msg.id); setEditContent(msg.content); }} className="p-1 hover:bg-muted rounded" title="Edit">
+                            <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
+                          </button>
+                          <button onClick={() => deleteMessage(msg.id)} className="p-1 hover:bg-muted rounded" title="Delete">
+                            <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    {/* Content / Edit mode */}
+                    {isEditing ? (
+                      <div className="flex gap-2 items-start">
+                        <Textarea value={editContent} onChange={(e) => setEditContent(e.target.value)} rows={2} className="text-sm resize-none" autoFocus />
+                        <Button size="sm" onClick={() => editMessage(msg.id)} disabled={!editContent.trim()}><Check className="h-4 w-4" /></Button>
+                        <Button size="sm" variant="ghost" onClick={() => setEditingId(null)}><X className="h-4 w-4" /></Button>
+                      </div>
+                    ) : (
+                      <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                    )}
+                    {/* Reactions */}
+                    {!isEditing && (
+                      <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
+                        {msg.reactions.map((r) => (
+                          <button
+                            key={r.emoji}
+                            onClick={() => toggleReaction(msg.id, r.emoji)}
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs border transition-colors ${
+                              r.userIds.includes(data?.currentUserId || '') ? 'bg-accent/20 border-accent' : 'bg-muted/50 border-transparent hover:border-muted-foreground/30'
+                            }`}
+                          >
+                            <span>{r.emoji}</span>
+                            <span className="font-medium">{r.userIds.length}</span>
+                          </button>
+                        ))}
+                        {/* Add reaction button */}
+                        <div className="relative">
+                          <button onClick={() => setShowEmojiPicker(showEmojiPicker === msg.id ? null : msg.id)} className="p-1 hover:bg-muted rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Smile className="h-4 w-4 text-muted-foreground" />
+                          </button>
+                          {showEmojiPicker === msg.id && (
+                            <div className="absolute bottom-full left-0 mb-1 flex gap-1 p-1.5 bg-background border rounded-lg shadow-lg z-10">
+                              {EMOJI_OPTIONS.map((e) => (
+                                <button key={e} onClick={() => toggleReaction(msg.id, e)} className="p-1 hover:bg-muted rounded text-lg">
+                                  {e}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
-              </div>
-            ))}
+              );
+            })}
             {(data?.messages ?? []).length === 0 && (
-              <p className="text-sm text-muted-foreground py-4">No messages yet. Start the conversation!</p>
+              <p className="text-sm text-muted-foreground py-4 text-center">No messages yet. Start the conversation!</p>
             )}
+            <div ref={messagesEndRef} />
           </div>
-          <div className="flex gap-2">
+          {/* Composer */}
+          <div className="flex gap-2 pt-2 border-t">
             <Textarea
-              placeholder="Add a message..."
+              placeholder="Type a message..."
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
               onKeyDown={(e) => {
@@ -264,7 +414,7 @@ export function WorkspaceClient({ workspaceId, isCoach = false }: { workspaceId:
               rows={2}
               className="resize-none"
             />
-            <Button onClick={sendMessage} disabled={sendingMessage || !newMessage.trim()} title="Send message">
+            <Button onClick={sendMessage} disabled={sendingMessage || !newMessage.trim()}>
               {sendingMessage ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Send'}
             </Button>
           </div>

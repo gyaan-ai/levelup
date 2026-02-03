@@ -37,18 +37,33 @@ export async function POST(
     }
 
     const ext = file.name.split('.').pop()?.toLowerCase() || '';
-    const isVideo = ['mp4', 'mov', 'webm'].includes(ext);
-    const isImage = ['jpg', 'jpeg', 'png', 'webp'].includes(ext);
+    const isVideo = ['mp4', 'mov', 'webm', 'm4v'].includes(ext);
+    const isImage = ['jpg', 'jpeg', 'png', 'webp', 'heic', 'heif'].includes(ext);
     if (!isVideo && !isImage) {
-      return NextResponse.json({ error: 'Only video (mp4, mov, webm) and image (jpg, png, webp) files allowed' }, { status: 400 });
+      return NextResponse.json({ error: 'Only video (mp4, mov, webm) and image (jpg, png, webp, heic) files allowed' }, { status: 400 });
+    }
+
+    // Map extension to allowed MIME type (bucket restricts by MIME)
+    const mimeMap: Record<string, string> = {
+      mp4: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm', m4v: 'video/x-m4v',
+      jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp',
+      heic: 'image/heic', heif: 'image/heif',
+    };
+    const contentType = mimeMap[ext] || (isVideo ? 'video/mp4' : 'image/jpeg');
+
+    if (file.size > 50 * 1024 * 1024) {
+      return NextResponse.json({ error: 'File must be under 50MB' }, { status: 400 });
     }
 
     const storagePath = `${workspaceId}/${crypto.randomUUID()}.${ext}`;
 
-    // Use admin client for storage to bypass RLS (we've already verified workspace access above)
+    // Convert to Buffer for reliable upload in serverless (FormData File can be incomplete)
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
     const { data: uploadData, error: uploadError } = await admin.storage
       .from('workspace-media')
-      .upload(storagePath, file, { cacheControl: '3600', upsert: false });
+      .upload(storagePath, buffer, { cacheControl: '3600', upsert: false, contentType });
 
     if (uploadError) {
       console.error('Workspace media upload error:', uploadError);

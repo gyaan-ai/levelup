@@ -39,7 +39,7 @@ const profileSchema = z.object({
   })).optional(),
   facilityId: z.string().optional(),
   venmoHandle: z.string().max(30).optional(),
-  zelleEmail: z.union([z.string().email('Use a valid email for Zelle'), z.literal('')]).optional(),
+  zelleEmail: z.string().optional().refine((v) => !v || v.trim() === '' || (v.includes('@') ? /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim()) : v.replace(/\D/g, '').length >= 7), 'Use a valid email or phone (7+ digits) for Zelle'),
   photo: z.instanceof(File).optional(),
 });
 
