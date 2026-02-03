@@ -5,9 +5,9 @@
 @layer base {
   :root {
     --guild-black: #000000;
-    --guild-gold: #d4af37;
-    --guild-gold-dark: #b8941f;
-    --guild-gold-light: #f4e5c2;
+    --guild-gold: #B89D60;
+    --guild-gold-dark: #9A8550;
+    --guild-gold-light: #C9B078;
 
     --primary: var(--guild-black);
     --accent: var(--guild-gold);
@@ -28,7 +28,7 @@
     --destructive-foreground: 210 40% 98%;
     --border: 0 0% 90%;
     --input: 0 0% 90%;
-    --ring: 43 74% 49%;
+    --ring: 39 39% 55%;
     --radius: 0.5rem;
   }
 
@@ -39,19 +39,19 @@
     --card-foreground: 210 40% 98%;
     --popover: 0 0% 0%;
     --popover-foreground: 210 40% 98%;
-    --primary: 43 74% 49%;
+    --primary: 39 39% 55%;
     --primary-foreground: 0 0% 0%;
     --secondary: 0 0% 10%;
     --secondary-foreground: 210 40% 98%;
     --muted: 0 0% 10%;
     --muted-foreground: 215 20% 65%;
-    --accent: 43 74% 49%;
+    --accent: 39 39% 55%;
     --accent-foreground: 0 0% 0%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
     --border: 0 0% 15%;
     --input: 0 0% 15%;
-    --ring: 43 74% 49%;
+    --ring: 39 39% 55%;
   }
 }
 
@@ -84,15 +84,15 @@
 }
 
 .gold-glow {
-  box-shadow: 0 0 20px rgba(212, 175, 55, 0.4);
+  box-shadow: 0 0 20px rgba(184, 157, 96, 0.4);
 }
 
 .gold-glow-hover:hover {
-  box-shadow: 0 0 30px rgba(212, 175, 55, 0.6);
+  box-shadow: 0 0 30px rgba(184, 157, 96, 0.6);
 }
 
 .gold-shimmer {
-  background: linear-gradient(90deg, #b8941f 0%, #d4af37 50%, #f4e5c2 100%);
+  background: linear-gradient(90deg, #9A8550 0%, #B89D60 50%, #C9B078 100%);
   background-size: 200% auto;
   animation: shimmer 3s linear infinite;
 }

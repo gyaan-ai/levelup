@@ -67,9 +67,9 @@ export const tenants: Record<string, TenantConfig> = {
 
     brandColors: {
       primary: "#000000",
-      accent: "#D4AF37",
-      accentHover: "#B8941F",
-      accentLight: "#F4E5C2",
+      accent: "#B89D60",
+      accentHover: "#9A8550",
+      accentLight: "#C9B078",
       background: "#FFFFFF",
       textPrimary: "#000000",
       textSecondary: "#6B7280",

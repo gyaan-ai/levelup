@@ -7,7 +7,7 @@ When users add the site to their home screen (mobile shortcut), the app uses the
 **`/apple-touch-icon.png`** — Gold G logo on black background
 - **Size:** 180×180px minimum (192×192 or 512×512 recommended)
 - **Format:** PNG
-- **Content:** Your Guild “G” logo in gold (#D4AF37) on black (#000000)
+- **Content:** Your Guild “G” logo in gold (#B89D60) on black (#000000)
 - Used by: iOS (Add to Home Screen), Android, PWA
 
 ## Quick setup

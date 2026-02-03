@@ -4,14 +4,16 @@ import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useAuth } from '@/lib/auth/use-auth';
+import { useNotificationCount } from '@/lib/hooks/use-notification-count';
 import { Button } from './ui/button';
-import { Menu, X } from 'lucide-react';
+import { Bell, Menu, X } from 'lucide-react';
 
 const navLinkClass = 'block py-3 px-4 text-white hover:text-accent hover:bg-white/10 transition-colors font-medium min-h-[44px] flex items-center';
 
 export function Header() {
   const { user, userRole, loading, signOut } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const notificationCount = useNotificationCount(!!user);
 
   const handleSignOut = async () => {
     await signOut();
@@ -49,9 +51,15 @@ export function Header() {
                   </Link>
                   <Link
                     href="/notifications"
-                    className="text-white hover:text-accent transition-colors font-medium"
+                    className="relative flex items-center justify-center p-1.5 text-white hover:text-accent transition-colors font-medium rounded hover:bg-white/10"
+                    aria-label={notificationCount > 0 ? `Notifications (${notificationCount} unread)` : 'Notifications'}
                   >
-                    Notifications
+                    <Bell className="h-5 w-5" />
+                    {notificationCount > 0 && (
+                      <span className="absolute top-0 right-0 min-w-[18px] h-[18px] px-1 flex items-center justify-center text-[10px] font-bold bg-accent text-black rounded-full -translate-y-0.5 translate-x-0.5">
+                        {notificationCount > 99 ? '99+' : notificationCount}
+                      </span>
+                    )}
                   </Link>
                 </>
               )}
@@ -95,9 +103,15 @@ export function Header() {
                   </Link>
                   <Link
                     href="/notifications"
-                    className="text-white hover:text-accent transition-colors font-medium"
+                    className="relative flex items-center justify-center p-1.5 text-white hover:text-accent transition-colors font-medium rounded hover:bg-white/10"
+                    aria-label={notificationCount > 0 ? `Notifications (${notificationCount} unread)` : 'Notifications'}
                   >
-                    Notifications
+                    <Bell className="h-5 w-5" />
+                    {notificationCount > 0 && (
+                      <span className="absolute top-0 right-0 min-w-[18px] h-[18px] px-1 flex items-center justify-center text-[10px] font-bold bg-accent text-black rounded-full -translate-y-0.5 translate-x-0.5">
+                        {notificationCount > 99 ? '99+' : notificationCount}
+                      </span>
+                    )}
                   </Link>
                   {userRole === 'admin' && (
                     <Link
@@ -143,7 +157,17 @@ export function Header() {
                   {userRole === 'athlete' && (
                     <>
                       <Link href="/athlete-dashboard" className={navLinkClass} onClick={() => setMobileOpen(false)}>Dashboard</Link>
-                      <Link href="/notifications" className={navLinkClass} onClick={() => setMobileOpen(false)}>Notifications</Link>
+                      <Link href="/notifications" className={navLinkClass} onClick={() => setMobileOpen(false)}>
+                        <span className="flex items-center gap-2">
+                          <Bell className="h-5 w-5 shrink-0" />
+                          Notifications
+                          {notificationCount > 0 && (
+                            <span className="min-w-[20px] h-5 px-1.5 flex items-center justify-center text-xs font-bold bg-accent text-black rounded-full">
+                              {notificationCount > 99 ? '99+' : notificationCount}
+                            </span>
+                          )}
+                        </span>
+                      </Link>
                     </>
                   )}
                   {(userRole === 'admin' || userRole === 'parent') && (
@@ -154,7 +178,17 @@ export function Header() {
                       <Link href="/bookings" className={navLinkClass} onClick={() => setMobileOpen(false)}>My Bookings</Link>
                       <Link href="/workspaces" className={navLinkClass} onClick={() => setMobileOpen(false)}>Workspaces</Link>
                       <Link href="/partner-sessions" className={navLinkClass} onClick={() => setMobileOpen(false)}>Partner Sessions</Link>
-                      <Link href="/notifications" className={navLinkClass} onClick={() => setMobileOpen(false)}>Notifications</Link>
+                      <Link href="/notifications" className={navLinkClass} onClick={() => setMobileOpen(false)}>
+                        <span className="flex items-center gap-2">
+                          <Bell className="h-5 w-5 shrink-0" />
+                          Notifications
+                          {notificationCount > 0 && (
+                            <span className="min-w-[20px] h-5 px-1.5 flex items-center justify-center text-xs font-bold bg-accent text-black rounded-full">
+                              {notificationCount > 99 ? '99+' : notificationCount}
+                            </span>
+                          )}
+                        </span>
+                      </Link>
                       {userRole === 'admin' && (
                         <Link href="/admin" className={navLinkClass} onClick={() => setMobileOpen(false)}>Admin</Link>
                       )}
