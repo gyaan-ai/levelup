@@ -4,20 +4,14 @@ import { useState } from 'react';
 import { useActionItems } from '@/lib/hooks/use-action-items';
 import { Card, CardContent } from '@/components/ui/card';
 import { format, formatDistanceToNow, isPast } from 'date-fns';
-import { Button } from '@/components/ui/button';
 import { CheckCircle2, Circle, Loader2, Calendar } from 'lucide-react';
 
 interface ActionItemsListProps {
   workspaceId: string;
   canComplete?: boolean;
-  onStatusChange?: () => void;
 }
 
-export function ActionItemsList({
-  workspaceId,
-  canComplete = false,
-  onStatusChange,
-}: ActionItemsListProps) {
+export function ActionItemsList({ workspaceId, canComplete = false }: ActionItemsListProps) {
   const { items, loading, error } = useActionItems(workspaceId);
   const [completingId, setCompletingId] = useState<string | null>(null);
 
@@ -31,7 +25,6 @@ export function ActionItemsList({
         body: JSON.stringify({ status: currentStatus === 'completed' ? 'pending' : 'completed' }),
       });
       if (!res.ok) throw new Error();
-      onStatusChange?.();
     } catch {
       alert('Failed to update action item');
     } finally {
