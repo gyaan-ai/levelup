@@ -44,12 +44,23 @@ type Message = {
   reactions: Reaction[];
 };
 
+type SessionSummary = {
+  id: string;
+  focus_areas: string[];
+  what_we_worked_on: string;
+  progress_notes: string | null;
+  next_session_plan: string | null;
+  overall_effort: number | null;
+  technical_progress: number | null;
+  created_at: string;
+};
+
 type SessionItem = {
   id: string;
   scheduled_datetime: string;
   status: string;
+  summary: SessionSummary | null;
 };
-
 
 export function WorkspaceClient({ workspaceId, isCoach = false }: { workspaceId: string; isCoach?: boolean }) {
   const router = useRouter();
