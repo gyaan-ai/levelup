@@ -115,8 +115,14 @@ export default async function WorkspacesPage() {
             const wrestlerName = yw ? `${yw.first_name || ''} ${yw.last_name || ''}`.trim() : 'Wrestler';
             const coachName = coach ? `${coach.first_name || ''} ${coach.last_name || ''}`.trim() : 'Coach';
             const isParent = userData?.role === 'parent';
-            const cardTitle = isParent ? coachName : wrestlerName;
-            const subtitle = isParent ? `Athlete: ${wrestlerName}` : `Coach: ${coachName}`;
+            const cardTitle = coachName || 'Coach';
+            const subtitle = isParent
+              ? wrestlerName
+                ? `Athlete: ${wrestlerName}`
+                : 'Your athlete'
+              : coachName
+              ? `Coach: ${coachName}`
+              : 'Coach';
             return (
               <Link key={ws.id} href={`/workspaces/${ws.id}`}>
                 <Card className="hover:border-primary/50 transition-colors h-full">
@@ -124,7 +130,7 @@ export default async function WorkspacesPage() {
                     <CardTitle className="text-lg flex items-center gap-2">
                       <User className="h-5 w-5" />
                       {cardTitle}
-                      {isParent && coach?.school && (
+                      {coach?.school && (
                         <span className="flex items-center gap-1 text-sm text-muted-foreground">
                           <SchoolLogo school={coach.school} size="sm" />
                           ({coach.school})
@@ -133,12 +139,6 @@ export default async function WorkspacesPage() {
                     </CardTitle>
                     <CardDescription className="flex items-center gap-1">
                       {subtitle}
-                      {!isParent && coach?.school && (
-                        <span className="flex items-center gap-1 text-sm text-muted-foreground">
-                          <SchoolLogo school={coach.school} size="sm" />
-                          ({coach.school})
-                        </span>
-                      )}
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
