@@ -114,18 +114,27 @@ export default async function WorkspacesPage() {
             const coach = Array.isArray(ws.athletes) ? ws.athletes[0] : ws.athletes;
             const wrestlerName = yw ? `${yw.first_name || ''} ${yw.last_name || ''}`.trim() : 'Wrestler';
             const coachName = coach ? `${coach.first_name || ''} ${coach.last_name || ''}`.trim() : 'Coach';
+            const isParent = userData?.role === 'parent';
+            const cardTitle = isParent ? coachName : wrestlerName;
+            const subtitle = isParent ? `Athlete: ${wrestlerName}` : `Coach: ${coachName}`;
             return (
               <Link key={ws.id} href={`/workspaces/${ws.id}`}>
                 <Card className="hover:border-primary/50 transition-colors h-full">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-lg flex items-center gap-2">
                       <User className="h-5 w-5" />
-                      {userData?.role === 'parent' ? wrestlerName : wrestlerName}
+                      {cardTitle}
+                      {isParent && coach?.school && (
+                        <span className="flex items-center gap-1 text-sm text-muted-foreground">
+                          <SchoolLogo school={coach.school} size="sm" />
+                          ({coach.school})
+                        </span>
+                      )}
                     </CardTitle>
                     <CardDescription className="flex items-center gap-1">
-                      with {coachName}
-                      {coach?.school && (
-                        <span className="flex items-center gap-1">
+                      {subtitle}
+                      {!isParent && coach?.school && (
+                        <span className="flex items-center gap-1 text-sm text-muted-foreground">
                           <SchoolLogo school={coach.school} size="sm" />
                           ({coach.school})
                         </span>
