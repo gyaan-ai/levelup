@@ -24,7 +24,15 @@ import {
 } from '@/components/ui/dialog';
 import { Eye, Pencil, Archive, ArchiveRestore, Trash2, Search } from 'lucide-react';
 import { format } from 'date-fns';
-import type { AdminUserRow } from '../page';
+
+export type AdminUserRow = {
+  id: string;
+  email: string;
+  role: string;
+  created_at: string;
+  last_login_at: string | null;
+  archived_at: string | null;
+};
 
 type SortOption = 'email_asc' | 'email_desc' | 'role' | 'created_desc' | 'created_asc' | 'login_desc' | 'login_asc';
 

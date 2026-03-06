@@ -4,16 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import Link from 'next/link';
-import { AdminUsersClient } from './users-client';
-
-export type AdminUserRow = {
-  id: string;
-  email: string;
-  role: string;
-  created_at: string;
-  last_login_at: string | null;
-  archived_at: string | null;
-};
+import { AdminUsersClient, type AdminUserRow } from './users-client';
 
 export default async function AdminUsersPage() {
   const headersList = await headers();
