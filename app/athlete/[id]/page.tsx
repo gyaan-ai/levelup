@@ -146,10 +146,10 @@ export default async function AthleteProfilePage({
                 <img
                   src={athlete.photo_url}
                   alt={`${athlete.first_name} ${athlete.last_name}`}
-                  className="w-32 h-32 md:w-40 md:h-40 rounded-full object-cover border-4 border-primary/20"
+                  className="w-32 h-32 md:w-40 md:h-40 rounded-full object-cover border-4 border-accent/30"
                 />
               ) : (
-                <div className="w-32 h-32 md:w-40 md:h-40 rounded-full bg-muted flex items-center justify-center border-4 border-primary/20">
+                <div className="w-32 h-32 md:w-40 md:h-40 rounded-full bg-muted flex items-center justify-center border-4 border-accent/30">
                   <User className="h-16 w-16 md:h-20 md:w-20 text-muted-foreground" />
                 </div>
               )}
@@ -301,7 +301,7 @@ export default async function AthleteProfilePage({
             <ul className="space-y-2">
               {credentialsList.map((credential, index) => (
                 <li key={index} className="flex items-start gap-2">
-                  <Award className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                  <Award className="h-5 w-5 text-accent mt-0.5 flex-shrink-0" />
                   <span className="text-muted-foreground">{String(credential)}</span>
                 </li>
               ))}

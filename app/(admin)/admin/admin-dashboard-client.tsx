@@ -276,7 +276,7 @@ export function AdminDashboardClient({
                         <td className="py-2">
                           <a
                             href={`mailto:${s.parent_email}`}
-                            className="text-primary hover:underline"
+                            className="text-accent hover:underline"
                           >
                             {s.parent_email}
                           </a>
@@ -359,7 +359,7 @@ export function AdminDashboardClient({
                         <td className="py-2">
                           <a
                             href={`mailto:${u.email}`}
-                            className="text-primary hover:underline"
+                            className="text-accent hover:underline"
                           >
                             {u.email}
                           </a>
@@ -465,7 +465,7 @@ export function AdminDashboardClient({
                         <td className="py-2">
                           <Link
                             href={`/athlete/${p.athlete_id}`}
-                            className="text-primary hover:underline font-medium"
+                            className="text-accent hover:underline font-medium"
                           >
                             {p.name}
                           </Link>
@@ -551,7 +551,7 @@ export function AdminDashboardClient({
                         <td className="py-2">
                           <a
                             href={`mailto:${c.parent_email}`}
-                            className="text-primary hover:underline"
+                            className="text-accent hover:underline"
                           >
                             {c.parent_email}
                           </a>
@@ -593,7 +593,7 @@ export function AdminDashboardClient({
                 </div>
                 <div>
                   <p className="text-sm text-muted-foreground">Outstanding</p>
-                  <p className="text-xl font-bold text-primary">
+                  <p className="text-xl font-bold text-accent">
                     ${credits.reduce((sum, c) => sum + Number(c.remaining), 0).toFixed(2)}
                   </p>
                 </div>
@@ -650,7 +650,7 @@ export function AdminDashboardClient({
                         <td className="py-2">
                           <Link
                             href={`/athlete/${a.athlete_id}`}
-                            className="text-primary hover:underline font-medium"
+                            className="text-accent hover:underline font-medium"
                           >
                             {a.athlete_name}
                           </Link>

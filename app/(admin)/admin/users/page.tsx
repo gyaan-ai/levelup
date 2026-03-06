@@ -44,7 +44,7 @@ export default async function AdminUsersPage() {
         ← Back to Admin
       </Link>
       <div className="mb-8">
-        <h1 className="text-3xl font-bold font-serif text-primary">User Management</h1>
+        <h1 className="text-3xl font-bold font-serif text-foreground">User Management</h1>
         <p className="text-muted-foreground mt-1">
           View, edit, archive, and delete users. Sort and filter by role.
         </p>

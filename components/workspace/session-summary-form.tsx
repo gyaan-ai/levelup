@@ -136,7 +136,7 @@ export function SessionSummaryForm({
               onClick={() => toggleFocus(area)}
               className={`px-3 py-1.5 rounded-full text-sm transition-colors ${
                 focusAreas.includes(area)
-                  ? 'bg-primary text-primary-foreground'
+                  ? 'bg-accent text-black'
                   : 'bg-muted text-foreground hover:bg-muted/80'
               }`}
               type="button"

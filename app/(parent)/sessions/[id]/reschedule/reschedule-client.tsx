@@ -140,7 +140,7 @@ export function RescheduleClient({
       </Link>
 
       <div className="mb-6">
-        <h1 className="text-2xl font-serif font-bold text-primary">Reschedule Session</h1>
+        <h1 className="text-2xl font-serif font-bold text-foreground">Reschedule Session</h1>
         <p className="text-muted-foreground mt-1">
           Pick a new date and time. No additional payment.
         </p>
@@ -205,8 +205,8 @@ export function RescheduleClient({
                       onClick={() => setSelectedTime(t)}
                       className={`min-h-[44px] p-2 rounded-lg border text-sm transition-all touch-manipulation ${
                         selectedTime === t
-                          ? 'border-primary bg-primary text-white'
-                          : 'border-border hover:border-primary/50'
+                          ? 'border-accent bg-accent text-black'
+                          : 'border-border hover:border-accent/50'
                       }`}
                     >
                       {formatSlotDisplay(t)}

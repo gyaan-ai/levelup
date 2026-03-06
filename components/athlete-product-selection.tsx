@@ -132,7 +132,7 @@ export function AthleteProductSelection() {
                     Parent pays: <span className="font-medium">${product.parent_price.toFixed(2)}</span>/person
                   </span>
                   <span>
-                    You receive: <span className="font-medium text-primary">${product.athlete_payout.toFixed(2)}</span>/person
+                    You receive: <span className="font-medium text-accent">${product.athlete_payout.toFixed(2)}</span>/person
                   </span>
                 </div>
               </div>

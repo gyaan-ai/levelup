@@ -71,10 +71,10 @@ export default function HomePage() {
       </section>
 
       {/* How The Guild Works */}
-      <section id="how-it-works" className="py-12 sm:py-16 md:py-20 bg-white">
+      <section id="how-it-works" className="py-12 sm:py-16 md:py-20 bg-background">
         <div className="container mx-auto px-4">
           <div className="text-center mb-10 sm:mb-16">
-            <h2 className="text-3xl sm:text-4xl md:text-5xl font-serif font-bold text-black mb-4">
+            <h2 className="text-3xl sm:text-4xl md:text-5xl font-serif font-bold text-foreground mb-4">
               How The Guild Works
             </h2>
             <p className="text-xl text-muted-foreground">
@@ -83,10 +83,10 @@ export default function HomePage() {
           </div>
           <div className="grid md:grid-cols-3 gap-6 sm:gap-8 max-w-6xl mx-auto">
             <Card className="p-6 sm:p-8 text-center border-2 hover:border-accent transition-all">
-              <div className="w-16 h-16 bg-accent/10 rounded-full flex items-center justify-center mx-auto mb-6">
+              <div className="w-16 h-16 bg-accent/20 rounded-full flex items-center justify-center mx-auto mb-6">
                 <Users className="w-8 h-8 text-accent" />
               </div>
-              <h3 className="text-2xl font-bold text-black mb-4">
+              <h3 className="text-2xl font-bold text-foreground mb-4">
                 Browse Elite Coaches
               </h3>
               <p className="text-muted-foreground">
@@ -95,10 +95,10 @@ export default function HomePage() {
               </p>
             </Card>
             <Card className="p-6 sm:p-8 text-center border-2 hover:border-accent transition-all">
-              <div className="w-16 h-16 bg-accent/10 rounded-full flex items-center justify-center mx-auto mb-6">
+              <div className="w-16 h-16 bg-accent/20 rounded-full flex items-center justify-center mx-auto mb-6">
                 <Award className="w-8 h-8 text-accent" />
               </div>
-              <h3 className="text-2xl font-bold text-black mb-4">
+              <h3 className="text-2xl font-bold text-foreground mb-4">
                 Book Private Sessions
               </h3>
               <p className="text-muted-foreground">
@@ -107,10 +107,10 @@ export default function HomePage() {
               </p>
             </Card>
             <Card className="p-6 sm:p-8 text-center border-2 hover:border-accent transition-all">
-              <div className="w-16 h-16 bg-accent/10 rounded-full flex items-center justify-center mx-auto mb-6">
+              <div className="w-16 h-16 bg-accent/20 rounded-full flex items-center justify-center mx-auto mb-6">
                 <Shield className="w-8 h-8 text-accent" />
               </div>
-              <h3 className="text-2xl font-bold text-black mb-4">
+              <h3 className="text-2xl font-bold text-foreground mb-4">
                 Master Your Technique
               </h3>
               <p className="text-muted-foreground">
@@ -131,7 +131,7 @@ export default function HomePage() {
       <section className="py-20 bg-muted/50">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-serif font-bold text-black mb-4">
+            <h2 className="text-4xl md:text-5xl font-serif font-bold text-foreground mb-4">
               Why Choose The Guild
             </h2>
           </div>
@@ -165,7 +165,7 @@ export default function HomePage() {
               <Card key={item.title} className="p-6 border-l-4 border-accent">
                 <div className="flex items-start gap-3 mb-4">
                   <CheckCircle className="w-6 h-6 text-accent flex-shrink-0 mt-1" />
-                  <h3 className="text-xl font-bold text-black">{item.title}</h3>
+                  <h3 className="text-xl font-bold text-foreground">{item.title}</h3>
                 </div>
                 <p className="text-muted-foreground">{item.text}</p>
               </Card>

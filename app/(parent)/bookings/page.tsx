@@ -148,12 +148,12 @@ export default async function MyBookingsPage() {
           </p>
         </div>
         {creditBalance > 0 && (
-          <Card className="bg-primary/5 border-primary/20">
+          <Card className="bg-accent/10 border-accent/30">
             <CardContent className="py-3 px-4 flex items-center gap-2">
-              <Wallet className="h-5 w-5 text-primary" />
+              <Wallet className="h-5 w-5 text-accent" />
               <div>
                 <p className="text-sm text-muted-foreground">Credit Balance</p>
-                <p className="text-xl font-bold text-primary">${creditBalance.toFixed(2)}</p>
+                <p className="text-xl font-bold text-accent">${creditBalance.toFixed(2)}</p>
               </div>
             </CardContent>
           </Card>
@@ -166,7 +166,7 @@ export default async function MyBookingsPage() {
           {upcoming.length === 0 ? (
             <Card>
               <CardContent className="py-8 text-center text-muted-foreground">
-                No upcoming sessions. <Link href="/browse" className="text-primary underline">Browse coaches</Link> to book.
+                No upcoming sessions. <Link href="/browse" className="text-accent underline">Browse coaches</Link> to book.
               </CardContent>
             </Card>
           ) : (

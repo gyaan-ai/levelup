@@ -42,7 +42,7 @@ export default async function AdminFacilitiesPage() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold font-serif text-primary">Facilities</h1>
+        <h1 className="text-3xl font-bold font-serif text-foreground">Facilities</h1>
         <p className="text-muted-foreground mt-1">
           Manage the global list of locations. Coaches can only choose from this list.
         </p>

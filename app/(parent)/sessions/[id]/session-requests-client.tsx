@@ -130,7 +130,7 @@ export function SessionRequestsClient({
                   size="sm"
                   onClick={() => handleResponse(r.id, 'approve')}
                   disabled={!!loadingId}
-                  className="bg-primary text-white"
+                  className="bg-accent text-black hover:bg-accent-hover"
                 >
                   {loadingId === r.id ? '…' : 'Approve'}
                 </Button>

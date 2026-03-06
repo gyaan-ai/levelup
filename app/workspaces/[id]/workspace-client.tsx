@@ -246,7 +246,7 @@ export function WorkspaceClient({ workspaceId, isCoach = false }: { workspaceId:
       </Link>
 
       <div className="mb-8">
-        <h1 className="text-3xl font-serif font-bold text-primary">{wrestlerName}</h1>
+        <h1 className="text-3xl font-serif font-bold text-foreground">{wrestlerName}</h1>
         <p className="text-muted-foreground flex items-center gap-2 mt-1">
           with {coachName}
           {coach?.school && (

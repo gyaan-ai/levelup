@@ -147,7 +147,7 @@ export default function SignupPage() {
     <div className="container mx-auto px-4 py-16 flex items-center justify-center min-h-screen">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle className="text-primary font-serif">Join The Guild</CardTitle>
+          <CardTitle className="text-foreground font-serif">Join The Guild</CardTitle>
           <CardDescription>
             Create your account for elite technique instruction
           </CardDescription>
@@ -326,7 +326,7 @@ export default function SignupPage() {
           <div className="mt-4 text-center text-sm">
             <p className="text-muted-foreground">
               Already have an account?{' '}
-              <Link href="/login" className="text-primary hover:underline">
+              <Link href="/login" className="text-accent hover:underline">
                 Sign in
               </Link>
             </p>

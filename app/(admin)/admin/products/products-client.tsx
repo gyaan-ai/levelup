@@ -240,7 +240,7 @@ export function ProductsClient({ products }: ProductsClientProps) {
                     </div>
                     <div>
                       <p className="text-muted-foreground">Guild net</p>
-                      <p className="font-bold text-primary">${fees.guildNet.toFixed(2)}</p>
+                      <p className="font-bold text-accent">${fees.guildNet.toFixed(2)}</p>
                     </div>
                   </div>
                 </div>
@@ -405,7 +405,7 @@ export function ProductsClient({ products }: ProductsClientProps) {
                   <div>Total revenue: <span className="font-medium">${previewFees.totalParentPrice.toFixed(2)}</span></div>
                   <div>Coach payout: <span className="font-medium">${previewFees.totalAthletePayout.toFixed(2)}</span></div>
                   <div>Stripe fee: <span className="font-medium text-destructive">-${previewFees.stripeFee.toFixed(2)}</span></div>
-                  <div>Guild net: <span className="font-bold text-primary">${previewFees.guildNet.toFixed(2)}</span></div>
+                  <div>Guild net: <span className="font-bold text-accent">${previewFees.guildNet.toFixed(2)}</span></div>
                 </div>
               </div>
             )}

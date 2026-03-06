@@ -85,7 +85,7 @@ export default async function ParentDashboard() {
 
             return (
               <Card key={wrestler.id} className="overflow-hidden">
-                <div className="relative h-48 bg-gradient-to-br from-primary/20 to-primary/40">
+                <div className="relative h-48 bg-gradient-to-br from-accent/20 to-accent/40">
                   {wrestler.photo_url ? (
                     <img
                       src={wrestler.photo_url}

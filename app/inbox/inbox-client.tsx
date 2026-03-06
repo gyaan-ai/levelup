@@ -107,7 +107,7 @@ export function InboxClient({ role }: { role: 'parent' | 'athlete' }) {
                         <p className="font-medium truncate flex items-center gap-2">
                           {t.otherName}
                           {t.unread && (
-                            <span className="shrink-0 w-2 h-2 rounded-full bg-primary" aria-hidden />
+                            <span className="shrink-0 w-2 h-2 rounded-full bg-accent" aria-hidden />
                           )}
                         </p>
                         <p className="text-sm text-muted-foreground line-clamp-1">{t.lastBody}</p>

@@ -107,19 +107,19 @@ export default async function ParentDashboard() {
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-serif font-bold mb-2 text-primary">Your Wrestlers</h1>
+          <h1 className="text-3xl font-serif font-bold mb-2 text-foreground">Your Wrestlers</h1>
           <p className="text-muted-foreground">
             Manage profiles and book sessions with elite coaches
           </p>
         </div>
         <div className="flex items-center gap-4">
           {creditBalance > 0 && (
-            <Card className="bg-primary/5 border-primary/20">
+            <Card className="bg-accent/10 border-accent/30">
               <CardContent className="py-3 px-4 flex items-center gap-2">
-                <Wallet className="h-5 w-5 text-primary" />
+                <Wallet className="h-5 w-5 text-accent" />
                 <div>
                   <p className="text-sm text-muted-foreground">Credit Balance</p>
-                  <p className="text-xl font-bold text-primary">${creditBalance.toFixed(2)}</p>
+                  <p className="text-xl font-bold text-accent">${creditBalance.toFixed(2)}</p>
                 </div>
               </CardContent>
             </Card>
@@ -193,7 +193,7 @@ export default async function ParentDashboard() {
               
               return (
                 <Card key={wrestler.id} className="overflow-hidden">
-                  <div className="relative h-48 bg-gradient-to-br from-primary/20 to-primary/40">
+                  <div className="relative h-48 bg-gradient-to-br from-accent/20 to-accent/40">
                     {wrestler.photo_url ? (
                       <img
                         src={wrestler.photo_url}

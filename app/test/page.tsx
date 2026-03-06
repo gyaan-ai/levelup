@@ -42,9 +42,9 @@ export default async function TestPage() {
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="p-4 bg-green-50 border border-green-200 rounded-md">
-                <h3 className="font-semibold text-green-800 mb-2">✅ Connection Successful!</h3>
-                <p className="text-sm text-green-700">
+              <div className="p-4 bg-green-950/50 border border-green-800 rounded-md">
+                <h3 className="font-semibold text-green-400 mb-2">✅ Connection Successful!</h3>
+                <p className="text-sm text-green-300">
                   Successfully connected to Supabase and queried the facilities table.
                 </p>
               </div>

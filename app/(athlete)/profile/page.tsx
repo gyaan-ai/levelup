@@ -442,7 +442,7 @@ export default function ProfilePage() {
 
               {/* Payout: Venmo / Zelle */}
               <div className="space-y-4 rounded-lg border p-4">
-                <p className="text-sm font-medium text-primary">How you get paid</p>
+                <p className="text-sm font-medium text-foreground">How you get paid</p>
                 <p className="text-sm text-muted-foreground">
                   We pay coaches via Venmo or Zelle. Add at least one so we can send your earnings.
                 </p>

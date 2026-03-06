@@ -76,7 +76,7 @@ export default async function WorkspacesPage() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-serif font-bold text-primary">Development Workspaces</h1>
+        <h1 className="text-3xl font-serif font-bold text-foreground">Development Workspaces</h1>
         <p className="text-muted-foreground mt-1">
           {userData?.role === 'parent'
             ? 'Collaboration spaces with your wrestler\'s coaches — goals, video, session notes, and actions'
@@ -125,7 +125,7 @@ export default async function WorkspacesPage() {
               : 'Coach';
             return (
               <Link key={ws.id} href={`/workspaces/${ws.id}`}>
-                <Card className="hover:border-primary/50 transition-colors h-full">
+                <Card className="hover:border-accent/50 transition-colors h-full">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-lg flex items-center gap-2">
                       <User className="h-5 w-5" />

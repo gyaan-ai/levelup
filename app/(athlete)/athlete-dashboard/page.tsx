@@ -192,7 +192,7 @@ export default async function AthleteDashboard() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-serif font-bold mb-2 text-primary">Wrestler Dashboard</h1>
+        <h1 className="text-3xl font-serif font-bold mb-2 text-foreground">Wrestler Dashboard</h1>
         <p className="text-muted-foreground">
           Welcome back{athlete?.first_name ? `, ${athlete.first_name}` : ''}. Your Guild wrestler dashboard.
         </p>

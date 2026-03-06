@@ -44,7 +44,7 @@ export function SessionSummaryDisplay({
               {summary.focus_areas.map((area) => (
                 <span
                   key={area}
-                  className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm"
+                  className="px-3 py-1 bg-accent/10 text-accent rounded-full text-sm"
                 >
                   {area}
                 </span>

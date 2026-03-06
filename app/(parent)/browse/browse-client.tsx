@@ -118,7 +118,7 @@ export function BrowseAthletesClient({ initialAthletes }: BrowseAthletesClientPr
       </Link>
 
       <div className="mb-8">
-        <h1 className="text-3xl font-serif font-bold mb-2 text-primary">Browse Elite Coaches</h1>
+        <h1 className="text-3xl font-serif font-bold mb-2 text-foreground">Browse Elite Coaches</h1>
         <p className="text-muted-foreground">
           Find NCAA athletes and elite coaches to refine your technique
         </p>
@@ -254,10 +254,10 @@ export function BrowseAthletesClient({ initialAthletes }: BrowseAthletesClientPr
                         <img
                           src={athlete.photo_url}
                           alt={`${athlete.first_name} ${athlete.last_name}`}
-                          className="w-24 h-24 rounded-full object-cover border-2 border-primary/20"
+                          className="w-24 h-24 rounded-full object-cover border-2 border-accent/30"
                         />
                       ) : (
-                        <div className="w-24 h-24 rounded-full bg-muted flex items-center justify-center border-2 border-primary/20">
+                        <div className="w-24 h-24 rounded-full bg-muted flex items-center justify-center border-2 border-accent/30">
                           <User className="h-12 w-12 text-muted-foreground" />
                         </div>
                       )}

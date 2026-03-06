@@ -289,7 +289,7 @@ export function CoachScheduleCard({
                 onMonthChange={setCalendarMonth}
                 selected={undefined}
                 modifiers={{ hasSession: calendarDaysWithSessions }}
-                modifiersClassNames={{ hasSession: 'bg-primary/20 font-semibold' }}
+                modifiersClassNames={{ hasSession: 'bg-accent/20 font-semibold' }}
                 className="rounded-md border w-fit"
               />
             </div>

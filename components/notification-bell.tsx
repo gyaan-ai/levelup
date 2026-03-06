@@ -138,7 +138,7 @@ export function NotificationBell({
             <Link
               href="/notifications"
               onClick={() => setOpen(false)}
-              className="text-sm text-primary hover:underline font-medium"
+              className="text-sm text-accent hover:underline font-medium"
             >
               View all notifications
             </Link>

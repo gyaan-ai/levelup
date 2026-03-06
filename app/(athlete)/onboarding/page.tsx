@@ -290,7 +290,7 @@ export default function OnboardingPage() {
         )}
         {success && (
           <div className="mb-4 p-4 bg-accent/10 border-2 border-accent rounded-md">
-            <p className="font-semibold text-primary">Welcome to The Guild!</p>
+            <p className="font-semibold text-foreground">Welcome to The Guild!</p>
             <p className="text-sm text-muted-foreground mt-1">{successMessage}</p>
           </div>
         )}

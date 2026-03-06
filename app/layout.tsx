@@ -49,8 +49,8 @@ export default async function RootLayout({
   
   if (!tenant) {
     return (
-      <html lang="en" className={playfair.variable}>
-        <body className="font-sans">
+      <html lang="en" className={`dark ${playfair.variable}`}>
+        <body className="font-sans bg-background text-foreground">
           <div className="flex items-center justify-center min-h-screen">
             <div className="text-center">
               <h1 className="text-2xl font-bold">Tenant not found</h1>
@@ -63,8 +63,8 @@ export default async function RootLayout({
   }
   
   return (
-    <html lang="en" className={playfair.variable}>
-      <body className="flex flex-col min-h-screen font-sans">
+    <html lang="en" className={`dark ${playfair.variable}`}>
+      <body className="flex flex-col min-h-screen font-sans bg-background text-foreground">
         <ThemeProvider tenant={tenant}>
           <AuthProvider tenantSlug={tenant.slug}>
             <Header />

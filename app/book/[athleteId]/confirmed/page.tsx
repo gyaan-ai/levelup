@@ -117,7 +117,7 @@ export default async function BookingConfirmedPage({
                 <Button asChild variant="outline" className="flex-1">
                   <Link href="/dashboard">View My Sessions</Link>
                 </Button>
-                <Button asChild className="flex-1 bg-primary text-white hover:bg-primary/90">
+                <Button asChild className="flex-1">
                   <a href={`https://calendar.google.com/calendar/render?action=TEMPLATE&text=Wrestling+Session&dates=${scheduledAt?.toISOString().replace(/[-:]/g, '').slice(0, 15)}/${scheduledAt?.toISOString().replace(/[-:]/g, '').slice(0, 15)}`} target="_blank" rel="noopener noreferrer">
                     Add to Calendar
                   </a>

@@ -54,7 +54,7 @@ export default async function AdminEarlyAccessPage() {
         ← Back to Admin
       </Link>
       <div className="mb-8">
-        <h1 className="text-3xl font-bold font-serif text-primary">Early Access Submissions</h1>
+        <h1 className="text-3xl font-bold font-serif text-foreground">Early Access Submissions</h1>
         <p className="text-muted-foreground mt-1">
           Homepage signups (testers, early adopters)
         </p>

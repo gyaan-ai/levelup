@@ -262,7 +262,7 @@ export function AdminUsersClient({ initialUsers }: { initialUsers: AdminUserRow[
                   filteredAndSorted.map((u) => (
                     <tr key={u.id} className={`border-b last:border-0 ${u.archived_at ? 'opacity-60' : ''}`}>
                       <td className="py-2">
-                        <a href={`mailto:${u.email}`} className="text-primary hover:underline">
+                        <a href={`mailto:${u.email}`} className="text-accent hover:underline">
                           {u.email}
                         </a>
                       </td>

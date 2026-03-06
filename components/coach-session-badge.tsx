@@ -42,7 +42,7 @@ export function CoachSessionBadge({ totalSessions, className, size = 'md' }: Coa
   return (
     <div
       className={cn(
-        'inline-flex items-center bg-primary text-white rounded-full border-2 border-accent font-semibold',
+        'inline-flex items-center bg-accent text-black rounded-full border-2 border-accent font-semibold',
         sizeClasses[size],
         className
       )}

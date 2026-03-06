@@ -76,7 +76,7 @@ export function JoinSessionClient({
       <Button
         onClick={handleJoin}
         disabled={!selectedWrestlerId}
-        className="w-full bg-primary text-white hover:bg-primary/90"
+        className="w-full bg-accent text-black hover:bg-accent-hover"
       >
         Join for ${Number(pricePerParticipant).toFixed(2)}
       </Button>

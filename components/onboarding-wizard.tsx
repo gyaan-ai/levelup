@@ -58,7 +58,7 @@ export function OnboardingWizard({
       {/* Header - show once, keep it short */}
       {wizardTitle && (
         <div className="mb-6">
-          <h1 className="text-xl sm:text-2xl font-serif font-bold text-primary">{wizardTitle}</h1>
+          <h1 className="text-xl sm:text-2xl font-serif font-bold text-foreground">{wizardTitle}</h1>
           {wizardDescription && (
             <p className="text-muted-foreground mt-0.5 text-sm">{wizardDescription}</p>
           )}

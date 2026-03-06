@@ -23,7 +23,7 @@ export default async function MyCoachesPage() {
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold font-serif text-primary">My Coaches</h1>
+        <h1 className="text-3xl font-bold font-serif text-foreground">My Coaches</h1>
         <p className="text-muted-foreground mt-1">
           Coaches you follow. You’ll be notified when they add new availability.
         </p>
