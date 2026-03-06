@@ -5,7 +5,9 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import { generateInviteCode } from '@/lib/sessions';
 import { getStripeInstance } from '@/lib/stripe/webhooks';
+import { createNotification } from '@/lib/notifications';
 import type { SessionMode } from '@/types';
+import { format } from 'date-fns';
 
 export async function POST(req: NextRequest) {
   try {
@@ -47,7 +49,7 @@ export async function POST(req: NextRequest) {
       scheduledTime,
       totalPrice,
       pricePerParticipant,
-      useCredits = true, // Default to using credits if available
+      useCredits = false, // Simple route: pay at book only; no credits applied
       productId,
     } = body;
 
@@ -169,6 +171,18 @@ export async function POST(req: NextRequest) {
     }
     if (!session) {
       return NextResponse.json({ error: 'Failed to create session' }, { status: 500 });
+    }
+
+    try {
+      await createNotification(admin, {
+        user_id: athleteId,
+        type: 'new_session',
+        title: 'New session booked',
+        body: `Session on ${format(new Date(scheduledDatetime), 'MMM d, yyyy')} at ${format(new Date(scheduledDatetime), 'h:mm a')}. View your dashboard.`,
+        data: { link: '/athlete-dashboard', session_id: session.id },
+      });
+    } catch (notifErr) {
+      console.warn('Notify coach of new session failed:', notifErr);
     }
 
     for (const ywId of youthWrestlerIds) {

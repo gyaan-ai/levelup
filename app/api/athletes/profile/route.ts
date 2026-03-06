@@ -70,7 +70,7 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { weightClass, bio, credentials, photoUrl, facilityId, active, venmoHandle, zelleEmail } = body;
+    const { weightClass, bio, credentials, photoUrl, facilityId, secondaryFacilityId, active, venmoHandle, zelleEmail } = body;
 
     // Check if user is an athlete
     const { data: userData } = await supabase
@@ -116,6 +116,7 @@ export async function PUT(req: NextRequest) {
       credentials: credentials || {},
       photo_url: photoUrl || null,
       facility_id: facilityId || null,
+      secondary_facility_id: secondaryFacilityId ?? null,
       // Public (active) = visible in browse & bookable; Private = hidden, keep editing
       active: active === true,
     };

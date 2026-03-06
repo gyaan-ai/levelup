@@ -7,9 +7,9 @@ import { isProfileComplete } from '@/lib/athletes';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import { Calendar, DollarSign, TrendingUp, Clock, Trophy, Users, MessageCircle } from 'lucide-react';
+import { Calendar, DollarSign, TrendingUp, Clock, Trophy, Users } from 'lucide-react';
+import { CoachScheduleCard } from './coach-schedule-card';
 
 export default async function AthleteDashboard() {
   const headersList = await headers();
@@ -132,14 +132,6 @@ export default async function AthleteDashboard() {
     ? Math.min((athlete.commitment_sessions / (athlete.commitment_sessions || 1)) * 100, 100)
     : 0;
 
-  const facilityName = (s: { facilities?: unknown }) => {
-    const f = s.facilities;
-    if (!f || typeof f !== 'object') return '—';
-    const arr = Array.isArray(f) ? f : [f];
-    const first = arr[0] as { name?: string } | null;
-    return first?.name ?? '—';
-  };
-
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
@@ -230,118 +222,11 @@ export default async function AthleteDashboard() {
         </Card>
       )}
 
-      {/* Schedule: Upcoming */}
-      <Card className="mb-8">
-        <CardHeader>
-          <CardTitle>Schedule & Bookings</CardTitle>
-          <CardDescription>Upcoming and past sessions</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <div>
-            <h3 className="text-sm font-semibold mb-3">Upcoming</h3>
-            {upcomingSessions && upcomingSessions.length > 0 ? (
-              <div className="space-y-3">
-                {upcomingSessions.map((session: { id: string; scheduled_datetime: string; facilities?: unknown; total_price?: number; session_type?: string; status?: string }) => (
-                  <div
-                    key={session.id}
-                    className="flex items-center justify-between p-4 border rounded-lg"
-                  >
-                    <div>
-                      <p className="font-medium">
-                        {new Date(session.scheduled_datetime).toLocaleDateString('en-US', {
-                          weekday: 'long',
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric',
-                        })}
-                      </p>
-                      <div className="text-sm text-muted-foreground flex flex-wrap items-center gap-x-1 gap-y-1">
-                        {new Date(session.scheduled_datetime).toLocaleTimeString('en-US', {
-                          hour: 'numeric',
-                          minute: '2-digit',
-                        })}
-                        {' • '}
-                        {facilityName(session)}
-                        {session.status === 'pending_payment' && (
-                          <>
-                            <span> • </span>
-                            <Badge variant="secondary" className="text-xs">Pending payment</Badge>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                    <div className="text-right flex flex-col items-end gap-1">
-                      <p className="font-medium">${Number(session.total_price || 0).toFixed(2)}</p>
-                      <p className="text-xs text-muted-foreground">{session.session_type || '—'}</p>
-                      <Link href={`/messages/${session.id}`}>
-                        <Button variant="ghost" size="sm">
-                          <MessageCircle className="h-4 w-4 mr-1" />
-                          Message
-                        </Button>
-                      </Link>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 border rounded-lg bg-muted/30">
-                <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground">No upcoming sessions</p>
-              </div>
-            )}
-          </div>
-
-          {/* Past */}
-          <div>
-            <h3 className="text-sm font-semibold mb-3">Past</h3>
-            {pastSessions && pastSessions.length > 0 ? (
-              <div className="space-y-3">
-                {pastSessions.map((session: { id: string; scheduled_datetime: string; facilities?: unknown; total_price?: number; session_type?: string; status?: string }) => (
-                  <div
-                    key={session.id}
-                    className="flex items-center justify-between p-4 border rounded-lg bg-muted/20"
-                  >
-                    <div>
-                      <p className="font-medium">
-                        {new Date(session.scheduled_datetime).toLocaleDateString('en-US', {
-                          weekday: 'short',
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric',
-                        })}
-                      </p>
-                      <div className="text-sm text-muted-foreground flex flex-wrap items-center gap-x-1 gap-y-1">
-                        {new Date(session.scheduled_datetime).toLocaleTimeString('en-US', {
-                          hour: 'numeric',
-                          minute: '2-digit',
-                        })}
-                        {' • '}
-                        {facilityName(session)}
-                        {' • '}
-                        <Badge variant={session.status === 'completed' ? 'default' : 'secondary'}>
-                          {session.status === 'completed' ? 'Completed' : session.status === 'cancelled' ? 'Cancelled' : 'No-show'}
-                        </Badge>
-                      </div>
-                    </div>
-                    <div className="text-right flex flex-col items-end gap-1">
-                      <p className="font-medium">${Number(session.total_price || 0).toFixed(2)}</p>
-                      <p className="text-xs text-muted-foreground">{session.session_type || '—'}</p>
-                      <Link href={`/messages/${session.id}`}>
-                        <Button variant="ghost" size="sm">
-                          <MessageCircle className="h-4 w-4 mr-1" />
-                          Message
-                        </Button>
-                      </Link>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground py-4">No past sessions yet.</p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      {/* Schedule: List / Table / Calendar */}
+      <CoachScheduleCard
+        upcomingSessions={(upcomingSessions ?? []) as import('./coach-schedule-card').CoachSession[]}
+        pastSessions={(pastSessions ?? []) as import('./coach-schedule-card').CoachSession[]}
+      />
 
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

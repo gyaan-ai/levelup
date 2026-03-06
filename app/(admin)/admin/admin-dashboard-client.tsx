@@ -21,6 +21,8 @@ import {
   Search,
   Wallet,
   CreditCard,
+  MapPin,
+  Package,
 } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
@@ -171,8 +173,9 @@ export function AdminDashboardClient({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap gap-2 border-b border-border pb-4">
-        {tabs.map((t) => (
+      <div className="flex flex-wrap items-center gap-2 border-b border-border pb-4">
+        <div className="flex flex-wrap gap-2 mr-4">
+          {tabs.map((t) => (
           <Button
             key={t.id}
             variant={tab === t.id ? 'default' : 'outline'}
@@ -184,6 +187,15 @@ export function AdminDashboardClient({
             {t.label}
           </Button>
         ))}
+        </div>
+        <Link href="/admin/facilities" className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground border border-border rounded-md hover:bg-muted/50">
+          <MapPin className="h-4 w-4" />
+          Facilities
+        </Link>
+        <Link href="/admin/products" className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground border border-border rounded-md hover:bg-muted/50">
+          <Package className="h-4 w-4" />
+          Products
+        </Link>
       </div>
 
       {tab === 'sessions' && (

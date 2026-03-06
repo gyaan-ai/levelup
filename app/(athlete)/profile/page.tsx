@@ -38,6 +38,7 @@ const profileSchema = z.object({
     description: z.string().optional(),
   })).optional(),
   facilityId: z.string().optional(),
+  secondaryFacilityId: z.string().optional(),
   venmoHandle: z.string().max(30).optional(),
   zelleEmail: z.string().optional().refine((v) => !v || v.trim() === '' || (v.includes('@') ? /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim()) : v.replace(/\D/g, '').length >= 7), 'Use a valid email or phone (7+ digits) for Zelle'),
   photo: z.instanceof(File).optional(),
@@ -65,6 +66,7 @@ export default function ProfilePage() {
       bio: '',
       credentials: [],
       facilityId: '',
+      secondaryFacilityId: '',
       venmoHandle: '',
       zelleEmail: '',
     },
@@ -92,6 +94,7 @@ export default function ProfilePage() {
                 }))
               : [],
             facilityId: data.athlete.facility_id || '',
+            secondaryFacilityId: data.athlete.secondary_facility_id || '',
             venmoHandle: data.athlete.venmo_handle || '',
             zelleEmail: data.athlete.zelle_email || '',
           });
@@ -171,6 +174,7 @@ export default function ProfilePage() {
           credentials: credentialsObj,
           photoUrl,
           facilityId: values.facilityId,
+          secondaryFacilityId: values.secondaryFacilityId || undefined,
           venmoHandle: values.venmoHandle?.trim() || undefined,
           zelleEmail: values.zelleEmail?.trim() || undefined,
           active: makePublic,
@@ -370,30 +374,65 @@ export default function ProfilePage() {
 
               {/* Facility Selection */}
               {facilities.length > 0 && (
-                <FormField
-                  control={form.control}
-                  name="facilityId"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Primary Facility</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a facility" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {facilities.map((facility) => (
-                            <SelectItem key={facility.id} value={facility.id}>
-                              {facility.name} - {facility.school}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <>
+                  <FormField
+                    control={form.control}
+                    name="facilityId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Primary Facility</FormLabel>
+                        <Select
+                          onValueChange={(val) => {
+                            field.onChange(val);
+                            if (form.getValues('secondaryFacilityId') === val) form.setValue('secondaryFacilityId', '');
+                          }}
+                          value={field.value}
+                        >
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select a facility" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {facilities.map((facility) => (
+                              <SelectItem key={facility.id} value={facility.id}>
+                                {facility.name} - {facility.school}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="secondaryFacilityId"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Secondary Facility (optional)</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="None" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            <SelectItem value="">None</SelectItem>
+                            {facilities
+                              .filter((f) => f.id !== form.watch('facilityId'))
+                              .map((f) => (
+                                <SelectItem key={f.id} value={f.id}>
+                                  {f.name} - {f.school}
+                                </SelectItem>
+                              ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </>
               )}
 
               {/* Payout: Venmo / Zelle */}

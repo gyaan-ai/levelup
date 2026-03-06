@@ -43,3 +43,43 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
+
+export async function PATCH(req: NextRequest) {
+  try {
+    const headersList = await headers();
+    const host = headersList.get('host') || '';
+    const tenant = getTenantByDomain(host);
+    if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
+    const supabase = await createClient(tenant.slug);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const body = await req.json().catch(() => ({})) as { id?: string; all?: boolean };
+    const now = new Date().toISOString();
+
+    if (body.all) {
+      const { error: updateError } = await supabase
+        .from('notifications')
+        .update({ read_at: now })
+        .eq('user_id', user.id)
+        .is('read_at', null);
+      if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
+      return NextResponse.json({ success: true });
+    }
+
+    if (body.id) {
+      const { error: updateError } = await supabase
+        .from('notifications')
+        .update({ read_at: now })
+        .eq('id', body.id)
+        .eq('user_id', user.id);
+      if (updateError) return NextResponse.json({ error: updateError.message }, { status: 500 });
+      return NextResponse.json({ success: true });
+    }
+
+    return NextResponse.json({ error: 'Provide id or all' }, { status: 400 });
+  } catch (e) {
+    console.error('Notifications PATCH error:', e);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}

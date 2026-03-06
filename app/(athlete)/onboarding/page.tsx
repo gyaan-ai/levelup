@@ -32,6 +32,7 @@ import { Camera, Globe, Lock } from 'lucide-react';
 const onboardingSchema = z.object({
   bio: z.string().max(500, 'Bio must be 500 characters or less').optional(),
   facilityId: z.string().optional(),
+  secondaryFacilityId: z.string().optional(),
   venmoHandle: z.string().max(30).optional(),
   zelleEmail: z.string().optional().refine((v) => !v || v.trim() === '' || (v.includes('@') ? /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim()) : v.replace(/\D/g, '').length >= 7), 'Use a valid email or phone (7+ digits) for Zelle'),
   photo: z.instanceof(File).optional(),
@@ -60,6 +61,7 @@ export default function OnboardingPage() {
     defaultValues: {
       bio: '',
       facilityId: '',
+      secondaryFacilityId: '',
       venmoHandle: '',
       zelleEmail: '',
     },
@@ -77,6 +79,7 @@ export default function OnboardingPage() {
           form.reset({
             bio: data.athlete.bio || '',
             facilityId: data.athlete.facility_id || '',
+            secondaryFacilityId: data.athlete.secondary_facility_id || '',
             venmoHandle: data.athlete.venmo_handle || '',
             zelleEmail: data.athlete.zelle_email || '',
           });
@@ -127,6 +130,7 @@ export default function OnboardingPage() {
         bio: values.bio,
         photoUrl,
         facilityId: values.facilityId,
+        secondaryFacilityId: values.secondaryFacilityId || undefined,
         venmoHandle: values.venmoHandle?.trim() || undefined,
         zelleEmail: values.zelleEmail?.trim() || undefined,
         active,
@@ -283,7 +287,7 @@ export default function OnboardingPage() {
                   Add a photo so parents recognize you.
                 </p>
                 <div className="flex flex-col sm:flex-row items-center gap-6">
-                  <label className="relative cursor-pointer group">
+                  <label className="relative cursor-pointer group touch-manipulation min-w-[44px] min-h-[44px]">
                     <div className="w-32 h-32 rounded-full border-4 border-dashed border-muted-foreground/30 flex items-center justify-center overflow-hidden group-hover:border-accent/50 transition-colors bg-muted/30">
                       {photoPreview ? (
                         <img src={photoPreview} alt="Preview" className="w-full h-full object-cover" />
@@ -351,10 +355,16 @@ export default function OnboardingPage() {
                       name="facilityId"
                       render={({ field }) => (
                         <FormItem>
-                          <Select onValueChange={field.onChange} value={field.value}>
+                          <Select
+                            onValueChange={(val) => {
+                              field.onChange(val);
+                              if (form.getValues('secondaryFacilityId') === val) form.setValue('secondaryFacilityId', '');
+                            }}
+                            value={field.value}
+                          >
                             <FormControl>
                               <SelectTrigger>
-                                <SelectValue placeholder="Select a facility" />
+                                <SelectValue placeholder="Primary facility" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
@@ -363,6 +373,32 @@ export default function OnboardingPage() {
                                   {f.name} – {f.school}
                                 </SelectItem>
                               ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name="secondaryFacilityId"
+                      render={({ field }) => (
+                        <FormItem className="mt-4">
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Secondary facility (optional)" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="">None</SelectItem>
+                              {facilities
+                                .filter((f) => f.id !== form.watch('facilityId'))
+                                .map((f) => (
+                                  <SelectItem key={f.id} value={f.id}>
+                                    {f.name} – {f.school}
+                                  </SelectItem>
+                                ))}
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -405,7 +441,7 @@ export default function OnboardingPage() {
                     <FormItem>
                       <FormLabel>Zelle</FormLabel>
                       <FormControl>
-                        <Input placeholder="email@example.com or 5551234567" {...field} />
+                        <Input placeholder="email@example.com or 5551234567" inputMode="email" autoComplete="email" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -418,7 +454,7 @@ export default function OnboardingPage() {
         </Form>
       </OnboardingWizard>
 
-      <dialog ref={visibilityModalRef} className="rounded-lg border bg-background p-6 shadow-lg max-w-md w-[calc(100%-2rem)]">
+      <dialog ref={visibilityModalRef} className="rounded-lg border bg-background p-6 shadow-lg max-w-md w-[calc(100%-2rem)] max-h-[90vh] overflow-y-auto">
         <h3 className="font-semibold text-lg mb-2">Go live?</h3>
         <p className="text-muted-foreground text-sm mb-4">
           Public = parents can book you. Private = keep editing.

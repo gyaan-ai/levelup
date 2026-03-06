@@ -42,7 +42,7 @@ export function BookingCard({ session, isPast = false }: BookingCardProps) {
     (session.status === 'scheduled' || session.status === 'pending_payment') &&
     scheduledTime > new Date();
   
-  const willGetCredit = hoursUntilSession >= CANCELLATION_WINDOW_HOURS && session.status === 'scheduled';
+  const willGetRefund = hoursUntilSession >= CANCELLATION_WINDOW_HOURS && session.status === 'scheduled';
 
   const handleCancel = async () => {
     setCancelling(true);
@@ -154,9 +154,9 @@ export function BookingCard({ session, isPast = false }: BookingCardProps) {
               <div className="mt-2 p-3 border border-destructive/50 rounded-lg bg-destructive/5 text-left w-full max-w-xs">
                 <p className="text-sm font-medium mb-2">Cancel this session?</p>
                 <p className="text-xs text-muted-foreground mb-3">
-                  {willGetCredit 
-                    ? `You'll receive a $${Number(session.total_price).toFixed(2)} credit for future bookings.`
-                    : `Less than ${CANCELLATION_WINDOW_HOURS} hours notice — no credit will be issued.`
+                  {willGetRefund
+                    ? `A refund of $${Number(session.total_price).toFixed(2)} will be processed (24h+ notice).`
+                    : `Less than ${CANCELLATION_WINDOW_HOURS} hours notice — no refund.`
                   }
                 </p>
                 <div className="flex gap-2">

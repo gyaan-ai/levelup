@@ -5,6 +5,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useAuth } from '@/lib/auth/use-auth';
 import { useNotificationCount } from '@/lib/hooks/use-notification-count';
+import { NotificationBell } from '@/components/notification-bell';
 import { Button } from './ui/button';
 import { Bell, Menu, X } from 'lucide-react';
 
@@ -13,7 +14,7 @@ const navLinkClass = 'block py-3 px-4 text-white hover:text-accent hover:bg-whit
 export function Header() {
   const { user, userRole, loading, signOut } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const notificationCount = useNotificationCount(!!user);
+  const [notificationCount, refreshNotifications] = useNotificationCount(!!user);
 
   const handleSignOut = async () => {
     await signOut();
@@ -49,18 +50,7 @@ export function Header() {
                   >
                     Dashboard
                   </Link>
-                  <Link
-                    href="/notifications"
-                    className="relative flex items-center justify-center p-1.5 text-white hover:text-accent transition-colors font-medium rounded hover:bg-white/10"
-                    aria-label={notificationCount > 0 ? `Notifications (${notificationCount} unread)` : 'Notifications'}
-                  >
-                    <Bell className="h-5 w-5" />
-                    {notificationCount > 0 && (
-                      <span className="absolute top-0 right-0 min-w-[18px] h-[18px] px-1 flex items-center justify-center text-[10px] font-bold bg-accent text-black rounded-full -translate-y-0.5 translate-x-0.5">
-                        {notificationCount > 99 ? '99+' : notificationCount}
-                      </span>
-                    )}
-                  </Link>
+                  <NotificationBell count={notificationCount} onRefresh={refreshNotifications} />
                 </>
               )}
               {(userRole === 'admin' || userRole === 'parent') && (
@@ -101,18 +91,7 @@ export function Header() {
                   >
                     Partner Sessions
                   </Link>
-                  <Link
-                    href="/notifications"
-                    className="relative flex items-center justify-center p-1.5 text-white hover:text-accent transition-colors font-medium rounded hover:bg-white/10"
-                    aria-label={notificationCount > 0 ? `Notifications (${notificationCount} unread)` : 'Notifications'}
-                  >
-                    <Bell className="h-5 w-5" />
-                    {notificationCount > 0 && (
-                      <span className="absolute top-0 right-0 min-w-[18px] h-[18px] px-1 flex items-center justify-center text-[10px] font-bold bg-accent text-black rounded-full -translate-y-0.5 translate-x-0.5">
-                        {notificationCount > 99 ? '99+' : notificationCount}
-                      </span>
-                    )}
-                  </Link>
+                  <NotificationBell count={notificationCount} onRefresh={refreshNotifications} />
                   {userRole === 'admin' && (
                     <Link
                       href="/admin"
