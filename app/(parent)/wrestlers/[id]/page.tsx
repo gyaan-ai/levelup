@@ -123,7 +123,7 @@ export default async function YouthWrestlerProfilePage({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         {/* School Info */}
-        {(youthWrestler.school || youthWrestler.grade) && (
+        {(youthWrestler.school || youthWrestler.graduation_year) && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -135,8 +135,8 @@ export default async function YouthWrestlerProfilePage({
               {youthWrestler.school && (
                 <p className="font-medium mb-1">{youthWrestler.school}</p>
               )}
-              {youthWrestler.grade && (
-                <p className="text-sm text-muted-foreground">Grade {youthWrestler.grade}</p>
+              {youthWrestler.graduation_year && (
+                <p className="text-sm text-muted-foreground">Class of {youthWrestler.graduation_year}</p>
               )}
             </CardContent>
           </Card>

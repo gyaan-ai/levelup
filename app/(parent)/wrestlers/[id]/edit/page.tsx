@@ -33,7 +33,7 @@ const youthWrestlerSchema = z.object({
   lastName: z.string().min(1, 'Last name is required'),
   dateOfBirth: z.string().optional(),
   school: z.string().optional(),
-  grade: z.string().optional(),
+  graduationYear: z.union([z.string(), z.number()]).optional().transform((v) => (v === '' || v == null ? undefined : typeof v === 'string' ? parseInt(v, 10) : v)),
   weightClass: z.string().optional(),
   skillLevel: z.enum(['beginner', 'intermediate', 'advanced', 'elite']).optional(),
   wrestlingExperience: z.string().optional(),
@@ -60,7 +60,7 @@ export default function EditYouthWrestlerPage() {
       lastName: '',
       dateOfBirth: '',
       school: '',
-      grade: '',
+      graduationYear: undefined as number | undefined,
       weightClass: '',
       skillLevel: '' as any,
       wrestlingExperience: '',
@@ -89,7 +89,7 @@ export default function EditYouthWrestlerPage() {
           lastName: youthWrestler.last_name || '',
           dateOfBirth: dateOfBirth,
           school: youthWrestler.school || '',
-          grade: youthWrestler.grade || '',
+          graduationYear: youthWrestler.graduation_year ?? undefined,
           weightClass: youthWrestler.weight_class || '',
           skillLevel: youthWrestler.skill_level || '',
           wrestlingExperience: youthWrestler.wrestling_experience || '',
@@ -280,7 +280,7 @@ export default function EditYouthWrestlerPage() {
                 )}
               />
 
-              {/* School and Grade */}
+              {/* School and Graduation year */}
               <div className="grid grid-cols-2 gap-4">
                 <FormField
                   control={form.control}
@@ -298,13 +298,28 @@ export default function EditYouthWrestlerPage() {
 
                 <FormField
                   control={form.control}
-                  name="grade"
+                  name="graduationYear"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Grade</FormLabel>
-                      <FormControl>
-                        <Input placeholder="5th" {...field} />
-                      </FormControl>
+                      <FormLabel>Graduation year</FormLabel>
+                      <Select
+                        onValueChange={(v) => field.onChange(v === '' ? undefined : parseInt(v, 10))}
+                        value={field.value != null ? String(field.value) : ''}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Class of …" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {Array.from({ length: 16 }, (_, i) => new Date().getFullYear() - 2 + i).map((year) => (
+                            <SelectItem key={year} value={String(year)}>
+                              Class of {year}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormDescription>Won&apos;t need yearly updates</FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}

@@ -33,7 +33,7 @@ const youthWrestlerSchema = z.object({
   lastName: z.string().min(1, 'Last name is required'),
   dateOfBirth: z.string().optional(),
   school: z.string().optional(),
-  grade: z.string().optional(),
+  graduationYear: z.union([z.string(), z.number()]).optional().transform((v) => (v === '' || v == null ? undefined : typeof v === 'string' ? parseInt(v, 10) : v)),
   weightClass: z.string().optional(),
   skillLevel: z.enum(['beginner', 'intermediate', 'advanced', 'elite']).optional(),
   wrestlingExperience: z.string().optional(),
@@ -61,7 +61,7 @@ export default function AddYouthWrestlerPage() {
       lastName: '',
       dateOfBirth: '',
       school: '',
-      grade: '',
+      graduationYear: undefined as number | undefined,
       weightClass: '',
       skillLevel: undefined,
       wrestlingExperience: '',
@@ -278,6 +278,33 @@ export default function AddYouthWrestlerPage() {
                         <Input type="date" {...field} />
                       </FormControl>
                       <FormDescription>Optional</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="graduationYear"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Graduation year</FormLabel>
+                      <Select
+                        onValueChange={(v) => field.onChange(v === '' ? undefined : parseInt(v, 10))}
+                        value={field.value != null ? String(field.value) : ''}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Class of …" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {Array.from({ length: 16 }, (_, i) => new Date().getFullYear() - 2 + i).map((year) => (
+                            <SelectItem key={year} value={String(year)}>
+                              Class of {year}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                       <FormMessage />
                     </FormItem>
                   )}

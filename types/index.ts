@@ -119,7 +119,7 @@ export interface YouthWrestler {
   date_of_birth?: string;
   age?: number;
   school?: string;
-  grade?: string;
+  graduation_year?: number;
   weight_class?: string;
   skill_level?: SkillLevel;
   wrestling_experience?: string;

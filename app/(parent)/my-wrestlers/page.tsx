@@ -112,7 +112,7 @@ export default async function ParentDashboard() {
                   {wrestler.school && (
                     <p className="text-sm text-muted-foreground mb-2">
                       {wrestler.school}
-                      {wrestler.grade && ` • Grade ${wrestler.grade}`}
+                      {wrestler.graduation_year && ` • Class of ${wrestler.graduation_year}`}
                     </p>
                   )}
 
