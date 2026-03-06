@@ -64,7 +64,7 @@ export function Footer() {
           </div>
           <div>
             <h4 className="font-semibold text-lg mb-4 text-accent">
-              For NCAA Wrestlers
+              For NCAA Wrestlers & Coaches
             </h4>
             <ul className="space-y-2 text-sm">
               <li>

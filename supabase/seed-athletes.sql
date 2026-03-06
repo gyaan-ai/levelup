@@ -1,4 +1,4 @@
--- Complete seed script for test college athletes
+-- Complete seed script for test coaches (NCAA or club)
 -- Run this in Supabase SQL Editor
 -- 
 -- IMPORTANT: This script requires auth users to exist first!

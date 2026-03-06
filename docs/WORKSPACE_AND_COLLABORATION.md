@@ -42,7 +42,7 @@ Comprehensive plan for: **follow coaches**, **availability alerts**, and **coach
 
 ## 3. Workspace (coach–parent collaboration)
 
-**Concept:** A **workspace** is the shared collaboration space between one **coach** (NCAA wrestler) and one **parent**. It aggregates all sessions, notes, videos, and “things to work on” requests. Both coach and parent can use it.
+**Concept:** A **workspace** is the shared collaboration space between one **coach** and one **parent**. It aggregates all sessions, notes, videos, and “things to work on” requests. Both coach and parent can use it.
 
 **Data model:**
 
@@ -115,7 +115,7 @@ Recommendation: **lazy-create** when first accessed (e.g. parent clicks “Works
 
 ## 7. Terminology
 
-- **Coach** = NCAA wrestler ( teaches ). Stored in `athletes`; profile at `/athlete/[id]`.
+- **Coach** = NCAA or club coach (teaches). Stored in `athletes`; profile at `/athlete/[id]`.
 - **Parent** = User with role `parent`; books for youth wrestlers.
 - **Workspace** = Shared collaboration space between one parent and one coach.
 

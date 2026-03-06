@@ -10,7 +10,7 @@ Set **`ADMIN_EMAILS`** in your environment (e.g. `.env.local`, Vercel). Use a co
 ADMIN_EMAILS=admin@example.com,other@example.com
 ```
 
-- Users must already exist (sign up as Parent or NCAA Wrestler, then add their email to `ADMIN_EMAILS`).
+- Users must already exist (sign up as Parent or Coach, then add their email to `ADMIN_EMAILS`).
 - On next login, their `users.role` is set to `admin` automatically.
 - Case-insensitive; leading/trailing spaces are trimmed.
 

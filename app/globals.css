@@ -101,8 +101,6 @@
   to {
     background-position: 200% center;
   }
-}
-
-.bg-black-gradient {
+}.bg-black-gradient {
   background: linear-gradient(135deg, #000000 0%, #1a1a1a 100%);
 }

@@ -150,7 +150,7 @@ export default async function ParentDashboard() {
             <User className="h-16 w-16 text-muted-foreground mb-4" />
             <h3 className="text-xl font-semibold mb-2">No youth wrestlers yet</h3>
             <p className="text-muted-foreground mb-6 text-center max-w-md">
-              Add a profile for your youth wrestler to start booking sessions with college athletes.
+              Add a profile for your youth wrestler to start booking sessions with NCAA athletes and coaches.
             </p>
             <Link href="/wrestlers/add">
               <Button>

@@ -3,7 +3,7 @@ import Link from 'next/link';
 
 export const metadata = {
   title: 'About The Guild | The Guild',
-  description: 'Elite wrestling technique instruction. Train with NCAA wrestlers in your community.',
+  description: 'Elite wrestling technique instruction. Train with NCAA wrestlers and elite coaches in your community.',
 };
 
 export default function AboutPage() {
@@ -15,7 +15,7 @@ export default function AboutPage() {
         </CardHeader>
         <CardContent className="space-y-4 text-muted-foreground">
           <p>
-            The Guild connects youth wrestlers with NCAA wrestlers in your
+            The Guild connects youth wrestlers with NCAA wrestlers and elite coaches in your
             community for private technique instruction. Mastery. Technique.
             Access the Elite.
           </p>

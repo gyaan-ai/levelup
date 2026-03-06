@@ -59,7 +59,7 @@ Edit `/app/layout.tsx` to update page metadata:
 ```typescript
 export const metadata = {
   title: 'LevelUp - Private Wrestling Lessons',
-  description: 'Connect with college wrestlers for private lessons',
+  description: 'Connect with NCAA wrestlers and elite coaches for private lessons',
   icons: {
     icon: '/favicon.ico',
   },

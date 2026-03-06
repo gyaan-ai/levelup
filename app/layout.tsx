@@ -17,9 +17,9 @@ const playfair = Playfair_Display({
 export const metadata = {
   title: 'The Guild | Elite Wrestling Technique Instruction',
   description:
-    'Train with NCAA wrestlers in your community for private technique instruction. Master your wrestling through elite-level coaching.',
+    'Train with NCAA wrestlers and elite coaches in your community for private technique instruction. Master your wrestling through top-level coaching.',
   keywords:
-    'the guild wrestling, wrestling lessons, NCAA wrestlers, elite technique, private lessons',
+    'the guild wrestling, wrestling lessons, NCAA wrestlers, elite coaches, elite technique, private lessons',
   icons: {
     icon: '/favicon.ico',
     apple: '/apple-touch-icon.png',

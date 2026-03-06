@@ -120,7 +120,7 @@ export function BrowseAthletesClient({ initialAthletes }: BrowseAthletesClientPr
       <div className="mb-8">
         <h1 className="text-3xl font-serif font-bold mb-2 text-primary">Browse Elite Coaches</h1>
         <p className="text-muted-foreground">
-          Find the perfect NCAA coach to refine your technique
+          Find NCAA athletes and elite coaches to refine your technique
         </p>
       </div>
 
@@ -209,7 +209,7 @@ export function BrowseAthletesClient({ initialAthletes }: BrowseAthletesClientPr
             <User className="h-16 w-16 text-muted-foreground mb-4" />
             <h3 className="text-xl font-semibold mb-2">No athletes available yet</h3>
             <p className="text-muted-foreground text-center max-w-md">
-              Check back soon! We&apos;re working on getting more college athletes on the platform.
+              Check back soon! We&apos;re working on getting more NCAA athletes and coaches on the platform.
             </p>
           </CardContent>
         </Card>

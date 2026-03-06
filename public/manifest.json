@@ -1,7 +1,7 @@
 {
   "name": "The Guild",
   "short_name": "The Guild",
-  "description": "Elite wrestling technique instruction with NCAA wrestlers",
+  "description": "Elite wrestling technique instruction with NCAA wrestlers and elite coaches",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#000000",

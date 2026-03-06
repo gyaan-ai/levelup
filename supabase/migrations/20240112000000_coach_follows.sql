@@ -1,4 +1,4 @@
--- Coach follows: parents can follow/favorite coaches (NCAA wrestlers)
+-- Coach follows: parents can follow/favorite coaches
 CREATE TABLE IF NOT EXISTS public.coach_follows (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   parent_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,

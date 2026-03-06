@@ -3,7 +3,7 @@ import Link from 'next/link';
 
 export const metadata = {
   title: 'Earnings | The Guild',
-  description: 'Earnings for NCAA wrestlers on The Guild.',
+  description: 'Earnings for NCAA wrestlers and coaches on The Guild.',
 };
 
 export default function EarningsPage() {

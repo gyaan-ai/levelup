@@ -8,7 +8,7 @@ import { AddToHomeScreen } from '@/components/add-to-home-screen';
 export const metadata = {
   title: 'The Guild | Elite Wrestling Technique Instruction',
   description:
-    'Train with NCAA wrestlers in your community for private technique instruction. Master your wrestling through elite-level coaching.',
+    'Train with NCAA wrestlers and elite coaches in your community for private technique instruction. Master your wrestling through top-level coaching.',
 };
 
 export default function HomePage() {
@@ -31,7 +31,7 @@ export default function HomePage() {
                   Mastery. Technique. Access the Elite.
                 </p>
                 <p className="text-base sm:text-lg text-white/80 mb-8 sm:mb-12 max-w-xl mx-auto lg:mx-0">
-                  Train with NCAA wrestlers in your community for private technique
+                  Train with NCAA wrestlers and elite coaches in your community for private technique
                   instruction. Master the details that separate good from elite.
                 </p>
                 <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4 justify-center lg:justify-start">
@@ -89,7 +89,7 @@ export default function HomePage() {
                 Browse Elite Coaches
               </h3>
               <p className="text-muted-foreground">
-                NCAA wrestlers from top programs. View credentials, specialties,
+                NCAA athletes and elite coaches from top programs. View credentials, specialties,
                 and reviews.
               </p>
             </Card>
@@ -137,8 +137,8 @@ export default function HomePage() {
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 sm:gap-8 max-w-6xl mx-auto">
             {[
               {
-                title: 'NCAA Wrestlers',
-                text: 'Train with current NCAA wrestlers. Active competitors who bring real experience to every session.',
+                title: 'NCAA Athletes & Coaches',
+                text: 'Train with current NCAA wrestlers and elite club coaches. Active competitors and experienced coaches who bring real experience to every session.',
               },
               {
                 title: 'Technical Mastery',
@@ -178,18 +178,18 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* For NCAA Wrestlers */}
+      {/* For NCAA Wrestlers & Coaches */}
       <section className="py-20 bg-black text-white">
         <div className="container mx-auto px-4">
           <div className="max-w-4xl mx-auto text-center">
             <h2 className="text-4xl md:text-5xl font-serif font-bold mb-6">
-              Are You an NCAA Wrestler?
+              Are You an NCAA Wrestler or Coach?
             </h2>
             <p className="text-xl sm:text-2xl text-accent mb-6 sm:mb-8">
-              Share your expertise. Earn while you compete.
+              Share your expertise. Earn while you compete or coach.
             </p>
             <p className="text-base sm:text-xl text-white/90 mb-6 sm:mb-8">
-              The Guild connects NCAA wrestlers with youth athletes for private
+              The Guild connects NCAA wrestlers and elite coaches with youth athletes for private
               technique instruction. Earn money, build coaching experience, and
               give back to the wrestling community.
             </p>
@@ -198,7 +198,7 @@ export default function HomePage() {
               <ul className="space-y-3 text-lg">
                 <li className="flex items-start gap-3">
                   <CheckCircle className="w-6 h-6 text-accent flex-shrink-0 mt-1" />
-                  <span>Current NCAA wrestler</span>
+                  <span>Current NCAA athlete or qualified club coach</span>
                 </li>
                 <li className="flex items-start gap-3">
                   <CheckCircle className="w-6 h-6 text-accent flex-shrink-0 mt-1" />
@@ -230,7 +230,7 @@ export default function HomePage() {
             Ready to Master Your Technique?
           </h2>
           <p className="text-xl text-black/80 mb-10 max-w-2xl mx-auto">
-            Join The Guild and train with NCAA wrestlers in your community.
+            Join The Guild and train with NCAA wrestlers and elite coaches in your community.
             Private technique sessions.
           </p>
           <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center">

@@ -55,12 +55,12 @@ CREATE INDEX IF NOT EXISTS idx_athlete_products_product ON public.athlete_produc
 ALTER TABLE public.products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.athlete_products ENABLE ROW LEVEL SECURITY;
 
--- Everyone can view active products
+DROP POLICY IF EXISTS "Anyone can view active products" ON public.products;
 CREATE POLICY "Anyone can view active products"
   ON public.products FOR SELECT
   USING (active = true);
 
--- Admins can manage all products
+DROP POLICY IF EXISTS "Admins can manage products" ON public.products;
 CREATE POLICY "Admins can manage products"
   ON public.products FOR ALL
   USING (
@@ -70,12 +70,12 @@ CREATE POLICY "Admins can manage products"
     )
   );
 
--- Service role full access
+DROP POLICY IF EXISTS "Service role full access to products" ON public.products;
 CREATE POLICY "Service role full access to products"
   ON public.products FOR ALL
   USING (auth.jwt() ->> 'role' = 'service_role');
 
--- Athletes can view their own product settings
+DROP POLICY IF EXISTS "Athletes can view own products" ON public.athlete_products;
 CREATE POLICY "Athletes can view own products"
   ON public.athlete_products FOR SELECT
   USING (
@@ -84,7 +84,7 @@ CREATE POLICY "Athletes can view own products"
     )
   );
 
--- Athletes can manage their own product settings
+DROP POLICY IF EXISTS "Athletes can manage own products" ON public.athlete_products;
 CREATE POLICY "Athletes can manage own products"
   ON public.athlete_products FOR ALL
   USING (
@@ -93,7 +93,7 @@ CREATE POLICY "Athletes can manage own products"
     )
   );
 
--- Admins can view all athlete products
+DROP POLICY IF EXISTS "Admins can view all athlete products" ON public.athlete_products;
 CREATE POLICY "Admins can view all athlete products"
   ON public.athlete_products FOR SELECT
   USING (
@@ -103,12 +103,12 @@ CREATE POLICY "Admins can view all athlete products"
     )
   );
 
--- Service role full access
+DROP POLICY IF EXISTS "Service role full access to athlete_products" ON public.athlete_products;
 CREATE POLICY "Service role full access to athlete_products"
   ON public.athlete_products FOR ALL
   USING (auth.jwt() ->> 'role' = 'service_role');
 
--- Parents can view athlete products for booking
+DROP POLICY IF EXISTS "Parents can view athlete products" ON public.athlete_products;
 CREATE POLICY "Parents can view athlete products"
   ON public.athlete_products FOR SELECT
   USING (
@@ -119,11 +119,13 @@ CREATE POLICY "Parents can view athlete products"
   );
 
 -- Insert default products
+-- Platform take: 10% of parent price. Stripe fee is paid from that 10% (platform nets 10% minus Stripe).
+-- Coach gets 90% of parent price per participant.
 INSERT INTO public.products (slug, name, description, parent_price, athlete_payout, min_participants, max_participants, display_order)
 VALUES
-  ('private', '1:1 Private Session', 'One-on-one instruction with a college wrestler', 60.00, 50.00, 1, 1, 1),
-  ('partner', 'Partner Session (1:2)', 'Train with a workout partner, split the cost', 40.00, 32.00, 2, 2, 2),
-  ('small-group', 'Small Group (3-5)', 'Small group training session', 30.00, 24.00, 3, 5, 3)
+  ('private', '1:1 Private Session', 'One-on-one instruction with your coach', 60.00, 54.00, 1, 1, 1),
+  ('partner', 'Partner Session (1:2)', 'Train with a workout partner, split the cost', 40.00, 36.00, 2, 2, 2),
+  ('small-group', 'Small Group (3-5)', 'Small group training session', 30.00, 27.00, 3, 5, 3)
 ON CONFLICT (slug) DO NOTHING;
 
 -- Function to calculate expected fees and net
@@ -159,8 +161,8 @@ ALTER TABLE public.sessions
   ADD COLUMN IF NOT EXISTS product_id UUID REFERENCES public.products(id);
 
 -- Comments
-COMMENT ON TABLE public.products IS 'Session product SKUs with pricing breakdown';
+COMMENT ON TABLE public.products IS 'Session product SKUs with pricing breakdown. Platform take is 10% of parent price; Stripe is paid from that 10%.';
 COMMENT ON TABLE public.athlete_products IS 'Which products each athlete offers';
 COMMENT ON COLUMN public.products.parent_price IS 'Price per participant charged to parent';
-COMMENT ON COLUMN public.products.athlete_payout IS 'Payout per participant to athlete/coach';
+COMMENT ON COLUMN public.products.athlete_payout IS 'Payout per participant to athlete/coach (90% of parent_price by default)';
 COMMENT ON COLUMN public.athlete_products.custom_parent_price IS 'Optional athlete-specific price override';

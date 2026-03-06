@@ -8,7 +8,7 @@ import { Athlete } from '@/types';
 export const metadata = {
   title: 'Browse Elite Coaches | The Guild',
   description:
-    'Train with NCAA coaches in your community. View profiles, credentials, and reviews. Book private technique sessions.',
+    'Train with NCAA wrestlers and elite coaches in your community. View profiles, credentials, and reviews. Book private technique sessions.',
 };
 
 export default async function BrowsePage() {
