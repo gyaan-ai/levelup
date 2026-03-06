@@ -102,7 +102,7 @@ export default function HomePage() {
                 Book Private Sessions
               </h3>
               <p className="text-muted-foreground">
-                One-on-one technique instruction at college facilities. Flexible
+                One-on-one technique instruction at top facilities. Flexible
                 scheduling.
               </p>
             </Card>
