@@ -1,0 +1,114 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { MessageCircle, Users, Plus } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+
+type Group = { id: string; name: string; athleteId: string; createdAt: string };
+type DmThread = {
+  parentId: string;
+  athleteId: string;
+  lastBody: string;
+  lastAt: string;
+  otherName: string;
+  unread?: boolean;
+};
+
+export function InboxSidebar({ role }: { role: 'parent' | 'athlete' }) {
+  const pathname = usePathname();
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [threads, setThreads] = useState<DmThread[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    Promise.all([
+      fetch('/api/messaging-groups').then((r) => r.json()),
+      fetch('/api/coach-inquiries/threads').then((r) => r.json()),
+    ]).then(([groupsRes, threadsRes]) => {
+      if (groupsRes.groups) setGroups(groupsRes.groups);
+      if (threadsRes.threads) setThreads(threadsRes.threads);
+    }).catch(() => {}).finally(() => setLoading(false));
+  }, []);
+
+  const isGroupPath = pathname?.startsWith('/inbox/groups/');
+  const groupId = pathname?.match(/^\/inbox\/groups\/([^/]+)/)?.[1];
+
+  return (
+    <aside className="w-60 shrink-0 border-r border-border bg-card flex flex-col h-full">
+      <div className="p-3 border-b border-border">
+        <h2 className="text-sm font-semibold text-foreground">Messages</h2>
+      </div>
+      <div className="flex-1 overflow-y-auto p-2 space-y-4">
+        {role === 'athlete' && (
+          <section>
+            <div className="flex items-center justify-between px-2 py-1">
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Groups</span>
+              <Link href="/inbox/groups/new">
+                <Button variant="ghost" size="icon" className="h-7 w-7" title="New group">
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </Link>
+            </div>
+            {loading ? (
+              <p className="text-xs text-muted-foreground px-2 py-2">Loading…</p>
+            ) : groups.length === 0 ? (
+              <p className="text-xs text-muted-foreground px-2 py-2">No groups yet</p>
+            ) : (
+              <ul className="space-y-0.5">
+                {groups.map((g) => (
+                  <li key={g.id}>
+                    <Link
+                      href={`/inbox/groups/${g.id}`}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${
+                        groupId === g.id
+                          ? 'bg-accent/20 text-accent border-l-2 border-accent'
+                          : 'hover:bg-muted/50'
+                      }`}
+                    >
+                      <Users className="h-4 w-4 shrink-0" />
+                      <span className="truncate">{g.name}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        )}
+
+        <section>
+          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide px-2 py-1 block">Direct messages</span>
+          {loading ? (
+            <p className="text-xs text-muted-foreground px-2 py-2">Loading…</p>
+          ) : threads.length === 0 ? (
+            <p className="text-xs text-muted-foreground px-2 py-2">No conversations</p>
+          ) : (
+            <ul className="space-y-0.5">
+              {threads.map((t) => {
+                const href = `/inbox/thread/${t.parentId}/${t.athleteId}`;
+                const active = pathname === href || (pathname?.startsWith(href + '/'));
+                return (
+                  <li key={`${t.parentId}-${t.athleteId}`}>
+                    <Link
+                      href={href}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${
+                        active ? 'bg-accent/20 text-accent border-l-2 border-accent' : 'hover:bg-muted/50'
+                      } ${t.unread ? 'font-medium' : ''}`}
+                    >
+                      <MessageCircle className="h-4 w-4 shrink-0" />
+                      <span className="truncate flex-1">{t.otherName}</span>
+                      {t.unread && (
+                        <span className="w-2 h-2 rounded-full bg-accent shrink-0" aria-hidden />
+                      )}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+      </div>
+    </aside>
+  );
+}

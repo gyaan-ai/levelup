@@ -2,7 +2,13 @@ import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
-export default async function InboxPage() {
+import { InboxSidebar } from './inbox-sidebar';
+
+export default async function InboxLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const headersList = await headers();
   const host = headersList.get('host') || '';
   const tenant = getTenantByDomain(host);
@@ -24,21 +30,11 @@ export default async function InboxPage() {
   }
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="p-4 border-b border-border">
-        <h1 className="text-xl font-bold">Messages</h1>
-        <p className="text-sm text-muted-foreground">
-          {role === 'parent' ? 'Message coaches or join group conversations.' : 'Groups and direct conversations with parents.'}
-        </p>
-      </div>
-      <div className="flex-1 overflow-auto p-4 flex items-center justify-center">
-        <div className="text-center text-muted-foreground max-w-sm">
-          <p className="font-medium text-foreground mb-1">Select a conversation</p>
-          <p className="text-sm">
-            Choose a group or direct message from the sidebar to start.
-          </p>
-        </div>
-      </div>
+    <div className="flex h-[calc(100vh-3.5rem)] max-h-[calc(100vh-3.5rem)]">
+      <InboxSidebar role={role} />
+      <main className="flex-1 min-w-0 flex flex-col overflow-hidden bg-background">
+        {children}
+      </main>
     </div>
   );
 }

@@ -119,6 +119,17 @@ export default function ProfilePage() {
     }
   }, [user, form]);
 
+  // Scroll to rate card section when navigating via dashboard "Session types" link
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.location.hash === '#rate-card') {
+      const el = document.getElementById('rate-card');
+      if (el) {
+        const t = setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+        return () => clearTimeout(t);
+      }
+    }
+  }, []);
+
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {

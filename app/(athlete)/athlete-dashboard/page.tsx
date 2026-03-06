@@ -367,7 +367,7 @@ export default async function AthleteDashboard() {
         <Link href="/profile#rate-card" className="block">
           <Button variant="outline" className="w-full h-12 gap-2">
             <DollarSign className="h-5 w-5 shrink-0" />
-            Rate card
+            Session types
           </Button>
         </Link>
         <Link href="/profile" className="block">
