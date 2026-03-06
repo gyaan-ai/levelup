@@ -124,10 +124,10 @@ export default function SignupPage() {
         .eq('id', authData.user.id)
         .single();
 
-      // Redirect based on role
+      // Redirect based on role (coaches go to onboarding first to complete profile)
       const role = userData?.role || values.role;
       if (role === 'athlete') {
-        router.push('/athlete-dashboard');
+        router.push('/onboarding');
       } else if (role === 'youth_wrestler') {
         router.push('/youth-dashboard');
       } else if (role === 'admin') {

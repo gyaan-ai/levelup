@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import Link from 'next/link';
-import { Calendar, DollarSign, TrendingUp, Clock, Trophy, Users } from 'lucide-react';
+import { Calendar, DollarSign, TrendingUp, Clock, Trophy, Users, User } from 'lucide-react';
 import { CoachScheduleCard } from './coach-schedule-card';
 
 export default async function AthleteDashboard() {
@@ -231,15 +231,15 @@ export default async function AthleteDashboard() {
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Link href="/availability">
-          <Button variant="outline" className="w-full h-20 flex flex-col items-center justify-center">
-            <Calendar className="h-6 w-6 mb-2" />
-            Set Availability
+          <Button variant="outline" className="w-full h-20 flex flex-col items-center justify-center gap-2">
+            <Calendar className="h-6 w-6 shrink-0" />
+            <span>Set Availability</span>
           </Button>
         </Link>
         <Link href="/profile">
-          <Button variant="outline" className="w-full h-20 flex flex-col items-center justify-center">
-            <span className="text-2xl mb-2">👤</span>
-            View Profile
+          <Button variant="outline" className="w-full h-20 flex flex-col items-center justify-center gap-2">
+            <User className="h-6 w-6 shrink-0" />
+            <span>View Profile</span>
           </Button>
         </Link>
       </div>

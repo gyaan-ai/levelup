@@ -411,14 +411,14 @@ export default function ProfilePage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Secondary Facility (optional)</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
+                        <Select onValueChange={(v) => field.onChange(v === '__none__' ? '' : v)} value={field.value || '__none__'}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="None" />
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="">None</SelectItem>
+                            <SelectItem value="__none__">None</SelectItem>
                             {facilities
                               .filter((f) => f.id !== form.watch('facilityId'))
                               .map((f) => (

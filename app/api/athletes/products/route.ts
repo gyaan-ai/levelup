@@ -34,16 +34,8 @@ export async function GET(req: NextRequest) {
 
     const admin = createAdminClient(tenant.slug);
 
-    // Get athlete ID
-    const { data: athlete } = await admin
-      .from('athletes')
-      .select('id')
-      .eq('user_id', user.id)
-      .single();
-
-    if (!athlete) {
-      return NextResponse.json({ error: 'Athlete not found' }, { status: 404 });
-    }
+    // Athlete id is the user id (athletes.id references users.id)
+    const athleteId = user.id;
 
     // Get active products
     const { data: products } = await admin
@@ -56,7 +48,7 @@ export async function GET(req: NextRequest) {
     const { data: athleteProducts } = await admin
       .from('athlete_products')
       .select('product_id, enabled')
-      .eq('athlete_id', athlete.id);
+      .eq('athlete_id', athleteId);
 
     return NextResponse.json({
       products: products || [],
@@ -105,22 +97,14 @@ export async function PUT(req: NextRequest) {
 
     const admin = createAdminClient(tenant.slug);
 
-    // Get athlete ID
-    const { data: athlete } = await admin
-      .from('athletes')
-      .select('id')
-      .eq('user_id', user.id)
-      .single();
-
-    if (!athlete) {
-      return NextResponse.json({ error: 'Athlete not found' }, { status: 404 });
-    }
+    // Athlete id is the user id (athletes.id references users.id)
+    const athleteId = user.id;
 
     // Upsert athlete product selection
     const { error } = await admin
       .from('athlete_products')
       .upsert({
-        athlete_id: athlete.id,
+        athlete_id: athleteId,
         product_id: productId,
         enabled,
         updated_at: new Date().toISOString(),
