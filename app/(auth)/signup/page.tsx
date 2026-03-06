@@ -225,7 +225,7 @@ export default function SignupPage() {
                         render={({ field }) => (
                           <FormItem>
                             <FormLabel>I am an...</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value ?? ''}>
+                            <Select onValueChange={field.onChange} value={field.value || undefined}>
                               <FormControl>
                                 <SelectTrigger>
                                   <SelectValue placeholder="Select one" />

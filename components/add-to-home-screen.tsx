@@ -25,7 +25,7 @@ export function AddToHomeScreen() {
 
   useEffect(() => {
     const handler = (e: Event) => {
-      e.preventDefault();
+      // Don't preventDefault: avoids "must call prompt()" console warning when we show our own button and call prompt() on click.
       setDeferredPrompt(e as unknown as { prompt: () => Promise<{ outcome: string }> });
       setState('installable');
     };

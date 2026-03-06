@@ -384,14 +384,14 @@ export default function OnboardingPage() {
                       name="secondaryFacilityId"
                       render={({ field }) => (
                         <FormItem className="mt-4">
-                          <Select onValueChange={field.onChange} value={field.value}>
+                          <Select onValueChange={(v) => field.onChange(v === '__none__' ? '' : v)} value={field.value || '__none__'}>
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder="Secondary facility (optional)" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="">None</SelectItem>
+                              <SelectItem value="__none__">None</SelectItem>
                               {facilities
                                 .filter((f) => f.id !== form.watch('facilityId'))
                                 .map((f) => (
