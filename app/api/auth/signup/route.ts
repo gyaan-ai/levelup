@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { email, password, role, firstName, lastName, school } = body;
+    const { email, password, role, coachType, firstName, lastName, school } = body;
 
     // Validate required fields
     if (!email || !password || !role) {
@@ -33,12 +33,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // For athletes, require additional fields
-    if (role === 'athlete' && (!firstName || !lastName || !school)) {
-      return NextResponse.json(
-        { error: 'First name, last name, and school are required for athletes' },
-        { status: 400 }
-      );
+    // For athletes (coaches), require additional fields and coach type
+    if (role === 'athlete') {
+      if (!firstName || !lastName || !school?.trim()) {
+        return NextResponse.json(
+          { error: 'First name, last name, and school/club are required for coaches' },
+          { status: 400 }
+        );
+      }
+      if (!['ncaa_athlete', 'club_hs_coach'].includes(coachType)) {
+        return NextResponse.json(
+          { error: 'Please select whether you are an Active NCAA Athlete or Club/HS Coach' },
+          { status: 400 }
+        );
+      }
     }
 
     // For youth wrestlers, require name fields
@@ -94,7 +102,8 @@ export async function POST(req: NextRequest) {
           id: userId,
           first_name: firstName,
           last_name: lastName,
-          school,
+          school: school.trim(),
+          coach_type: coachType,
           active: false, // Will be activated after certification verification
         });
 

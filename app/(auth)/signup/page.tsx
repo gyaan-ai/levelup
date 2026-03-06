@@ -33,6 +33,7 @@ const signupSchema = z.object({
   password: z.string().min(6, 'Password must be at least 6 characters'),
   confirmPassword: z.string(),
   role: z.enum(['parent', 'athlete', 'youth_wrestler']),
+  coachType: z.enum(['ncaa_athlete', 'club_hs_coach']).optional(),
   firstName: z.string().optional(),
   lastName: z.string().optional(),
   school: z.string().optional(),
@@ -41,11 +42,11 @@ const signupSchema = z.object({
   path: ['confirmPassword'],
 }).refine((data) => {
   if (data.role === 'athlete') {
-    return data.firstName && data.lastName && data.school;
+    return data.firstName && data.lastName && data.coachType && data.school?.trim();
   }
   return true;
 }, {
-  message: 'First name, last name, and school are required for athletes',
+  message: 'First name, last name, coach type, and school/club are required for coaches',
   path: ['firstName'],
 });
 
@@ -65,6 +66,7 @@ export default function SignupPage() {
       password: '',
       confirmPassword: '',
       role: 'parent',
+      coachType: undefined,
       firstName: '',
       lastName: '',
       school: '',
@@ -72,6 +74,7 @@ export default function SignupPage() {
   });
 
   const selectedRole = form.watch('role');
+  const selectedCoachType = form.watch('coachType');
 
   const onSubmit = async (values: SignupFormValues) => {
     setLoading(true);
@@ -87,9 +90,10 @@ export default function SignupPage() {
           email: values.email,
           password: values.password,
           role: values.role,
+          coachType: values.coachType,
           firstName: values.firstName,
           lastName: values.lastName,
-          school: values.school,
+          school: values.school?.trim(),
         }),
       });
 
@@ -192,7 +196,7 @@ export default function SignupPage() {
                       <FormItem>
                         <FormLabel>First Name</FormLabel>
                         <FormControl>
-                          <Input placeholder="John" {...field} />
+                          <Input placeholder="Eric" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -206,7 +210,7 @@ export default function SignupPage() {
                       <FormItem>
                         <FormLabel>Last Name</FormLabel>
                         <FormControl>
-                          <Input placeholder="Doe" {...field} />
+                          <Input placeholder="Aponte" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -214,19 +218,59 @@ export default function SignupPage() {
                   />
 
                   {selectedRole === 'athlete' && (
-                    <FormField
-                      control={form.control}
-                      name="school"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>School</FormLabel>
-                          <FormControl>
-                            <Input placeholder="UNC" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
+                    <>
+                      <FormField
+                        control={form.control}
+                        name="coachType"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>I am an...</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value ?? ''}>
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select one" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                <SelectItem value="ncaa_athlete">Active NCAA Athlete</SelectItem>
+                                <SelectItem value="club_hs_coach">Club / HS Coach</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                      {selectedCoachType === 'ncaa_athlete' && (
+                        <FormField
+                          control={form.control}
+                          name="school"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>School</FormLabel>
+                              <FormControl>
+                                <Input placeholder="UNC" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
                       )}
-                    />
+                      {selectedCoachType === 'club_hs_coach' && (
+                        <FormField
+                          control={form.control}
+                          name="school"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Club or high school</FormLabel>
+                              <FormControl>
+                                <Input placeholder="e.g. Triangle Wrestling Club" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      )}
+                    </>
                   )}
                 </>
               )}

@@ -201,6 +201,10 @@ export function AdminDashboardClient({
           <ClipboardList className="h-4 w-4" />
           Early Access
         </Link>
+        <Link href="/admin/users" className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground border border-border rounded-md hover:bg-muted/50">
+          <Users className="h-4 w-4" />
+          User Management
+        </Link>
       </div>
 
       {tab === 'sessions' && (

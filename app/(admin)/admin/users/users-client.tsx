@@ -1,0 +1,411 @@
+'use client';
+
+import { useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Eye, Pencil, Archive, ArchiveRestore, Trash2, Search } from 'lucide-react';
+import { format } from 'date-fns';
+import type { AdminUserRow } from '../page';
+
+type SortOption = 'email_asc' | 'email_desc' | 'role' | 'created_desc' | 'created_asc' | 'login_desc' | 'login_asc';
+
+const ROLE_LABELS: Record<string, string> = {
+  parent: 'Parent',
+  athlete: 'Coach',
+  admin: 'Admin',
+  youth_wrestler: 'Youth wrestler',
+};
+
+export function AdminUsersClient({ initialUsers }: { initialUsers: AdminUserRow[] }) {
+  const router = useRouter();
+  const [users, setUsers] = useState<AdminUserRow[]>(initialUsers);
+  const [roleFilter, setRoleFilter] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<SortOption>('created_desc');
+  const [includeArchived, setIncludeArchived] = useState(false);
+  const [search, setSearch] = useState('');
+  const [editUser, setEditUser] = useState<AdminUserRow | null>(null);
+  const [editRole, setEditRole] = useState('');
+  const [deleteUser, setDeleteUser] = useState<AdminUserRow | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const filteredAndSorted = useMemo(() => {
+    let list = users.filter((u) => {
+      if (!includeArchived && u.archived_at) return false;
+      if (roleFilter !== 'all' && u.role !== roleFilter) return false;
+      if (search.trim()) {
+        const q = search.toLowerCase().trim();
+        if (!u.email.toLowerCase().includes(q)) return false;
+      }
+      return true;
+    });
+    const cmp = (a: AdminUserRow, b: AdminUserRow) => {
+      switch (sortBy) {
+        case 'email_asc':
+          return a.email.localeCompare(b.email);
+        case 'email_desc':
+          return b.email.localeCompare(a.email);
+        case 'role':
+          return a.role.localeCompare(b.role) || a.email.localeCompare(b.email);
+        case 'created_desc':
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        case 'created_asc':
+          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        case 'login_desc': {
+          const ta = a.last_login_at ? new Date(a.last_login_at).getTime() : 0;
+          const tb = b.last_login_at ? new Date(b.last_login_at).getTime() : 0;
+          return tb - ta;
+        }
+        case 'login_asc': {
+          const ta = a.last_login_at ? new Date(a.last_login_at).getTime() : 0;
+          const tb = b.last_login_at ? new Date(b.last_login_at).getTime() : 0;
+          return ta - tb;
+        }
+        default:
+          return 0;
+      }
+    };
+    list.sort(cmp);
+    return list;
+  }, [users, roleFilter, sortBy, includeArchived, search]);
+
+  const handleArchive = async (u: AdminUserRow, archive: boolean) => {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/users/${u.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ archived_at: archive ? new Date().toISOString() : null }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error || 'Failed to update');
+        return;
+      }
+      setUsers((prev) =>
+        prev.map((x) => (x.id === u.id ? { ...x, archived_at: archive ? new Date().toISOString() : null } : x))
+      );
+      setEditUser(null);
+    } catch {
+      setError('Something went wrong');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editUser || editRole === '' || editRole === editUser.role) {
+      setEditUser(null);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/users/${editUser.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: editRole }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error || 'Failed to update');
+        return;
+      }
+      setUsers((prev) => prev.map((x) => (x.id === editUser.id ? { ...x, role: editRole } : x)));
+      setEditUser(null);
+    } catch {
+      setError('Something went wrong');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteUser) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/users/${deleteUser.id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error || 'Failed to delete');
+        return;
+      }
+      setUsers((prev) => prev.filter((x) => x.id !== deleteUser.id));
+      setDeleteUser(null);
+    } catch {
+      setError('Something went wrong');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const viewProfileUrl = (u: AdminUserRow) => {
+    if (u.role === 'athlete') return `/athlete/${u.id}`;
+    if (u.role === 'parent') return '/bookings';
+    return null;
+  };
+
+  return (
+    <div className="space-y-6">
+      {error && (
+        <div className="rounded-md bg-destructive/10 text-destructive px-4 py-2 text-sm">
+          {error}
+        </div>
+      )}
+
+      <Card>
+        <CardHeader>
+          <CardTitle>All users</CardTitle>
+          <CardDescription>
+            Sort and filter between athletes (coaches), parents, and admins. View profiles, edit role, archive, or delete.
+          </CardDescription>
+          <div className="flex flex-wrap gap-4 pt-4">
+            <Select value={roleFilter} onValueChange={setRoleFilter}>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="Role" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All roles</SelectItem>
+                <SelectItem value="athlete">Coaches</SelectItem>
+                <SelectItem value="parent">Parents</SelectItem>
+                <SelectItem value="admin">Admin</SelectItem>
+                <SelectItem value="youth_wrestler">Youth wrestler</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Sort by" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="created_desc">Newest first</SelectItem>
+                <SelectItem value="created_asc">Oldest first</SelectItem>
+                <SelectItem value="email_asc">Email A–Z</SelectItem>
+                <SelectItem value="email_desc">Email Z–A</SelectItem>
+                <SelectItem value="role">Role</SelectItem>
+                <SelectItem value="login_desc">Last login (recent)</SelectItem>
+                <SelectItem value="login_asc">Last login (oldest)</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="relative flex-1 min-w-[200px] max-w-xs">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by email..."
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="pl-8"
+              />
+            </div>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={includeArchived}
+                onChange={(e) => setIncludeArchived(e.target.checked)}
+                className="rounded border-input"
+              />
+              Include archived
+            </label>
+            <span className="text-sm text-muted-foreground self-center">
+              {filteredAndSorted.length} user{filteredAndSorted.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left py-2 font-medium">Email</th>
+                  <th className="text-left py-2 font-medium">Role</th>
+                  <th className="text-left py-2 font-medium">Created</th>
+                  <th className="text-left py-2 font-medium">Last login</th>
+                  <th className="text-left py-2 font-medium">Status</th>
+                  <th className="text-right py-2 font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredAndSorted.length === 0 ? (
+                  <tr>
+                    <td colSpan={6} className="py-8 text-center text-muted-foreground">
+                      No users match filters.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredAndSorted.map((u) => (
+                    <tr key={u.id} className={`border-b last:border-0 ${u.archived_at ? 'opacity-60' : ''}`}>
+                      <td className="py-2">
+                        <a href={`mailto:${u.email}`} className="text-primary hover:underline">
+                          {u.email}
+                        </a>
+                      </td>
+                      <td className="py-2">
+                        <Badge variant="outline">{ROLE_LABELS[u.role] ?? u.role}</Badge>
+                      </td>
+                      <td className="py-2 text-muted-foreground">
+                        {format(new Date(u.created_at), 'MMM d, yyyy')}
+                      </td>
+                      <td className="py-2 text-muted-foreground">
+                        {u.last_login_at
+                          ? format(new Date(u.last_login_at), 'MMM d, yyyy h:mm a')
+                          : '—'}
+                      </td>
+                      <td className="py-2">
+                        {u.archived_at ? (
+                          <Badge variant="secondary">Archived</Badge>
+                        ) : (
+                          <span className="text-muted-foreground">Active</span>
+                        )}
+                      </td>
+                      <td className="py-2 text-right">
+                        <div className="flex flex-wrap gap-1 justify-end">
+                          {viewProfileUrl(u) && (
+                            <Link href={viewProfileUrl(u)!}>
+                              <Button variant="ghost" size="sm" className="h-8">
+                                <Eye className="h-4 w-4 mr-1" />
+                                View
+                              </Button>
+                            </Link>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8"
+                            onClick={() => {
+                              setEditUser(u);
+                              setEditRole(u.role);
+                              setError(null);
+                            }}
+                          >
+                            <Pencil className="h-4 w-4 mr-1" />
+                            Edit
+                          </Button>
+                          {u.archived_at ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8"
+                              onClick={() => handleArchive(u, false)}
+                              disabled={loading}
+                            >
+                              <ArchiveRestore className="h-4 w-4 mr-1" />
+                              Unarchive
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8"
+                              onClick={() => handleArchive(u, true)}
+                              disabled={loading}
+                            >
+                              <Archive className="h-4 w-4 mr-1" />
+                              Archive
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 text-destructive hover:text-destructive"
+                            onClick={() => {
+                              setDeleteUser(u);
+                              setError(null);
+                            }}
+                          >
+                            <Trash2 className="h-4 w-4 mr-1" />
+                            Delete
+                          </Button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Edit modal */}
+      <Dialog open={!!editUser} onOpenChange={(open) => !open && setEditUser(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit user</DialogTitle>
+            <DialogDescription>
+              {editUser?.email}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <label className="text-sm font-medium mb-2 block">Role</label>
+              <Select value={editRole} onValueChange={setEditRole}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="parent">Parent</SelectItem>
+                  <SelectItem value="athlete">Coach</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="youth_wrestler">Youth wrestler</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {editUser?.archived_at && (
+              <Button
+                variant="outline"
+                onClick={() => editUser && handleArchive(editUser, false)}
+                disabled={loading}
+              >
+                <ArchiveRestore className="h-4 w-4 mr-2" />
+                Unarchive user
+              </Button>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditUser(null)}>Cancel</Button>
+            <Button onClick={handleSaveEdit} disabled={loading || editRole === editUser?.role}>
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirm */}
+      <Dialog open={!!deleteUser} onOpenChange={(open) => !open && setDeleteUser(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete user</DialogTitle>
+            <DialogDescription>
+              Delete {deleteUser?.email}? This will remove their user record and cannot be undone. Related data (sessions, etc.) may be affected by your database rules.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteUser(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={loading}>
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

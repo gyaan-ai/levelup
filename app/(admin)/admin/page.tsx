@@ -82,7 +82,7 @@ export default async function AdminPage() {
       .order('scheduled_datetime', { ascending: false }),
     admin
       .from('users')
-      .select('id, email, role, created_at')
+      .select('id, email, role, created_at, last_login_at')
       .order('created_at', { ascending: false }),
     admin
       .from('credits')
