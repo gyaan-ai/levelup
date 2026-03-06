@@ -27,6 +27,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { OnboardingWizard } from '@/components/onboarding-wizard';
+import { AthleteProductSelection } from '@/components/athlete-product-selection';
 import { Camera, Globe, Lock } from 'lucide-react';
 
 const onboardingSchema = z.object({
@@ -40,7 +41,7 @@ const onboardingSchema = z.object({
 
 type OnboardingFormValues = z.infer<typeof onboardingSchema>;
 
-const TOTAL_STEPS = 4;
+const TOTAL_STEPS = 5;
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -210,6 +211,19 @@ export default function OnboardingPage() {
       setSubmitting(true);
       try {
         await savePartial(values, false);
+        setStep(4);
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'Failed to save');
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
+    if (step === 4) {
+      setSubmitting(true);
+      try {
+        await savePartial(form.getValues(), false);
         visibilityModalRef.current?.showModal();
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : 'Failed to save');
@@ -228,6 +242,9 @@ export default function OnboardingPage() {
     if (step === 0) setStep(1);
     else if (step === 2 && facilities.length > 0) setStep(3);
     else if (step === 3) setError('Add Venmo or Zelle to receive payments.');
+    else if (step === 4) {
+      visibilityModalRef.current?.showModal();
+    }
   };
 
   const canGoNext = (() => {
@@ -240,7 +257,7 @@ export default function OnboardingPage() {
     return true;
   })();
 
-  const showSkip = step === 0 || (step === 2 && facilities.length > 0);
+  const showSkip = step === 0 || (step === 2 && facilities.length > 0) || step === 4;
 
   if (loading) {
     return (
@@ -260,7 +277,7 @@ export default function OnboardingPage() {
         onSkip={handleSkip}
         canGoNext={canGoNext}
         isLoading={submitting}
-        nextLabel={step === TOTAL_STEPS - 1 ? 'Finish' : 'Continue'}
+        nextLabel={step === 4 ? 'Finish' : 'Continue'}
         showSkip={showSkip}
         skipLabel="Skip for now"
         wizardTitle="Coach profile"
@@ -447,7 +464,19 @@ export default function OnboardingPage() {
                     </FormItem>
                   )}
                 />
-                <p className="text-sm text-muted-foreground pt-2">Almost done. Choose whether to go live next.</p>
+                <p className="text-sm text-muted-foreground pt-2">You can add or change payout details anytime in your profile.</p>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Step 4: Rate card / Session types */}
+          {step === 4 && (
+            <Card className="border-0 shadow-none">
+              <CardContent className="p-0">
+                <p className="text-muted-foreground mb-4">
+                  Choose which session types you offer and at what price. You can edit this anytime in your profile.
+                </p>
+                <AthleteProductSelection />
               </CardContent>
             </Card>
           )}

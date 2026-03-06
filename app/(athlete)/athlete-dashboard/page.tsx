@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import Link from 'next/link';
-import { Calendar, DollarSign, TrendingUp, Clock, Trophy, Users, User } from 'lucide-react';
+import { Calendar, DollarSign, TrendingUp, Clock, Trophy, Users, User, BarChart3, MessageCircle, Lightbulb } from 'lucide-react';
 import { CoachScheduleCard } from './coach-schedule-card';
 
 export default async function AthleteDashboard() {
@@ -69,12 +69,39 @@ export default async function AthleteDashboard() {
 
   const { data: thisMonthSessions } = await supabase
     .from('sessions')
-    .select('athlete_payment')
+    .select('athlete_payment, completed_at')
     .eq('athlete_id', user.id)
     .eq('status', 'completed')
     .gte('completed_at', thisMonth.toISOString());
 
   const thisMonthEarnings = thisMonthSessions?.reduce((sum, s) => sum + Number(s.athlete_payment || 0), 0) || 0;
+  const thisMonthBookings = thisMonthSessions?.length ?? 0;
+
+  const now = new Date();
+  const weekStart = new Date(now);
+  weekStart.setDate(now.getDate() - now.getDay());
+  weekStart.setHours(0, 0, 0, 0);
+  const { count: thisWeekBookings } = await supabase
+    .from('sessions')
+    .select('*', { count: 'exact', head: true })
+    .eq('athlete_id', user.id)
+    .eq('status', 'completed')
+    .gte('completed_at', weekStart.toISOString());
+
+  const lastMonthStart = new Date(thisMonth);
+  lastMonthStart.setMonth(lastMonthStart.getMonth() - 1);
+  const { count: lastMonthBookings } = await supabase
+    .from('sessions')
+    .select('*', { count: 'exact', head: true })
+    .eq('athlete_id', user.id)
+    .eq('status', 'completed')
+    .gte('completed_at', lastMonthStart.toISOString())
+    .lt('completed_at', thisMonth.toISOString());
+
+  const growthVsLastMonth =
+    (lastMonthBookings ?? 0) > 0
+      ? Math.round((((thisMonthBookings - (lastMonthBookings ?? 0)) / (lastMonthBookings ?? 1)) * 100))
+      : (thisMonthBookings > 0 ? 100 : 0);
 
   // Get pending earnings
   const { data: pendingSessions } = await supabase
@@ -86,24 +113,54 @@ export default async function AthleteDashboard() {
 
   const pendingEarnings = pendingSessions?.reduce((sum, s) => sum + Number(s.athlete_payment || 0), 0) || 0;
 
-  // Upcoming: scheduled + pending_payment, future only
+  // Upcoming: scheduled + pending_payment, future only (include youth wrestlers)
   const { data: upcomingSessions } = await supabase
     .from('sessions')
-    .select('*, facilities(name)')
+    .select('*, facilities(name), session_participants(youth_wrestler_id, youth_wrestlers(id, first_name, last_name))')
     .eq('athlete_id', user.id)
     .in('status', ['scheduled', 'pending_payment'])
     .gte('scheduled_datetime', new Date().toISOString())
     .order('scheduled_datetime', { ascending: true })
     .limit(20);
 
-  // Past: completed, cancelled, no-show, or already passed
+  // Past: completed, cancelled, no-show, or already passed (include youth wrestlers)
   const { data: pastSessions } = await supabase
     .from('sessions')
-    .select('*, facilities(name)')
+    .select('*, facilities(name), session_participants(youth_wrestler_id, youth_wrestlers(id, first_name, last_name))')
     .eq('athlete_id', user.id)
     .in('status', ['completed', 'cancelled', 'no-show'])
     .order('scheduled_datetime', { ascending: false })
     .limit(15);
+
+  // Outreach recommendations: youth wrestlers with no session in 14+ days
+  const { data: completedForRecommendations } = await supabase
+    .from('sessions')
+    .select('id, completed_at, session_participants(youth_wrestler_id, youth_wrestlers(id, first_name, last_name))')
+    .eq('athlete_id', user.id)
+    .eq('status', 'completed')
+    .not('completed_at', 'is', null)
+    .order('completed_at', { ascending: false });
+
+  const lastSessionByYouth = new Map<string, { date: Date; name: string }>();
+  for (const s of completedForRecommendations ?? []) {
+    const completedAt = s.completed_at ? new Date(s.completed_at) : null;
+    if (!completedAt) continue;
+    const participants = (s as { session_participants?: Array<{ youth_wrestler_id?: string; youth_wrestlers?: { first_name?: string; last_name?: string } | { first_name?: string; last_name?: string }[] }> }).session_participants ?? [];
+    for (const p of participants) {
+      const yw = p.youth_wrestlers;
+      const y = Array.isArray(yw) ? yw[0] : yw;
+      const yid = (p as { youth_wrestler_id?: string }).youth_wrestler_id;
+      if (!yid || lastSessionByYouth.has(yid)) continue;
+      const name = y ? [y.first_name, y.last_name].filter(Boolean).join(' ') || 'A wrestler' : 'A wrestler';
+      lastSessionByYouth.set(yid, { date: completedAt, name });
+    }
+  }
+  const fourteenDaysAgo = new Date();
+  fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+  const outreachRecommendations = Array.from(lastSessionByYouth.entries())
+    .filter(([, v]) => v.date < fourteenDaysAgo)
+    .map(([yid, v]) => ({ youthWrestlerId: yid, name: v.name, lastSessionDate: v.date }))
+    .slice(0, 10);
 
   // Coach ranking (admin client to read all athletes)
   type LeaderboardRow = { id: string; total_sessions: number; ytd_earnings: number };
@@ -141,8 +198,8 @@ export default async function AthleteDashboard() {
         </p>
       </div>
 
-      {/* Earnings + Ranking */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      {/* Earnings + Bookings analytics + Ranking */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">This Month</CardTitle>
@@ -150,6 +207,39 @@ export default async function AthleteDashboard() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">${thisMonthEarnings.toFixed(2)}</div>
+            <p className="text-xs text-muted-foreground mt-1">Earnings</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Monthly Bookings</CardTitle>
+            <BarChart3 className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{thisMonthBookings}</div>
+            <p className="text-xs text-muted-foreground mt-1">Completed this month</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">This Week</CardTitle>
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{thisWeekBookings ?? 0}</div>
+            <p className="text-xs text-muted-foreground mt-1">Completed sessions</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Growth</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-bold ${growthVsLastMonth >= 0 ? 'text-green-600' : 'text-destructive'}`}>
+              {growthVsLastMonth >= 0 ? '+' : ''}{growthVsLastMonth}%
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">vs last month</p>
           </CardContent>
         </Card>
 
@@ -201,6 +291,44 @@ export default async function AthleteDashboard() {
         )}
       </div>
 
+      {/* Outreach recommendations */}
+      {outreachRecommendations.length > 0 && (
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Lightbulb className="h-5 w-5" />
+              Consider reaching out
+            </CardTitle>
+            <CardDescription>
+              These wrestlers haven&apos;t had a session in 14+ days. A quick message can help bring them back.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-2">
+              {outreachRecommendations.map((r) => (
+                <li
+                  key={r.youthWrestlerId}
+                  className="flex items-center justify-between gap-2 py-2 border-b last:border-0"
+                >
+                  <div>
+                    <p className="font-medium">{r.name}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Last session {r.lastSessionDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </p>
+                  </div>
+                  <Link href="/inbox">
+                    <Button variant="ghost" size="sm">
+                      <MessageCircle className="h-4 w-4 mr-1" />
+                      Message
+                    </Button>
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Commitment Progress */}
       {athlete && athlete.commitment_sessions > 0 && (
         <Card className="mb-8">
@@ -229,17 +357,23 @@ export default async function AthleteDashboard() {
       />
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Link href="/availability">
-          <Button variant="outline" className="w-full h-20 flex flex-col items-center justify-center gap-2">
-            <Calendar className="h-6 w-6 shrink-0" />
-            <span>Set Availability</span>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <Link href="/availability" className="block">
+          <Button variant="outline" className="w-full h-12 gap-2">
+            <Calendar className="h-5 w-5 shrink-0" />
+            Set Availability
           </Button>
         </Link>
-        <Link href="/profile">
-          <Button variant="outline" className="w-full h-20 flex flex-col items-center justify-center gap-2">
-            <User className="h-6 w-6 shrink-0" />
-            <span>View Profile</span>
+        <Link href="/profile#rate-card" className="block">
+          <Button variant="outline" className="w-full h-12 gap-2">
+            <DollarSign className="h-5 w-5 shrink-0" />
+            Rate card
+          </Button>
+        </Link>
+        <Link href="/profile" className="block">
+          <Button variant="outline" className="w-full h-12 gap-2">
+            <User className="h-5 w-5 shrink-0" />
+            View Profile
           </Button>
         </Link>
       </div>

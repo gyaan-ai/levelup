@@ -5,9 +5,10 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { useAuth } from '@/lib/auth/use-auth';
 import { useNotificationCount } from '@/lib/hooks/use-notification-count';
+import { useInboxUnreadCount } from '@/lib/hooks/use-inbox-unread-count';
 import { NotificationBell } from '@/components/notification-bell';
 import { Button } from './ui/button';
-import { Bell, Menu, X } from 'lucide-react';
+import { Bell, Menu, X, Mail } from 'lucide-react';
 
 const navLinkClass = 'block py-3 px-4 text-white hover:text-accent hover:bg-white/10 transition-colors font-medium min-h-[44px] flex items-center';
 
@@ -15,6 +16,8 @@ export function Header() {
   const { user, userRole, loading, signOut } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [notificationCount, refreshNotifications] = useNotificationCount(!!user);
+  const showInboxIcon = userRole === 'parent' || userRole === 'athlete';
+  const [inboxUnreadCount, refreshInboxUnread] = useInboxUnreadCount(!!user && showInboxIcon);
 
   const handleSignOut = async () => {
     await signOut();
@@ -50,6 +53,24 @@ export function Header() {
                   >
                     Dashboard
                   </Link>
+                  <Link
+                    href="/inbox"
+                    className="text-white hover:text-accent transition-colors font-medium"
+                  >
+                    Messages
+                  </Link>
+                  <Link
+                    href="/inbox"
+                    className="relative flex items-center justify-center p-1.5 text-white hover:text-accent transition-colors font-medium rounded hover:bg-white/10"
+                    aria-label={inboxUnreadCount > 0 ? `Inbox (${inboxUnreadCount} unread)` : 'Inbox'}
+                  >
+                    <Mail className="h-5 w-5" />
+                    {inboxUnreadCount > 0 && (
+                      <span className="absolute top-0 right-0 min-w-[18px] h-[18px] px-1 flex items-center justify-center text-[10px] font-bold bg-accent text-black rounded-full -translate-y-0.5 translate-x-0.5">
+                        {inboxUnreadCount > 99 ? '99+' : inboxUnreadCount}
+                      </span>
+                    )}
+                  </Link>
                   <NotificationBell count={notificationCount} onRefresh={refreshNotifications} />
                 </>
               )}
@@ -78,6 +99,24 @@ export function Header() {
                     className="text-white hover:text-accent transition-colors font-medium"
                   >
                     My Bookings
+                  </Link>
+                  <Link
+                    href="/inbox"
+                    className="text-white hover:text-accent transition-colors font-medium"
+                  >
+                    Messages
+                  </Link>
+                  <Link
+                    href="/inbox"
+                    className="relative flex items-center justify-center p-1.5 text-white hover:text-accent transition-colors font-medium rounded hover:bg-white/10"
+                    aria-label={inboxUnreadCount > 0 ? `Inbox (${inboxUnreadCount} unread)` : 'Inbox'}
+                  >
+                    <Mail className="h-5 w-5" />
+                    {inboxUnreadCount > 0 && (
+                      <span className="absolute top-0 right-0 min-w-[18px] h-[18px] px-1 flex items-center justify-center text-[10px] font-bold bg-accent text-black rounded-full -translate-y-0.5 translate-x-0.5">
+                        {inboxUnreadCount > 99 ? '99+' : inboxUnreadCount}
+                      </span>
+                    )}
                   </Link>
                   <Link
                     href="/workspaces"
@@ -136,6 +175,17 @@ export function Header() {
                   {userRole === 'athlete' && (
                     <>
                       <Link href="/athlete-dashboard" className={navLinkClass} onClick={() => setMobileOpen(false)}>Dashboard</Link>
+                      <Link href="/inbox" className={navLinkClass} onClick={() => setMobileOpen(false)}>
+                        <span className="flex items-center gap-2">
+                          <Mail className="h-5 w-5 shrink-0" />
+                          Messages
+                          {inboxUnreadCount > 0 && (
+                            <span className="min-w-[20px] h-5 px-1.5 flex items-center justify-center text-xs font-bold bg-accent text-black rounded-full">
+                              {inboxUnreadCount > 99 ? '99+' : inboxUnreadCount}
+                            </span>
+                          )}
+                        </span>
+                      </Link>
                       <Link href="/notifications" className={navLinkClass} onClick={() => setMobileOpen(false)}>
                         <span className="flex items-center gap-2">
                           <Bell className="h-5 w-5 shrink-0" />
@@ -155,6 +205,17 @@ export function Header() {
                       <Link href="/browse" className={navLinkClass} onClick={() => setMobileOpen(false)}>Browse Coaches</Link>
                       <Link href="/my-coaches" className={navLinkClass} onClick={() => setMobileOpen(false)}>My Coaches</Link>
                       <Link href="/bookings" className={navLinkClass} onClick={() => setMobileOpen(false)}>My Bookings</Link>
+                      <Link href="/inbox" className={navLinkClass} onClick={() => setMobileOpen(false)}>
+                        <span className="flex items-center gap-2">
+                          <Mail className="h-5 w-5 shrink-0" />
+                          Messages
+                          {inboxUnreadCount > 0 && (
+                            <span className="min-w-[20px] h-5 px-1.5 flex items-center justify-center text-xs font-bold bg-accent text-black rounded-full">
+                              {inboxUnreadCount > 99 ? '99+' : inboxUnreadCount}
+                            </span>
+                          )}
+                        </span>
+                      </Link>
                       <Link href="/workspaces" className={navLinkClass} onClick={() => setMobileOpen(false)}>Workspaces</Link>
                       <Link href="/partner-sessions" className={navLinkClass} onClick={() => setMobileOpen(false)}>Partner Sessions</Link>
                       <Link href="/notifications" className={navLinkClass} onClick={() => setMobileOpen(false)}>

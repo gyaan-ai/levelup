@@ -1,12 +1,13 @@
 import { notFound } from 'next/navigation';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import { ArrowLeft, Star, User, MapPin, Award, Shield, CheckCircle } from 'lucide-react';
+import { ArrowLeft, Star, User, MapPin, Award, Shield, CheckCircle, MessageCircle, DollarSign } from 'lucide-react';
 import { SchoolLogo } from '@/components/school-logo';
 import { CoachSessionBadge } from '@/components/coach-session-badge';
 import { FollowCoachButton } from '@/components/follow-coach-button';
@@ -95,6 +96,35 @@ export default async function AthleteProfilePage({
   const schoolColor = SCHOOL_COLORS[athlete.school] || { bg: 'bg-gray-500', text: 'text-white' };
   const rating = (athlete.average_rating ?? 0) > 0 ? (athlete.average_rating ?? 0).toFixed(1) : 'New';
   const facility = athlete.facilities as any;
+
+  const { data: { user } } = await supabase.auth.getUser();
+  const { data: userData } = user
+    ? await supabase.from('users').select('role').eq('id', user.id).single()
+    : { data: null };
+  const isParent = userData?.role === 'parent';
+
+  // Rate card: products this coach offers (for public display)
+  const admin = createAdminClient(tenantSlug);
+  const { data: allProducts } = await admin
+    .from('products')
+    .select('id, name, slug, description, parent_price, min_participants, max_participants, display_order')
+    .eq('active', true)
+    .order('display_order', { ascending: true });
+  const { data: athleteProducts } = await admin
+    .from('athlete_products')
+    .select('product_id, enabled, custom_parent_price')
+    .eq('athlete_id', id);
+  const disabledIds = new Set(
+    (athleteProducts || []).filter((ap) => ap.enabled === false).map((ap) => ap.product_id)
+  );
+  const apMap = new Map((athleteProducts || []).map((ap) => [ap.product_id, ap]));
+  const rateCardProducts = (allProducts || [])
+    .filter((p) => !disabledIds.has(p.id))
+    .map((p) => {
+      const ap = apMap.get(p.id);
+      const price = ap?.custom_parent_price != null ? Number(ap.custom_parent_price) : Number(p.parent_price);
+      return { ...p, price };
+    });
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-5xl">
@@ -186,7 +216,7 @@ export default async function AthleteProfilePage({
                 )}
               </div>
 
-              {/* Book + Follow */}
+              {/* Book + Message + Follow */}
               <div className="flex flex-wrap items-center gap-3">
                 <Link href={`/book/${athlete.id}`}>
                   <Button
@@ -197,12 +227,55 @@ export default async function AthleteProfilePage({
                     Book a Session with {athlete.first_name} →
                   </Button>
                 </Link>
+                {isParent && user && (
+                  <Link href={`/inbox/thread/${user.id}/${athlete.id}`}>
+                    <Button size="lg" variant="outline" className="w-full md:w-auto">
+                      <MessageCircle className="h-4 w-4 mr-2" />
+                      Message
+                    </Button>
+                  </Link>
+                )}
                 <FollowCoachButton coachId={athlete.id} />
               </div>
             </div>
           </div>
         </CardContent>
       </Card>
+
+      {/* Rate card: session types & pricing */}
+      {rateCardProducts.length > 0 && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5" />
+              Session types & rates
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Prices per participant. You&apos;ll choose date and time when you book.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-4">
+              {rateCardProducts.map((p) => (
+                <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 py-2 border-b last:border-0">
+                  <div>
+                    <p className="font-medium">{p.name}</p>
+                    {p.description && (
+                      <p className="text-sm text-muted-foreground">{p.description}</p>
+                    )}
+                    {p.min_participants !== p.max_participants && (
+                      <p className="text-xs text-muted-foreground">
+                        {p.min_participants}–{p.max_participants} participants
+                      </p>
+                    )}
+                  </div>
+                  <p className="text-lg font-semibold shrink-0">${p.price.toFixed(2)}</p>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
 
       {/* About Section */}
       {athlete.bio && (

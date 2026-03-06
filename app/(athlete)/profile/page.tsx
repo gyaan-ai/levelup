@@ -222,10 +222,15 @@ export default function ProfilePage() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-2xl">
-      <Link href="/athlete-dashboard" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-6">
-        <ArrowLeft className="h-4 w-4 mr-2" />
-        Back to Dashboard
-      </Link>
+      <div className="flex flex-wrap items-center gap-4 mb-6">
+        <Link href="/athlete-dashboard" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Dashboard
+        </Link>
+        <Link href="/inbox" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
+          Inbox
+        </Link>
+      </div>
 
       <Card>
         <CardHeader>
@@ -542,8 +547,8 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
 
-      {/* Product/Session Type Selection */}
-      <div className="mt-6">
+      {/* Product/Session Type Selection (rate card) */}
+      <div id="rate-card" className="mt-6 scroll-mt-4">
         <AthleteProductSelection />
       </div>
 

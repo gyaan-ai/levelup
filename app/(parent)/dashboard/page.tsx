@@ -261,6 +261,9 @@ export default async function ParentDashboard() {
                   <Link href="/bookings">
                     <Button variant="outline">View bookings</Button>
                   </Link>
+                  <Link href="/inbox">
+                    <Button variant="outline">Inbox</Button>
+                  </Link>
                   <Link href="/browse">
                     <Button variant="premium">Find an Elite Coach</Button>
                   </Link>

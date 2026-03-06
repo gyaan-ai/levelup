@@ -17,6 +17,10 @@ export type CoachSession = {
   session_type?: string;
   status: string;
   facilities?: { name?: string } | { name?: string }[] | null;
+  session_participants?: Array<{
+    youth_wrestler_id?: string | null;
+    youth_wrestlers?: { id: string; first_name?: string; last_name?: string } | { id: string; first_name?: string; last_name?: string }[] | null;
+  }> | null;
 };
 
 function facilityName(s: CoachSession): string {
@@ -25,6 +29,17 @@ function facilityName(s: CoachSession): string {
   const arr = Array.isArray(f) ? f : [f];
   const first = arr[0] as { name?: string } | null;
   return first?.name ?? '—';
+}
+
+function wrestlerNames(s: CoachSession): string[] {
+  const parts = s.session_participants ?? [];
+  return parts
+    .map((p) => {
+      const yw = p.youth_wrestlers;
+      const o = Array.isArray(yw) ? yw[0] : yw;
+      return o && (o.first_name || o.last_name) ? [o.first_name, o.last_name].filter(Boolean).join(' ') : null;
+    })
+    .filter((n): n is string => Boolean(n));
 }
 
 type ViewMode = 'list' | 'table' | 'calendar';
@@ -123,6 +138,12 @@ export function CoachScheduleCard({
                           {format(new Date(session.scheduled_datetime), 'h:mm a')}
                           {' • '}
                           {facilityName(session)}
+                          {wrestlerNames(session).length > 0 && (
+                            <>
+                              <span> • </span>
+                              <span>with {wrestlerNames(session).join(', ')}</span>
+                            </>
+                          )}
                           {session.status === 'pending_payment' && (
                             <>
                               <span> • </span>
@@ -167,6 +188,12 @@ export function CoachScheduleCard({
                           {format(new Date(session.scheduled_datetime), 'h:mm a')}
                           {' • '}
                           {facilityName(session)}
+                          {wrestlerNames(session).length > 0 && (
+                            <>
+                              <span> • </span>
+                              <span>with {wrestlerNames(session).join(', ')}</span>
+                            </>
+                          )}
                           {' • '}
                           <Badge variant={session.status === 'completed' ? 'default' : 'secondary'}>
                             {session.status === 'completed' ? 'Completed' : session.status === 'cancelled' ? 'Cancelled' : 'No-show'}
@@ -200,6 +227,7 @@ export function CoachScheduleCard({
                 <tr className="border-b">
                   <th className="text-left py-2 px-2">Date</th>
                   <th className="text-left py-2 px-2">Time</th>
+                  <th className="text-left py-2 px-2">Youth wrestler(s)</th>
                   <th className="text-left py-2 px-2">Facility</th>
                   <th className="text-left py-2 px-2">Type</th>
                   <th className="text-right py-2 px-2">Amount</th>
@@ -214,6 +242,7 @@ export function CoachScheduleCard({
                     <tr key={session.id} className="border-b last:border-0">
                       <td className="py-2 px-2">{format(new Date(session.scheduled_datetime), 'MMM d, yyyy')}</td>
                       <td className="py-2 px-2">{format(new Date(session.scheduled_datetime), 'h:mm a')}</td>
+                      <td className="py-2 px-2">{wrestlerNames(session).length > 0 ? wrestlerNames(session).join(', ') : '—'}</td>
                       <td className="py-2 px-2">{facilityName(session)}</td>
                       <td className="py-2 px-2">{session.session_type || '—'}</td>
                       <td className="py-2 px-2 text-right">${Number(session.total_price || 0).toFixed(2)}</td>
@@ -247,8 +276,8 @@ export function CoachScheduleCard({
         )}
 
         {viewMode === 'calendar' && (
-          <div className="flex flex-col md:flex-row gap-6">
-            <div className="flex flex-col items-center">
+          <div className="flex flex-col lg:flex-row gap-6">
+            <div className="flex flex-col items-center shrink-0 w-fit">
               <div className="flex items-center gap-2 mb-2">
                 <Button variant="outline" size="icon" onClick={() => setCalendarMonth((m) => subMonths(m, 1))}>←</Button>
                 <span className="font-medium min-w-[140px] text-center">{format(calendarMonth, 'MMMM yyyy')}</span>
@@ -261,22 +290,26 @@ export function CoachScheduleCard({
                 selected={undefined}
                 modifiers={{ hasSession: calendarDaysWithSessions }}
                 modifiersClassNames={{ hasSession: 'bg-primary/20 font-semibold' }}
-                className="rounded-md border"
+                className="rounded-md border w-fit"
               />
             </div>
-            <div className="flex-1 min-w-0">
-              <h3 className="text-sm font-semibold mb-2">Sessions in {format(calendarMonth, 'MMMM yyyy')}</h3>
+            <div className="min-w-0 flex-1 lg:min-w-[260px] lg:max-w-[360px]">
+              <h3 className="text-sm font-semibold mb-2 break-words">Sessions in {format(calendarMonth, 'MMMM yyyy')}</h3>
               {sessionsInMonth.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No sessions this month.</p>
+                <p className="text-sm text-muted-foreground break-words">No sessions this month.</p>
               ) : (
                 <ul className="space-y-2">
                   {sessionsInMonth.map((session) => (
-                    <li key={session.id} className="flex items-center justify-between p-3 border rounded-lg">
-                      <div>
-                        <p className="font-medium text-sm">
+                    <li key={session.id} className="flex items-center justify-between gap-3 p-3 border rounded-lg">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-sm break-words">
                           {format(new Date(session.scheduled_datetime), 'EEE, MMM d')} at {format(new Date(session.scheduled_datetime), 'h:mm a')}
                         </p>
-                        <p className="text-xs text-muted-foreground">{facilityName(session)} • ${Number(session.total_price || 0).toFixed(2)}</p>
+                        <p className="text-xs text-muted-foreground break-words">
+                          {facilityName(session)}
+                          {wrestlerNames(session).length > 0 && ` • with ${wrestlerNames(session).join(', ')}`}
+                          {' • '}${Number(session.total_price || 0).toFixed(2)}
+                        </p>
                       </div>
                       {['scheduled', 'pending_payment'].includes(session.status) && new Date(session.scheduled_datetime) > new Date() ? (
                         <div className="flex gap-1">
