@@ -4,6 +4,13 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import { Sparkles } from 'lucide-react';
 
 const INTEREST_OPTIONS = [
@@ -39,6 +46,7 @@ export function EarlyAccessForm() {
   const [interest, setInterest] = useState('');
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
   const [message, setMessage] = useState('');
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,8 +72,8 @@ export function EarlyAccessForm() {
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        setStatus('success');
-        setMessage(data.message || "You're on the list!");
+        setStatus('idle');
+        setMessage('');
         setParentName('');
         setEmail('');
         setParentPhone('');
@@ -76,6 +84,7 @@ export function EarlyAccessForm() {
         setWeightClass('');
         setExperienceLevel('');
         setInterest('');
+        setShowSuccessDialog(true);
       } else {
         setStatus('error');
         setMessage(data.error || 'Something went wrong. Please try again.');
@@ -239,10 +248,25 @@ export function EarlyAccessForm() {
       </div>
 
       {message && (
-        <p className={`mt-6 text-sm ${status === 'success' ? 'text-accent' : 'text-red-300'}`}>
+        <p className="mt-6 text-sm text-red-300">
           {message}
         </p>
       )}
+
+      <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>You&apos;re on the list</DialogTitle>
+          </DialogHeader>
+          <p className="text-muted-foreground">
+            We&apos;ll be in touch soon.
+          </p>
+          <DialogFooter>
+            <Button onClick={() => setShowSuccessDialog(false)}>OK</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <Button
         type="submit"
         size="lg"

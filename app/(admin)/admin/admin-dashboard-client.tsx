@@ -23,6 +23,7 @@ import {
   CreditCard,
   MapPin,
   Package,
+  ClipboardList,
 } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
@@ -195,6 +196,10 @@ export function AdminDashboardClient({
         <Link href="/admin/products" className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground border border-border rounded-md hover:bg-muted/50">
           <Package className="h-4 w-4" />
           Products
+        </Link>
+        <Link href="/admin/early-access" className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground border border-border rounded-md hover:bg-muted/50">
+          <ClipboardList className="h-4 w-4" />
+          Early Access
         </Link>
       </div>
 
