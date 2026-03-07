@@ -61,6 +61,48 @@ export function InboxSidebar({ role }: { role: 'parent' | 'athlete' | 'youth_wre
         <h2 className="text-sm font-semibold text-foreground">Community</h2>
       </div>
       <div className="flex-1 overflow-y-auto p-2 space-y-4">
+        {/* Direct messages first – plus opens "New message" (coach list for parent; groups for athlete) */}
+        <section>
+          <div className="flex items-center justify-between px-2 py-1">
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Direct messages</span>
+            {(role === 'parent' || role === 'athlete') && (
+              <Link href="/inbox/new" title="New message">
+                <Button variant="ghost" size="icon" className="h-7 w-7">
+                  <Plus className="h-4 w-4" />
+                </Button>
+              </Link>
+            )}
+          </div>
+          {loading ? (
+            <p className="text-xs text-muted-foreground px-2 py-2">Loading…</p>
+          ) : threads.length === 0 ? (
+            <p className="text-xs text-muted-foreground px-2 py-2">No conversations</p>
+          ) : (
+            <ul className="space-y-0.5">
+              {threads.map((t) => {
+                const href = `/inbox/thread/${t.parentId}/${t.athleteId}`;
+                const active = pathname === href || (pathname?.startsWith(href + '/'));
+                return (
+                  <li key={`${t.parentId}-${t.athleteId}`}>
+                    <Link
+                      href={href}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${
+                        active ? 'bg-accent/20 text-accent border-l-2 border-accent' : 'hover:bg-muted/50'
+                      } ${t.unread ? 'font-medium' : ''}`}
+                    >
+                      <MessageCircle className="h-4 w-4 shrink-0" />
+                      <span className="truncate flex-1">{t.otherName}</span>
+                      {t.unread && (
+                        <span className="w-2 h-2 rounded-full bg-accent shrink-0" aria-hidden />
+                      )}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
+
         {(role === 'parent' || role === 'athlete' || role === 'youth_wrestler') && (
           <section>
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide px-2 py-1 block">Spaces</span>
@@ -124,38 +166,6 @@ export function InboxSidebar({ role }: { role: 'parent' | 'athlete' | 'youth_wre
             )}
           </section>
         )}
-
-        <section>
-          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide px-2 py-1 block">Direct messages</span>
-          {loading ? (
-            <p className="text-xs text-muted-foreground px-2 py-2">Loading…</p>
-          ) : threads.length === 0 ? (
-            <p className="text-xs text-muted-foreground px-2 py-2">No conversations</p>
-          ) : (
-            <ul className="space-y-0.5">
-              {threads.map((t) => {
-                const href = `/inbox/thread/${t.parentId}/${t.athleteId}`;
-                const active = pathname === href || (pathname?.startsWith(href + '/'));
-                return (
-                  <li key={`${t.parentId}-${t.athleteId}`}>
-                    <Link
-                      href={href}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${
-                        active ? 'bg-accent/20 text-accent border-l-2 border-accent' : 'hover:bg-muted/50'
-                      } ${t.unread ? 'font-medium' : ''}`}
-                    >
-                      <MessageCircle className="h-4 w-4 shrink-0" />
-                      <span className="truncate flex-1">{t.otherName}</span>
-                      {t.unread && (
-                        <span className="w-2 h-2 rounded-full bg-accent shrink-0" aria-hidden />
-                      )}
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </section>
       </div>
     </aside>
   );

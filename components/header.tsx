@@ -124,6 +124,12 @@ export function Header() {
                     My Bookings
                   </Link>
                   <Link
+                    href="/small-group-sessions"
+                    className="text-white hover:text-accent transition-colors font-medium"
+                  >
+                    Small group
+                  </Link>
+                  <Link
                     href="/inbox"
                     className="relative flex items-center justify-center p-1.5 text-white hover:text-accent transition-colors font-medium rounded hover:bg-white/10"
                     aria-label={inboxUnreadCount > 0 ? `Community (${inboxUnreadCount} unread)` : 'Community'}
@@ -237,6 +243,7 @@ export function Header() {
                   <Link href="/dashboard" className={navLinkClass} onClick={() => setMobileOpen(false)}>Dashboard</Link>
                   <Link href="/browse" className={navLinkClass} onClick={() => setMobileOpen(false)}>Browse Coaches</Link>
                   <Link href="/bookings" className={navLinkClass} onClick={() => setMobileOpen(false)}>My Bookings</Link>
+                  <Link href="/small-group-sessions" className={navLinkClass} onClick={() => setMobileOpen(false)}>Small group</Link>
                   <Link href="/inbox" className={navLinkClass} onClick={() => setMobileOpen(false)}>
                     <span className="flex items-center gap-2">
                       <Mail className="h-5 w-5 shrink-0" />

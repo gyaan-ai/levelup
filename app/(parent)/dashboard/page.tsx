@@ -183,6 +183,20 @@ export default async function ParentDashboard() {
     .gte('scheduled_datetime', new Date().toISOString())
     .lt('current_participants', 2);
 
+  // Small group sessions this week (for dashboard summary)
+  const weekStart = new Date();
+  weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+  weekStart.setHours(0, 0, 0, 0);
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekEnd.getDate() + 7);
+  const { count: smallGroupCount } = await supabase
+    .from('sessions')
+    .select('*', { count: 'exact', head: true })
+    .in('session_type', ['group', 'small_group'])
+    .in('status', ['scheduled', 'pending_payment'])
+    .gte('scheduled_datetime', weekStart.toISOString())
+    .lt('scheduled_datetime', weekEnd.toISOString());
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
@@ -315,8 +329,8 @@ export default async function ParentDashboard() {
             })}
           </div>
 
-          {/* My Coaches & Partner Sessions – quick access from dashboard */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          {/* My Coaches, Partner Sessions, Small group – quick access from dashboard */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-base flex items-center gap-2">
@@ -364,6 +378,25 @@ export default async function ParentDashboard() {
                 </p>
                 <Link href="/partner-sessions">
                   <Button variant="outline" size="sm">View open sessions</Button>
+                </Link>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  Small group
+                </CardTitle>
+                <CardDescription>Group sessions this week. Owner can manage join requests.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground mb-4">
+                  {(smallGroupCount ?? 0) > 0
+                    ? `${smallGroupCount} group session${(smallGroupCount ?? 0) !== 1 ? 's' : ''} this week.`
+                    : 'No small group sessions this week.'}
+                </p>
+                <Link href="/small-group-sessions">
+                  <Button variant="outline" size="sm">View small group sessions</Button>
                 </Link>
               </CardContent>
             </Card>

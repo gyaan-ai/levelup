@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { Calendar, User, MapPin, X, FolderOpen } from 'lucide-react';
+import { Calendar, User, MapPin, X, FolderOpen, Share2, Check } from 'lucide-react';
 import { SchoolLogo } from '@/components/school-logo';
 import { differenceInHours } from 'date-fns';
 
@@ -34,6 +34,19 @@ export function BookingCard({ session, isPast = false }: BookingCardProps) {
   const router = useRouter();
   const [cancelling, setCancelling] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+
+  const handleCopyShareLink = async () => {
+    if (!session.partner_invite_code) return;
+    const url = `${typeof window !== 'undefined' ? window.location.origin : ''}/join/${session.partner_invite_code}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setLinkCopied(true);
+      setTimeout(() => setLinkCopied(false), 2000);
+    } catch {
+      setLinkCopied(false);
+    }
+  };
 
   const scheduledTime = new Date(session.scheduled_datetime);
   const hoursUntilSession = differenceInHours(scheduledTime, new Date());
@@ -125,6 +138,12 @@ export function BookingCard({ session, isPast = false }: BookingCardProps) {
             </p>
             <p className="text-xs text-muted-foreground">{session.session_type ?? '—'}</p>
             <div className="flex flex-wrap gap-2 sm:justify-end">
+              {session.partner_invite_code && !isPast && (
+                <Button variant="outline" size="sm" className="min-h-[44px] px-4" onClick={handleCopyShareLink} title="Copy invite link to share">
+                  {linkCopied ? <Check className="h-4 w-4 mr-1 text-green-600 shrink-0" /> : <Share2 className="h-4 w-4 mr-1 shrink-0" />}
+                  {linkCopied ? 'Copied!' : 'Share link'}
+                </Button>
+              )}
               <Link href={`/workspaces/from-session/${session.id}`} className="min-h-[44px] inline-flex">
                 <Button variant="outline" size="sm" className="min-h-[44px] px-4">
                   <FolderOpen className="h-4 w-4 mr-1 shrink-0" />
