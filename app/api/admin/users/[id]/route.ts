@@ -76,6 +76,7 @@ export async function DELETE(
     const admin = createAdminClient(tenant.slug);
     const { error } = await admin.from('users').delete().eq('id', id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    await admin.auth.admin.deleteUser(id);
     return NextResponse.json({ success: true });
   } catch (e) {
     console.error('Admin DELETE user error:', e);

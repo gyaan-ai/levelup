@@ -291,6 +291,8 @@ export function AdminDashboardClient({
   }>>([]);
   const [facilityRequestsLoading, setFacilityRequestsLoading] = useState(false);
   const [facilityRequestActionId, setFacilityRequestActionId] = useState<string | null>(null);
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
+  const [syncingEmails, setSyncingEmails] = useState(false);
 
   const filteredSessions = sessions.filter((s) => {
     const d = s.scheduled_datetime.slice(0, 10);
@@ -574,7 +576,7 @@ export function AdminDashboardClient({
           <CardHeader>
             <CardTitle>Users by role</CardTitle>
             <CardDescription>
-              All users with role, created date, and last login.
+              All users with role, created date, and last login. Use User Management to edit role, archive, or sync emails from Auth.
             </CardDescription>
             <div className="flex flex-wrap gap-4 pt-2">
               <Select value={userRoleFilter} onValueChange={setUserRoleFilter}>
@@ -601,6 +603,29 @@ export function AdminDashboardClient({
               <span className="text-sm text-muted-foreground">
                 {filteredUsers.length} users
               </span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={syncingEmails}
+                onClick={async () => {
+                  setSyncingEmails(true);
+                  try {
+                    const res = await fetch('/api/admin/users/sync-emails', { method: 'POST' });
+                    const data = await res.json().catch(() => ({}));
+                    if (res.ok && data.success) {
+                      router.refresh();
+                      if (data.updated > 0) alert(`Synced ${data.updated} email(s) from Auth.`);
+                      else alert('Emails already in sync.');
+                    } else {
+                      alert(data.error || 'Sync failed');
+                    }
+                  } finally {
+                    setSyncingEmails(false);
+                  }
+                }}
+              >
+                {syncingEmails ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Sync emails from Auth'}
+              </Button>
             </div>
           </CardHeader>
           <CardContent>
@@ -612,12 +637,13 @@ export function AdminDashboardClient({
                     <th className="text-left py-2 font-medium">Role</th>
                     <th className="text-left py-2 font-medium">Created</th>
                     <th className="text-left py-2 font-medium">Last login</th>
+                    <th className="text-right py-2 font-medium">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredUsers.length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="py-8 text-center">
+                      <td colSpan={5} className="py-8 text-center">
                         {usersError ? (
                           <span className="text-destructive">{usersError}</span>
                         ) : users.length === 0 ? (
@@ -648,6 +674,39 @@ export function AdminDashboardClient({
                           {u.last_login_at
                             ? format(new Date(u.last_login_at), 'MMM d, yyyy h:mm a')
                             : '—'}
+                        </td>
+                        <td className="py-2 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <Link href="/admin/users">
+                              <Button variant="ghost" size="sm" className="text-xs">
+                                Manage
+                              </Button>
+                            </Link>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="text-destructive hover:text-destructive"
+                              title="Delete user"
+                              disabled={deletingUserId === u.id}
+                              onClick={async () => {
+                                if (!confirm(`Delete ${u.email}? This removes their account and related data. You cannot delete your own account.`)) return;
+                                setDeletingUserId(u.id);
+                                try {
+                                  const res = await fetch(`/api/admin/users/${u.id}`, { method: 'DELETE' });
+                                  const data = await res.json().catch(() => ({}));
+                                  if (res.ok) {
+                                    router.refresh();
+                                  } else {
+                                    alert(data.error || 'Delete failed');
+                                  }
+                                } finally {
+                                  setDeletingUserId(null);
+                                }
+                              }}
+                            >
+                              {deletingUserId === u.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                            </Button>
+                          </div>
                         </td>
                       </tr>
                     ))

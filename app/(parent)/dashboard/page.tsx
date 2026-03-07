@@ -43,13 +43,14 @@ export default async function ParentDashboard() {
   }
   // parent and admin can both access dashboard (admin can switch to product view)
 
-  // Get youth wrestlers (primary or linked parent; RLS returns both)
-  const { data: youthWrestlers } = await supabase
+  // Get youth wrestlers (primary or linked parent; RLS returns both); dedupe by id so same kid never shows twice
+  const { data: youthWrestlersRaw } = await supabase
     .from('youth_wrestlers')
     .select('*')
     .order('created_at', { ascending: false });
+  const youthWrestlers = [...new Map((youthWrestlersRaw ?? []).map((yw: YouthWrestler) => [yw.id, yw])).values()];
 
-  const youthWrestlerIds = youthWrestlers?.map((yw) => yw.id) || [];
+  const youthWrestlerIds = youthWrestlers.map((yw) => yw.id);
 
   // Session IDs where any of my kids (primary or linked) participated — shared view for both parents
   let familySessionIds: string[] = [];
