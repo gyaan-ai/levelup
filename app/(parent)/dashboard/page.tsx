@@ -7,7 +7,7 @@ import { getTenantByDomain } from '@/config/tenants';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { Plus, Edit, User, Calendar, DollarSign } from 'lucide-react';
+import { Plus, Edit, User, Calendar, DollarSign, Users, UserPlus } from 'lucide-react';
 import { YouthWrestler } from '@/types';
 import { BookingCard, type BookingSession } from '@/app/(parent)/bookings/booking-card';
 
@@ -162,6 +162,27 @@ export default async function ParentDashboard() {
     monthLabels[m] = date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
   });
 
+  // Followed coaches for dashboard summary
+  const { data: followRows } = await supabase
+    .from('coach_follows')
+    .select('coach_id, athletes(id, first_name, last_name, school)')
+    .eq('parent_id', user.id)
+    .order('created_at', { ascending: false })
+    .limit(5);
+  const followedCoaches = (followRows ?? []).map((f: { coach_id: string; athletes?: { id: string; first_name?: string; last_name?: string; school?: string } | Array<{ id: string; first_name?: string; last_name?: string; school?: string }> }) => {
+    const a = Array.isArray(f.athletes) ? f.athletes[0] : f.athletes;
+    return { id: f.coach_id, name: a ? `${a.first_name ?? ''} ${a.last_name ?? ''}`.trim() || 'Coach' : 'Coach', school: a?.school ?? '' };
+  });
+
+  // Open partner sessions (scheduled in future) count for dashboard summary
+  const { count: openPartnerCount } = await supabase
+    .from('sessions')
+    .select('*', { count: 'exact', head: true })
+    .eq('session_mode', 'partner-open')
+    .in('status', ['scheduled', 'pending_payment'])
+    .gte('scheduled_datetime', new Date().toISOString())
+    .lt('current_participants', 2);
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
@@ -185,90 +206,7 @@ export default async function ParentDashboard() {
 
       {youthWrestlers && youthWrestlers.length > 0 ? (
         <>
-          {/* Spending summary */}
-          <Card className="mb-6">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <DollarSign className="h-5 w-5" />
-                Spending
-              </CardTitle>
-              <CardDescription>
-                What you&apos;ve spent on sessions (paid and completed). Refunded sessions are excluded.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div>
-                <p className="text-sm text-muted-foreground">Total spent</p>
-                <p className="text-2xl font-bold text-accent">${totalSpent.toFixed(2)}</p>
-              </div>
-
-              {coachTotals.length > 0 && (
-                <div>
-                  <p className="text-sm font-medium mb-2">By coach</p>
-                  <ul className="space-y-1.5">
-                    {coachTotals.map((c) => (
-                      <li key={c.id} className="flex justify-between text-sm">
-                        <span>{c.name}</span>
-                        <span className="font-medium">${c.total.toFixed(2)}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {youthWrestlers && youthWrestlers.length > 0 && (
-                <div>
-                  <p className="text-sm font-medium mb-2">By wrestler</p>
-                  <ul className="space-y-1.5">
-                    {youthWrestlers.map((w: YouthWrestler) => (
-                      <li key={w.id} className="flex justify-between text-sm">
-                        <span>{w.first_name} {w.last_name}</span>
-                        <span className="font-medium">${(byKid[w.id] ?? 0).toFixed(2)}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-
-              {youthWrestlers && youthWrestlers.length > 0 && last6Months.some((m) => youthWrestlers.some((w: YouthWrestler) => (byKidByMonth[w.id]?.[m] ?? 0) > 0)) && (
-                <div>
-                  <p className="text-sm font-medium mb-2">By wrestler, by month (last 6 months)</p>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm border-collapse">
-                      <thead>
-                        <tr className="border-b">
-                          <th className="text-left py-2 pr-4 font-medium">Wrestler</th>
-                          {last6Months.map((m) => (
-                            <th key={m} className="text-right py-2 px-2 font-medium text-muted-foreground">
-                              {monthLabels[m]}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {youthWrestlers.map((w: YouthWrestler) => (
-                          <tr key={w.id} className="border-b border-border/50">
-                            <td className="py-2 pr-4">{w.first_name} {w.last_name}</td>
-                            {last6Months.map((m) => (
-                              <td key={m} className="text-right py-2 px-2">
-                                ${((byKidByMonth[w.id]?.[m] ?? 0)).toFixed(2)}
-                              </td>
-                            ))}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
-
-              {totalSpent === 0 && (
-                <p className="text-sm text-muted-foreground">No paid sessions yet. Book a session to see spending here.</p>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Upcoming Sessions - shown first on mobile so booked sessions are visible without scrolling */}
+          {/* Upcoming Sessions first so booked sessions are visible without scrolling */}
           {upcomingSessions && upcomingSessions.length > 0 ? (
             <Card className="mb-6">
               <CardHeader className="flex flex-row items-center justify-between">
@@ -376,6 +314,143 @@ export default async function ParentDashboard() {
               );
             })}
           </div>
+
+          {/* My Coaches & Partner Sessions – quick access from dashboard */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <UserPlus className="h-4 w-4" />
+                  My Coaches
+                </CardTitle>
+                <CardDescription>Coaches you follow. Get notified when they add availability.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {followedCoaches.length > 0 ? (
+                  <ul className="text-sm space-y-1.5 mb-4">
+                    {followedCoaches.slice(0, 3).map((c) => (
+                      <li key={c.id} className="truncate">{c.name}{c.school ? ` · ${c.school}` : ''}</li>
+                    ))}
+                    {followedCoaches.length > 3 && (
+                      <li className="text-muted-foreground">+{followedCoaches.length - 3} more</li>
+                    )}
+                  </ul>
+                ) : (
+                  <p className="text-sm text-muted-foreground mb-4">Follow coaches from Browse to see them here.</p>
+                )}
+                <div className="flex gap-2">
+                  <Link href="/my-coaches">
+                    <Button variant="outline" size="sm">View all</Button>
+                  </Link>
+                  <Link href="/browse">
+                    <Button variant="ghost" size="sm">Browse coaches</Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  Partner Sessions
+                </CardTitle>
+                <CardDescription>Sessions looking for a partner. Request to join and train together.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm text-muted-foreground mb-4">
+                  {(openPartnerCount ?? 0) > 0
+                    ? `${openPartnerCount} open session${(openPartnerCount ?? 0) !== 1 ? 's' : ''} available.`
+                    : 'No open partner sessions right now.'}
+                </p>
+                <Link href="/partner-sessions">
+                  <Button variant="outline" size="sm">View open sessions</Button>
+                </Link>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Spending – at bottom so dashboard leads with wrestlers and bookings */}
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <DollarSign className="h-5 w-5" />
+                Spending
+              </CardTitle>
+              <CardDescription>
+                What you&apos;ve spent on sessions (paid and completed). Refunded sessions are excluded.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div>
+                <p className="text-sm text-muted-foreground">Total spent</p>
+                <p className="text-2xl font-bold text-accent">${totalSpent.toFixed(2)}</p>
+              </div>
+
+              {coachTotals.length > 0 && (
+                <div>
+                  <p className="text-sm font-medium mb-2">By coach</p>
+                  <ul className="space-y-1.5">
+                    {coachTotals.map((c) => (
+                      <li key={c.id} className="flex justify-between text-sm">
+                        <span>{c.name}</span>
+                        <span className="font-medium">${c.total.toFixed(2)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {youthWrestlers && youthWrestlers.length > 0 && (
+                <div>
+                  <p className="text-sm font-medium mb-2">By wrestler</p>
+                  <ul className="space-y-1.5">
+                    {youthWrestlers.map((w: YouthWrestler) => (
+                      <li key={w.id} className="flex justify-between text-sm">
+                        <span>{w.first_name} {w.last_name}</span>
+                        <span className="font-medium">${(byKid[w.id] ?? 0).toFixed(2)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {youthWrestlers && youthWrestlers.length > 0 && last6Months.some((m) => youthWrestlers.some((w: YouthWrestler) => (byKidByMonth[w.id]?.[m] ?? 0) > 0)) && (
+                <div>
+                  <p className="text-sm font-medium mb-2">By wrestler, by month (last 6 months)</p>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm border-collapse">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left py-2 pr-4 font-medium">Wrestler</th>
+                          {last6Months.map((m) => (
+                            <th key={m} className="text-right py-2 px-2 font-medium text-muted-foreground">
+                              {monthLabels[m]}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {youthWrestlers.map((w: YouthWrestler) => (
+                          <tr key={w.id} className="border-b border-border/50">
+                            <td className="py-2 pr-4">{w.first_name} {w.last_name}</td>
+                            {last6Months.map((m) => (
+                              <td key={m} className="text-right py-2 px-2">
+                                ${((byKidByMonth[w.id]?.[m] ?? 0)).toFixed(2)}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {totalSpent === 0 && (
+                <p className="text-sm text-muted-foreground">No paid sessions yet. Book a session to see spending here.</p>
+              )}
+            </CardContent>
+          </Card>
 
           {/* Upcoming Sessions empty state - only show when no sessions */}
           {(!upcomingSessions || upcomingSessions.length === 0) && (

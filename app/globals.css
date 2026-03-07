@@ -73,6 +73,15 @@
       font-size: 16px !important;
     }
   }
+
+  /* Keep inputs dark when browser autofill is applied (avoids white flash) */
+  .dark-input-fill:-webkit-autofill,
+  .dark-input-fill:-webkit-autofill:hover,
+  .dark-input-fill:-webkit-autofill:focus {
+    -webkit-text-fill-color: hsl(0 0% 95%);
+    -webkit-box-shadow: 0 0 0 1000px hsl(0 0% 18%) inset;
+    caret-color: hsl(0 0% 95%);
+  }
 }
 
 .font-premium {

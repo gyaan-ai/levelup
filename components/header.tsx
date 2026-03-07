@@ -118,12 +118,6 @@ export function Header() {
                     Browse Coaches
                   </Link>
                   <Link
-                    href="/my-coaches"
-                    className="text-white hover:text-accent transition-colors font-medium"
-                  >
-                    My Coaches
-                  </Link>
-                  <Link
                     href="/bookings"
                     className="text-white hover:text-accent transition-colors font-medium"
                   >
@@ -131,14 +125,9 @@ export function Header() {
                   </Link>
                   <Link
                     href="/inbox"
-                    className="text-white hover:text-accent transition-colors font-medium"
-                  >
-                    Community
-                  </Link>
-                  <Link
-                    href="/inbox"
                     className="relative flex items-center justify-center p-1.5 text-white hover:text-accent transition-colors font-medium rounded hover:bg-white/10"
                     aria-label={inboxUnreadCount > 0 ? `Community (${inboxUnreadCount} unread)` : 'Community'}
+                    title="Community"
                   >
                     <Mail className="h-5 w-5" />
                     {inboxUnreadCount > 0 && (
@@ -146,12 +135,6 @@ export function Header() {
                         {inboxUnreadCount > 99 ? '99+' : inboxUnreadCount}
                       </span>
                     )}
-                  </Link>
-                  <Link
-                    href="/partner-sessions"
-                    className="text-white hover:text-accent transition-colors font-medium"
-                  >
-                    Partner Sessions
                   </Link>
                   <NotificationBell count={notificationCount} onRefresh={refreshNotifications} />
                   {userRole === 'admin' && (
@@ -251,23 +234,21 @@ export function Header() {
                   )}
                   {(userRole === 'admin' || userRole === 'parent') && (
                     <>
-                      <Link href="/dashboard" className={navLinkClass} onClick={() => setMobileOpen(false)}>Dashboard</Link>
-                      <Link href="/browse" className={navLinkClass} onClick={() => setMobileOpen(false)}>Browse Coaches</Link>
-                      <Link href="/my-coaches" className={navLinkClass} onClick={() => setMobileOpen(false)}>My Coaches</Link>
-                      <Link href="/bookings" className={navLinkClass} onClick={() => setMobileOpen(false)}>My Bookings</Link>
-                      <Link href="/inbox" className={navLinkClass} onClick={() => setMobileOpen(false)}>
-                        <span className="flex items-center gap-2">
-                          <Mail className="h-5 w-5 shrink-0" />
-                          Community
-                          {inboxUnreadCount > 0 && (
-                            <span className="min-w-[20px] h-5 px-1.5 flex items-center justify-center text-xs font-bold bg-accent text-black rounded-full">
-                              {inboxUnreadCount > 99 ? '99+' : inboxUnreadCount}
-                            </span>
-                          )}
+                  <Link href="/dashboard" className={navLinkClass} onClick={() => setMobileOpen(false)}>Dashboard</Link>
+                  <Link href="/browse" className={navLinkClass} onClick={() => setMobileOpen(false)}>Browse Coaches</Link>
+                  <Link href="/bookings" className={navLinkClass} onClick={() => setMobileOpen(false)}>My Bookings</Link>
+                  <Link href="/inbox" className={navLinkClass} onClick={() => setMobileOpen(false)}>
+                    <span className="flex items-center gap-2">
+                      <Mail className="h-5 w-5 shrink-0" />
+                      Community
+                      {inboxUnreadCount > 0 && (
+                        <span className="min-w-[20px] h-5 px-1.5 flex items-center justify-center text-xs font-bold bg-accent text-black rounded-full">
+                          {inboxUnreadCount > 99 ? '99+' : inboxUnreadCount}
                         </span>
-                      </Link>
-                      <Link href="/partner-sessions" className={navLinkClass} onClick={() => setMobileOpen(false)}>Partner Sessions</Link>
-                      <Link href="/notifications" className={navLinkClass} onClick={() => setMobileOpen(false)}>
+                      )}
+                    </span>
+                  </Link>
+                  <Link href="/notifications" className={navLinkClass} onClick={() => setMobileOpen(false)}>
                         <span className="flex items-center gap-2">
                           <Bell className="h-5 w-5 shrink-0" />
                           Notifications
