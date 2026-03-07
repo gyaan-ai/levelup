@@ -116,7 +116,8 @@ export default async function AthleteProfilePage({
   const durationLabel = (m: number) => m === 30 ? '30 min' : m === 60 ? '1 hr' : m === 90 ? '1 hr 30 min' : m === 120 ? '2 hr' : `${m} min`;
   const typeLabel = (t: string) => t === 'private' ? 'Private (1:1)' : t === 'partner' ? 'Partner (1:2)' : 'Small group';
 
-  const rateCardFromServices = (coachServices ?? []).map((s) => ({
+  type RateCardItem = { id: string; name: string; price: number; description?: string; min_participants?: number; max_participants?: number };
+  const rateCardFromServices: RateCardItem[] = (coachServices ?? []).map((s) => ({
     id: s.id,
     name: `${durationLabel(s.duration_minutes)} · ${typeLabel(s.session_type)}${s.session_type === 'small_group' ? ` (up to ${s.max_participants})` : ''}`,
     price: Number(s.parent_price),
@@ -135,15 +136,15 @@ export default async function AthleteProfilePage({
     (athleteProducts || []).filter((ap) => ap.enabled === false).map((ap) => ap.product_id)
   );
   const apMap = new Map((athleteProducts || []).map((ap) => [ap.product_id, ap]));
-  const rateCardFromProducts = (allProducts || [])
+  const rateCardFromProducts: RateCardItem[] = (allProducts || [])
     .filter((p) => !disabledIds.has(p.id))
     .map((p) => {
       const ap = apMap.get(p.id);
       const price = ap?.custom_parent_price != null ? Number(ap.custom_parent_price) : Number(p.parent_price);
-      return { id: p.id, name: p.name, price };
+      return { id: p.id, name: p.name, price, description: p.description ?? undefined, min_participants: p.min_participants, max_participants: p.max_participants };
     });
 
-  const rateCardProducts = rateCardFromServices.length > 0 ? rateCardFromServices : rateCardFromProducts;
+  const rateCardProducts: RateCardItem[] = rateCardFromServices.length > 0 ? rateCardFromServices : rateCardFromProducts;
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-5xl">
@@ -279,10 +280,10 @@ export default async function AthleteProfilePage({
                 <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 py-2 border-b last:border-0">
                   <div>
                     <p className="font-medium">{p.name}</p>
-                    {'description' in p && p.description && (
+                    {p.description != null && p.description !== '' && (
                       <p className="text-sm text-muted-foreground">{p.description}</p>
                     )}
-                    {'min_participants' in p && 'max_participants' in p && p.min_participants !== p.max_participants && (
+                    {p.min_participants != null && p.max_participants != null && p.min_participants !== p.max_participants && (
                       <p className="text-xs text-muted-foreground">
                         {p.min_participants}–{p.max_participants} participants
                       </p>
