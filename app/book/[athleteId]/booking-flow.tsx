@@ -382,7 +382,12 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
                       >
                         <CardContent className="p-4 flex items-center gap-4">
                           {w.photo_url ? (
-                            <img src={w.photo_url} alt="" className="w-14 h-14 rounded-full object-cover shrink-0" />
+                            <img
+                              src={w.photo_url}
+                              alt=""
+                              className="w-14 h-14 rounded-full object-cover shrink-0"
+                              style={{ objectPosition: `${w.photo_focus_x ?? 50}% ${w.photo_focus_y ?? 50}%` }}
+                            />
                           ) : (
                             <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center shrink-0">
                               <User className="h-7 w-7 text-muted-foreground" />

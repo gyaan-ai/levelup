@@ -113,6 +113,7 @@ export default async function YouthWrestlerProfilePage({
                 src={youthWrestler.photo_url}
                 alt={`${youthWrestler.first_name} ${youthWrestler.last_name}`}
                 className="w-32 h-32 rounded-full object-cover border-4 border-accent/30"
+                style={{ objectPosition: `${youthWrestler.photo_focus_x ?? 50}% ${youthWrestler.photo_focus_y ?? 50}%` }}
               />
             ) : (
               <div className="w-32 h-32 rounded-full bg-muted flex items-center justify-center border-4 border-accent/30">

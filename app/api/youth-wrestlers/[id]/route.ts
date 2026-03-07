@@ -99,7 +99,13 @@ export async function PUT(
       goals,
       medicalNotes,
       photoUrl,
+      photoFocusX,
+      photoFocusY,
     } = body;
+
+    const clamp = (n: number) => Math.min(100, Math.max(0, Math.round(n)));
+    const focusX = photoFocusX != null ? clamp(Number(photoFocusX)) : undefined;
+    const focusY = photoFocusY != null ? clamp(Number(photoFocusY)) : undefined;
 
     // Calculate age from date of birth
     let age: number | null = null;
@@ -113,22 +119,26 @@ export async function PUT(
       }
     }
 
+    const updatePayload: Record<string, unknown> = {
+      first_name: firstName,
+      last_name: lastName,
+      date_of_birth: dateOfBirth || null,
+      age: age,
+      school: school || null,
+      graduation_year: graduationYear ?? null,
+      weight_class: weightClass || null,
+      skill_level: skillLevel || null,
+      wrestling_experience: wrestlingExperience || null,
+      goals: goals || null,
+      medical_notes: medicalNotes || null,
+      photo_url: photoUrl || null,
+    };
+    if (focusX !== undefined) updatePayload.photo_focus_x = focusX;
+    if (focusY !== undefined) updatePayload.photo_focus_y = focusY;
+
     const { data: youthWrestler, error } = await supabase
       .from('youth_wrestlers')
-      .update({
-        first_name: firstName,
-        last_name: lastName,
-        date_of_birth: dateOfBirth || null,
-        age: age,
-        school: school || null,
-        graduation_year: graduationYear ?? null,
-        weight_class: weightClass || null,
-        skill_level: skillLevel || null,
-        wrestling_experience: wrestlingExperience || null,
-        goals: goals || null,
-        medical_notes: medicalNotes || null,
-        photo_url: photoUrl || null,
-      })
+      .update(updatePayload)
       .eq('id', id)
       .select()
       .single();

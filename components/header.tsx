@@ -118,6 +118,12 @@ export function Header() {
                     Browse Coaches
                   </Link>
                   <Link
+                    href="/signup?role=athlete"
+                    className="text-white hover:text-accent transition-colors font-medium"
+                  >
+                    For Coaches
+                  </Link>
+                  <Link
                     href="/bookings"
                     className="text-white hover:text-accent transition-colors font-medium"
                   >
@@ -242,6 +248,7 @@ export function Header() {
                     <>
                   <Link href="/dashboard" className={navLinkClass} onClick={() => setMobileOpen(false)}>Dashboard</Link>
                   <Link href="/browse" className={navLinkClass} onClick={() => setMobileOpen(false)}>Browse Coaches</Link>
+                  <Link href="/signup?role=athlete" className={navLinkClass} onClick={() => setMobileOpen(false)}>For Coaches</Link>
                   <Link href="/bookings" className={navLinkClass} onClick={() => setMobileOpen(false)}>My Bookings</Link>
                   <Link href="/small-group-sessions" className={navLinkClass} onClick={() => setMobileOpen(false)}>Small group</Link>
                   <Link href="/inbox" className={navLinkClass} onClick={() => setMobileOpen(false)}>
@@ -295,6 +302,12 @@ export function Header() {
                 Browse Coaches
               </Link>
               <Link
+                href="/signup?role=athlete"
+                className="text-white hover:text-accent transition-colors font-medium"
+              >
+                For Coaches
+              </Link>
+              <Link
                 href="/how-it-works"
                 className="text-white hover:text-accent transition-colors font-medium"
               >
@@ -333,6 +346,7 @@ export function Header() {
               <nav className="absolute left-0 right-0 top-full bg-primary border-b border-accent/20 shadow-lg md:hidden" aria-label="Mobile navigation">
                 <div className="container mx-auto px-0 py-2">
                   <Link href="/browse" className={navLinkClass} onClick={() => setMobileOpen(false)}>Browse Coaches</Link>
+                  <Link href="/signup?role=athlete" className={navLinkClass} onClick={() => setMobileOpen(false)}>For Coaches</Link>
                   <Link href="/how-it-works" className={navLinkClass} onClick={() => setMobileOpen(false)}>How It Works</Link>
                   <Link href="/signup" className={navLinkClass} onClick={() => setMobileOpen(false)}>
                     <span className="font-semibold text-accent">Book Training</span>

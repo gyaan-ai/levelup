@@ -57,6 +57,8 @@ export default function SignupPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const inviteToken = searchParams?.get('invite')?.trim() || undefined;
+  const roleParam = searchParams?.get('role')?.toLowerCase();
+  const defaultRole = inviteToken ? 'parent' : (roleParam === 'athlete' ? 'athlete' : 'parent');
   const tenant = useTenant();
   const supabase = createClient(tenant.slug);
   const [loading, setLoading] = useState(false);
@@ -68,7 +70,7 @@ export default function SignupPage() {
       email: '',
       password: '',
       confirmPassword: '',
-      role: inviteToken ? 'parent' : 'parent',
+      role: defaultRole,
       coachType: undefined,
       firstName: '',
       lastName: '',
@@ -79,7 +81,8 @@ export default function SignupPage() {
 
   useEffect(() => {
     if (inviteToken) form.setValue('role', 'parent');
-  }, [inviteToken, form]);
+    else if (roleParam === 'athlete') form.setValue('role', 'athlete');
+  }, [inviteToken, roleParam, form]);
 
   const selectedRole = form.watch('role');
   const selectedCoachType = form.watch('coachType');

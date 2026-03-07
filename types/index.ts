@@ -126,6 +126,8 @@ export interface YouthWrestler {
   goals?: string;
   medical_notes?: string;
   photo_url?: string;
+  photo_focus_x?: number;
+  photo_focus_y?: number;
   active: boolean;
   created_at: string;
   updated_at: string;

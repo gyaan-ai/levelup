@@ -48,6 +48,14 @@ export default function HomePage() {
                     size="xl"
                     variant="outline"
                     asChild
+                    className="bg-transparent text-white border-accent text-accent hover:bg-accent hover:text-black"
+                  >
+                    <Link href="/signup?role=athlete">Coach? Join The Guild</Link>
+                  </Button>
+                  <Button
+                    size="xl"
+                    variant="outline"
+                    asChild
                     className="bg-transparent text-white border-white hover:bg-white hover:text-black"
                   >
                     <Link href="/#how-it-works">How It Works</Link>

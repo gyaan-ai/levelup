@@ -111,6 +111,7 @@ export async function DELETE(
     if (delError) return NextResponse.json({ error: delError.message }, { status: 500 });
 
     await admin.from('users').delete().eq('id', id);
+    await admin.auth.admin.deleteUser(id);
 
     return NextResponse.json({ ok: true });
   } catch (e) {

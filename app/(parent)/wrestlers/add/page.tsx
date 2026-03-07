@@ -26,7 +26,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { OnboardingWizard } from '@/components/onboarding-wizard';
-import { Camera } from 'lucide-react';
+import { Camera, AlertTriangle } from 'lucide-react';
+import Link from 'next/link';
 
 const youthWrestlerSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
@@ -53,6 +54,7 @@ export default function AddYouthWrestlerPage() {
   const [error, setError] = useState<string | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [duplicateOf, setDuplicateOf] = useState<{ id: string; first_name: string; last_name: string } | null>(null);
 
   const form = useForm<YouthWrestlerFormValues>({
     resolver: zodResolver(youthWrestlerSchema),
@@ -99,13 +101,29 @@ export default function AddYouthWrestlerPage() {
     if (!ok) return;
 
     setLoading(true);
+    setDuplicateOf(null);
     try {
       const values = form.getValues();
-      const createResponse = await fetch('/api/youth-wrestlers', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(values),
-      });
+      const doCreate = async (allowDuplicate = false) => {
+        const res = await fetch('/api/youth-wrestlers', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...values, allowDuplicate }),
+        });
+        return res;
+      };
+
+      let createResponse = await doCreate(false);
+
+      if (createResponse.status === 409) {
+        const data = await createResponse.json();
+        if (data.code === 'DUPLICATE_PROFILE' && data.duplicateOf) {
+          setDuplicateOf(data.duplicateOf);
+          setLoading(false);
+          return;
+        }
+        throw new Error(data.message || data.error || 'Duplicate profile');
+      }
 
       if (!createResponse.ok) {
         const data = await createResponse.json();
@@ -132,6 +150,54 @@ export default function AddYouthWrestlerPage() {
         }
       }
 
+      const redirectTo = searchParams.get('redirect');
+      const safeRedirect =
+        redirectTo &&
+        redirectTo.startsWith('/') &&
+        !redirectTo.startsWith('//') &&
+        !redirectTo.includes(':');
+      router.push(safeRedirect ? redirectTo : '/dashboard');
+      router.refresh();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An unexpected error occurred');
+      setLoading(false);
+    }
+  };
+
+  const handleCreateAnyway = async () => {
+    if (!duplicateOf) return;
+    setDuplicateOf(null);
+    setLoading(true);
+    setError(null);
+    try {
+      const values = form.getValues();
+      const createResponse = await fetch('/api/youth-wrestlers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...values, allowDuplicate: true }),
+      });
+      if (!createResponse.ok) {
+        const data = await createResponse.json();
+        throw new Error(data.error || 'Failed to create youth wrestler');
+      }
+      const { youthWrestler } = await createResponse.json();
+      if (photoFile) {
+        const formData = new FormData();
+        formData.append('file', photoFile);
+        formData.append('youthWrestlerId', youthWrestler.id);
+        const uploadResponse = await fetch('/api/youth-wrestlers/upload-photo', {
+          method: 'POST',
+          body: formData,
+        });
+        if (uploadResponse.ok) {
+          const uploadData = await uploadResponse.json();
+          await fetch(`/api/youth-wrestlers/${youthWrestler.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...values, photoUrl: uploadData.photoUrl }),
+          });
+        }
+      }
       const redirectTo = searchParams.get('redirect');
       const safeRedirect =
         redirectTo &&
@@ -186,6 +252,38 @@ export default function AddYouthWrestlerPage() {
         {error && (
           <div className="mb-4 p-3 bg-destructive/10 border border-destructive rounded-md">
             <p className="text-sm text-destructive">{error}</p>
+          </div>
+        )}
+
+        {duplicateOf && (
+          <div className="mb-4 p-4 bg-amber-500/10 border border-amber-500/50 rounded-md">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-amber-600 shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground">
+                  A profile for {duplicateOf.first_name} {duplicateOf.last_name} already exists.
+                </p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Use the existing profile (e.g. from your spouse) or create a second one.
+                </p>
+                <div className="flex flex-wrap gap-2 mt-3">
+                  <Link href={`/wrestlers/${duplicateOf.id}`}>
+                    <Button type="button" variant="default" size="sm">
+                      Use existing profile
+                    </Button>
+                  </Link>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleCreateAnyway}
+                    disabled={loading}
+                  >
+                    Create another anyway
+                  </Button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 

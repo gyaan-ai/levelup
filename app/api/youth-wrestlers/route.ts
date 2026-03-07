@@ -94,7 +94,47 @@ export async function POST(req: NextRequest) {
       goals,
       medicalNotes,
       photoUrl,
+      allowDuplicate,
     } = body;
+
+    const norm = (s: string) => (s ?? '').trim().toLowerCase();
+    const firstNorm = norm(firstName);
+    const lastNorm = norm(lastName);
+
+    if (!allowDuplicate && firstNorm && lastNorm) {
+      // All youth wrestlers this parent can see (primary or linked)
+      const { data: primaryRows } = await supabase
+        .from('youth_wrestlers')
+        .select('id, first_name, last_name')
+        .eq('parent_id', user.id);
+      const { data: linkedIds } = await supabase
+        .from('youth_wrestler_parents')
+        .select('youth_wrestler_id')
+        .eq('parent_id', user.id);
+      const linkedIdList = [...new Set((linkedIds ?? []).map((r: { youth_wrestler_id: string }) => r.youth_wrestler_id))];
+      const { data: linkedRows } = linkedIdList.length > 0
+        ? await supabase
+            .from('youth_wrestlers')
+            .select('id, first_name, last_name')
+            .in('id', linkedIdList)
+        : { data: [] };
+      const family = [...(primaryRows ?? []), ...(linkedRows ?? [])];
+      const deduped = [...new Map(family.map((r: { id: string }) => [r.id, r])).values()];
+      const duplicate = deduped.find(
+        (r: { first_name?: string; last_name?: string }) =>
+          norm(r.first_name ?? '') === firstNorm && norm(r.last_name ?? '') === lastNorm
+      );
+      if (duplicate) {
+        return NextResponse.json(
+          {
+            code: 'DUPLICATE_PROFILE',
+            message: `A profile for ${(firstName ?? '').trim()} ${(lastName ?? '').trim()} already exists.`,
+            duplicateOf: { id: duplicate.id, first_name: duplicate.first_name, last_name: duplicate.last_name },
+          },
+          { status: 409 }
+        );
+      }
+    }
 
     // Calculate age from date of birth
     let age: number | null = null;

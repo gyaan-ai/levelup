@@ -91,6 +91,7 @@ export default async function ParentDashboard() {
                       src={wrestler.photo_url}
                       alt={`${wrestler.first_name} ${wrestler.last_name}`}
                       className="w-full h-full object-cover"
+                      style={{ objectPosition: `${wrestler.photo_focus_x ?? 50}% ${wrestler.photo_focus_y ?? 50}%` }}
                     />
                   ) : (
                     <div className="flex items-center justify-center h-full">

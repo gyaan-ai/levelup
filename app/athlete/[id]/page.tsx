@@ -13,6 +13,7 @@ import { ArrowLeft, Star, User, MapPin, Award, Shield, CheckCircle, MessageCircl
 import { SchoolLogo } from '@/components/school-logo';
 import { CoachSessionBadge } from '@/components/coach-session-badge';
 import { FollowCoachButton } from '@/components/follow-coach-button';
+import { DeleteAthleteProfileButton } from '@/components/delete-athlete-profile-button';
 
 const SCHOOL_COLORS: Record<string, { bg: string; text: string }> = {
   'UNC': { bg: 'bg-blue-600', text: 'text-white' },
@@ -113,6 +114,10 @@ export default async function AthleteProfilePage({
     ? await supabase.from('users').select('role').eq('id', user.id).single()
     : { data: null };
   const isParent = userData?.role === 'parent';
+  const isAdmin = userData?.role === 'admin';
+  const isOwnProfile = !!user && user.id === id && userData?.role === 'athlete';
+  const canDelete = isAdmin || isParent || isOwnProfile;
+  const athleteName = `${athlete.first_name} ${athlete.last_name}`.trim() || 'This coach';
 
   // Rate card: coach-built services (preferred) or org products
   const admin = createAdminClient(tenantSlug);
@@ -345,7 +350,7 @@ export default async function AthleteProfilePage({
 
       {/* Training Location Section */}
       {facility && (
-        <Card>
+        <Card className="mb-6">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <MapPin className="h-5 w-5" />
@@ -364,6 +369,15 @@ export default async function AthleteProfilePage({
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Delete profile (admin, parent, or own profile) */}
+      {canDelete && (
+        <DeleteAthleteProfileButton
+          athleteId={id}
+          athleteName={athleteName}
+          isOwnProfile={isOwnProfile}
+        />
       )}
     </div>
   );
