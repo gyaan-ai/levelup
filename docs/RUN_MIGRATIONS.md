@@ -31,11 +31,21 @@ psql "postgresql://postgres:[PASSWORD]@[HOST]:5432/postgres" -f supabase/migrati
 
 Replace `[PASSWORD]` and `[HOST]` with your Supabase project credentials (Project Settings → Database).
 
+## athlete_services (coach rate card)
+
+If you see: *"Could not find the table 'public.athlete_services' in the schema cache"*
+
+1. Go to [Supabase Dashboard](https://supabase.com/dashboard) → your project → **SQL Editor**
+2. Open `supabase/migrations/20240140000000_athlete_services.sql` in your repo, copy its full contents, paste into the SQL Editor, and click **Run**.
+
+Or push all pending migrations: `supabase link --project-ref YOUR_REF` then `supabase db push`.
+
 ## Migrations included
 
 - `20240118000000_workspaces.sql` – Workspaces, goals, media, session notes, actions, workspace-media storage bucket
 - `20240120000000_workspace_messages.sql` – Collaboration messages table
 - `20240121000000_workspace_media_mime_types.sql` – Adds HEIC, M4V, etc. for mobile photo/video uploads
 - `20240122000000_workspace_messages_modern.sql` – Edit/delete messages, emoji reactions
+- `20240140000000_athlete_services.sql` – Coach rate card (durations, session types, price; platform 10%, coach 90%)
 
 If workspace features or video/photo upload fail, ensure all migrations have been run on production.
