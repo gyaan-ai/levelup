@@ -48,8 +48,9 @@ export async function GET(req: NextRequest) {
       const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
       const isParent = workspace.parent_id === user.id;
       const isCoach = workspace.athlete_id === user.id;
+      const isYouthWrestler = workspace.youth_wrestler_id === user.id;
       const isAdmin = userData?.role === 'admin';
-      if (!isParent && !isCoach && !isAdmin) {
+      if (!isParent && !isCoach && !isYouthWrestler && !isAdmin) {
         return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
       }
       return NextResponse.json(workspace);
@@ -59,7 +60,7 @@ export async function GET(req: NextRequest) {
 
     const admin = createAdminClient(tenant.slug);
 
-    if (userData?.role !== 'parent' && userData?.role !== 'athlete' && userData?.role !== 'admin') {
+    if (userData?.role !== 'parent' && userData?.role !== 'athlete' && userData?.role !== 'youth_wrestler' && userData?.role !== 'admin') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -115,6 +116,34 @@ export async function GET(req: NextRequest) {
           }
         }
       }
+    } else if (userData?.role === 'youth_wrestler') {
+      // Youth wrestler with account: their youth_wrestlers.id = user.id; ensure workspaces exist for their sessions
+      const { data: participants } = await admin
+        .from('session_participants')
+        .select('session_id, parent_id, youth_wrestler_id')
+        .eq('youth_wrestler_id', user.id);
+      if (participants?.length) {
+        const sessionIds = [...new Set(participants.map((p) => p.session_id))];
+        const { data: sessions } = await admin
+          .from('sessions')
+          .select('id, parent_id, athlete_id')
+          .in('id', sessionIds)
+          .in('status', ['scheduled', 'completed']);
+        const seen = new Set<string>();
+        for (const p of participants) {
+          const sess = sessions?.find((s) => s.id === p.session_id);
+          if (!sess) continue;
+          const key = `${sess.parent_id}-${p.youth_wrestler_id}-${sess.athlete_id}`;
+          if (!seen.has(key)) {
+            seen.add(key);
+            await admin.rpc('get_or_create_workspace', {
+              p_parent_id: sess.parent_id,
+              p_youth_wrestler_id: p.youth_wrestler_id,
+              p_athlete_id: sess.athlete_id,
+            });
+          }
+        }
+      }
     }
 
     let query = admin
@@ -134,6 +163,8 @@ export async function GET(req: NextRequest) {
       query = query.eq('parent_id', user.id);
     } else if (userData?.role === 'athlete') {
       query = query.eq('athlete_id', user.id);
+    } else if (userData?.role === 'youth_wrestler') {
+      query = query.eq('youth_wrestler_id', user.id);
     }
 
     const { data: workspaces, error } = await query.order('updated_at', { ascending: false });

@@ -22,6 +22,12 @@ export async function PATCH(
 
     const admin = createAdminClient(tenant.slug);
 
+    const { data: ws } = await admin.from('workspaces').select('parent_id, youth_wrestler_id, athlete_id').eq('id', workspaceId).single();
+    if (!ws) return NextResponse.json({ error: 'Workspace not found' }, { status: 404 });
+    const { data: ud } = await supabase.from('users').select('role').eq('id', user.id).single();
+    const hasAccess = ws.parent_id === user.id || ws.athlete_id === user.id || ws.youth_wrestler_id === user.id || ud?.role === 'admin';
+    if (!hasAccess) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
     // Verify message exists and user owns it
     const { data: msg } = await admin
       .from('workspace_messages')
@@ -69,6 +75,12 @@ export async function DELETE(
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const admin = createAdminClient(tenant.slug);
+
+    const { data: ws } = await admin.from('workspaces').select('parent_id, youth_wrestler_id, athlete_id').eq('id', workspaceId).single();
+    if (!ws) return NextResponse.json({ error: 'Workspace not found' }, { status: 404 });
+    const { data: ud } = await supabase.from('users').select('role').eq('id', user.id).single();
+    const hasAccess = ws.parent_id === user.id || ws.athlete_id === user.id || ws.youth_wrestler_id === user.id || ud?.role === 'admin';
+    if (!hasAccess) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
     // Verify message exists and user owns it
     const { data: msg } = await admin

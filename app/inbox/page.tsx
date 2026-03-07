@@ -26,7 +26,7 @@ export default async function InboxPage() {
   return (
     <div className="flex flex-col h-full">
       <div className="p-4 border-b border-border">
-        <h1 className="text-xl font-bold">Messages</h1>
+        <h1 className="text-xl font-bold">Community</h1>
         <p className="text-sm text-muted-foreground">
           {role === 'parent' ? 'Message coaches or join group conversations.' : 'Groups and direct conversations with parents.'}
         </p>

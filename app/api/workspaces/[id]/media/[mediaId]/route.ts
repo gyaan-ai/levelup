@@ -19,7 +19,7 @@ async function requireAuth(workspaceId: string) {
   }
 
   const admin = createAdminClient(tenant.slug);
-  const { data: workspace } = await admin.from('workspaces').select('parent_id, athlete_id').eq('id', workspaceId).single();
+  const { data: workspace } = await admin.from('workspaces').select('parent_id, youth_wrestler_id, athlete_id').eq('id', workspaceId).single();
   if (!workspace) {
     return { error: NextResponse.json({ error: 'Workspace not found' }, { status: 404 }) };
   }
@@ -28,6 +28,7 @@ async function requireAuth(workspaceId: string) {
   const isAuthorized =
     workspace.parent_id === user.id ||
     workspace.athlete_id === user.id ||
+    workspace.youth_wrestler_id === user.id ||
     userRow?.role === 'admin';
 
   if (!isAuthorized) {

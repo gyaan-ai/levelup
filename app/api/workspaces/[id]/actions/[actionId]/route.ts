@@ -21,10 +21,11 @@ export async function PATCH(
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const admin = createAdminClient(tenant.slug);
-    const { data: ws } = await admin.from('workspaces').select('parent_id, athlete_id').eq('id', workspaceId).single();
+    const { data: ws } = await admin.from('workspaces').select('parent_id, youth_wrestler_id, athlete_id').eq('id', workspaceId).single();
     if (!ws) return NextResponse.json({ error: 'Workspace not found' }, { status: 404 });
     const { data: ud } = await supabase.from('users').select('role').eq('id', user.id).single();
-    if (ws.parent_id !== user.id && ws.athlete_id !== user.id && ud?.role !== 'admin') {
+    const isYouthWrestler = ws.youth_wrestler_id === user.id;
+    if (ws.parent_id !== user.id && ws.athlete_id !== user.id && !isYouthWrestler && ud?.role !== 'admin') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -70,8 +71,9 @@ export async function DELETE(
     const admin = createAdminClient(tenant.slug);
     const { data: ws } = await admin.from('workspaces').select('athlete_id').eq('id', workspaceId).single();
     if (!ws) return NextResponse.json({ error: 'Workspace not found' }, { status: 404 });
-    if (ws.athlete_id !== user.id) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const { data: ud } = await supabase.from('users').select('role').eq('id', user.id).single();
+    if (ws.athlete_id !== user.id && ud?.role !== 'admin') {
+      return NextResponse.json({ error: 'Forbidden - only coach can remove actions' }, { status: 403 });
     }
 
     const { error } = await admin

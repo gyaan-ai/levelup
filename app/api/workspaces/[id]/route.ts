@@ -40,10 +40,11 @@ export async function GET(
 
     const isParent = workspace.parent_id === user.id;
     const isCoach = workspace.athlete_id === user.id;
+    const isYouthWrestler = workspace.youth_wrestler_id === user.id;
     const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
     const isAdmin = userData?.role === 'admin';
 
-    if (!isParent && !isCoach && !isAdmin) {
+    if (!isParent && !isCoach && !isYouthWrestler && !isAdmin) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 

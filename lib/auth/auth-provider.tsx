@@ -7,7 +7,7 @@ import { User } from '@supabase/supabase-js';
 
 interface AuthContextType {
   user: User | null;
-  userRole: 'parent' | 'athlete' | 'admin' | null;
+  userRole: 'parent' | 'athlete' | 'admin' | 'youth_wrestler' | null;
   loading: boolean;
   signOut: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -23,7 +23,7 @@ export function AuthProvider({
   tenantSlug: string;
 }) {
   const [user, setUser] = useState<User | null>(null);
-  const [userRole, setUserRole] = useState<'parent' | 'athlete' | 'admin' | null>(null);
+  const [userRole, setUserRole] = useState<'parent' | 'athlete' | 'admin' | 'youth_wrestler' | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const supabase = createClient(tenantSlug);
@@ -44,7 +44,7 @@ export function AuthProvider({
       }
 
       if (data && data.role) {
-        setUserRole(data.role as 'parent' | 'athlete' | 'admin');
+        setUserRole(data.role as 'parent' | 'athlete' | 'admin' | 'youth_wrestler');
       } else {
         // User record doesn't exist yet - this can happen during signup
         setUserRole(null);

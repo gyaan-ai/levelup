@@ -23,10 +23,11 @@ export async function POST(
     const admin = createAdminClient(tenant.slug);
 
     // Verify workspace access
-    const { data: ws } = await admin.from('workspaces').select('parent_id, athlete_id').eq('id', workspaceId).single();
+    const { data: ws } = await admin.from('workspaces').select('parent_id, youth_wrestler_id, athlete_id').eq('id', workspaceId).single();
     if (!ws) return NextResponse.json({ error: 'Workspace not found' }, { status: 404 });
     const { data: ud } = await supabase.from('users').select('role').eq('id', user.id).single();
-    if (ws.parent_id !== user.id && ws.athlete_id !== user.id && ud?.role !== 'admin') {
+    const isYouthWrestler = ws.youth_wrestler_id === user.id;
+    if (ws.parent_id !== user.id && ws.athlete_id !== user.id && !isYouthWrestler && ud?.role !== 'admin') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 

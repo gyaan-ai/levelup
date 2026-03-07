@@ -16,7 +16,7 @@ export function Header() {
   const { user, userRole, loading, signOut } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [notificationCount, refreshNotifications] = useNotificationCount(!!user);
-  const showInboxIcon = userRole === 'parent' || userRole === 'athlete';
+  const showInboxIcon = userRole === 'parent' || userRole === 'athlete' || userRole === 'youth_wrestler';
   const [inboxUnreadCount, refreshInboxUnread] = useInboxUnreadCount(!!user && showInboxIcon);
 
   const handleSignOut = async () => {
@@ -57,12 +57,41 @@ export function Header() {
                     href="/inbox"
                     className="text-white hover:text-accent transition-colors font-medium"
                   >
-                    Messages
+                    Community
                   </Link>
                   <Link
                     href="/inbox"
                     className="relative flex items-center justify-center p-1.5 text-white hover:text-accent transition-colors font-medium rounded hover:bg-white/10"
-                    aria-label={inboxUnreadCount > 0 ? `Inbox (${inboxUnreadCount} unread)` : 'Inbox'}
+                    aria-label={inboxUnreadCount > 0 ? `Community (${inboxUnreadCount} unread)` : 'Community'}
+                  >
+                    <Mail className="h-5 w-5" />
+                    {inboxUnreadCount > 0 && (
+                      <span className="absolute top-0 right-0 min-w-[18px] h-[18px] px-1 flex items-center justify-center text-[10px] font-bold bg-accent text-black rounded-full -translate-y-0.5 translate-x-0.5">
+                        {inboxUnreadCount > 99 ? '99+' : inboxUnreadCount}
+                      </span>
+                    )}
+                  </Link>
+                  <NotificationBell count={notificationCount} onRefresh={refreshNotifications} />
+                </>
+              )}
+              {userRole === 'youth_wrestler' && (
+                <>
+                  <Link
+                    href="/youth-dashboard"
+                    className="text-white hover:text-accent transition-colors font-medium"
+                  >
+                    Dashboard
+                  </Link>
+                  <Link
+                    href="/inbox"
+                    className="text-white hover:text-accent transition-colors font-medium"
+                  >
+                    Community
+                  </Link>
+                  <Link
+                    href="/inbox"
+                    className="relative flex items-center justify-center p-1.5 text-white hover:text-accent transition-colors font-medium rounded hover:bg-white/10"
+                    aria-label={inboxUnreadCount > 0 ? `Community (${inboxUnreadCount} unread)` : 'Community'}
                   >
                     <Mail className="h-5 w-5" />
                     {inboxUnreadCount > 0 && (
@@ -104,12 +133,12 @@ export function Header() {
                     href="/inbox"
                     className="text-white hover:text-accent transition-colors font-medium"
                   >
-                    Messages
+                    Community
                   </Link>
                   <Link
                     href="/inbox"
                     className="relative flex items-center justify-center p-1.5 text-white hover:text-accent transition-colors font-medium rounded hover:bg-white/10"
-                    aria-label={inboxUnreadCount > 0 ? `Inbox (${inboxUnreadCount} unread)` : 'Inbox'}
+                    aria-label={inboxUnreadCount > 0 ? `Community (${inboxUnreadCount} unread)` : 'Community'}
                   >
                     <Mail className="h-5 w-5" />
                     {inboxUnreadCount > 0 && (
@@ -117,12 +146,6 @@ export function Header() {
                         {inboxUnreadCount > 99 ? '99+' : inboxUnreadCount}
                       </span>
                     )}
-                  </Link>
-                  <Link
-                    href="/workspaces"
-                    className="text-white hover:text-accent transition-colors font-medium"
-                  >
-                    Workspaces
                   </Link>
                   <Link
                     href="/partner-sessions"
@@ -178,7 +201,34 @@ export function Header() {
                       <Link href="/inbox" className={navLinkClass} onClick={() => setMobileOpen(false)}>
                         <span className="flex items-center gap-2">
                           <Mail className="h-5 w-5 shrink-0" />
-                          Messages
+                          Community
+                          {inboxUnreadCount > 0 && (
+                            <span className="min-w-[20px] h-5 px-1.5 flex items-center justify-center text-xs font-bold bg-accent text-black rounded-full">
+                              {inboxUnreadCount > 99 ? '99+' : inboxUnreadCount}
+                            </span>
+                          )}
+                        </span>
+                      </Link>
+                      <Link href="/notifications" className={navLinkClass} onClick={() => setMobileOpen(false)}>
+                        <span className="flex items-center gap-2">
+                          <Bell className="h-5 w-5 shrink-0" />
+                          Notifications
+                          {notificationCount > 0 && (
+                            <span className="min-w-[20px] h-5 px-1.5 flex items-center justify-center text-xs font-bold bg-accent text-black rounded-full">
+                              {notificationCount > 99 ? '99+' : notificationCount}
+                            </span>
+                          )}
+                        </span>
+                      </Link>
+                    </>
+                  )}
+                  {userRole === 'youth_wrestler' && (
+                    <>
+                      <Link href="/youth-dashboard" className={navLinkClass} onClick={() => setMobileOpen(false)}>Dashboard</Link>
+                      <Link href="/inbox" className={navLinkClass} onClick={() => setMobileOpen(false)}>
+                        <span className="flex items-center gap-2">
+                          <Mail className="h-5 w-5 shrink-0" />
+                          Community
                           {inboxUnreadCount > 0 && (
                             <span className="min-w-[20px] h-5 px-1.5 flex items-center justify-center text-xs font-bold bg-accent text-black rounded-full">
                               {inboxUnreadCount > 99 ? '99+' : inboxUnreadCount}
@@ -208,7 +258,7 @@ export function Header() {
                       <Link href="/inbox" className={navLinkClass} onClick={() => setMobileOpen(false)}>
                         <span className="flex items-center gap-2">
                           <Mail className="h-5 w-5 shrink-0" />
-                          Messages
+                          Community
                           {inboxUnreadCount > 0 && (
                             <span className="min-w-[20px] h-5 px-1.5 flex items-center justify-center text-xs font-bold bg-accent text-black rounded-full">
                               {inboxUnreadCount > 99 ? '99+' : inboxUnreadCount}
@@ -216,7 +266,6 @@ export function Header() {
                           )}
                         </span>
                       </Link>
-                      <Link href="/workspaces" className={navLinkClass} onClick={() => setMobileOpen(false)}>Workspaces</Link>
                       <Link href="/partner-sessions" className={navLinkClass} onClick={() => setMobileOpen(false)}>Partner Sessions</Link>
                       <Link href="/notifications" className={navLinkClass} onClick={() => setMobileOpen(false)}>
                         <span className="flex items-center gap-2">

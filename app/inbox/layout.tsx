@@ -25,13 +25,13 @@ export default async function InboxLayout({
     .single();
 
   const role = userData?.role;
-  if (role !== 'parent' && role !== 'athlete') {
+  if (role !== 'parent' && role !== 'athlete' && role !== 'youth_wrestler') {
     redirect(role === 'admin' ? '/admin' : '/dashboard');
   }
 
   return (
     <div className="flex h-[calc(100vh-3.5rem)] max-h-[calc(100vh-3.5rem)]">
-      <InboxSidebar role={role} />
+      <InboxSidebar role={role as 'parent' | 'athlete' | 'youth_wrestler'} />
       <main className="flex-1 min-w-0 flex flex-col overflow-hidden bg-background">
         {children}
       </main>

@@ -21,15 +21,16 @@ export async function POST(
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const admin = createAdminClient(tenant.slug);
-    const { data: ws } = await admin.from('workspaces').select('parent_id, athlete_id').eq('id', workspaceId).single();
+    const { data: ws } = await admin.from('workspaces').select('parent_id, youth_wrestler_id, athlete_id').eq('id', workspaceId).single();
     if (!ws) return NextResponse.json({ error: 'Workspace not found' }, { status: 404 });
 
     const { data: ud } = await supabase.from('users').select('role').eq('id', user.id).single();
     const isParent = ws.parent_id === user.id;
     const isCoach = ws.athlete_id === user.id;
+    const isYouthWrestler = ws.youth_wrestler_id === user.id;
     const isAdmin = ud?.role === 'admin';
 
-    if (!isParent && !isCoach && !isAdmin) {
+    if (!isParent && !isCoach && !isYouthWrestler && !isAdmin) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 

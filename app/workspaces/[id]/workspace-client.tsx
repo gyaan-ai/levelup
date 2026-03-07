@@ -89,7 +89,7 @@ export function WorkspaceClient({ workspaceId, isCoach = false }: { workspaceId:
   const load = useCallback(async () => {
     const res = await fetch(`/api/workspaces/${workspaceId}`);
     if (!res.ok) {
-      router.push('/workspaces');
+      router.push('/inbox');
       return;
     }
     const json = await res.json();
@@ -240,9 +240,9 @@ export function WorkspaceClient({ workspaceId, isCoach = false }: { workspaceId:
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <Link href="/workspaces" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-6">
+      <Link href="/inbox" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-6">
         <ArrowLeft className="h-4 w-4 mr-2" />
-        Back to workspaces
+        Back to Community
       </Link>
 
       <div className="mb-8">

@@ -21,12 +21,16 @@ export default async function WorkspacePage({
   if (!user) redirect('/login');
 
   const admin = createAdminClient(tenant.slug);
-  const { data: workspace } = await admin.from('workspaces').select('parent_id, athlete_id').eq('id', id).single();
+  const { data: workspace } = await admin.from('workspaces').select('parent_id, youth_wrestler_id, athlete_id').eq('id', id).single();
   if (!workspace) notFound();
 
   const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
-  const hasAccess = workspace.parent_id === user.id || workspace.athlete_id === user.id || userData?.role === 'admin';
-  if (!hasAccess) redirect('/workspaces');
+  const hasAccess =
+    workspace.parent_id === user.id ||
+    workspace.athlete_id === user.id ||
+    workspace.youth_wrestler_id === user.id ||
+    userData?.role === 'admin';
+  if (!hasAccess) redirect('/inbox');
 
   const isCoach = workspace.athlete_id === user.id;
   return <WorkspaceClient workspaceId={id} isCoach={isCoach} />;

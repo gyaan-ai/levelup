@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { MessageCircle, Users, Plus } from 'lucide-react';
+import { MessageCircle, Users, Plus, LayoutGrid } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 type Group = { id: string; name: string; athleteId: string; createdAt: string };
@@ -15,32 +15,80 @@ type DmThread = {
   otherName: string;
   unread?: boolean;
 };
+type WorkspaceItem = {
+  id: string;
+  youth_wrestlers?: { first_name?: string; last_name?: string } | { first_name?: string; last_name?: string }[];
+  athletes?: { first_name?: string; last_name?: string } | { first_name?: string; last_name?: string }[];
+};
 
-export function InboxSidebar({ role }: { role: 'parent' | 'athlete' }) {
+function workspaceLabel(ws: WorkspaceItem): string {
+  const coach = Array.isArray(ws.athletes) ? ws.athletes[0] : ws.athletes;
+  const kid = Array.isArray(ws.youth_wrestlers) ? ws.youth_wrestlers[0] : ws.youth_wrestlers;
+  const coachName = coach ? `${coach.first_name ?? ''} ${coach.last_name ?? ''}`.trim() : 'Coach';
+  const kidName = kid ? `${kid.first_name ?? ''} ${kid.last_name ?? ''}`.trim() : 'Wrestler';
+  return kidName ? `${coachName} · ${kidName}` : coachName;
+}
+
+export function InboxSidebar({ role }: { role: 'parent' | 'athlete' | 'youth_wrestler' }) {
   const pathname = usePathname();
   const [groups, setGroups] = useState<Group[]>([]);
   const [threads, setThreads] = useState<DmThread[]>([]);
+  const [workspaces, setWorkspaces] = useState<WorkspaceItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const workspacesPromise = (role === 'parent' || role === 'athlete' || role === 'youth_wrestler')
+      ? fetch('/api/workspaces').then((r) => r.json()).then((d) => d.workspaces ?? [])
+      : Promise.resolve([]);
     Promise.all([
       fetch('/api/messaging-groups').then((r) => r.json()),
       fetch('/api/coach-inquiries/threads').then((r) => r.json()),
-    ]).then(([groupsRes, threadsRes]) => {
+      workspacesPromise,
+    ]).then(([groupsRes, threadsRes, wsList]) => {
       if (groupsRes.groups) setGroups(groupsRes.groups);
       if (threadsRes.threads) setThreads(threadsRes.threads);
+      if (Array.isArray(wsList)) setWorkspaces(wsList);
     }).catch(() => {}).finally(() => setLoading(false));
-  }, []);
+  }, [role]);
 
   const isGroupPath = pathname?.startsWith('/inbox/groups/');
   const groupId = pathname?.match(/^\/inbox\/groups\/([^/]+)/)?.[1];
+  const workspaceId = pathname?.match(/^\/workspaces\/([^/]+)/)?.[1];
 
   return (
     <aside className="w-60 shrink-0 border-r border-border bg-card flex flex-col h-full">
       <div className="p-3 border-b border-border">
-        <h2 className="text-sm font-semibold text-foreground">Messages</h2>
+        <h2 className="text-sm font-semibold text-foreground">Community</h2>
       </div>
       <div className="flex-1 overflow-y-auto p-2 space-y-4">
+        {(role === 'parent' || role === 'athlete' || role === 'youth_wrestler') && (
+          <section>
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide px-2 py-1 block">Spaces</span>
+            {loading ? (
+              <p className="text-xs text-muted-foreground px-2 py-2">Loading…</p>
+            ) : workspaces.length === 0 ? (
+              <p className="text-xs text-muted-foreground px-2 py-2">No spaces yet</p>
+            ) : (
+              <ul className="space-y-0.5">
+                {workspaces.map((ws) => (
+                  <li key={ws.id}>
+                    <Link
+                      href={`/workspaces/${ws.id}`}
+                      className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${
+                        workspaceId === ws.id
+                          ? 'bg-accent/20 text-accent border-l-2 border-accent'
+                          : 'hover:bg-muted/50'
+                      }`}
+                    >
+                      <LayoutGrid className="h-4 w-4 shrink-0" />
+                      <span className="truncate">{workspaceLabel(ws)}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        )}
         {role === 'athlete' && (
           <section>
             <div className="flex items-center justify-between px-2 py-1">

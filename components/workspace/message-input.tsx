@@ -53,7 +53,7 @@ export function MessageInput({ workspaceId, onMessageSent }: MessageInputProps) 
         value={message}
         onChange={(e) => setMessage(e.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder="Type a message..."
+        placeholder="Type a message… (emoji supported)"
         className="min-h-[44px] max-h-32 resize-none text-[15px] py-3"
         disabled={sending}
         rows={1}

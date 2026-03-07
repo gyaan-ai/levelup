@@ -18,6 +18,8 @@ export interface WorkspaceMessage {
     name: string;
     role?: string;
   };
+  /** Aggregated by emoji: { emoji, userIds } */
+  reactions?: Array<{ emoji: string; userIds: string[] }>;
 }
 
 async function resolveAuthorName(
@@ -126,8 +128,28 @@ export function useWorkspaceMessages(workspaceId: string) {
           created_at: string;
           updated_at?: string;
         }>;
+        const msgIds = list.map((m) => m.id);
+        let reactionsMap = new Map<string, Array<{ emoji: string; userIds: string[] }>>();
+        if (msgIds.length > 0) {
+          const { data: reactions } = await supabase
+            .from('workspace_message_reactions')
+            .select('message_id, user_id, emoji')
+            .in('message_id', msgIds);
+          for (const r of reactions || []) {
+            const row = r as { message_id: string; user_id: string; emoji: string };
+            if (!reactionsMap.has(row.message_id)) reactionsMap.set(row.message_id, []);
+            const arr = reactionsMap.get(row.message_id)!;
+            const existing = arr.find((x) => x.emoji === row.emoji);
+            if (existing) existing.userIds.push(row.user_id);
+            else arr.push({ emoji: row.emoji, userIds: [row.user_id] });
+          }
+        }
         const withAuthors = await resolveAuthors(list);
-        setMessages(withAuthors);
+        const withReactions: WorkspaceMessage[] = withAuthors.map((m) => ({
+          ...m,
+          reactions: reactionsMap.get(m.id) || [],
+        }));
+        setMessages(withReactions);
       } catch (err) {
         setError(err instanceof Error ? err : new Error('Failed to load messages'));
         setMessages([]);
@@ -168,6 +190,7 @@ export function useWorkspaceMessages(workspaceId: string) {
             created_at: row.created_at,
             updated_at: row.updated_at,
             author,
+            reactions: [],
           };
           setMessages((prev) => [...prev, msg]);
         }
@@ -179,5 +202,31 @@ export function useWorkspaceMessages(workspaceId: string) {
     };
   }, [workspaceId, resolveAuthors, supabase]);
 
-  return { messages, loading, error };
+  const updateMessageContent = useCallback(
+    (messageId: string, content: string, updated_at: string) => {
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === messageId ? { ...m, content, updated_at } : m
+        )
+      );
+    },
+    []
+  );
+
+  const updateMessageReactions = useCallback(
+    (messageId: string, reactions: Array<{ emoji: string; userIds: string[] }>) => {
+      setMessages((prev) =>
+        prev.map((m) => (m.id === messageId ? { ...m, reactions } : m))
+      );
+    },
+    []
+  );
+
+  return {
+    messages,
+    loading,
+    error,
+    updateMessageContent,
+    updateMessageReactions,
+  };
 }

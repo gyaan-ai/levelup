@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
+import { createNotification } from '@/lib/notifications';
 
 /** GET ?parentId=&athleteId= - messages in thread + other party name */
 export async function GET(req: NextRequest) {
@@ -102,6 +104,39 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    const recipientId = user.id === parentId ? athleteId : parentId;
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (host.startsWith('localhost') ? `http://${host}` : `https://${host}`);
+    const threadLink = `${baseUrl}/inbox/thread/${parentId}/${athleteId}`;
+
+    try {
+      const admin = createAdminClient(tenant.slug);
+      if (recipientId === athleteId) {
+        await createNotification(admin, {
+          user_id: athleteId,
+          type: 'coach_inquiry_message',
+          title: 'New message from a parent',
+          body: text.trim().slice(0, 100) + (text.trim().length > 100 ? '…' : ''),
+          data: { parentId, athleteId, messageId: row.id, link: threadLink },
+        });
+      } else {
+        const { data: coach } = await supabase
+          .from('athletes')
+          .select('first_name, last_name')
+          .eq('id', athleteId)
+          .single();
+        const coachName = coach ? [coach.first_name, coach.last_name].filter(Boolean).join(' ') || 'Coach' : 'Coach';
+        await createNotification(admin, {
+          user_id: parentId,
+          type: 'coach_inquiry_message',
+          title: `New message from ${coachName}`,
+          body: text.trim().slice(0, 100) + (text.trim().length > 100 ? '…' : ''),
+          data: { parentId, athleteId, messageId: row.id, link: threadLink },
+        });
+      }
+    } catch (notifErr) {
+      console.warn('Coach inquiry notification insert failed:', notifErr);
+    }
 
     return NextResponse.json({ message: row });
   } catch (e) {
