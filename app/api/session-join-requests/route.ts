@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (host.startsWith('localhost') ? `http://${host}` : `https://${host}`);
     const link = `${baseUrl}/sessions/${sessionId}/requests`;
     const title = 'Join request for your session';
-    const body = `${ywName} requested to join. Approve or decline based on skill level, weight, etc.`;
+    const notificationBody = `${ywName} requested to join. Approve or decline based on skill level, weight, etc.`;
 
     try {
       const admin = createAdminClient(tenant.slug);
@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
           user_id: s.parent_id,
           type: 'session_join_request',
           title,
-          body,
+          body: notificationBody,
           data: { sessionId, youthWrestlerId, link },
         });
       }
@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
           user_id: s.athlete_id,
           type: 'session_join_request',
           title,
-          body,
+          body: notificationBody,
           data: { sessionId, youthWrestlerId, link },
         });
       }
