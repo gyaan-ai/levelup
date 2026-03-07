@@ -4,7 +4,6 @@ import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
 import { Card, CardContent } from '@/components/ui/card';
 import Link from 'next/link';
-import { Wallet } from 'lucide-react';
 import { BookingCard, type BookingSession } from './booking-card';
 
 export default async function MyBookingsPage() {
@@ -27,43 +26,26 @@ export default async function MyBookingsPage() {
   if (userData?.role === 'athlete') redirect('/athlete-dashboard');
   // parent and admin can both access (admin sees empty state if no bookings)
 
-  const [sessionsRes, creditsRes] = await Promise.all([
-    supabase
-      .from('sessions')
-      .select(`
-        id,
-        scheduled_datetime,
-        status,
-        total_price,
-        session_type,
-        session_mode,
-        partner_invite_code,
-        athletes(id, first_name, last_name, school, photo_url),
-        facilities(id, name, address),
-        session_participants(youth_wrestler_id, youth_wrestlers(id, first_name, last_name))
-      `)
-      .eq('parent_id', user.id)
-      .order('scheduled_datetime', { ascending: false }),
-    supabase
-      .from('credits')
-      .select('remaining, expires_at')
-      .eq('parent_id', user.id)
-      .gt('remaining', 0),
-  ]);
-
-  const sessions = sessionsRes.data;
-  const error = sessionsRes.error;
+  const { data: sessions, error } = await supabase
+    .from('sessions')
+    .select(`
+      id,
+      scheduled_datetime,
+      status,
+      total_price,
+      session_type,
+      session_mode,
+      partner_invite_code,
+      athletes(id, first_name, last_name, school, photo_url),
+      facilities(id, name, address),
+      session_participants(youth_wrestler_id, youth_wrestlers(id, first_name, last_name))
+    `)
+    .eq('parent_id', user.id)
+    .order('scheduled_datetime', { ascending: false });
 
   if (error) {
     console.error('Bookings fetch error:', error);
   }
-
-  // Calculate credit balance
-  const now = new Date();
-  const availableCredits = (creditsRes.data || []).filter(c => 
-    c.remaining > 0 && (!c.expires_at || new Date(c.expires_at) > now)
-  );
-  const creditBalance = availableCredits.reduce((sum, c) => sum + Number(c.remaining), 0);
 
   const all = (sessions || []) as Array<{
     id: string;
@@ -147,17 +129,6 @@ export default async function MyBookingsPage() {
             Upcoming and past sessions for your wrestlers
           </p>
         </div>
-        {creditBalance > 0 && (
-          <Card className="bg-accent/10 border-accent/30">
-            <CardContent className="py-3 px-4 flex items-center gap-2">
-              <Wallet className="h-5 w-5 text-accent" />
-              <div>
-                <p className="text-sm text-muted-foreground">Credit Balance</p>
-                <p className="text-xl font-bold text-accent">${creditBalance.toFixed(2)}</p>
-              </div>
-            </CardContent>
-          </Card>
-        )}
       </div>
 
       <div className="space-y-8">

@@ -14,6 +14,13 @@ const playfair = Playfair_Display({
   display: 'swap',
 });
 
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+  viewportFit: 'cover',
+} as const;
+
 export const metadata = {
   title: 'The Guild | Elite Wrestling Technique Instruction',
   description:
@@ -30,12 +37,6 @@ export const metadata = {
     title: 'The Guild',
   },
   manifest: '/manifest.json',
-  viewport: {
-    width: 'device-width',
-    initialScale: 1,
-    maximumScale: 5,
-    viewportFit: 'cover',
-  },
 };
 
 export default async function RootLayout({

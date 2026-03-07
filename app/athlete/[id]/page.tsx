@@ -1,6 +1,8 @@
 import { notFound } from 'next/navigation';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
+
+export const dynamic = 'force-dynamic';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -36,17 +38,32 @@ export default async function AthleteProfilePage({
   const tenantSlug = tenant.slug;
   const supabase = await createClient(tenantSlug);
   
-  // Fetch athlete with facility join
-  const { data: athlete, error: athleteError } = await supabase
+  // Fetch athlete first without join to avoid RLS/join issues
+  const { data: athleteRow, error: athleteError } = await supabase
     .from('athletes')
-    .select('*, facilities(name, address, school)')
+    .select('*')
     .eq('id', id)
-    .single();
+    .maybeSingle();
 
-  // If athlete not found or not active, show 404
-  if (athleteError || !athlete || !athlete.active) {
+  if (athleteError) {
+    console.error('[Athlete profile] fetch error:', athleteError);
     notFound();
   }
+  if (!athleteRow || !athleteRow.active) {
+    notFound();
+  }
+
+  // Fetch facility separately so public profile doesn't depend on join RLS
+  let facility: { name: string; address?: string; school?: string } | null = null;
+  if (athleteRow.facility_id) {
+    const { data: fac } = await supabase
+      .from('facilities')
+      .select('name, address, school')
+      .eq('id', athleteRow.facility_id)
+      .maybeSingle();
+    facility = fac;
+  }
+  const athlete = { ...athleteRow, facilities: facility };
 
   // Calculate total sessions from sessions table
   const { count: totalSessionsCount } = await supabase

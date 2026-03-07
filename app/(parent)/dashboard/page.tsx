@@ -7,7 +7,7 @@ import { getTenantByDomain } from '@/config/tenants';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { Plus, Edit, User, Calendar, Wallet } from 'lucide-react';
+import { Plus, Edit, User, Calendar, DollarSign } from 'lucide-react';
 import { YouthWrestler } from '@/types';
 import { BookingCard, type BookingSession } from '@/app/(parent)/bookings/booking-card';
 
@@ -51,18 +51,6 @@ export default async function ParentDashboard() {
 
   const youthWrestlerIds = youthWrestlers?.map((yw) => yw.id) || [];
 
-  // Fetch credit balance for parents
-  const { data: creditsData } = await supabase
-    .from('credits')
-    .select('remaining, expires_at')
-    .eq('parent_id', user.id)
-    .gt('remaining', 0);
-  const now = new Date();
-  const availableCredits = (creditsData || []).filter(
-    (c) => c.remaining > 0 && (!c.expires_at || new Date(c.expires_at) > now)
-  );
-  const creditBalance = availableCredits.reduce((sum, c) => sum + Number(c.remaining), 0);
-
   const { data: completedSessions } = await supabase
     .from('sessions')
     .select('id')
@@ -103,6 +91,77 @@ export default async function ParentDashboard() {
     .order('scheduled_datetime', { ascending: true })
     .limit(10);
 
+  // Spending: paid sessions (scheduled or completed), exclude refunded
+  const { data: paidSessions } = await supabase
+    .from('sessions')
+    .select(`
+      id,
+      total_price,
+      scheduled_datetime,
+      athlete_id,
+      refunded_at,
+      athletes(id, first_name, last_name),
+      session_participants(youth_wrestler_id)
+    `)
+    .eq('parent_id', user.id)
+    .in('status', ['scheduled', 'completed']);
+
+  const nonRefunded = (paidSessions ?? []).filter(
+    (s: { refunded_at?: string | null }) => !s.refunded_at
+  ) as Array<{
+    id: string;
+    total_price: number;
+    scheduled_datetime: string;
+    athlete_id: string;
+    athletes?: { id: string; first_name?: string; last_name?: string } | { id: string; first_name?: string; last_name?: string }[];
+    session_participants?: Array<{ youth_wrestler_id: string }>;
+  }>;
+
+  const totalSpent = nonRefunded.reduce((sum, s) => sum + Number(s.total_price), 0);
+
+  const byCoach: Record<string, { name: string; total: number }> = {};
+  for (const s of nonRefunded) {
+    const a = s.athletes;
+    const coach = Array.isArray(a) ? a[0] : a;
+    const name = coach ? `${coach.first_name ?? ''} ${coach.last_name ?? ''}`.trim() || 'Coach' : 'Coach';
+    if (!byCoach[s.athlete_id]) byCoach[s.athlete_id] = { name, total: 0 };
+    byCoach[s.athlete_id].total += Number(s.total_price);
+  }
+  const coachTotals = Object.entries(byCoach).map(([id, v]) => ({ id, ...v })).sort((a, b) => b.total - a.total);
+
+  const participants = youthWrestlerIds as string[];
+  const byKid: Record<string, number> = {};
+  const byKidByMonth: Record<string, Record<string, number>> = {};
+  for (const yid of participants) {
+    byKid[yid] = 0;
+    byKidByMonth[yid] = {};
+  }
+  for (const s of nonRefunded) {
+    const parts = s.session_participants ?? [];
+    const n = Math.max(1, parts.length);
+    const share = Number(s.total_price) / n;
+    const month = s.scheduled_datetime.slice(0, 7);
+    for (const p of parts) {
+      const yid = p.youth_wrestler_id;
+      byKid[yid] = (byKid[yid] ?? 0) + share;
+      if (!byKidByMonth[yid]) byKidByMonth[yid] = {};
+      byKidByMonth[yid][month] = (byKidByMonth[yid][month] ?? 0) + share;
+    }
+  }
+
+  const last6Months: string[] = [];
+  const now = new Date();
+  for (let i = 0; i < 6; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    last6Months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+  }
+  const monthLabels: Record<string, string> = {};
+  last6Months.forEach((m) => {
+    const [y, mo] = m.split('-');
+    const date = new Date(parseInt(y, 10), parseInt(mo, 10) - 1, 1);
+    monthLabels[m] = date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+  });
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
@@ -113,17 +172,6 @@ export default async function ParentDashboard() {
           </p>
         </div>
         <div className="flex items-center gap-4">
-          {creditBalance > 0 && (
-            <Card className="bg-accent/10 border-accent/30">
-              <CardContent className="py-3 px-4 flex items-center gap-2">
-                <Wallet className="h-5 w-5 text-accent" />
-                <div>
-                  <p className="text-sm text-muted-foreground">Credit Balance</p>
-                  <p className="text-xl font-bold text-accent">${creditBalance.toFixed(2)}</p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
           {youthWrestlers && youthWrestlers.length > 0 && (
             <Link href="/wrestlers/add">
               <Button>
@@ -137,6 +185,89 @@ export default async function ParentDashboard() {
 
       {youthWrestlers && youthWrestlers.length > 0 ? (
         <>
+          {/* Spending summary */}
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <DollarSign className="h-5 w-5" />
+                Spending
+              </CardTitle>
+              <CardDescription>
+                What you&apos;ve spent on sessions (paid and completed). Refunded sessions are excluded.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div>
+                <p className="text-sm text-muted-foreground">Total spent</p>
+                <p className="text-2xl font-bold text-accent">${totalSpent.toFixed(2)}</p>
+              </div>
+
+              {coachTotals.length > 0 && (
+                <div>
+                  <p className="text-sm font-medium mb-2">By coach</p>
+                  <ul className="space-y-1.5">
+                    {coachTotals.map((c) => (
+                      <li key={c.id} className="flex justify-between text-sm">
+                        <span>{c.name}</span>
+                        <span className="font-medium">${c.total.toFixed(2)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {youthWrestlers && youthWrestlers.length > 0 && (
+                <div>
+                  <p className="text-sm font-medium mb-2">By wrestler</p>
+                  <ul className="space-y-1.5">
+                    {youthWrestlers.map((w: YouthWrestler) => (
+                      <li key={w.id} className="flex justify-between text-sm">
+                        <span>{w.first_name} {w.last_name}</span>
+                        <span className="font-medium">${(byKid[w.id] ?? 0).toFixed(2)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {youthWrestlers && youthWrestlers.length > 0 && last6Months.some((m) => youthWrestlers.some((w: YouthWrestler) => (byKidByMonth[w.id]?.[m] ?? 0) > 0)) && (
+                <div>
+                  <p className="text-sm font-medium mb-2">By wrestler, by month (last 6 months)</p>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm border-collapse">
+                      <thead>
+                        <tr className="border-b">
+                          <th className="text-left py-2 pr-4 font-medium">Wrestler</th>
+                          {last6Months.map((m) => (
+                            <th key={m} className="text-right py-2 px-2 font-medium text-muted-foreground">
+                              {monthLabels[m]}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {youthWrestlers.map((w: YouthWrestler) => (
+                          <tr key={w.id} className="border-b border-border/50">
+                            <td className="py-2 pr-4">{w.first_name} {w.last_name}</td>
+                            {last6Months.map((m) => (
+                              <td key={m} className="text-right py-2 px-2">
+                                ${((byKidByMonth[w.id]?.[m] ?? 0)).toFixed(2)}
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {totalSpent === 0 && (
+                <p className="text-sm text-muted-foreground">No paid sessions yet. Book a session to see spending here.</p>
+              )}
+            </CardContent>
+          </Card>
+
           {/* Upcoming Sessions - shown first on mobile so booked sessions are visible without scrolling */}
           {upcomingSessions && upcomingSessions.length > 0 ? (
             <Card className="mb-6">

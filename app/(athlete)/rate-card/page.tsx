@@ -1,10 +1,21 @@
-'use client';
-
+import { headers } from 'next/headers';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
+import { getTenantByDomain } from '@/config/tenants';
 import { ServiceBuilder } from '@/components/service-builder';
 
-export default function RateCardPage() {
+export default async function RateCardPage() {
+  const headersList = await headers();
+  const host = headersList.get('host') || '';
+  const tenant = getTenantByDomain(host);
+  const recommendedRates = tenant?.pricing
+    ? {
+        oneOnOne: tenant.pricing.oneOnOne,
+        twoAthlete: tenant.pricing.twoAthlete,
+        groupRate: tenant.pricing.groupRate,
+      }
+    : undefined;
+
   return (
     <div className="container mx-auto px-4 py-8 max-w-2xl">
       <Link
@@ -20,7 +31,7 @@ export default function RateCardPage() {
           Build what you offer: duration (30m, 1hr, 1:30, 2hr), type (private, partner, small group), and price per person. Platform fee is 10%; you receive 90%.
         </p>
       </div>
-      <ServiceBuilder />
+      <ServiceBuilder recommendedRates={recommendedRates} />
     </div>
   );
 }

@@ -48,7 +48,17 @@ function formatType(t: string) {
   return SESSION_TYPES.find((s) => s.value === t)?.label ?? t;
 }
 
-export function ServiceBuilder() {
+export type RecommendedRates = {
+  oneOnOne: number;
+  twoAthlete: number;
+  groupRate: number;
+};
+
+type ServiceBuilderProps = {
+  recommendedRates?: RecommendedRates;
+};
+
+export function ServiceBuilder({ recommendedRates }: ServiceBuilderProps) {
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
@@ -267,7 +277,17 @@ export function ServiceBuilder() {
                 type="number"
                 min={0}
                 step={0.01}
-                placeholder="e.g. 60"
+                placeholder={
+                  recommendedRates
+                    ? String(
+                        newType === 'private'
+                          ? recommendedRates.oneOnOne
+                          : newType === 'partner'
+                            ? Math.round(recommendedRates.twoAthlete / 2)
+                            : recommendedRates.groupRate
+                      )
+                    : 'e.g. 60'
+                }
                 value={newPrice}
                 onChange={(e) => setNewPrice(e.target.value)}
               />
@@ -277,6 +297,14 @@ export function ServiceBuilder() {
               Add
             </Button>
           </div>
+          {recommendedRates && (
+            <p className="text-sm text-muted-foreground">
+              Recommended range:{' '}
+              {newType === 'private' && `about $${recommendedRates.oneOnOne} for 1 hr private`}
+              {newType === 'partner' && `about $${Math.round(recommendedRates.twoAthlete / 2)}/person for 1 hr (2 athletes)`}
+              {newType === 'small_group' && `about $${recommendedRates.groupRate}/person for group sessions`}
+            </p>
+          )}
           {addError && (
             <p className="text-sm text-destructive" role="alert">
               {addError}
