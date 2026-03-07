@@ -174,8 +174,11 @@ export default async function AthleteProfilePage({
       </Link>
 
       {/* Hero Section */}
-      <Card className="mb-6">
+      <Card className="mb-6 relative">
         <CardContent className="p-8">
+          <div className="absolute top-6 right-6">
+            <FollowCoachButton coachId={athlete.id} />
+          </div>
           <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
             {/* Photo */}
             <div className="flex-shrink-0">
@@ -273,7 +276,6 @@ export default async function AthleteProfilePage({
                     </Button>
                   </Link>
                 )}
-                <FollowCoachButton coachId={athlete.id} />
                 {canEdit && (
                   isOwnProfile ? (
                     <Link href="/profile">
