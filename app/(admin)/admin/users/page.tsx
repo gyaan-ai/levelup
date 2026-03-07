@@ -20,23 +20,37 @@ export default async function AdminUsersPage() {
   if (userData?.role !== 'admin') redirect('/');
 
   const admin = createAdminClient(tenant.slug);
+  // Select only columns that exist in base schema; last_login_at and archived_at require migrations 20240111000000, 20240134000000
   const { data: rows, error } = await admin
     .from('users')
     .select('id, email, role, created_at, last_login_at, archived_at')
     .order('created_at', { ascending: false });
 
-  if (error) {
-    console.error('Admin users fetch error:', error);
+  let users: AdminUserRow[];
+  if (error && (error.message?.includes('last_login_at') || error.message?.includes('archived_at'))) {
+    const { data: fallbackRows } = await admin
+      .from('users')
+      .select('id, email, role, created_at')
+      .order('created_at', { ascending: false });
+    users = (fallbackRows ?? []).map((u) => ({
+      id: u.id,
+      email: u.email,
+      role: u.role,
+      created_at: u.created_at,
+      last_login_at: null,
+      archived_at: null,
+    }));
+  } else {
+    if (error) console.error('Admin users fetch error:', error);
+    users = (rows ?? []).map((u) => ({
+      id: u.id,
+      email: u.email,
+      role: u.role,
+      created_at: u.created_at,
+      last_login_at: (u as { last_login_at?: string | null }).last_login_at ?? null,
+      archived_at: (u as { archived_at?: string | null }).archived_at ?? null,
+    }));
   }
-
-  const users: AdminUserRow[] = (rows ?? []).map((u) => ({
-    id: u.id,
-    email: u.email,
-    role: u.role,
-    created_at: u.created_at,
-    last_login_at: u.last_login_at ?? null,
-    archived_at: u.archived_at ?? null,
-  }));
 
   return (
     <div className="container mx-auto px-4 py-8">

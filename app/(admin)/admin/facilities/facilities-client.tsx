@@ -1,12 +1,20 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import Link from 'next/link';
-import { MapPin, Plus, ArrowLeft } from 'lucide-react';
+import { MapPin, Plus, ArrowLeft, Pencil, Trash2 } from 'lucide-react';
 
 export type Facility = {
   id: string;
@@ -27,6 +35,11 @@ export function FacilitiesClient({ initialFacilities }: Props) {
   const [name, setName] = useState('');
   const [school, setSchool] = useState('');
   const [address, setAddress] = useState('');
+  const [editing, setEditing] = useState<Facility | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editSchool, setEditSchool] = useState('');
+  const [editAddress, setEditAddress] = useState('');
+  const [deleting, setDeleting] = useState<Facility | null>(null);
 
   const fetchFacilities = async () => {
     const res = await fetch('/api/admin/facilities');
@@ -59,6 +72,70 @@ export function FacilitiesClient({ initialFacilities }: Props) {
       setName('');
       setSchool('');
       setAddress('');
+    } catch {
+      setError('Something went wrong');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const openEdit = (f: Facility) => {
+    setEditing(f);
+    setEditName(f.name);
+    setEditSchool(f.school);
+    setEditAddress(f.address ?? '');
+    setError(null);
+  };
+
+  const handleEditSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editing) return;
+    if (!editName.trim() || !editSchool.trim()) {
+      setError('Name and school are required.');
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/facilities/${editing.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: editName.trim(),
+          school: editSchool.trim(),
+          address: editAddress.trim() || null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || 'Failed to update facility');
+        setLoading(false);
+        return;
+      }
+      setFacilities((prev) => prev.map((p) => (p.id === editing.id ? { ...p, ...data.facility } : p)));
+      setEditing(null);
+    } catch {
+      setError('Something went wrong');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleting) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/facilities/${deleting.id}`, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || 'Failed to delete facility');
+        setLoading(false);
+        setDeleting(null);
+        return;
+      }
+      setFacilities((prev) => prev.filter((p) => p.id !== deleting.id));
+      setDeleting(null);
     } catch {
       setError('Something went wrong');
     } finally {
@@ -138,16 +215,72 @@ export function FacilitiesClient({ initialFacilities }: Props) {
           ) : (
             <ul className="divide-y divide-border">
               {facilities.map((f) => (
-                <li key={f.id} className="py-3 flex flex-wrap items-baseline gap-2">
-                  <span className="font-medium">{f.name}</span>
-                  <span className="text-muted-foreground">— {f.school}</span>
-                  {f.address && <span className="text-sm text-muted-foreground w-full">{f.address}</span>}
+                <li key={f.id} className="py-3 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-baseline gap-2">
+                    <span className="font-medium">{f.name}</span>
+                    <span className="text-muted-foreground">— {f.school}</span>
+                    {f.address && <span className="text-sm text-muted-foreground w-full">{f.address}</span>}
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button variant="ghost" size="icon" onClick={() => openEdit(f)} disabled={loading} title="Edit">
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" onClick={() => setDeleting(f)} disabled={loading} title="Delete" className="text-destructive hover:text-destructive">
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </li>
               ))}
             </ul>
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={!!editing} onOpenChange={(open) => !open && setEditing(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit facility</DialogTitle>
+            <DialogDescription>Update name, school, or address.</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleEditSave} className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Name</Label>
+                <Input value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="e.g. NC State Wrestling Facility" />
+              </div>
+              <div className="space-y-2">
+                <Label>School / program</Label>
+                <Input value={editSchool} onChange={(e) => setEditSchool(e.target.value)} placeholder="e.g. NC State" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>Address (optional)</Label>
+              <Input value={editAddress} onChange={(e) => setEditAddress(e.target.value)} placeholder="Street, city, state" />
+            </div>
+            {error && <p className="text-sm text-destructive">{error}</p>}
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setEditing(null)}>Cancel</Button>
+              <Button type="submit" disabled={loading}>{loading ? 'Saving…' : 'Save'}</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!deleting} onOpenChange={(open) => !open && setDeleting(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete facility</DialogTitle>
+            <DialogDescription>
+              Delete &quot;{deleting?.name}&quot;? This will fail if any coach or session uses this facility.
+            </DialogDescription>
+          </DialogHeader>
+          {error && <p className="text-sm text-destructive">{error}</p>}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setDeleting(null); setError(null); }}>Cancel</Button>
+            <Button variant="destructive" onClick={handleDelete} disabled={loading}>{loading ? 'Deleting…' : 'Delete'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

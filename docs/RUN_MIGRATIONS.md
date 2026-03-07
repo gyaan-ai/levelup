@@ -40,8 +40,19 @@ If you see: *"Could not find the table 'public.athlete_services' in the schema c
 
 Or push all pending migrations: `supabase link --project-ref YOUR_REF` then `supabase db push`.
 
+## Admin Users: Last login & archived
+
+If you see: *"column users.last_login_at does not exist"* on Admin → Users, the app will still load (it falls back to a query without those columns). To enable **Last login** and **Archived** in User Management, run:
+
+- `supabase/migrations/20240111000000_add_users_last_login.sql` – adds `last_login_at`
+- `supabase/migrations/20240134000000_users_archived_at.sql` – adds `archived_at`
+
+Run each in the Supabase SQL Editor, or use `supabase db push` to apply all pending migrations.
+
 ## Migrations included
 
+- `20240111000000_add_users_last_login.sql` – Admin: last login column on users
+- `20240134000000_users_archived_at.sql` – Admin: archived_at on users
 - `20240118000000_workspaces.sql` – Workspaces, goals, media, session notes, actions, workspace-media storage bucket
 - `20240120000000_workspace_messages.sql` – Collaboration messages table
 - `20240121000000_workspace_media_mime_types.sql` – Adds HEIC, M4V, etc. for mobile photo/video uploads

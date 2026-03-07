@@ -93,6 +93,21 @@ export default async function AdminPage() {
   if (usersRes.error) {
     console.error('Admin users fetch error:', usersRes.error);
   }
+  // If users fetch failed due to missing last_login_at column, refetch without it (migration 20240111000000 not run)
+  let usersRows = (usersRes.data ?? []) as Array<{
+    id: string;
+    email: string;
+    role: string;
+    created_at: string;
+    last_login_at?: string | null;
+  }>;
+  if (usersRes.error && usersRes.error.message?.includes('last_login_at')) {
+    const { data: fallback } = await admin
+      .from('users')
+      .select('id, email, role, created_at')
+      .order('created_at', { ascending: false });
+    usersRows = (fallback ?? []).map((u) => ({ ...u, last_login_at: null }));
+  }
   if (sessionsRes.error) {
     console.error('Admin sessions fetch error:', sessionsRes.error);
     console.error('Admin sessions error details:', JSON.stringify(sessionsRes.error, null, 2));
@@ -120,14 +135,6 @@ export default async function AdminPage() {
     session_mode?: string;
     athletes?: { id: string; first_name: string; last_name: string; school: string; venmo_handle?: string | null; zelle_email?: string | null } | { id: string; first_name: string; last_name: string; school: string; venmo_handle?: string | null; zelle_email?: string | null }[];
     facilities?: { id: string; name: string } | { id: string; name: string }[];
-  }>;
-
-  const usersRows = (usersRes.data ?? []) as Array<{
-    id: string;
-    email: string;
-    role: string;
-    created_at: string;
-    last_login_at?: string | null;
   }>;
 
   const emailByUserId = new Map(usersRows.map((u) => [u.id, u.email]));

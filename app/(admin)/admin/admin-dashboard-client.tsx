@@ -14,6 +14,15 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import {
   Calendar,
   Users,
   DollarSign,
@@ -24,6 +33,9 @@ import {
   MapPin,
   Package,
   ClipboardList,
+  Pencil,
+  UserX,
+  Loader2,
 } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
@@ -122,6 +134,11 @@ export function AdminDashboardClient({
   const [userRoleFilter, setUserRoleFilter] = useState<string>('all');
   const [userSearch, setUserSearch] = useState('');
   const [athleteSearch, setAthleteSearch] = useState('');
+  const [editingAthleteId, setEditingAthleteId] = useState<string | null>(null);
+  const [athleteEditForm, setAthleteEditForm] = useState<{ first_name: string; last_name: string; school: string; facility_id: string | null; active: boolean } | null>(null);
+  const [facilities, setFacilities] = useState<{ id: string; name: string; school: string }[]>([]);
+  const [athleteEditSaving, setAthleteEditSaving] = useState(false);
+  const [deactivatingId, setDeactivatingId] = useState<string | null>(null);
 
   const filteredSessions = sessions.filter((s) => {
     const d = s.scheduled_datetime.slice(0, 10);
@@ -147,6 +164,77 @@ export function AdminDashboardClient({
       a.school.toLowerCase().includes(q)
     );
   });
+
+  const openAthleteEdit = async (athleteId: string) => {
+    setEditingAthleteId(athleteId);
+    setAthleteEditForm(null);
+    try {
+      const [athleteRes, facilitiesRes] = await Promise.all([
+        fetch(`/api/admin/athletes/${athleteId}`),
+        fetch('/api/admin/facilities'),
+      ]);
+      const athleteData = await athleteRes.json();
+      const facilitiesData = await facilitiesRes.json();
+      if (!athleteRes.ok || !athleteData.athlete) {
+        setEditingAthleteId(null);
+        return;
+      }
+      const a = athleteData.athlete;
+      setAthleteEditForm({
+        first_name: a.first_name ?? '',
+        last_name: a.last_name ?? '',
+        school: a.school ?? '',
+        facility_id: a.facility_id ?? null,
+        active: a.active ?? true,
+      });
+      setFacilities(facilitiesData.facilities ?? []);
+    } catch {
+      setEditingAthleteId(null);
+    }
+  };
+
+  const saveAthleteEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingAthleteId || !athleteEditForm) return;
+    setAthleteEditSaving(true);
+    try {
+      const res = await fetch(`/api/admin/athletes/${editingAthleteId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          first_name: athleteEditForm.first_name.trim(),
+          last_name: athleteEditForm.last_name.trim(),
+          school: athleteEditForm.school.trim(),
+          facility_id: athleteEditForm.facility_id || null,
+          active: athleteEditForm.active,
+        }),
+      });
+      if (!res.ok) {
+        setAthleteEditSaving(false);
+        return;
+      }
+      setEditingAthleteId(null);
+      setAthleteEditForm(null);
+      router.refresh();
+    } finally {
+      setAthleteEditSaving(false);
+    }
+  };
+
+  const handleDeactivateAthlete = async (athleteId: string) => {
+    if (!confirm('Deactivate this coach? They will be hidden from Browse and cannot receive new bookings.')) return;
+    setDeactivatingId(athleteId);
+    try {
+      const res = await fetch(`/api/admin/athletes/${athleteId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ active: false }),
+      });
+      if (res.ok) router.refresh();
+    } finally {
+      setDeactivatingId(null);
+    }
+  };
 
   const statusBadge = (status: string) => {
     const v: Record<string, 'default' | 'secondary' | 'outline'> = {
@@ -635,12 +723,13 @@ export function AdminDashboardClient({
                     <th className="text-right py-2 font-medium">Sessions</th>
                     <th className="text-right py-2 font-medium">Completed</th>
                     <th className="text-right py-2 font-medium">Total earnings</th>
+                    <th className="text-right py-2 font-medium w-24">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredAthletes.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="py-8 text-center text-muted-foreground">
+                      <td colSpan={6} className="py-8 text-center text-muted-foreground">
                         No athletes match filters.
                       </td>
                     </tr>
@@ -661,6 +750,16 @@ export function AdminDashboardClient({
                         <td className="py-2 text-right font-medium">
                           ${a.total_earnings.toFixed(2)}
                         </td>
+                        <td className="py-2 text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            <Button variant="ghost" size="icon" onClick={() => openAthleteEdit(a.athlete_id)} title="Edit coach">
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => handleDeactivateAthlete(a.athlete_id)} disabled={deactivatingId === a.athlete_id} title="Deactivate (hide from Browse)">
+                              {deactivatingId === a.athlete_id ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserX className="h-4 w-4 text-destructive" />}
+                            </Button>
+                          </div>
+                        </td>
                       </tr>
                     ))
                   )}
@@ -670,6 +769,68 @@ export function AdminDashboardClient({
           </CardContent>
         </Card>
       )}
+
+      <Dialog open={!!editingAthleteId} onOpenChange={(open) => { if (!open) { setEditingAthleteId(null); setAthleteEditForm(null); } }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit coach</DialogTitle>
+            <DialogDescription>Update name, school, facility, or visibility. Deactivated coaches are hidden from Browse.</DialogDescription>
+          </DialogHeader>
+          {athleteEditForm ? (
+            <form onSubmit={saveAthleteEdit} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>First name</Label>
+                  <Input value={athleteEditForm.first_name} onChange={(e) => setAthleteEditForm((p) => p ? { ...p, first_name: e.target.value } : null)} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Last name</Label>
+                  <Input value={athleteEditForm.last_name} onChange={(e) => setAthleteEditForm((p) => p ? { ...p, last_name: e.target.value } : null)} />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>School</Label>
+                <Input value={athleteEditForm.school} onChange={(e) => setAthleteEditForm((p) => p ? { ...p, school: e.target.value } : null)} placeholder="e.g. NC State" />
+              </div>
+              <div className="space-y-2">
+                <Label>Primary facility</Label>
+                <Select
+                  value={athleteEditForm.facility_id ?? 'none'}
+                  onValueChange={(v) => setAthleteEditForm((p) => p ? { ...p, facility_id: v === 'none' ? null : v } : null)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select facility" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {facilities.map((f) => (
+                      <SelectItem key={f.id} value={f.id}>{f.name} — {f.school}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="athlete-active"
+                  checked={athleteEditForm.active}
+                  onChange={(e) => setAthleteEditForm((p) => p ? { ...p, active: e.target.checked } : null)}
+                  className="rounded border-input"
+                />
+                <Label htmlFor="athlete-active">Active (visible in Browse)</Label>
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => { setEditingAthleteId(null); setAthleteEditForm(null); }}>Cancel</Button>
+                <Button type="submit" disabled={athleteEditSaving}>{athleteEditSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save'}</Button>
+              </DialogFooter>
+            </form>
+          ) : (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
