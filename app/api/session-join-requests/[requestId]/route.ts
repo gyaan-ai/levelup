@@ -86,13 +86,15 @@ export async function PATCH(
       const admin = createAdminClient(tenant.slug);
       // Notify requesting parent (and their athlete/youth if they had an account – we notify the parent who requested)
       if (action === 'approve') {
-        await createNotification(admin, {
-          user_id: requestingParentId,
-          type: 'session_join_approved',
-          title: 'Join request approved',
-          body: 'Your wrestler was approved to join the session. Check My Bookings for details.',
-          data: { sessionId, link: bookingsLink },
-        });
+        if (requestingParentId) {
+          await createNotification(admin, {
+            user_id: requestingParentId,
+            type: 'session_join_approved',
+            title: 'Join request approved',
+            body: 'Your wrestler was approved to join the session. Check My Bookings for details.',
+            data: { sessionId, link: bookingsLink },
+          });
+        }
         // Notify coach so they know a new participant was added
         if (coachId) {
           await createNotification(admin, {
@@ -103,7 +105,7 @@ export async function PATCH(
             data: { sessionId, link: `${baseUrl}/sessions/${sessionId}/requests` },
           });
         }
-      } else {
+      } else if (requestingParentId) {
         await createNotification(admin, {
           user_id: requestingParentId,
           type: 'session_join_declined',
