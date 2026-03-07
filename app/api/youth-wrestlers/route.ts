@@ -118,11 +118,11 @@ export async function POST(req: NextRequest) {
             .select('id, first_name, last_name')
             .in('id', linkedIdList)
         : { data: [] };
-      const family = [...(primaryRows ?? []), ...(linkedRows ?? [])];
-      const deduped = [...new Map(family.map((r: { id: string }) => [r.id, r])).values()];
+      type FamilyRow = { id: string; first_name?: string; last_name?: string };
+      const family: FamilyRow[] = [...(primaryRows ?? []), ...(linkedRows ?? [])];
+      const deduped: FamilyRow[] = [...new Map(family.map((r) => [r.id, r])).values()];
       const duplicate = deduped.find(
-        (r: { first_name?: string; last_name?: string }) =>
-          norm(r.first_name ?? '') === firstNorm && norm(r.last_name ?? '') === lastNorm
+        (r) => norm(r.first_name ?? '') === firstNorm && norm(r.last_name ?? '') === lastNorm
       );
       if (duplicate) {
         return NextResponse.json(
