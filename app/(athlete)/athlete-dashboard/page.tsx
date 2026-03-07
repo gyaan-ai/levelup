@@ -364,7 +364,7 @@ export default async function AthleteDashboard() {
             Set Availability
           </Button>
         </Link>
-        <Link href="/profile#rate-card" className="block">
+        <Link href="/rate-card" className="block">
           <Button variant="outline" className="w-full h-12 gap-2">
             <DollarSign className="h-5 w-5 shrink-0" />
             Session types
