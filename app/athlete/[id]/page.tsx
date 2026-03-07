@@ -279,10 +279,10 @@ export default async function AthleteProfilePage({
                 <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 py-2 border-b last:border-0">
                   <div>
                     <p className="font-medium">{p.name}</p>
-                    {p.description && (
+                    {'description' in p && p.description && (
                       <p className="text-sm text-muted-foreground">{p.description}</p>
                     )}
-                    {p.min_participants !== p.max_participants && (
+                    {'min_participants' in p && 'max_participants' in p && p.min_participants !== p.max_participants && (
                       <p className="text-xs text-muted-foreground">
                         {p.min_participants}–{p.max_participants} participants
                       </p>
