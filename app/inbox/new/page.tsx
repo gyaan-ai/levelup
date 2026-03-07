@@ -23,7 +23,9 @@ export default async function InboxNewPage() {
       <div className="p-4 border-b border-border">
         <h1 className="text-xl font-bold">New message</h1>
         <p className="text-sm text-muted-foreground">
-          Start a direct message with a coach or browse to find one.
+          {role === 'athlete'
+            ? 'Start a direct message with a parent or create a group.'
+            : 'Start a direct message with any coach.'}
         </p>
       </div>
       <div className="flex-1 overflow-auto p-4">

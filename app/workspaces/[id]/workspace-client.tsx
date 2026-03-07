@@ -10,7 +10,6 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { ArrowLeft, Target, Video, FileText, Plus, Loader2, Upload, MessageCircle, Trash2, X, Check } from 'lucide-react';
 import { SchoolLogo } from '@/components/school-logo';
-import { MessagesSection } from '@/components/workspace/messages-section';
 import { SessionsSection } from '@/components/workspace/sessions-section';
 import { ActionItemsSection } from '@/components/workspace/action-items-section';
 
@@ -258,18 +257,23 @@ export function WorkspaceClient({ workspaceId, isCoach = false }: { workspaceId:
         </p>
       </div>
 
-      <Card className="mb-6 overflow-hidden">
+      <Card className="mb-6">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <MessageCircle className="h-5 w-5" />
-            Collaboration
+            Messages
           </CardTitle>
           <CardDescription>
-            Parent, coach, and athlete can message back and forth in real time.
+            All messaging happens in Community. Use DMs and groups there to coordinate with this coach and wrestler.
           </CardDescription>
         </CardHeader>
-        <CardContent className="p-0 h-[600px] min-h-[400px]">
-          <MessagesSection workspaceId={workspaceId} currentUserId={data.currentUserId ?? ''} />
+        <CardContent>
+          <Link href="/inbox">
+            <Button variant="outline" className="gap-2">
+              <MessageCircle className="h-4 w-4" />
+              Open Community
+            </Button>
+          </Link>
         </CardContent>
       </Card>
 

@@ -21,11 +21,12 @@ export async function GET(
 
     const { data: group } = await supabase
       .from('messaging_groups')
-      .select('athlete_id')
+      .select('athlete_id, parent_id')
       .eq('id', groupId)
       .single();
-    if (!group || group.athlete_id !== user.id) {
-      return NextResponse.json({ error: 'Only the group coach can list addable kids' }, { status: 403 });
+    const g = group as { athlete_id?: string; parent_id?: string } | null;
+    if (!g || (g.athlete_id !== user.id && g.parent_id !== user.id)) {
+      return NextResponse.json({ error: 'Only the group owner can list addable kids' }, { status: 403 });
     }
 
     const { data: alreadyInGroup } = await supabase
@@ -34,21 +35,31 @@ export async function GET(
       .eq('group_id', groupId);
     const inGroupIds = new Set((alreadyInGroup ?? []).map((r) => r.youth_wrestler_id));
 
-    const { data: sessions } = await supabase
-      .from('sessions')
-      .select('id')
-      .eq('athlete_id', user.id);
-    const sessionIds = (sessions ?? []).map((s) => s.id);
-    if (sessionIds.length === 0) {
-      return NextResponse.json({ kids: [] });
+    let addableIds: string[] = [];
+
+    if (g.athlete_id === user.id) {
+      const { data: sessions } = await supabase
+        .from('sessions')
+        .select('id')
+        .eq('athlete_id', user.id);
+      const sessionIds = (sessions ?? []).map((s) => (s as { id: string }).id);
+      if (sessionIds.length === 0) {
+        return NextResponse.json({ kids: [] });
+      }
+      const { data: participants } = await supabase
+        .from('session_participants')
+        .select('youth_wrestler_id')
+        .in('session_id', sessionIds);
+      const ywIds = [...new Set((participants ?? []).map((p) => (p as { youth_wrestler_id: string }).youth_wrestler_id).filter(Boolean))];
+      addableIds = ywIds.filter((id) => !inGroupIds.has(id));
+    } else {
+      const { data: myKids } = await supabase
+        .from('youth_wrestlers')
+        .select('id')
+        .eq('parent_id', user.id);
+      addableIds = (myKids ?? []).map((r) => (r as { id: string }).id).filter((id) => !inGroupIds.has(id));
     }
 
-    const { data: participants } = await supabase
-      .from('session_participants')
-      .select('youth_wrestler_id')
-      .in('session_id', sessionIds);
-    const ywIds = [...new Set((participants ?? []).map((p) => p.youth_wrestler_id).filter(Boolean))] as string[];
-    const addableIds = ywIds.filter((id) => !inGroupIds.has(id));
     if (addableIds.length === 0) {
       return NextResponse.json({ kids: [] });
     }
@@ -58,13 +69,16 @@ export async function GET(
       .select('id, first_name, last_name, parent_id')
       .in('id', addableIds);
 
-    const kids = (youthWrestlers ?? []).map((yw) => ({
-      id: yw.id,
-      first_name: yw.first_name,
-      last_name: yw.last_name,
-      name: [yw.first_name, yw.last_name].filter(Boolean).join(' ') || '—',
-      parent_id: yw.parent_id,
-    }));
+    const kids = (youthWrestlers ?? []).map((yw) => {
+      const y = yw as { id: string; first_name?: string; last_name?: string; parent_id?: string };
+      return {
+        id: y.id,
+        first_name: y.first_name,
+        last_name: y.last_name,
+        name: [y.first_name, y.last_name].filter(Boolean).join(' ') || '—',
+        parent_id: y.parent_id,
+      };
+    });
 
     return NextResponse.json({ kids });
   } catch (e) {

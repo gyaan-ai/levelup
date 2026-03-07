@@ -21,11 +21,12 @@ export async function POST(
 
     const { data: group } = await supabase
       .from('messaging_groups')
-      .select('athlete_id')
+      .select('athlete_id, parent_id')
       .eq('id', groupId)
       .single();
-    if (!group || group.athlete_id !== user.id) {
-      return NextResponse.json({ error: 'Only the group coach can add kids' }, { status: 403 });
+    const g = group as { athlete_id?: string; parent_id?: string } | null;
+    if (!g || (g.athlete_id !== user.id && g.parent_id !== user.id)) {
+      return NextResponse.json({ error: 'Only the group owner can add kids' }, { status: 403 });
     }
 
     const body = await req.json().catch(() => ({}));

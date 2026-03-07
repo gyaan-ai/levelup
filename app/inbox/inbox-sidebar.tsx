@@ -105,11 +105,11 @@ export function InboxSidebar({ role }: { role: 'parent' | 'athlete' | 'youth_wre
 
         {(role === 'parent' || role === 'athlete' || role === 'youth_wrestler') && (
           <section>
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide px-2 py-1 block">Spaces</span>
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide px-2 py-1 block">Hubs</span>
             {loading ? (
               <p className="text-xs text-muted-foreground px-2 py-2">Loading…</p>
             ) : workspaces.length === 0 ? (
-              <p className="text-xs text-muted-foreground px-2 py-2">No spaces yet</p>
+              <p className="text-xs text-muted-foreground px-2 py-2">No hubs yet</p>
             ) : (
               <ul className="space-y-0.5">
                 {workspaces.map((ws) => (
@@ -131,7 +131,7 @@ export function InboxSidebar({ role }: { role: 'parent' | 'athlete' | 'youth_wre
             )}
           </section>
         )}
-        {role === 'athlete' && (
+        {(role === 'athlete' || role === 'parent') && (
           <section>
             <div className="flex items-center justify-between px-2 py-1">
               <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Groups</span>

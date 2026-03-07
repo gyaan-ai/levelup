@@ -21,11 +21,12 @@ export default async function GroupChannelPage({
 
   const { data: group, error: groupError } = await supabase
     .from('messaging_groups')
-    .select('id, name, athlete_id')
+    .select('id, name, athlete_id, parent_id')
     .eq('id', groupId)
     .single();
 
   if (groupError || !group) notFound();
+  const g = group as { athlete_id?: string | null; parent_id?: string | null };
 
   const { data: membersRows } = await supabase
     .from('messaging_group_members')
@@ -71,7 +72,7 @@ export default async function GroupChannelPage({
     };
   });
 
-  const isCoach = group.athlete_id === user.id;
+  const isCoach = g.athlete_id === user.id || g.parent_id === user.id;
 
   return (
     <GroupChannelClient

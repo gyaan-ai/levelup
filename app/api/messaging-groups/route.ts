@@ -36,7 +36,7 @@ export async function GET() {
   }
 }
 
-/** POST - create a group (coach only). Body: { name } */
+/** POST - create a group (coach or parent). Body: { name } */
 export async function POST(req: Request) {
   try {
     const headersList = await headers();
@@ -49,24 +49,45 @@ export async function POST(req: Request) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
-    if (userData?.role !== 'athlete' && userData?.role !== 'admin') {
-      return NextResponse.json({ error: 'Only coaches can create groups' }, { status: 403 });
+    const role = userData?.role;
+    if (role !== 'athlete' && role !== 'parent' && role !== 'admin') {
+      return NextResponse.json({ error: 'Only coaches or parents can create groups' }, { status: 403 });
     }
 
     const body = await req.json().catch(() => ({}));
     const name = typeof body.name === 'string' ? body.name.trim() : '';
     if (!name) return NextResponse.json({ error: 'Group name is required' }, { status: 400 });
 
-    const { data: athlete } = await supabase
-      .from('athletes')
-      .select('id')
-      .eq('id', user.id)
-      .single();
-    if (!athlete) return NextResponse.json({ error: 'Coach profile not found' }, { status: 403 });
+    if (role === 'athlete' || role === 'admin') {
+      const { data: athlete } = await supabase
+        .from('athletes')
+        .select('id')
+        .eq('id', user.id)
+        .single();
+      if (!athlete) return NextResponse.json({ error: 'Coach profile not found' }, { status: 403 });
 
+      const { data: group, error } = await supabase
+        .from('messaging_groups')
+        .insert({ name, athlete_id: athlete.id })
+        .select('id, name, athlete_id, created_at')
+        .single();
+
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+      return NextResponse.json({
+        group: {
+          id: group.id,
+          name: group.name,
+          athleteId: group.athlete_id,
+          createdAt: group.created_at,
+        },
+      });
+    }
+
+    // Parent (or admin acting as parent): create parent-owned group
     const { data: group, error } = await supabase
       .from('messaging_groups')
-      .insert({ name, athlete_id: athlete.id })
+      .insert({ name, parent_id: user.id, athlete_id: null })
       .select('id, name, athlete_id, created_at')
       .single();
 

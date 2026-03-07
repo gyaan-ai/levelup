@@ -5,11 +5,52 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { MessageCircle, Users, Loader2 } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { MessageCircle, Users, Loader2, Search } from 'lucide-react';
 import { SchoolLogo } from '@/components/school-logo';
 
 type Coach = { id: string; firstName: string; lastName: string; school: string; photoUrl?: string };
 type Follow = { coachId: string; coach: Coach | null };
+
+function CoachRow({
+  coach,
+  onSelect,
+  badge,
+}: {
+  coach: Coach;
+  onSelect: () => void;
+  badge?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      className="w-full flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-muted/50 text-left transition-colors"
+    >
+      {coach.photoUrl ? (
+        <img src={coach.photoUrl} alt="" className="w-10 h-10 rounded-full object-cover shrink-0" />
+      ) : (
+        <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">
+          <MessageCircle className="h-5 w-5 text-muted-foreground" />
+        </div>
+      )}
+      <div className="min-w-0 flex-1">
+        <p className="font-medium truncate flex items-center gap-2">
+          {coach.firstName} {coach.lastName}
+          {badge && (
+            <span className="text-xs font-normal text-muted-foreground bg-muted px-1.5 py-0.5 rounded">{badge}</span>
+          )}
+        </p>
+        {coach.school && (
+          <p className="text-xs text-muted-foreground flex items-center gap-1">
+            <SchoolLogo school={coach.school} size="sm" />
+            {coach.school}
+          </p>
+        )}
+      </div>
+    </button>
+  );
+}
 
 export function NewMessageClient({
   currentUserId,
@@ -20,18 +61,32 @@ export function NewMessageClient({
 }) {
   const router = useRouter();
   const [follows, setFollows] = useState<Follow[]>([]);
+  const [allCoaches, setAllCoaches] = useState<Coach[]>([]);
+  const [parents, setParents] = useState<Array<{ id: string; name: string; email?: string }>>([]);
   const [loading, setLoading] = useState(true);
+  const [coachSearch, setCoachSearch] = useState('');
   const isParentView = role === 'parent' || role === 'admin';
 
   useEffect(() => {
     if (!isParentView) {
-      setLoading(false);
+      // Athlete: load parents they have sessions with
+      Promise.all([
+        fetch('/api/inbox/parents-for-athlete').then((r) => r.json()),
+      ])
+        .then(([parentsRes]) => {
+          if (parentsRes.parents) setParents(parentsRes.parents);
+        })
+        .catch(() => {})
+        .finally(() => setLoading(false));
       return;
     }
-    fetch('/api/coach-follows')
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.follows) setFollows(d.follows);
+    Promise.all([
+      fetch('/api/coach-follows').then((r) => r.json()),
+      fetch('/api/inbox/coaches').then((r) => r.json()),
+    ])
+      .then(([followsRes, coachesRes]) => {
+        if (followsRes.follows) setFollows(followsRes.follows);
+        if (coachesRes.coaches) setAllCoaches(coachesRes.coaches);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
@@ -41,21 +96,63 @@ export function NewMessageClient({
     router.push(`/inbox/thread/${currentUserId}/${coachId}`);
   };
 
+  const handleParentClick = (parentId: string) => {
+    router.push(`/inbox/thread/${parentId}/${currentUserId}`);
+  };
+
   if (!isParentView) {
     return (
-      <Card>
-        <CardContent className="pt-6 space-y-4">
-          <p className="text-muted-foreground">
-            Start a group to message parents and wrestlers together, or use existing conversations in the sidebar.
-          </p>
-          <Link href="/inbox/groups/new">
-            <Button className="gap-2">
-              <Users className="h-4 w-4" />
-              Create a group
-            </Button>
-          </Link>
-        </CardContent>
-      </Card>
+      <div className="space-y-6 max-w-lg">
+        <Card>
+          <CardContent className="pt-6 space-y-4">
+            <h2 className="font-semibold flex items-center gap-2">
+              <MessageCircle className="h-4 w-4" />
+              Message a parent
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Start a direct message with a parent you have sessions or workspaces with.
+            </p>
+            {loading ? (
+              <div className="flex justify-center py-6">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : parents.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No parents to message yet. Sessions and workspaces will appear here.</p>
+            ) : (
+              <ul className="space-y-2">
+                {parents.map((p) => (
+                  <li key={p.id}>
+                    <button
+                      type="button"
+                      onClick={() => handleParentClick(p.id)}
+                      className="w-full flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-muted/50 text-left transition-colors"
+                    >
+                      <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">
+                        <MessageCircle className="h-5 w-5 text-muted-foreground" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium truncate">{p.name}</p>
+                        {p.email && <p className="text-xs text-muted-foreground truncate">{p.email}</p>}
+                      </div>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6 space-y-4">
+            <p className="text-muted-foreground text-sm">Start a group to message parents and wrestlers together.</p>
+            <Link href="/inbox/groups/new">
+              <Button className="gap-2">
+                <Users className="h-4 w-4" />
+                Create a group
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
     );
   }
 
@@ -67,7 +164,20 @@ export function NewMessageClient({
     );
   }
 
-  const coaches = follows.filter((f) => f.coach).map((f) => f.coach!);
+  const followedIds = new Set(follows.filter((f) => f.coach).map((f) => f.coach!.id));
+  const followedCoaches = allCoaches.filter((c) => followedIds.has(c.id));
+  const otherCoaches = allCoaches.filter((c) => !followedIds.has(c.id));
+  const searchLower = coachSearch.trim().toLowerCase();
+  const filterCoaches = (list: Coach[]) =>
+    searchLower
+      ? list.filter(
+          (c) =>
+            `${c.firstName} ${c.lastName}`.toLowerCase().includes(searchLower) ||
+            (c.school && c.school.toLowerCase().includes(searchLower))
+        )
+      : list;
+  const filteredFollowed = filterCoaches(followedCoaches);
+  const filteredOther = filterCoaches(otherCoaches);
 
   return (
     <div className="space-y-6 max-w-lg">
@@ -78,47 +188,47 @@ export function NewMessageClient({
             Message a coach
           </h2>
           <p className="text-sm text-muted-foreground mb-4">
-            Choose a coach you follow to start or continue a conversation. Share links, ask questions, or coordinate sessions.
+            Start or continue a conversation with any coach. You can message coaches you follow or any other coach.
           </p>
-          {coaches.length === 0 ? (
-            <p className="text-sm text-muted-foreground mb-4">
-              You don&apos;t follow any coaches yet. Browse coaches and follow them to message from here.
-            </p>
-          ) : (
-            <ul className="space-y-2">
-              {coaches.map((c) => (
-                <li key={c.id}>
-                  <button
-                    type="button"
-                    onClick={() => handleCoachClick(c.id)}
-                    className="w-full flex items-center gap-3 p-3 rounded-lg border bg-card hover:bg-muted/50 text-left transition-colors"
-                  >
-                    {c.photoUrl ? (
-                      <img src={c.photoUrl} alt="" className="w-10 h-10 rounded-full object-cover shrink-0" />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center shrink-0">
-                        <MessageCircle className="h-5 w-5 text-muted-foreground" />
-                      </div>
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <p className="font-medium truncate">
-                        {c.firstName} {c.lastName}
-                      </p>
-                      {c.school && (
-                        <p className="text-xs text-muted-foreground flex items-center gap-1">
-                          <SchoolLogo school={c.school} size="sm" />
-                          {c.school}
-                        </p>
-                      )}
-                    </div>
-                  </button>
-                </li>
-              ))}
-            </ul>
+          <div className="relative mb-4">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search coaches by name or school..."
+              value={coachSearch}
+              onChange={(e) => setCoachSearch(e.target.value)}
+              className="pl-9"
+            />
+          </div>
+          {filteredFollowed.length > 0 && (
+            <>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Coaches you follow</p>
+              <ul className="space-y-2 mb-4">
+                {filteredFollowed.map((c) => (
+                  <li key={c.id}>
+                    <CoachRow coach={c} onSelect={() => handleCoachClick(c.id)} badge="Following" />
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+          {(filteredOther.length > 0 || (searchLower && filteredFollowed.length === 0)) && (
+            <>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">All coaches</p>
+              <ul className="space-y-2">
+                {filteredOther.map((c) => (
+                  <li key={c.id}>
+                    <CoachRow coach={c} onSelect={() => handleCoachClick(c.id)} />
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+          {!searchLower && filteredFollowed.length === 0 && filteredOther.length === 0 && (
+            <p className="text-sm text-muted-foreground">No coaches found. Browse coaches to book sessions.</p>
           )}
           <div className="mt-4 pt-4 border-t">
             <Button variant="outline" asChild className="w-full sm:w-auto">
-              <Link href="/browse">Browse all coaches</Link>
+              <Link href="/browse">Browse coaches to book</Link>
             </Button>
           </div>
         </CardContent>
