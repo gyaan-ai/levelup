@@ -183,6 +183,7 @@ export default async function AthleteProfilePage({
                   src={athlete.photo_url}
                   alt={`${athlete.first_name} ${athlete.last_name}`}
                   className="w-32 h-32 md:w-40 md:h-40 rounded-full object-cover border-4 border-accent/30"
+                  style={{ objectPosition: `${athlete.photo_focus_x ?? 50}% ${athlete.photo_focus_y ?? 50}%` }}
                 />
               ) : (
                 <div className="w-32 h-32 md:w-40 md:h-40 rounded-full bg-muted flex items-center justify-center border-4 border-accent/30">

@@ -290,6 +290,7 @@ export function BrowseAthletesClient({ initialAthletes, isAdmin }: BrowseAthlete
                           src={athlete.photo_url}
                           alt={`${athlete.first_name} ${athlete.last_name}`}
                           className="w-24 h-24 rounded-full object-cover border-2 border-accent/30"
+                          style={{ objectPosition: `${athlete.photo_focus_x ?? 50}% ${athlete.photo_focus_y ?? 50}%` }}
                         />
                       ) : (
                         <div className="w-24 h-24 rounded-full bg-muted flex items-center justify-center border-2 border-accent/30">

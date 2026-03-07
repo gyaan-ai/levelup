@@ -70,7 +70,11 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { weightClass, bio, credentials, photoUrl, facilityId, secondaryFacilityId, active, venmoHandle, zelleEmail } = body;
+    const { weightClass, bio, credentials, photoUrl, facilityId, secondaryFacilityId, active, venmoHandle, zelleEmail, photoFocusX, photoFocusY } = body;
+
+    const clamp = (n: number) => Math.min(100, Math.max(0, Math.round(n)));
+    const focusX = photoFocusX != null ? clamp(Number(photoFocusX)) : undefined;
+    const focusY = photoFocusY != null ? clamp(Number(photoFocusY)) : undefined;
 
     // Check if user is an athlete
     const { data: userData } = await supabase
@@ -117,9 +121,10 @@ export async function PUT(req: NextRequest) {
       photo_url: photoUrl || null,
       facility_id: facilityId || null,
       secondary_facility_id: secondaryFacilityId ?? null,
-      // Public (active) = visible in browse & bookable; Private = hidden, keep editing
       active: active === true,
     };
+    if (focusX !== undefined) updateData.photo_focus_x = focusX;
+    if (focusY !== undefined) updateData.photo_focus_y = focusY;
     if (venmoHandle !== undefined) updateData.venmo_handle = venmoHandle === '' ? null : String(venmoHandle).trim();
     if (zelleEmail !== undefined) {
       updateData.zelle_email = zelleEmail === '' ? null : normalizeZelleInput(String(zelleEmail).trim()) ?? null;

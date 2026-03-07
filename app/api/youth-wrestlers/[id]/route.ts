@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 
-// GET - Get single youth wrestler
+// GET - Get single youth wrestler (parent, linked parent, or admin)
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -25,7 +26,12 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { data: youthWrestler, error } = await supabase
+    const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
+    const isAdmin = userData?.role === 'admin';
+
+    const db = isAdmin ? createAdminClient(tenant.slug) : supabase;
+
+    const { data: youthWrestler, error } = await db
       .from('youth_wrestlers')
       .select('*')
       .eq('id', id)
@@ -37,7 +43,7 @@ export async function GET(
     }
 
     // Get sessions for this youth wrestler
-    const { data: sessions } = await supabase
+    const { data: sessions } = await db
       .from('sessions')
       .select('*, athletes(first_name, last_name), facilities(name)')
       .eq('youth_wrestler_id', id)
@@ -78,14 +84,19 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Verify can edit (primary parent or linked parent)
-    const { data: existing } = await supabase.from('youth_wrestlers').select('parent_id').eq('id', id).single();
-    if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    if (existing.parent_id !== user.id) {
-      const { data: link } = await supabase.from('youth_wrestler_parents').select('id').eq('youth_wrestler_id', id).eq('parent_id', user.id).maybeSingle();
-      if (!link) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
+    const isAdmin = userData?.role === 'admin';
+
+    if (!isAdmin) {
+      const { data: existing } = await supabase.from('youth_wrestlers').select('parent_id').eq('id', id).single();
+      if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+      if (existing.parent_id !== user.id) {
+        const { data: link } = await supabase.from('youth_wrestler_parents').select('id').eq('youth_wrestler_id', id).eq('parent_id', user.id).maybeSingle();
+        if (!link) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
     }
 
+    const db = isAdmin ? createAdminClient(tenant.slug) : supabase;
     const body = await req.json();
     const {
       firstName,
@@ -136,7 +147,7 @@ export async function PUT(
     if (focusX !== undefined) updatePayload.photo_focus_x = focusX;
     if (focusY !== undefined) updatePayload.photo_focus_y = focusY;
 
-    const { data: youthWrestler, error } = await supabase
+    const { data: youthWrestler, error } = await db
       .from('youth_wrestlers')
       .update(updatePayload)
       .eq('id', id)
@@ -179,18 +190,22 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Verify ownership
-    const { data: existing } = await supabase
-      .from('youth_wrestlers')
-      .select('parent_id')
-      .eq('id', id)
-      .single();
+    const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
+    const isAdmin = userData?.role === 'admin';
 
-    if (!existing || existing.parent_id !== user.id) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    if (!isAdmin) {
+      const { data: existing } = await supabase
+        .from('youth_wrestlers')
+        .select('parent_id')
+        .eq('id', id)
+        .single();
+      if (!existing || existing.parent_id !== user.id) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
     }
 
-    const { error } = await supabase
+    const db = isAdmin ? createAdminClient(tenant.slug) : supabase;
+    const { error } = await db
       .from('youth_wrestlers')
       .delete()
       .eq('id', id);

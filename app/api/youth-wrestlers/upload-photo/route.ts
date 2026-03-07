@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 
 export async function POST(req: NextRequest) {
@@ -32,15 +33,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Youth wrestler ID required' }, { status: 400 });
     }
 
-    // Verify ownership
-    const { data: existing } = await supabase
-      .from('youth_wrestlers')
-      .select('parent_id')
-      .eq('id', youthWrestlerId)
-      .single();
+    const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
+    const isAdmin = userData?.role === 'admin';
 
-    if (!existing || existing.parent_id !== user.id) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    if (!isAdmin) {
+      const { data: existing } = await supabase
+        .from('youth_wrestlers')
+        .select('parent_id')
+        .eq('id', youthWrestlerId)
+        .single();
+      if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+      if (existing.parent_id !== user.id) {
+        const { data: link } = await supabase.from('youth_wrestler_parents').select('id').eq('youth_wrestler_id', youthWrestlerId).eq('parent_id', user.id).maybeSingle();
+        if (!link) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      }
     }
 
     // Validate file type
@@ -53,30 +59,31 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'File size must be less than 5MB' }, { status: 400 });
     }
 
+    const db = isAdmin ? createAdminClient(tenant.slug) : supabase;
+
     // Upload photo (reuse athlete photo storage, but with youth wrestler ID)
     const fileExt = file.name.split('.').pop();
     const fileName = `${Date.now()}.${fileExt}`;
     const filePath = `youth-wrestlers/${youthWrestlerId}/${fileName}`;
 
     // Delete old photo if exists
-    const { data: oldData } = await supabase
+    const { data: oldData } = await db
       .from('youth_wrestlers')
       .select('photo_url')
       .eq('id', youthWrestlerId)
       .single();
 
     if (oldData?.photo_url) {
-      // Extract path from URL
       const oldUrl = oldData.photo_url;
       const oldPathMatch = oldUrl.match(/\/storage\/v1\/object\/public\/athlete-photos\/(.+)/);
       if (oldPathMatch) {
-        await supabase.storage
+        await db.storage
           .from('athlete-photos')
           .remove([oldPathMatch[1]]);
       }
     }
 
-    const { data, error: uploadError } = await supabase.storage
+    const { data, error: uploadError } = await db.storage
       .from('athlete-photos')
       .upload(filePath, file, {
         cacheControl: '3600',
@@ -92,7 +99,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Get public URL
-    const { data: urlData } = supabase.storage
+    const { data: urlData } = db.storage
       .from('athlete-photos')
       .getPublicUrl(data.path);
 

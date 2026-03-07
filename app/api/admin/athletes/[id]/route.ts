@@ -30,7 +30,7 @@ export async function GET(
     const admin = createAdminClient(tenant.slug);
     const { data: athlete, error } = await admin
       .from('athletes')
-      .select('id, first_name, last_name, school, facility_id, active, weight_class, bio, photo_url')
+      .select('*')
       .eq('id', id)
       .single();
 
@@ -62,6 +62,16 @@ export async function PATCH(
       last_name?: string;
       school?: string;
       facility_id?: string | null;
+      secondary_facility_id?: string | null;
+      year?: string | null;
+      weight_class?: string | null;
+      bio?: string | null;
+      credentials?: Record<string, unknown> | null;
+      photo_url?: string | null;
+      photo_focus_x?: number;
+      photo_focus_y?: number;
+      venmo_handle?: string | null;
+      zelle_email?: string | null;
     };
     const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
     if (typeof body.active === 'boolean') updates.active = body.active;
@@ -69,13 +79,23 @@ export async function PATCH(
     if (typeof body.last_name === 'string' && body.last_name.trim()) updates.last_name = body.last_name.trim();
     if (typeof body.school === 'string' && body.school.trim()) updates.school = body.school.trim();
     if (body.facility_id !== undefined) updates.facility_id = body.facility_id === null || body.facility_id === '' ? null : body.facility_id;
+    if (body.secondary_facility_id !== undefined) updates.secondary_facility_id = body.secondary_facility_id === null || body.secondary_facility_id === '' ? null : body.secondary_facility_id;
+    if (body.year !== undefined) updates.year = body.year === null || body.year === '' ? null : body.year;
+    if (body.weight_class !== undefined) updates.weight_class = body.weight_class === null || body.weight_class === '' ? null : body.weight_class;
+    if (body.bio !== undefined) updates.bio = body.bio === null || body.bio === '' ? null : body.bio;
+    if (body.credentials !== undefined) updates.credentials = body.credentials;
+    if (body.photo_url !== undefined) updates.photo_url = body.photo_url === null || body.photo_url === '' ? null : body.photo_url;
+    if (typeof body.photo_focus_x === 'number') updates.photo_focus_x = Math.min(100, Math.max(0, Math.round(body.photo_focus_x)));
+    if (typeof body.photo_focus_y === 'number') updates.photo_focus_y = Math.min(100, Math.max(0, Math.round(body.photo_focus_y)));
+    if (body.venmo_handle !== undefined) updates.venmo_handle = body.venmo_handle === null || body.venmo_handle === '' ? null : body.venmo_handle;
+    if (body.zelle_email !== undefined) updates.zelle_email = body.zelle_email === null || body.zelle_email === '' ? null : body.zelle_email;
 
     const admin = createAdminClient(tenant.slug);
     const { data: athlete, error } = await admin
       .from('athletes')
       .update(updates)
       .eq('id', id)
-      .select('id, first_name, last_name, school, facility_id, active')
+      .select()
       .single();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });

@@ -271,7 +271,23 @@ export function AdminDashboardClient({
   const [userSearch, setUserSearch] = useState('');
   const [athleteSearch, setAthleteSearch] = useState('');
   const [editingAthleteId, setEditingAthleteId] = useState<string | null>(null);
-  const [athleteEditForm, setAthleteEditForm] = useState<{ first_name: string; last_name: string; school: string; facility_id: string | null; active: boolean; photo_url: string | null } | null>(null);
+  const [athleteEditForm, setAthleteEditForm] = useState<{
+    first_name: string;
+    last_name: string;
+    school: string;
+    facility_id: string | null;
+    secondary_facility_id: string | null;
+    year: string | null;
+    weight_class: string | null;
+    bio: string | null;
+    credentials: Record<string, unknown> | null;
+    photo_url: string | null;
+    photo_focus_x: number;
+    photo_focus_y: number;
+    venmo_handle: string | null;
+    zelle_email: string | null;
+    active: boolean;
+  } | null>(null);
   const [facilities, setFacilities] = useState<{ id: string; name: string; school: string }[]>([]);
   const [athleteEditSaving, setAthleteEditSaving] = useState(false);
   const [athletePhotoUploading, setAthletePhotoUploading] = useState(false);
@@ -339,8 +355,17 @@ export function AdminDashboardClient({
         last_name: a.last_name ?? '',
         school: a.school ?? '',
         facility_id: a.facility_id ?? null,
-        active: a.active ?? true,
+        secondary_facility_id: a.secondary_facility_id ?? null,
+        year: a.year ?? null,
+        weight_class: a.weight_class ?? null,
+        bio: a.bio ?? null,
+        credentials: a.credentials ?? null,
         photo_url: a.photo_url ?? null,
+        photo_focus_x: typeof a.photo_focus_x === 'number' ? a.photo_focus_x : 50,
+        photo_focus_y: typeof a.photo_focus_y === 'number' ? a.photo_focus_y : 50,
+        venmo_handle: a.venmo_handle ?? null,
+        zelle_email: a.zelle_email ?? null,
+        active: a.active ?? true,
       });
       setFacilities(facilitiesData.facilities ?? []);
     } catch {
@@ -361,6 +386,16 @@ export function AdminDashboardClient({
           last_name: athleteEditForm.last_name.trim(),
           school: athleteEditForm.school.trim(),
           facility_id: athleteEditForm.facility_id || null,
+          secondary_facility_id: athleteEditForm.secondary_facility_id || null,
+          year: athleteEditForm.year || null,
+          weight_class: athleteEditForm.weight_class || null,
+          bio: athleteEditForm.bio || null,
+          credentials: athleteEditForm.credentials,
+          photo_url: athleteEditForm.photo_url,
+          photo_focus_x: athleteEditForm.photo_focus_x,
+          photo_focus_y: athleteEditForm.photo_focus_y,
+          venmo_handle: athleteEditForm.venmo_handle || null,
+          zelle_email: athleteEditForm.zelle_email || null,
           active: athleteEditForm.active,
         }),
       });
@@ -1132,7 +1167,7 @@ export function AdminDashboardClient({
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Edit coach</DialogTitle>
-            <DialogDescription>Update name, school, facility, or visibility. Deactivated coaches are hidden from Browse.</DialogDescription>
+            <DialogDescription>Edit every aspect of this coach profile. Deactivated coaches are hidden from Browse.</DialogDescription>
           </DialogHeader>
           {athleteEditForm ? (
             <form onSubmit={saveAthleteEdit} className="space-y-4">
@@ -1141,7 +1176,12 @@ export function AdminDashboardClient({
                 <div className="flex items-center gap-4">
                   <div className="w-20 h-20 rounded-full border-2 border-border overflow-hidden bg-muted flex items-center justify-center shrink-0">
                     {athleteEditForm.photo_url ? (
-                      <img src={athleteEditForm.photo_url} alt="Coach" className="w-full h-full object-cover" />
+                      <img
+                        src={athleteEditForm.photo_url}
+                        alt="Coach"
+                        className="w-full h-full object-cover"
+                        style={{ objectPosition: `${athleteEditForm.photo_focus_x}% ${athleteEditForm.photo_focus_y}%` }}
+                      />
                     ) : (
                       <User className="h-8 w-8 text-muted-foreground" />
                     )}
@@ -1203,6 +1243,43 @@ export function AdminDashboardClient({
                 <Label>School</Label>
                 <Input value={athleteEditForm.school} onChange={(e) => setAthleteEditForm((p) => p ? { ...p, school: e.target.value } : null)} placeholder="e.g. NC State" />
               </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Photo focus X (0–100)</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={athleteEditForm.photo_focus_x}
+                    onChange={(e) => setAthleteEditForm((p) => p ? { ...p, photo_focus_x: Math.min(100, Math.max(0, parseInt(e.target.value, 10) || 50)) } : null)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Photo focus Y (0–100)</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={athleteEditForm.photo_focus_y}
+                    onChange={(e) => setAthleteEditForm((p) => p ? { ...p, photo_focus_y: Math.min(100, Math.max(0, parseInt(e.target.value, 10) || 50)) } : null)}
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">Lower Y = face higher in frame (fix head cut off). 50,50 = center.</p>
+              <div className="space-y-2">
+                <Label>Weight class</Label>
+                <Input value={athleteEditForm.weight_class ?? ''} onChange={(e) => setAthleteEditForm((p) => p ? { ...p, weight_class: e.target.value || null } : null)} placeholder="e.g. 157 lbs" />
+              </div>
+              <div className="space-y-2">
+                <Label>Bio</Label>
+                <textarea
+                  className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                  value={athleteEditForm.bio ?? ''}
+                  onChange={(e) => setAthleteEditForm((p) => p ? { ...p, bio: e.target.value || null } : null)}
+                  placeholder="Coach bio..."
+                  rows={3}
+                />
+              </div>
               <div className="space-y-2">
                 <Label>Primary facility</Label>
                 <Select
@@ -1217,6 +1294,42 @@ export function AdminDashboardClient({
                     {facilities.map((f) => (
                       <SelectItem key={f.id} value={f.id}>{f.name} — {f.school}</SelectItem>
                     ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Secondary facility</Label>
+                <Select
+                  value={athleteEditForm.secondary_facility_id ?? 'none'}
+                  onValueChange={(v) => setAthleteEditForm((p) => p ? { ...p, secondary_facility_id: v === 'none' ? null : v } : null)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="None" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {facilities.map((f) => (
+                      <SelectItem key={f.id} value={f.id}>{f.name} — {f.school}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Year (e.g. Senior)</Label>
+                <Select
+                  value={athleteEditForm.year ?? 'none'}
+                  onValueChange={(v) => setAthleteEditForm((p) => p ? { ...p, year: v === 'none' ? null : v } : null)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    <SelectItem value="Freshman">Freshman</SelectItem>
+                    <SelectItem value="Sophomore">Sophomore</SelectItem>
+                    <SelectItem value="Junior">Junior</SelectItem>
+                    <SelectItem value="Senior">Senior</SelectItem>
+                    <SelectItem value="5th Year">5th Year</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

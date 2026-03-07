@@ -19,6 +19,8 @@ export interface Athlete {
   weight_class?: string;
   bio?: string;
   photo_url?: string;
+  photo_focus_x?: number;
+  photo_focus_y?: number;
   credentials?: Record<string, any>;
   average_rating: number;
   total_sessions: number;

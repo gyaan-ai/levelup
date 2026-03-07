@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -56,8 +56,12 @@ export default function ProfilePage() {
   const [facilities, setFacilities] = useState<Array<{ id: string; name: string; school: string }>>([]);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoFocusX, setPhotoFocusX] = useState(50);
+  const [photoFocusY, setPhotoFocusY] = useState(50);
   const [isPublic, setIsPublic] = useState(true);
   const visibilityModalRef = useRef<HTMLDialogElement>(null);
+  const photoContainerRef = useRef<HTMLDivElement>(null);
+  const photoImgRef = useRef<HTMLImageElement>(null);
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -102,6 +106,10 @@ export default function ProfilePage() {
           if (data.athlete.photo_url) {
             setPhotoPreview(data.athlete.photo_url);
           }
+          const fx = data.athlete.photo_focus_x;
+          const fy = data.athlete.photo_focus_y;
+          if (typeof fx === 'number' && fx >= 0 && fx <= 100) setPhotoFocusX(fx);
+          if (typeof fy === 'number' && fy >= 0 && fy <= 100) setPhotoFocusY(fy);
 
           setIsPublic(data.athlete.active === true);
         }
@@ -130,6 +138,29 @@ export default function ProfilePage() {
       reader.readAsDataURL(file);
     }
   };
+
+  const handlePhotoPositionClick = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      const container = photoContainerRef.current;
+      const img = photoImgRef.current;
+      if (!container || !img || !img.complete || !img.naturalWidth) return;
+      const rect = container.getBoundingClientRect();
+      const cx = e.clientX - rect.left;
+      const cy = e.clientY - rect.top;
+      const W = rect.width;
+      const H = rect.height;
+      const Iw = img.naturalWidth;
+      const Ih = img.naturalHeight;
+      const s = Math.max(W / Iw, H / Ih);
+      const px = (cx - W / 2) / s + (photoFocusX / 100) * Iw;
+      const py = (cy - H / 2) / s + (photoFocusY / 100) * Ih;
+      const newX = Math.min(100, Math.max(0, (px / Iw) * 100));
+      const newY = Math.min(100, Math.max(0, (py / Ih) * 100));
+      setPhotoFocusX(Math.round(newX));
+      setPhotoFocusY(Math.round(newY));
+    },
+    [photoFocusX, photoFocusY]
+  );
 
   const doSave = async (makePublic: boolean) => {
     setSubmitting(true);
@@ -173,6 +204,8 @@ export default function ProfilePage() {
           bio: values.bio,
           credentials: credentialsObj,
           photoUrl,
+          photoFocusX: photoFocusX,
+          photoFocusY: photoFocusY,
           facilityId: values.facilityId,
           secondaryFacilityId: values.secondaryFacilityId || undefined,
           venmoHandle: values.venmoHandle?.trim() || undefined,
@@ -267,6 +300,7 @@ export default function ProfilePage() {
                           src={photoPreview}
                           alt="Profile preview"
                           className="w-24 h-24 rounded-full object-cover border"
+                          style={{ objectPosition: `${photoFocusX}% ${photoFocusY}%` }}
                         />
                       )}
                       <div>
@@ -281,6 +315,32 @@ export default function ProfilePage() {
                         </FormDescription>
                       </div>
                     </div>
+                    {photoPreview && (
+                      <div className="mt-4">
+                        <p className="text-sm font-medium mb-2">Position photo</p>
+                        <p className="text-xs text-muted-foreground mb-2">
+                          Click where your face is so it isn’t cut off on your profile.
+                        </p>
+                        <div
+                          ref={photoContainerRef}
+                          role="button"
+                          tabIndex={0}
+                          onClick={handlePhotoPositionClick}
+                          onKeyDown={(e) => e.key === 'Enter' && (e.target as HTMLElement).click()}
+                          className="relative w-full max-w-[280px] h-36 rounded-lg overflow-hidden border bg-muted cursor-pointer focus:outline-none focus:ring-2 focus:ring-accent"
+                          aria-label="Click to set focal point"
+                        >
+                          <img
+                            ref={photoImgRef}
+                            src={photoPreview}
+                            alt=""
+                            className="w-full h-full object-cover pointer-events-none"
+                            style={{ objectPosition: `${photoFocusX}% ${photoFocusY}%` }}
+                            draggable={false}
+                          />
+                        </div>
+                      </div>
+                    )}
                   </FormItem>
                 )}
               />
