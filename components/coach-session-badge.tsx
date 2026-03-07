@@ -2,21 +2,9 @@
 
 import { Award } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { getSessionBadge } from '@/lib/badges';
 
-const MILESTONES = [
-  { min: 50, label: '50 Sessions' },
-  { min: 25, label: '25 Sessions' },
-  { min: 10, label: '10 Sessions' },
-  { min: 1, label: '1st Session' },
-] as const;
-
-function getMilestone(totalSessions: number): { label: string } | null {
-  for (const m of MILESTONES) {
-    if (totalSessions >= m.min) return { label: m.label };
-  }
-  return null;
-}
-
+/** Session badge for coaches and youth athletes. Completed sessions only. Tiers: New, 10, 25, 50, 100. */
 interface CoachSessionBadgeProps {
   totalSessions: number;
   className?: string;
@@ -24,8 +12,7 @@ interface CoachSessionBadgeProps {
 }
 
 export function CoachSessionBadge({ totalSessions, className, size = 'md' }: CoachSessionBadgeProps) {
-  const milestone = getMilestone(totalSessions);
-  if (!milestone) return null;
+  const { label } = getSessionBadge(totalSessions);
 
   const sizeClasses = {
     sm: 'px-2 py-1 text-xs gap-1',
@@ -46,10 +33,10 @@ export function CoachSessionBadge({ totalSessions, className, size = 'md' }: Coa
         sizeClasses[size],
         className
       )}
-      aria-label={`${milestone.label} completed`}
+      aria-label={`${label} sessions`}
     >
-      <Award className={cn('text-accent', iconSizes[size])} />
-      <span>{milestone.label}</span>
+      <Award className={cn('text-black', iconSizes[size])} />
+      <span>{label}</span>
     </div>
   );
 }

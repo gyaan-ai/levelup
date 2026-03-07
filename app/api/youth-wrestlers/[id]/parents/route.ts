@@ -95,3 +95,39 @@ export async function POST(
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
+
+/** DELETE - unlink current user from this youth wrestler (linked parent only). */
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id: youthWrestlerId } = await params;
+    const headersList = await headers();
+    const host = headersList.get('host') || '';
+    const tenant = getTenantByDomain(host);
+    if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
+
+    const supabase = await createClient(tenant.slug);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const { data: yw } = await supabase.from('youth_wrestlers').select('parent_id').eq('id', youthWrestlerId).single();
+    if (!yw) return NextResponse.json({ error: 'Youth wrestler not found' }, { status: 404 });
+    if (yw.parent_id === user.id) {
+      return NextResponse.json({ error: 'Primary parent cannot unlink; transfer primary or delete the profile from the edit page' }, { status: 400 });
+    }
+
+    const { error } = await supabase
+      .from('youth_wrestler_parents')
+      .delete()
+      .eq('youth_wrestler_id', youthWrestlerId)
+      .eq('parent_id', user.id);
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    console.error('Youth wrestler parents DELETE error:', e);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}

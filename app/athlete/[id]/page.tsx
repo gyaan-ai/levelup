@@ -65,13 +65,8 @@ export default async function AthleteProfilePage({
   }
   const athlete = { ...athleteRow, facilities: facility };
 
-  // Calculate total sessions from sessions table
-  const { count: totalSessionsCount } = await supabase
-    .from('sessions')
-    .select('*', { count: 'exact', head: true })
-    .eq('athlete_id', id);
-
-  const totalSessions = totalSessionsCount || athlete.total_sessions || 0;
+  // Use athlete.total_sessions (completed only, maintained by trigger) for badge and display
+  const completedSessions = athlete.total_sessions ?? 0;
 
   // Check certification status
   const today = new Date();
@@ -198,7 +193,7 @@ export default async function AthleteProfilePage({
               </h1>
               
               <div className="flex items-center gap-3 mb-3 flex-wrap">
-                <CoachSessionBadge totalSessions={totalSessions} size="lg" />
+                <CoachSessionBadge totalSessions={completedSessions} size="lg" />
                 <SchoolLogo school={athlete.school} size="md" />
                 <Badge className={`${schoolColor.bg} ${schoolColor.text}`}>
                   {athlete.school}
@@ -217,9 +212,9 @@ export default async function AthleteProfilePage({
               <div className="flex items-center gap-2 mb-4">
                 <Star className="h-5 w-5 fill-accent text-accent" />
                 <span className="text-lg font-semibold">{rating}</span>
-                {totalSessions > 0 && (
+                {completedSessions > 0 && (
                   <span className="text-muted-foreground">
-                    ({totalSessions} {totalSessions === 1 ? 'session' : 'sessions'})
+                    ({completedSessions} {completedSessions === 1 ? 'session' : 'sessions'})
                   </span>
                 )}
               </div>

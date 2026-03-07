@@ -6,6 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { ArrowLeft, Edit, Calendar, User, School, Target, Heart, Award } from 'lucide-react';
+import { CoachSessionBadge } from '@/components/coach-session-badge';
+import { LinkedParentsCard } from './linked-parents-card';
 
 export default async function YouthWrestlerProfilePage({
   params,
@@ -43,24 +45,49 @@ export default async function YouthWrestlerProfilePage({
   }
   // parent and admin can both access (admin redirected to dashboard if no matching wrestler)
 
-  // Get youth wrestler
+  // Get youth wrestler (RLS: primary or linked parent can see)
   const { data: youthWrestler, error } = await supabase
     .from('youth_wrestlers')
     .select('*')
     .eq('id', id)
-    .eq('parent_id', user.id)
     .single();
 
   if (error || !youthWrestler) {
     redirect('/dashboard');
   }
 
-  // Get sessions for this youth wrestler
-  const { data: sessions } = await supabase
-    .from('sessions')
-    .select('*, athletes(first_name, last_name, photo_url), facilities(name)')
-    .eq('youth_wrestler_id', id)
-    .order('scheduled_datetime', { ascending: false });
+  const isPrimary = youthWrestler.parent_id === user.id;
+  // Fetch linked parents for "Linked parents" section (primary can add; both can see list)
+  let parents: { parentId: string; email: string; isPrimary: boolean }[] = [];
+  const { data: links } = await supabase.from('youth_wrestler_parents').select('parent_id').eq('youth_wrestler_id', id);
+  const linkedIds = (links ?? []).map((r) => r.parent_id);
+  const allParentIds = [youthWrestler.parent_id, ...linkedIds];
+  if (allParentIds.length > 0) {
+    const { data: users } = await supabase.from('users').select('id, email').in('id', allParentIds);
+    const byId = new Map((users ?? []).map((u) => [u.id, u]));
+    parents = allParentIds.map((pid) => ({
+      parentId: pid,
+      email: byId.get(pid)?.email ?? '',
+      isPrimary: pid === youthWrestler.parent_id,
+    }));
+  }
+
+  // Completed session count (via session_participants for accuracy)
+  const { data: participantRows } = await supabase
+    .from('session_participants')
+    .select('session_id, sessions(status)')
+    .eq('youth_wrestler_id', id);
+  const completedCount = (participantRows ?? []).filter((p: { sessions?: { status: string } | null }) => (p.sessions as { status: string } | null)?.status === 'completed').length;
+
+  // Get sessions for this youth wrestler (sessions where they participated)
+  const sessionIds = [...new Set((participantRows ?? []).map((p: { session_id: string }) => p.session_id))];
+  const { data: sessions } = sessionIds.length > 0
+    ? await supabase
+        .from('sessions')
+        .select('*, athletes(first_name, last_name, photo_url), facilities(name)')
+        .in('id', sessionIds)
+        .order('scheduled_datetime', { ascending: false })
+    : { data: [] };
 
   const upcomingSessions = sessions?.filter(
     (s: any) => s.status === 'scheduled' && new Date(s.scheduled_datetime) >= new Date()
@@ -93,10 +120,13 @@ export default async function YouthWrestlerProfilePage({
               </div>
             )}
             <div className="flex-1">
-              <div className="flex items-center justify-between mb-2">
-                <h1 className="text-3xl font-bold">
-                  {youthWrestler.first_name} {youthWrestler.last_name}
-                </h1>
+              <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+                <div className="flex items-center gap-3">
+                  <h1 className="text-3xl font-bold">
+                    {youthWrestler.first_name} {youthWrestler.last_name}
+                  </h1>
+                  <CoachSessionBadge totalSessions={completedCount} size="md" />
+                </div>
                 <Link href={`/wrestlers/${id}/edit`}>
                   <Button variant="outline" size="icon">
                     <Edit className="h-4 w-4" />
@@ -120,6 +150,11 @@ export default async function YouthWrestlerProfilePage({
           </div>
         </CardContent>
       </Card>
+
+      {/* Linked parents: add another parent by email so they see this wrestler too */}
+      <div className="mb-6">
+        <LinkedParentsCard youthWrestlerId={id} isPrimary={isPrimary} parents={parents} />
+      </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         {/* School Info */}

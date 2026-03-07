@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -55,6 +55,8 @@ type SignupFormValues = z.infer<typeof signupSchema>;
 
 export default function SignupPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const inviteToken = searchParams?.get('invite')?.trim() || undefined;
   const tenant = useTenant();
   const supabase = createClient(tenant.slug);
   const [loading, setLoading] = useState(false);
@@ -66,7 +68,7 @@ export default function SignupPage() {
       email: '',
       password: '',
       confirmPassword: '',
-      role: 'parent',
+      role: inviteToken ? 'parent' : 'parent',
       coachType: undefined,
       firstName: '',
       lastName: '',
@@ -74,6 +76,10 @@ export default function SignupPage() {
       discountCode: '',
     },
   });
+
+  useEffect(() => {
+    if (inviteToken) form.setValue('role', 'parent');
+  }, [inviteToken, form]);
 
   const selectedRole = form.watch('role');
   const selectedCoachType = form.watch('coachType');
@@ -97,6 +103,7 @@ export default function SignupPage() {
           lastName: values.lastName,
           school: values.school?.trim(),
           discountCode: values.discountCode?.trim() || undefined,
+          inviteToken: inviteToken || undefined,
         }),
       });
 

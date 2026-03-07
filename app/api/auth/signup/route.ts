@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
+import { verifyInviteToken } from '@/lib/invite-parent-token';
 
 export async function POST(req: NextRequest) {
   try {
@@ -15,7 +16,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { email, password, role, coachType, firstName, lastName, school, discountCode } = body;
+    const { email, password, role, coachType, firstName, lastName, school, discountCode, inviteToken } = body;
 
     // Validate required fields
     if (!email || !password || !role) {
@@ -32,6 +33,13 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+    if (inviteToken && role !== 'parent') {
+      return NextResponse.json(
+        { error: 'Invite links are for parent accounts. Please sign up as Parent.' },
+        { status: 400 }
+      );
+    }
+    const invitePayload = typeof inviteToken === 'string' && inviteToken.trim() ? verifyInviteToken(inviteToken.trim()) : null;
 
     // For athletes (coaches), require additional fields and coach type
     if (role === 'athlete') {
@@ -119,6 +127,17 @@ export async function POST(req: NextRequest) {
         { error: `Failed to create user profile: ${userError.message}` },
         { status: 500 }
       );
+    }
+
+    // If they signed up via invite link, link them to the youth wrestler
+    if (invitePayload && role === 'parent') {
+      const { error: linkErr } = await supabaseAdmin.from('youth_wrestler_parents').insert({
+        youth_wrestler_id: invitePayload.youthWrestlerId,
+        parent_id: userId,
+      });
+      if (linkErr && linkErr.code !== '23505') {
+        console.warn('Invite link: failed to link parent to youth wrestler', linkErr);
+      }
     }
 
     // Grant early adopter entitlements (1 free 1-on-1, 1 free 2-athlete) for parents who used a valid code

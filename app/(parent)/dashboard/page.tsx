@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { Plus, Edit, User, Calendar, DollarSign, Users, UserPlus } from 'lucide-react';
 import { YouthWrestler } from '@/types';
 import { BookingCard, type BookingSession } from '@/app/(parent)/bookings/booking-card';
+import { CoachSessionBadge } from '@/components/coach-session-badge';
 
 export default async function ParentDashboard() {
   const headersList = await headers();
@@ -297,9 +298,12 @@ export default async function ParentDashboard() {
                     )}
                   </div>
                   <CardHeader>
-                    <CardTitle className="text-xl">
-                      {wrestler.first_name} {wrestler.last_name}
-                    </CardTitle>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <CardTitle className="text-xl">
+                        {wrestler.first_name} {wrestler.last_name}
+                      </CardTitle>
+                      <CoachSessionBadge totalSessions={sessionsCompleted} size="sm" />
+                    </div>
                     <CardDescription>
                       <div className="flex flex-wrap gap-2 text-sm">
                         {wrestler.age && <span>{wrestler.age} years</span>}
