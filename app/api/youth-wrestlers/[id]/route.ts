@@ -33,7 +33,7 @@ export async function GET(
 
     if (error || !youthWrestler) {
       if (error?.code === 'PGRST116' || !youthWrestler) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json({ error: error?.message ?? 'Internal server error' }, { status: 500 });
     }
 
     // Get sessions for this youth wrestler
