@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -34,10 +34,12 @@ import {
   Package,
   ClipboardList,
   Pencil,
+  User,
   UserX,
   Loader2,
   Trash2,
   UserMinus,
+  Building2,
 } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
@@ -107,7 +109,7 @@ export type CreditRecord = {
   expires_at?: string | null;
 };
 
-type TabId = 'sessions' | 'users' | 'billing' | 'athletes' | 'payouts' | 'credits';
+type TabId = 'sessions' | 'users' | 'billing' | 'athletes' | 'payouts' | 'credits' | 'facility_requests';
 
 function ClearTestDataCard() {
   const router = useRouter();
@@ -269,11 +271,26 @@ export function AdminDashboardClient({
   const [userSearch, setUserSearch] = useState('');
   const [athleteSearch, setAthleteSearch] = useState('');
   const [editingAthleteId, setEditingAthleteId] = useState<string | null>(null);
-  const [athleteEditForm, setAthleteEditForm] = useState<{ first_name: string; last_name: string; school: string; facility_id: string | null; active: boolean } | null>(null);
+  const [athleteEditForm, setAthleteEditForm] = useState<{ first_name: string; last_name: string; school: string; facility_id: string | null; active: boolean; photo_url: string | null } | null>(null);
   const [facilities, setFacilities] = useState<{ id: string; name: string; school: string }[]>([]);
   const [athleteEditSaving, setAthleteEditSaving] = useState(false);
+  const [athletePhotoUploading, setAthletePhotoUploading] = useState(false);
   const [deactivatingId, setDeactivatingId] = useState<string | null>(null);
   const [deletingAthleteId, setDeletingAthleteId] = useState<string | null>(null);
+  const athletePhotoInputRef = useRef<HTMLInputElement>(null);
+  const [facilityRequests, setFacilityRequests] = useState<Array<{
+    id: string;
+    requested_by_athlete_id: string;
+    name: string;
+    school: string;
+    address: string | null;
+    status: string;
+    created_at: string;
+    coach_name: string;
+    coach_school: string;
+  }>>([]);
+  const [facilityRequestsLoading, setFacilityRequestsLoading] = useState(false);
+  const [facilityRequestActionId, setFacilityRequestActionId] = useState<string | null>(null);
 
   const filteredSessions = sessions.filter((s) => {
     const d = s.scheduled_datetime.slice(0, 10);
@@ -321,6 +338,7 @@ export function AdminDashboardClient({
         school: a.school ?? '',
         facility_id: a.facility_id ?? null,
         active: a.active ?? true,
+        photo_url: a.photo_url ?? null,
       });
       setFacilities(facilitiesData.facilities ?? []);
     } catch {
@@ -408,8 +426,22 @@ export function AdminDashboardClient({
     { id: 'billing', label: 'Billing', icon: <DollarSign className="h-4 w-4" /> },
     { id: 'payouts', label: 'Coach payouts', icon: <Wallet className="h-4 w-4" /> },
     { id: 'credits', label: 'Credits', icon: <CreditCard className="h-4 w-4" /> },
+    { id: 'facility_requests', label: 'Facility requests', icon: <Building2 className="h-4 w-4" /> },
     { id: 'athletes', label: 'Athlete reports', icon: <BarChart3 className="h-4 w-4" /> },
   ];
+
+  // Fetch facility requests when tab is selected
+  useEffect(() => {
+    if (tab !== 'facility_requests') return;
+    setFacilityRequestsLoading(true);
+    fetch('/api/admin/facility-requests')
+      .then((r) => r.json())
+      .then((data) => {
+        setFacilityRequests(data.requests ?? []);
+      })
+      .catch(() => setFacilityRequests([]))
+      .finally(() => setFacilityRequestsLoading(false));
+  }, [tab]);
 
   return (
     <div className="space-y-6">
@@ -845,6 +877,116 @@ export function AdminDashboardClient({
         </Card>
       )}
 
+      {tab === 'facility_requests' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Facility requests</CardTitle>
+            <CardDescription>
+              Coaches can request facilities not on the list. Approve to create the facility and assign it to the coach.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {facilityRequestsLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : facilityRequests.length === 0 ? (
+              <p className="text-muted-foreground py-4">No facility requests.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b">
+                      <th className="text-left py-2 font-medium">Requested facility</th>
+                      <th className="text-left py-2 font-medium">School</th>
+                      <th className="text-left py-2 font-medium">Requested by</th>
+                      <th className="text-left py-2 font-medium">Status</th>
+                      <th className="text-left py-2 font-medium">Created</th>
+                      <th className="text-right py-2 font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {facilityRequests.map((r) => (
+                      <tr key={r.id} className="border-b last:border-0">
+                        <td className="py-2 font-medium">{r.name}</td>
+                        <td className="py-2 text-muted-foreground">{r.school}</td>
+                        <td className="py-2">
+                          <Link href={`/athlete/${r.requested_by_athlete_id}`} className="text-accent hover:underline">
+                            {r.coach_name}
+                          </Link>
+                          {r.coach_school && <span className="text-muted-foreground ml-1">({r.coach_school})</span>}
+                        </td>
+                        <td className="py-2">
+                          <Badge variant={r.status === 'pending' ? 'secondary' : r.status === 'approved' ? 'default' : 'outline'}>
+                            {r.status}
+                          </Badge>
+                        </td>
+                        <td className="py-2 text-muted-foreground">{format(new Date(r.created_at), 'MMM d, yyyy')}</td>
+                        <td className="py-2 text-right">
+                          {r.status === 'pending' && (
+                            <div className="flex justify-end gap-1">
+                              <Button
+                                size="sm"
+                                variant="default"
+                                disabled={facilityRequestActionId === r.id}
+                                onClick={async () => {
+                                  setFacilityRequestActionId(r.id);
+                                  try {
+                                    const res = await fetch(`/api/admin/facility-requests/${r.id}`, {
+                                      method: 'PATCH',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ action: 'approve' }),
+                                    });
+                                    const data = await res.json().catch(() => ({}));
+                                    if (res.ok) {
+                                      setFacilityRequests((prev) => prev.map((x) => (x.id === r.id ? { ...x, status: 'approved' } : x)));
+                                      router.refresh();
+                                    } else {
+                                      alert(data.error || 'Approve failed');
+                                    }
+                                  } finally {
+                                    setFacilityRequestActionId(null);
+                                  }
+                                }}
+                              >
+                                {facilityRequestActionId === r.id ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Approve'}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={facilityRequestActionId === r.id}
+                                onClick={async () => {
+                                  setFacilityRequestActionId(r.id);
+                                  try {
+                                    const res = await fetch(`/api/admin/facility-requests/${r.id}`, {
+                                      method: 'PATCH',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ action: 'reject' }),
+                                    });
+                                    if (res.ok) {
+                                      setFacilityRequests((prev) => prev.map((x) => (x.id === r.id ? { ...x, status: 'rejected' } : x)));
+                                      router.refresh();
+                                    }
+                                  } finally {
+                                    setFacilityRequestActionId(null);
+                                  }
+                                }}
+                              >
+                                Reject
+                              </Button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
       {tab === 'athletes' && (
         <Card>
           <CardHeader>
@@ -935,6 +1077,59 @@ export function AdminDashboardClient({
           </DialogHeader>
           {athleteEditForm ? (
             <form onSubmit={saveAthleteEdit} className="space-y-4">
+              {/* Admin: change coach photo */}
+              {editingAthleteId && (
+                <div className="flex items-center gap-4">
+                  <div className="w-20 h-20 rounded-full border-2 border-border overflow-hidden bg-muted flex items-center justify-center shrink-0">
+                    {athleteEditForm.photo_url ? (
+                      <img src={athleteEditForm.photo_url} alt="Coach" className="w-full h-full object-cover" />
+                    ) : (
+                      <User className="h-8 w-8 text-muted-foreground" />
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium mb-1">Profile photo</p>
+                    <input
+                      ref={athletePhotoInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file || !editingAthleteId) return;
+                        setAthletePhotoUploading(true);
+                        try {
+                          const formData = new FormData();
+                          formData.append('file', file);
+                          const res = await fetch(`/api/admin/athletes/${editingAthleteId}/upload-photo`, {
+                            method: 'POST',
+                            body: formData,
+                          });
+                          const data = await res.json().catch(() => ({}));
+                          if (res.ok && data.photoUrl) {
+                            setAthleteEditForm((p) => p ? { ...p, photo_url: data.photoUrl } : null);
+                            router.refresh();
+                          } else {
+                            console.error('Photo upload failed:', data.error ?? res.statusText);
+                          }
+                        } finally {
+                          setAthletePhotoUploading(false);
+                          e.target.value = '';
+                        }
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={athletePhotoUploading}
+                      onClick={() => athletePhotoInputRef.current?.click()}
+                    >
+                      {athletePhotoUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Change photo'}
+                    </Button>
+                  </div>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>First name</Label>

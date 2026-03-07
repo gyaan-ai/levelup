@@ -303,7 +303,7 @@ export default async function ParentDashboard() {
                       <img
                         src={wrestler.photo_url}
                         alt={`${wrestler.first_name} ${wrestler.last_name}`}
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover object-top"
                       />
                     ) : (
                       <div className="flex items-center justify-center h-full">

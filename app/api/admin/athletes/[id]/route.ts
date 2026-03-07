@@ -30,7 +30,7 @@ export async function GET(
     const admin = createAdminClient(tenant.slug);
     const { data: athlete, error } = await admin
       .from('athletes')
-      .select('id, first_name, last_name, school, facility_id, active, weight_class, bio')
+      .select('id, first_name, last_name, school, facility_id, active, weight_class, bio, photo_url')
       .eq('id', id)
       .single();
 

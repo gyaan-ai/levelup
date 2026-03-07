@@ -57,6 +57,7 @@ COMMENT ON TABLE public.youth_wrestler_parents IS 'Additional parents linked to 
 
 -- Session participants: parent can read rows for their kids (so they can get session ids for family view)
 DROP POLICY IF EXISTS "Participants: parent sees own" ON public.session_participants;
+DROP POLICY IF EXISTS "Participants: parent sees own or for their kids" ON public.session_participants;
 CREATE POLICY "Participants: parent sees own or for their kids"
   ON public.session_participants FOR SELECT
   TO authenticated
@@ -67,7 +68,7 @@ CREATE POLICY "Participants: parent sees own or for their kids"
   );
 
 DROP POLICY IF EXISTS "Parents can read own sessions" ON public.sessions;
-
+DROP POLICY IF EXISTS "Parents can read own sessions or sessions for their kids" ON public.sessions;
 CREATE POLICY "Parents can read own sessions or sessions for their kids"
   ON public.sessions FOR SELECT
   TO authenticated

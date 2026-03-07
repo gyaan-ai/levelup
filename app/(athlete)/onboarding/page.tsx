@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/select';
 import { OnboardingWizard } from '@/components/onboarding-wizard';
 import { AthleteProductSelection } from '@/components/athlete-product-selection';
+import { RequestFacilityBlock } from '@/components/request-facility-block';
 import { Camera, Globe, Lock } from 'lucide-react';
 
 const onboardingSchema = z.object({
@@ -422,9 +423,13 @@ export default function OnboardingPage() {
                         </FormItem>
                       )}
                     />
+                    <RequestFacilityBlock className="mt-4" />
                   </>
                 ) : (
-                  <p className="text-muted-foreground">No facilities set up yet. Add one in your profile later.</p>
+                  <>
+                    <p className="text-muted-foreground mb-4">No facilities set up yet. Request one and we&apos;ll add it after review.</p>
+                    <RequestFacilityBlock />
+                  </>
                 )}
               </CardContent>
             </Card>

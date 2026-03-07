@@ -26,6 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { RequestFacilityBlock } from '@/components/request-facility-block';
 import { Plus, X, ArrowLeft, Globe, Lock } from 'lucide-react';
 import Link from 'next/link';
 
@@ -436,7 +437,16 @@ export default function ProfilePage() {
                       </FormItem>
                     )}
                   />
+                  <div className="mt-3">
+                    <RequestFacilityBlock />
+                  </div>
                 </>
+              )}
+              {facilities.length === 0 && (
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">No facilities set up yet. Request one and we&apos;ll add it after review.</p>
+                  <RequestFacilityBlock />
+                </div>
               )}
 
               {/* Payout: Venmo / Zelle */}
