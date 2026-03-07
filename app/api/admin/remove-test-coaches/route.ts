@@ -44,7 +44,7 @@ export async function POST() {
     }
 
     // Check for sessions still referencing athletes (user should run Clear test data first)
-    const { data: sessionCount } = await admin.from('sessions').select('id', { count: 'exact', head: true });
+    const { count: sessionCount } = await admin.from('sessions').select('id', { count: 'exact', head: true });
     if ((sessionCount ?? 0) > 0) {
       return NextResponse.json(
         { error: 'Run "Clear test data" first to remove sessions, then try again.', counts },
