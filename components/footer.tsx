@@ -138,8 +138,10 @@ export function Footer() {
         <div className="border-t border-white/10 pt-6 sm:pt-8">
           <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-center md:text-left">
             <p className="text-sm text-white/60">
-              © {new Date().getFullYear()} The Guild. Operated by NC United
-              Wrestling.
+              © {new Date().getFullYear()} The Guild. Contact:{' '}
+              <a href="mailto:info@WrestlingGuild.com" className="text-accent hover:underline">
+                info@WrestlingGuild.com
+              </a>
             </p>
             <div className="flex gap-4">
               <a

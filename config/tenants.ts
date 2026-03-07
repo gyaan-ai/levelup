@@ -61,7 +61,7 @@ export interface TenantConfig {
 export const tenants: Record<string, TenantConfig> = {
   "nc-united": {
     slug: "nc-united",
-    orgName: "NC United Wrestling",
+    orgName: "The Guild",
     orgType: "501c3",
     productName: "The Guild",
 
@@ -81,7 +81,7 @@ export const tenants: Record<string, TenantConfig> = {
     secondaryTagline: "Elite wrestling technique instruction",
 
     domain: "guild.ncunitedwrestling.com",
-    supportEmail: "support@ncunitedwrestling.com",
+    supportEmail: "info@WrestlingGuild.com",
     phone: "(919) 555-0100",
 
     supabaseUrl: process.env.NEXT_PUBLIC_NC_UNITED_SUPABASE_URL!,
