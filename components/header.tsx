@@ -54,6 +54,12 @@ export function Header() {
                     Dashboard
                   </Link>
                   <Link
+                    href="/profile"
+                    className="text-white hover:text-accent transition-colors font-medium"
+                  >
+                    Profile
+                  </Link>
+                  <Link
                     href="/inbox"
                     className="text-white hover:text-accent transition-colors font-medium"
                   >
@@ -193,6 +199,7 @@ export function Header() {
                   {userRole === 'athlete' && (
                     <>
                       <Link href="/athlete-dashboard" className={navLinkClass} onClick={() => setMobileOpen(false)}>Dashboard</Link>
+                      <Link href="/profile" className={navLinkClass} onClick={() => setMobileOpen(false)}>Profile</Link>
                       <Link href="/inbox" className={navLinkClass} onClick={() => setMobileOpen(false)}>
                         <span className="flex items-center gap-2">
                           <Mail className="h-5 w-5 shrink-0" />

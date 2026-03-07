@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -263,7 +263,10 @@ export function AdminDashboardClient({
   usersError,
 }: Props) {
   const router = useRouter();
-  const [tab, setTab] = useState<TabId>('sessions');
+  const searchParams = useSearchParams();
+  const tabParam = searchParams.get('tab') as TabId | null;
+  const editAthleteId = searchParams.get('edit');
+  const [tab, setTab] = useState<TabId>(tabParam && ['sessions', 'users', 'billing', 'payouts', 'credits', 'facility_requests', 'athletes'].includes(tabParam) ? tabParam : 'sessions');
   const [markingAthleteId, setMarkingAthleteId] = useState<string | null>(null);
   const [sessionDateFrom, setSessionDateFrom] = useState('');
   const [sessionDateTo, setSessionDateTo] = useState('');
@@ -271,6 +274,13 @@ export function AdminDashboardClient({
   const [userSearch, setUserSearch] = useState('');
   const [athleteSearch, setAthleteSearch] = useState('');
   const [editingAthleteId, setEditingAthleteId] = useState<string | null>(null);
+  const hasOpenedEditFromUrl = useRef(false);
+  useEffect(() => {
+    if (editAthleteId && tab === 'athletes' && !hasOpenedEditFromUrl.current) {
+      hasOpenedEditFromUrl.current = true;
+      openAthleteEdit(editAthleteId);
+    }
+  }, [editAthleteId, tab]);
   const [athleteEditForm, setAthleteEditForm] = useState<{
     first_name: string;
     last_name: string;

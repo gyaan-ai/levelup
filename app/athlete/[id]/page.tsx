@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import { ArrowLeft, Star, User, MapPin, Award, Shield, CheckCircle, MessageCircle, DollarSign } from 'lucide-react';
+import { ArrowLeft, Star, User, MapPin, Award, Shield, CheckCircle, MessageCircle, DollarSign, Pencil } from 'lucide-react';
 import { SchoolLogo } from '@/components/school-logo';
 import { CoachSessionBadge } from '@/components/coach-session-badge';
 import { FollowCoachButton } from '@/components/follow-coach-button';
@@ -117,6 +117,7 @@ export default async function AthleteProfilePage({
   const isAdmin = userData?.role === 'admin';
   const isOwnProfile = !!user && user.id === id && userData?.role === 'athlete';
   const canDelete = isAdmin || isParent || isOwnProfile;
+  const canEdit = isOwnProfile || isAdmin;
   const athleteName = `${athlete.first_name} ${athlete.last_name}`.trim() || 'This coach';
 
   // Rate card: coach-built services (preferred) or org products
@@ -253,7 +254,7 @@ export default async function AthleteProfilePage({
                 )}
               </div>
 
-              {/* Book + Message + Follow */}
+              {/* Book + Message + Follow + Edit */}
               <div className="flex flex-wrap items-center gap-3">
                 <Link href={`/book/${athlete.id}`}>
                   <Button
@@ -273,6 +274,23 @@ export default async function AthleteProfilePage({
                   </Link>
                 )}
                 <FollowCoachButton coachId={athlete.id} />
+                {canEdit && (
+                  isOwnProfile ? (
+                    <Link href="/profile">
+                      <Button size="lg" variant="outline" className="w-full md:w-auto">
+                        <Pencil className="h-4 w-4 mr-2" />
+                        Edit profile
+                      </Button>
+                    </Link>
+                  ) : (
+                    <Link href={`/admin?tab=athletes&edit=${athlete.id}`}>
+                      <Button size="lg" variant="outline" className="w-full md:w-auto">
+                        <Pencil className="h-4 w-4 mr-2" />
+                        Edit coach
+                      </Button>
+                    </Link>
+                  )
+                )}
               </div>
             </div>
           </div>
@@ -359,14 +377,27 @@ export default async function AthleteProfilePage({
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
+            <div className="space-y-3">
               <p className="font-semibold text-lg">{facility.name}</p>
-              {facility.address && (
-                <p className="text-muted-foreground">{facility.address}</p>
-              )}
               {facility.school && (
                 <p className="text-sm text-muted-foreground">{facility.school}</p>
               )}
+              {facility.address && (
+                <p className="text-muted-foreground">{facility.address}</p>
+              )}
+              <a
+                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                  facility.address
+                    ? `${facility.name}, ${facility.address}`
+                    : `${facility.name}${facility.school ? ` ${facility.school}` : ''}`
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-sm font-medium text-accent hover:underline"
+              >
+                <MapPin className="h-4 w-4" />
+                Get directions (Google Maps)
+              </a>
             </div>
           </CardContent>
         </Card>
