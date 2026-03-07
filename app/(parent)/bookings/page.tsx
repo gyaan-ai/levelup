@@ -24,26 +24,44 @@ export default async function MyBookingsPage() {
     .single();
 
   if (userData?.role === 'athlete') redirect('/athlete-dashboard');
-  // parent and admin can both access (admin sees empty state if no bookings)
+  // parent and admin can both access; parents see all sessions for their kids (shared with linked parent)
 
-  const { data: sessions, error } = await supabase
-    .from('sessions')
-    .select(`
-      id,
-      scheduled_datetime,
-      status,
-      total_price,
-      session_type,
-      session_mode,
-      current_participants,
-      max_participants,
-      partner_invite_code,
-      athletes(id, first_name, last_name, school, photo_url),
-      facilities(id, name, address),
-      session_participants(youth_wrestler_id, youth_wrestlers(id, first_name, last_name))
-    `)
-    .eq('parent_id', user.id)
-    .order('scheduled_datetime', { ascending: false });
+  const { data: youthWrestlers } = await supabase
+    .from('youth_wrestlers')
+    .select('id')
+    .order('created_at', { ascending: false });
+  const youthWrestlerIds = (youthWrestlers ?? []).map((yw: { id: string }) => yw.id);
+
+  let familySessionIds: string[] = [];
+  if (youthWrestlerIds.length > 0) {
+    const { data: partRows } = await supabase
+      .from('session_participants')
+      .select('session_id')
+      .in('youth_wrestler_id', youthWrestlerIds);
+    familySessionIds = [...new Set((partRows ?? []).map((r: { session_id: string }) => r.session_id))];
+  }
+
+  const { data: sessions, error } = familySessionIds.length > 0
+    ? await supabase
+        .from('sessions')
+        .select(`
+          id,
+          scheduled_datetime,
+          status,
+          total_price,
+          session_type,
+          session_mode,
+          current_participants,
+          max_participants,
+          partner_invite_code,
+          parent_id,
+          athletes(id, first_name, last_name, school, photo_url),
+          facilities(id, name, address),
+          session_participants(youth_wrestler_id, youth_wrestlers(id, first_name, last_name))
+        `)
+        .in('id', familySessionIds)
+        .order('scheduled_datetime', { ascending: false })
+    : { data: [] };
 
   if (error) {
     console.error('Bookings fetch error:', error);

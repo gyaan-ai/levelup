@@ -51,11 +51,19 @@ export default async function ParentDashboard() {
 
   const youthWrestlerIds = youthWrestlers?.map((yw) => yw.id) || [];
 
-  const { data: completedSessions } = await supabase
-    .from('sessions')
-    .select('id')
-    .eq('parent_id', user.id)
-    .eq('status', 'completed');
+  // Session IDs where any of my kids (primary or linked) participated — shared view for both parents
+  let familySessionIds: string[] = [];
+  if (youthWrestlerIds.length > 0) {
+    const { data: partRows } = await supabase
+      .from('session_participants')
+      .select('session_id')
+      .in('youth_wrestler_id', youthWrestlerIds);
+    familySessionIds = [...new Set((partRows ?? []).map((r: { session_id: string }) => r.session_id))];
+  }
+
+  const { data: completedSessions } = familySessionIds.length > 0
+    ? await supabase.from('sessions').select('id').in('id', familySessionIds).eq('status', 'completed')
+    : { data: [] };
   const completedIds = (completedSessions ?? []).map((s: { id: string }) => s.id);
 
   const sessionCounts: Record<string, number> = {};
@@ -71,42 +79,48 @@ export default async function ParentDashboard() {
     }
   }
 
-  const { data: upcomingSessions } = await supabase
-    .from('sessions')
-    .select(`
-      id,
-      scheduled_datetime,
-      status,
-      total_price,
-      session_type,
-      session_mode,
-      current_participants,
-      max_participants,
-      partner_invite_code,
-      athletes(id, first_name, last_name, school),
-      facilities(id, name, address),
-      session_participants(youth_wrestler_id, youth_wrestlers(id, first_name, last_name))
-    `)
-    .eq('parent_id', user.id)
-    .in('status', ['scheduled', 'pending_payment'])
-    .gte('scheduled_datetime', new Date().toISOString())
-    .order('scheduled_datetime', { ascending: true })
-    .limit(10);
+  const nowISO = new Date().toISOString();
+  const { data: upcomingSessions } = familySessionIds.length > 0
+    ? await supabase
+        .from('sessions')
+        .select(`
+          id,
+          scheduled_datetime,
+          status,
+          total_price,
+          session_type,
+          session_mode,
+          current_participants,
+          max_participants,
+          partner_invite_code,
+          athletes(id, first_name, last_name, school),
+          facilities(id, name, address),
+          session_participants(youth_wrestler_id, youth_wrestlers(id, first_name, last_name))
+        `)
+        .in('id', familySessionIds)
+        .in('status', ['scheduled', 'pending_payment'])
+        .gte('scheduled_datetime', nowISO)
+        .order('scheduled_datetime', { ascending: true })
+        .limit(10)
+    : { data: [] };
 
-  // Spending: paid sessions (scheduled or completed), exclude refunded
-  const { data: paidSessions } = await supabase
-    .from('sessions')
-    .select(`
-      id,
-      total_price,
-      scheduled_datetime,
-      athlete_id,
-      refunded_at,
-      athletes(id, first_name, last_name),
-      session_participants(youth_wrestler_id)
-    `)
-    .eq('parent_id', user.id)
-    .in('status', ['scheduled', 'completed']);
+  // Spending: all paid sessions for my kids (whoever booked), exclude refunded
+  const { data: paidSessions } = familySessionIds.length > 0
+    ? await supabase
+        .from('sessions')
+        .select(`
+          id,
+          total_price,
+          scheduled_datetime,
+          athlete_id,
+          refunded_at,
+          parent_id,
+          athletes(id, first_name, last_name),
+          session_participants(youth_wrestler_id)
+        `)
+        .in('id', familySessionIds)
+        .in('status', ['scheduled', 'completed'])
+    : { data: [] };
 
   const nonRefunded = (paidSessions ?? []).filter(
     (s: { refunded_at?: string | null }) => !s.refunded_at

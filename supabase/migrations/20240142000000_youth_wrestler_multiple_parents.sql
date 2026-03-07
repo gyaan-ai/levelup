@@ -1,18 +1,13 @@
 -- Multiple parents per youth wrestler: link a second (or more) parent to the same kid.
 -- youth_wrestlers.parent_id remains the "primary" parent; additional parents are in youth_wrestler_parents.
 
+-- Primary parent must not be in this table (enforced by app: only "Add by email" / invite link add linked parents).
 CREATE TABLE IF NOT EXISTS public.youth_wrestler_parents (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   youth_wrestler_id UUID NOT NULL REFERENCES public.youth_wrestlers(id) ON DELETE CASCADE,
   parent_id UUID NOT NULL REFERENCES public.users(id) ON DELETE CASCADE,
   added_at TIMESTAMPTZ DEFAULT NOW(),
-  UNIQUE(youth_wrestler_id, parent_id),
-  CONSTRAINT no_duplicate_primary CHECK (
-    NOT EXISTS (
-      SELECT 1 FROM public.youth_wrestlers y
-      WHERE y.id = youth_wrestler_id AND y.parent_id = parent_id
-    )
-  )
+  UNIQUE(youth_wrestler_id, parent_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_youth_wrestler_parents_youth ON public.youth_wrestler_parents(youth_wrestler_id);
