@@ -88,6 +88,7 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
   const [slots, setSlots] = useState<string[]>([]);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
+  const [freeEntitlements, setFreeEntitlements] = useState({ free1on1: 0, free2Athlete: 0 });
 
   const sessionMode: SessionMode | null =
     sessionChoice === '1-on-1' ? 'private'
@@ -153,12 +154,30 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
   const isPartner = sessionChoice === 'partner';
   const needsPartnerOption = isPartner && partnerOption === null && oneWrestler;
 
+  const willUseFreeSession =
+    (sessionChoice === '1-on-1' && freeEntitlements.free1on1 > 0) ||
+    ((sessionChoice === 'partner' || sessionChoice === 'sibling') && freeEntitlements.free2Athlete > 0);
+
   useEffect(() => {
     if (youthWrestlers.length === 1) {
       setSelectedWrestlers([youthWrestlers[0]]);
       setCurrentStep(2);
     }
   }, [youthWrestlers]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const r = await fetch('/api/early-adopter-entitlements');
+        if (r.ok) {
+          const d = await r.json();
+          setFreeEntitlements({ free1on1: d.free1on1 ?? 0, free2Athlete: d.free2Athlete ?? 0 });
+        }
+      } catch {
+        /* ignore */
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     let ok = true;
@@ -419,7 +438,13 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
                       <CardContent className="p-5">
                         <h3 className="font-semibold text-lg">{firstPrivateProduct?.name ?? '1-on-1 Private Session'}</h3>
                         <p className="text-muted-foreground text-sm mb-2">Focused individual attention</p>
-                        <p className="text-2xl font-bold">${firstPrivateProduct ? firstPrivateProduct.parent_price.toFixed(0) : tenantPricing.oneOnOne}</p>
+                        <p className="text-2xl font-bold">
+                          {freeEntitlements.free1on1 > 0 ? (
+                            <span className="text-accent">Free session included</span>
+                          ) : (
+                            `$${firstPrivateProduct ? firstPrivateProduct.parent_price.toFixed(0) : tenantPricing.oneOnOne}`
+                          )}
+                        </p>
                       </CardContent>
                     </Card>
                     <Card
@@ -435,7 +460,13 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
                       <CardContent className="p-5 pr-24">
                         <h3 className="font-semibold text-lg">{firstPartnerProduct?.name ?? 'Partner Session'}</h3>
                         <p className="text-muted-foreground text-sm mb-2">Share the session with another wrestler</p>
-                        <p className="text-2xl font-bold">${firstPartnerProduct ? firstPartnerProduct.parent_price.toFixed(0) : '40'} <span className="text-base font-normal text-muted-foreground">per person</span></p>
+                        <p className="text-2xl font-bold">
+                          {freeEntitlements.free2Athlete > 0 ? (
+                            <span className="text-accent">Free session included</span>
+                          ) : (
+                            <>${firstPartnerProduct ? firstPartnerProduct.parent_price.toFixed(0) : '40'} <span className="text-base font-normal text-muted-foreground">per person</span></>
+                          )}
+                        </p>
                       </CardContent>
                     </Card>
                   </>
@@ -454,7 +485,11 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
                       <h3 className="font-semibold text-lg">{firstSiblingProduct?.name ?? 'Sibling Session'}</h3>
                       <p className="text-muted-foreground text-sm mb-2">Train together with one coach</p>
                       <p className="text-2xl font-bold">
-                        ${(firstSiblingProduct?.parent_price ?? 40).toFixed(0)} per wrestler (Total: ${((firstSiblingProduct?.parent_price ?? 40) * numSelected).toFixed(0)})
+                        {freeEntitlements.free2Athlete > 0 ? (
+                          <span className="text-accent">Free session included</span>
+                        ) : (
+                          <>${(firstSiblingProduct?.parent_price ?? 40).toFixed(0)} per wrestler (Total: ${((firstSiblingProduct?.parent_price ?? 40) * numSelected).toFixed(0)})</>
+                        )}
                       </p>
                     </CardContent>
                   </Card>
@@ -622,9 +657,16 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
                 )}
                 <div className="pt-4 border-t flex justify-between items-center">
                   <span className="font-semibold">Price</span>
-                  <span className="text-2xl font-bold">${totalPrice.toFixed(2)}</span>
+                  <span className="text-2xl font-bold">
+                    {willUseFreeSession ? <span className="text-accent">Free (early adopter)</span> : `$${totalPrice.toFixed(2)}`}
+                  </span>
                 </div>
-                {(sessionMode === 'partner-invite' || sessionMode === 'partner-open') && (
+                {willUseFreeSession && (
+                  <p className="text-sm text-muted-foreground">
+                    Your free session from the early adopter offer will be applied. No payment required.
+                  </p>
+                )}
+                {(sessionMode === 'partner-invite' || sessionMode === 'partner-open') && !willUseFreeSession && (
                   <p className="text-sm text-muted-foreground">
                     Second spot: partner will pay $40 when they join.
                   </p>
@@ -632,7 +674,7 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
                 <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mt-4">
                   <Button variant="outline" onClick={handleBack} className="flex-1 w-full sm:w-auto">Back</Button>
                   <Button onClick={handlePay} disabled={loading} className="flex-1 w-full sm:w-auto">
-                    {loading ? 'Booking…' : `Book Session ($${totalPrice.toFixed(2)})`}
+                    {loading ? 'Booking…' : willUseFreeSession ? 'Confirm booking (free)' : `Book Session ($${totalPrice.toFixed(2)})`}
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground text-center">

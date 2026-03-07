@@ -42,11 +42,10 @@ export default async function ParentDashboard() {
   }
   // parent and admin can both access dashboard (admin can switch to product view)
 
-  // Get youth wrestlers
+  // Get youth wrestlers (primary or linked parent; RLS returns both)
   const { data: youthWrestlers } = await supabase
     .from('youth_wrestlers')
     .select('*')
-    .eq('parent_id', user.id)
     .order('created_at', { ascending: false });
 
   const youthWrestlerIds = youthWrestlers?.map((yw) => yw.id) || [];

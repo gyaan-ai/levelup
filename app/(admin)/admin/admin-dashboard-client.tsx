@@ -36,6 +36,8 @@ import {
   Pencil,
   UserX,
   Loader2,
+  Trash2,
+  UserMinus,
 } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
@@ -107,6 +109,138 @@ export type CreditRecord = {
 
 type TabId = 'sessions' | 'users' | 'billing' | 'athletes' | 'payouts' | 'credits';
 
+function ClearTestDataCard() {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<{ counts: Record<string, number>; total: number } | null>(null);
+
+  const handleClear = async () => {
+    setLoading(true);
+    setResult(null);
+    try {
+      const res = await fetch('/api/admin/clear-test-data', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed');
+      setResult({ counts: data.counts ?? {}, total: data.total ?? 0 });
+      setOpen(false);
+      router.refresh();
+    } catch (e) {
+      setResult({ counts: {}, total: 0 });
+      alert(e instanceof Error ? e.message : 'Failed to clear test data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <>
+      <Card className="border-dashed">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Trash2 className="h-4 w-4" />
+            Test data
+          </CardTitle>
+          <CardDescription>
+            Remove all sessions, join requests, session notes, coach inquiries, and notifications. Keeps users, athletes, facilities, and products.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button variant="destructive" size="sm" onClick={() => setOpen(true)} disabled={loading}>
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+            Clear test data
+          </Button>
+          {result && result.total > 0 && (
+            <p className="text-sm text-muted-foreground mt-2">Cleared {result.total} row(s).</p>
+          )}
+        </CardContent>
+      </Card>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Clear test data?</DialogTitle>
+            <DialogDescription>
+              This will permanently delete all sessions, session participants, join requests, workspace session notes, session summaries, booking messages, coach inquiry messages, and notifications. Users, athletes, facilities, and products are not deleted.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)} disabled={loading}>Cancel</Button>
+            <Button variant="destructive" onClick={handleClear} disabled={loading}>
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Clear all'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+function RemoveTestCoachesCard() {
+  const router = useRouter();
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<{ counts: Record<string, number>; total: number } | null>(null);
+
+  const handleRemove = async () => {
+    setLoading(true);
+    setResult(null);
+    try {
+      const res = await fetch('/api/admin/remove-test-coaches', { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed');
+      setResult({ counts: data.counts ?? {}, total: data.total ?? 0 });
+      setOpen(false);
+      router.refresh();
+    } catch (e) {
+      setResult({ counts: {}, total: 0 });
+      alert(e instanceof Error ? e.message : 'Failed to remove test coaches');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <>
+      <Card className="border-dashed">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base flex items-center gap-2">
+            <UserMinus className="h-4 w-4" />
+            Test coaches
+          </CardTitle>
+          <CardDescription>
+            Remove all coaches (athletes). Run &quot;Clear test data&quot; first, then this. Use User Management to remove test parents or individual users.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button variant="destructive" size="sm" onClick={() => setOpen(true)} disabled={loading}>
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserMinus className="h-4 w-4" />}
+            Remove test coaches
+          </Button>
+          {result && result.total > 0 && (
+            <p className="text-sm text-muted-foreground mt-2">Removed {result.total} row(s) (e.g. coach follows, athletes).</p>
+          )}
+        </CardContent>
+      </Card>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove all test coaches?</DialogTitle>
+            <DialogDescription>
+              This will permanently delete all coaches (athletes) and their coach-follow links. Run &quot;Clear test data&quot; first so there are no sessions. Workspaces and messaging groups for those coaches will be removed. You can then onboard new coaches. To remove test parents, use User Management and delete or archive users.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)} disabled={loading}>Cancel</Button>
+            <Button variant="destructive" onClick={handleRemove} disabled={loading}>
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Remove all coaches'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 type Props = {
   sessions: AdminSession[];
   users: AdminUser[];
@@ -139,6 +273,7 @@ export function AdminDashboardClient({
   const [facilities, setFacilities] = useState<{ id: string; name: string; school: string }[]>([]);
   const [athleteEditSaving, setAthleteEditSaving] = useState(false);
   const [deactivatingId, setDeactivatingId] = useState<string | null>(null);
+  const [deletingAthleteId, setDeletingAthleteId] = useState<string | null>(null);
 
   const filteredSessions = sessions.filter((s) => {
     const d = s.scheduled_datetime.slice(0, 10);
@@ -236,6 +371,22 @@ export function AdminDashboardClient({
     }
   };
 
+  const handleDeleteAthlete = async (athleteId: string) => {
+    if (!confirm('Permanently delete this coach? Run "Clear test data" first if they have sessions. This cannot be undone.')) return;
+    setDeletingAthleteId(athleteId);
+    try {
+      const res = await fetch(`/api/admin/athletes/${athleteId}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data.error || 'Delete failed');
+        return;
+      }
+      router.refresh();
+    } finally {
+      setDeletingAthleteId(null);
+    }
+  };
+
   const statusBadge = (status: string) => {
     const v: Record<string, 'default' | 'secondary' | 'outline'> = {
       scheduled: 'default',
@@ -294,6 +445,9 @@ export function AdminDashboardClient({
           User Management
         </Link>
       </div>
+
+      <ClearTestDataCard />
+      <RemoveTestCoachesCard />
 
       {tab === 'sessions' && (
         <Card>
@@ -757,6 +911,9 @@ export function AdminDashboardClient({
                             </Button>
                             <Button variant="ghost" size="icon" onClick={() => handleDeactivateAthlete(a.athlete_id)} disabled={deactivatingId === a.athlete_id} title="Deactivate (hide from Browse)">
                               {deactivatingId === a.athlete_id ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserX className="h-4 w-4 text-destructive" />}
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => handleDeleteAthlete(a.athlete_id)} disabled={deletingAthleteId === a.athlete_id} title="Delete coach (admin only)">
+                              {deletingAthleteId === a.athlete_id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4 text-destructive" />}
                             </Button>
                           </div>
                         </td>

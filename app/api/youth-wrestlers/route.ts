@@ -32,11 +32,10 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    // Get all youth wrestlers for this parent
+    // Get all youth wrestlers this parent can see (primary or linked via youth_wrestler_parents)
     const { data: youthWrestlers, error } = await supabase
       .from('youth_wrestlers')
       .select('*')
-      .eq('parent_id', user.id)
       .order('created_at', { ascending: false });
 
     if (error) {

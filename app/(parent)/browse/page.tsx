@@ -82,5 +82,6 @@ export default async function BrowsePage() {
     nextAvailable: nextByAthlete.get(a.id) ?? null,
   }));
 
-  return <BrowseAthletesClient initialAthletes={athletesWithNext} />;
+  const isAdmin = userData?.role === 'admin';
+  return <BrowseAthletesClient initialAthletes={athletesWithNext} isAdmin={!!isAdmin} />;
 }

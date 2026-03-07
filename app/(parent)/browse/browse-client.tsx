@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,7 +15,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ArrowLeft, Star, User, Calendar } from 'lucide-react';
+import { ArrowLeft, Star, User, Calendar, Trash2, Loader2 } from 'lucide-react';
 import { SchoolLogo } from '@/components/school-logo';
 import { CoachSessionBadge } from '@/components/coach-session-badge';
 import { Athlete } from '@/types';
@@ -25,6 +26,7 @@ interface AthleteWithNext extends Athlete {
 
 interface BrowseAthletesClientProps {
   initialAthletes: AthleteWithNext[];
+  isAdmin?: boolean;
 }
 
 function formatNextAvailable(slot_date: string, start_time: string): string {
@@ -61,11 +63,31 @@ const SCHOOL_COLORS: Record<string, { bg: string; text: string }> = {
   'North Carolina State': { bg: 'bg-red-600', text: 'text-white' },
 };
 
-export function BrowseAthletesClient({ initialAthletes }: BrowseAthletesClientProps) {
+export function BrowseAthletesClient({ initialAthletes, isAdmin }: BrowseAthletesClientProps) {
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSchool, setSelectedSchool] = useState<string>('all');
   const [selectedWeightRanges, setSelectedWeightRanges] = useState<string[]>(['all']);
   const [loading, setLoading] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
+  const handleDeleteCoach = async (e: React.MouseEvent, athleteId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!confirm('Permanently delete this coach? This cannot be undone.')) return;
+    setDeletingId(athleteId);
+    try {
+      const res = await fetch(`/api/admin/athletes/${athleteId}`, { method: 'DELETE' });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert(data.error || 'Delete failed');
+        return;
+      }
+      router.refresh();
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const toggleWeightRange = (id: string) => {
     setSelectedWeightRanges(prev => {
@@ -246,11 +268,24 @@ export function BrowseAthletesClient({ initialAthletes }: BrowseAthletesClientPr
             const displayRating = rating > 0 ? rating.toFixed(1) : 'New';
 
             return (
-              <Link key={athlete.id} href={`/athlete/${athlete.id}`}>
-                <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
-                  <CardHeader>
-                    <div className="flex items-center gap-4">
-                      {athlete.photo_url ? (
+              <div key={athlete.id} className="relative">
+                {isAdmin && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute top-2 right-2 z-10 h-8 w-8 text-destructive hover:bg-destructive/10"
+                    onClick={(e) => handleDeleteCoach(e, athlete.id)}
+                    disabled={deletingId === athlete.id}
+                    title="Delete coach (admin only)"
+                  >
+                    {deletingId === athlete.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                  </Button>
+                )}
+                <Link href={`/athlete/${athlete.id}`}>
+                  <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
+                    <CardHeader>
+                      <div className="flex items-center gap-4">
+                        {athlete.photo_url ? (
                         <img
                           src={athlete.photo_url}
                           alt={`${athlete.first_name} ${athlete.last_name}`}
@@ -306,7 +341,8 @@ export function BrowseAthletesClient({ initialAthletes }: BrowseAthletesClientPr
                     </Button>
                   </CardContent>
                 </Card>
-              </Link>
+                </Link>
+              </div>
             );
           })}
         </div>

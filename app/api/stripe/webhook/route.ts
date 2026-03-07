@@ -38,12 +38,15 @@ export async function POST(req: NextRequest) {
 
       const supabase = createAdminClient(tenant.slug);
       const paymentIntentId = typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id;
+      const amountTotal = session.amount_total ?? 0;
+      const isFreeOrder = amountTotal === 0;
+      const earlyAdopterEntitlementId = session.metadata?.early_adopter_entitlement_id;
 
       const { error: updateError } = await supabase
         .from('sessions')
         .update({
           status: 'scheduled',
-          athlete_paid: true,
+          athlete_paid: !isFreeOrder,
           ...(paymentIntentId && { stripe_payment_intent_id: paymentIntentId }),
         })
         .eq('id', sessionId);
@@ -60,6 +63,20 @@ export async function POST(req: NextRequest) {
 
       if (participantsError) {
         console.error('Webhook: failed to update session_participants', participantsError);
+      }
+
+      if (earlyAdopterEntitlementId) {
+        const { data: ent } = await supabase
+          .from('early_adopter_entitlements')
+          .select('remaining')
+          .eq('id', earlyAdopterEntitlementId)
+          .single();
+        if (ent && (ent.remaining ?? 0) > 0) {
+          await supabase
+            .from('early_adopter_entitlements')
+            .update({ remaining: (ent.remaining ?? 1) - 1 })
+            .eq('id', earlyAdopterEntitlementId);
+        }
       }
     }
 

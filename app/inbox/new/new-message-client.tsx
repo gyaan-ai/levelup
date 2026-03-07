@@ -180,53 +180,55 @@ export function NewMessageClient({
   const filteredOther = filterCoaches(otherCoaches);
 
   return (
-    <div className="space-y-6 max-w-lg">
-      <Card>
-        <CardContent className="pt-6">
-          <h2 className="font-semibold mb-3 flex items-center gap-2">
+    <div className="space-y-6 max-w-lg h-full flex flex-col min-h-0">
+      <Card className="flex flex-col min-h-0 flex-1">
+        <CardContent className="pt-6 flex flex-col min-h-0 flex-1 flex">
+          <h2 className="font-semibold mb-3 flex items-center gap-2 shrink-0">
             <MessageCircle className="h-4 w-4" />
-            Message a coach
+            Message a coach or athlete
           </h2>
-          <p className="text-sm text-muted-foreground mb-4">
-            Start or continue a conversation with any coach. You can message coaches you follow or any other coach.
+          <p className="text-sm text-muted-foreground mb-4 shrink-0">
+            Start or continue a conversation with any coach. Use the search or scroll the list below.
           </p>
-          <div className="relative mb-4">
+          <div className="relative mb-4 shrink-0">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Search coaches by name or school..."
+              placeholder="Search by name or school..."
               value={coachSearch}
               onChange={(e) => setCoachSearch(e.target.value)}
               className="pl-9"
             />
           </div>
-          {filteredFollowed.length > 0 && (
-            <>
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">Coaches you follow</p>
-              <ul className="space-y-2 mb-4">
-                {filteredFollowed.map((c) => (
-                  <li key={c.id}>
-                    <CoachRow coach={c} onSelect={() => handleCoachClick(c.id)} badge="Following" />
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-          {(filteredOther.length > 0 || (searchLower && filteredFollowed.length === 0)) && (
-            <>
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">All coaches</p>
-              <ul className="space-y-2">
-                {filteredOther.map((c) => (
-                  <li key={c.id}>
-                    <CoachRow coach={c} onSelect={() => handleCoachClick(c.id)} />
-                  </li>
-                ))}
-              </ul>
-            </>
-          )}
-          {!searchLower && filteredFollowed.length === 0 && filteredOther.length === 0 && (
-            <p className="text-sm text-muted-foreground">No coaches found. Browse coaches to book sessions.</p>
-          )}
-          <div className="mt-4 pt-4 border-t">
+          <div className="min-h-[200px] max-h-[50vh] overflow-y-auto border rounded-lg bg-muted/20 p-2 space-y-2">
+            {filteredFollowed.length > 0 && (
+              <>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide sticky top-0 bg-background/95 py-1">Coaches you follow</p>
+                <ul className="space-y-2 mb-4">
+                  {filteredFollowed.map((c) => (
+                    <li key={c.id}>
+                      <CoachRow coach={c} onSelect={() => handleCoachClick(c.id)} badge="Following" />
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+            {(filteredOther.length > 0 || (searchLower && filteredFollowed.length === 0)) && (
+              <>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide sticky top-0 bg-background/95 py-1">All coaches / athletes</p>
+                <ul className="space-y-2">
+                  {filteredOther.map((c) => (
+                    <li key={c.id}>
+                      <CoachRow coach={c} onSelect={() => handleCoachClick(c.id)} />
+                    </li>
+                  ))}
+                </ul>
+              </>
+            )}
+            {!searchLower && filteredFollowed.length === 0 && filteredOther.length === 0 && (
+              <p className="text-sm text-muted-foreground py-4">No coaches found. Browse coaches to book sessions.</p>
+            )}
+          </div>
+          <div className="mt-4 pt-4 border-t shrink-0">
             <Button variant="outline" asChild className="w-full sm:w-auto">
               <Link href="/browse">Browse coaches to book</Link>
             </Button>

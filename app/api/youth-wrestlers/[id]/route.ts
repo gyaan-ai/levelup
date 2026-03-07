@@ -29,15 +29,11 @@ export async function GET(
       .from('youth_wrestlers')
       .select('*')
       .eq('id', id)
-      .eq('parent_id', user.id)
       .single();
 
-    if (error) {
+    if (error || !youthWrestler) {
+      if (error?.code === 'PGRST116' || !youthWrestler) return NextResponse.json({ error: 'Not found' }, { status: 404 });
       return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    if (!youthWrestler) {
-      return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
 
     // Get sessions for this youth wrestler
@@ -82,15 +78,12 @@ export async function PUT(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Verify ownership
-    const { data: existing } = await supabase
-      .from('youth_wrestlers')
-      .select('parent_id')
-      .eq('id', id)
-      .single();
-
-    if (!existing || existing.parent_id !== user.id) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    // Verify can edit (primary parent or linked parent)
+    const { data: existing } = await supabase.from('youth_wrestlers').select('parent_id').eq('id', id).single();
+    if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    if (existing.parent_id !== user.id) {
+      const { data: link } = await supabase.from('youth_wrestler_parents').select('id').eq('youth_wrestler_id', id).eq('parent_id', user.id).maybeSingle();
+      if (!link) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     const body = await req.json();

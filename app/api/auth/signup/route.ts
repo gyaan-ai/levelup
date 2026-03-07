@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { email, password, role, coachType, firstName, lastName, school } = body;
+    const { email, password, role, coachType, firstName, lastName, school, discountCode } = body;
 
     // Validate required fields
     if (!email || !password || !role) {
@@ -57,8 +57,35 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Create Supabase admin client (to create user)
     const supabaseAdmin = createAdminClient(tenant.slug);
+
+    // Early adopter discount: only for parents; validate code before creating user
+    let discountCodeValid: { id: string; code: string; redemptions: number } | null = null;
+    if (role === 'parent' && typeof discountCode === 'string' && discountCode.trim()) {
+      const codeNormalized = discountCode.trim().toUpperCase();
+      const { data: row, error: codeErr } = await supabaseAdmin
+        .from('discount_codes')
+        .select('id, code, max_redemptions, redemptions')
+        .eq('code', codeNormalized)
+        .maybeSingle();
+      if (codeErr || !row) {
+        return NextResponse.json(
+          { error: 'Invalid or expired discount code' },
+          { status: 400 }
+        );
+      }
+      const max = row.max_redemptions;
+      const current = row.redemptions ?? 0;
+      if (max != null && current >= max) {
+        return NextResponse.json(
+          { error: 'This discount code has reached its limit' },
+          { status: 400 }
+        );
+      }
+      discountCodeValid = { id: row.id, code: row.code, redemptions: current };
+    }
+
+    // Create Supabase admin client (to create user)
 
     // Create user in Supabase Auth
     const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
@@ -92,6 +119,37 @@ export async function POST(req: NextRequest) {
         { error: `Failed to create user profile: ${userError.message}` },
         { status: 500 }
       );
+    }
+
+    // Grant early adopter entitlements (1 free 1-on-1, 1 free 2-athlete) for parents who used a valid code
+    if (discountCodeValid && role === 'parent') {
+      const { error: ent1 } = await supabaseAdmin.from('early_adopter_entitlements').insert({
+        parent_id: userId,
+        session_type: '1-on-1',
+        remaining: 1,
+        discount_code: discountCodeValid.code,
+      });
+      const { error: ent2 } = await supabaseAdmin.from('early_adopter_entitlements').insert({
+        parent_id: userId,
+        session_type: '2-athlete',
+        remaining: 1,
+        discount_code: discountCodeValid.code,
+      });
+      if (ent1 || ent2) {
+        await supabaseAdmin.from('users').delete().eq('id', userId);
+        await supabaseAdmin.auth.admin.deleteUser(userId);
+        return NextResponse.json(
+          { error: 'Failed to apply discount code benefits' },
+          { status: 500 }
+        );
+      }
+      const { error: incErr } = await supabaseAdmin
+        .from('discount_codes')
+        .update({ redemptions: discountCodeValid.redemptions + 1, updated_at: new Date().toISOString() })
+        .eq('id', discountCodeValid.id);
+      if (incErr) {
+        console.warn('Discount code redemption count not incremented:', incErr);
+      }
     }
 
     // If athlete, create athlete profile

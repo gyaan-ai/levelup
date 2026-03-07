@@ -37,6 +37,7 @@ const signupSchema = z.object({
   firstName: z.string().optional(),
   lastName: z.string().optional(),
   school: z.string().optional(),
+  discountCode: z.string().optional(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don&apos;t match",
   path: ['confirmPassword'],
@@ -70,6 +71,7 @@ export default function SignupPage() {
       firstName: '',
       lastName: '',
       school: '',
+      discountCode: '',
     },
   });
 
@@ -94,6 +96,7 @@ export default function SignupPage() {
           firstName: values.firstName,
           lastName: values.lastName,
           school: values.school?.trim(),
+          discountCode: values.discountCode?.trim() || undefined,
         }),
       });
 
@@ -186,6 +189,25 @@ export default function SignupPage() {
                   </FormItem>
                 )}
               />
+
+              {selectedRole === 'parent' && (
+                <FormField
+                  control={form.control}
+                  name="discountCode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Discount code (optional)</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g. GUILDLAUNCH" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        Early adopters: enter your code for 1 free private + 1 free small group session
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
 
               {(selectedRole === 'athlete' || selectedRole === 'youth_wrestler') && (
                 <>

@@ -27,7 +27,7 @@ export default async function InboxThreadPage({
     .eq('id', user.id)
     .single();
   const role = userData?.role;
-  if (role !== 'parent' && role !== 'athlete') redirect('/inbox');
+  if (role !== 'parent' && role !== 'athlete' && role !== 'admin' && role !== 'youth_wrestler') redirect('/inbox');
 
   return (
     <InquiryThread parentId={parentId} athleteId={athleteId} currentUserId={user.id} />
