@@ -103,8 +103,25 @@ export default async function AthleteProfilePage({
     : { data: null };
   const isParent = userData?.role === 'parent';
 
-  // Rate card: products this coach offers (for public display)
+  // Rate card: coach-built services (preferred) or org products
   const admin = createAdminClient(tenantSlug);
+  const { data: coachServices } = await admin
+    .from('athlete_services')
+    .select('id, duration_minutes, session_type, max_participants, parent_price, display_order')
+    .eq('athlete_id', id)
+    .eq('active', true)
+    .order('display_order', { ascending: true })
+    .order('duration_minutes', { ascending: true });
+
+  const durationLabel = (m: number) => m === 30 ? '30 min' : m === 60 ? '1 hr' : m === 90 ? '1 hr 30 min' : m === 120 ? '2 hr' : `${m} min`;
+  const typeLabel = (t: string) => t === 'private' ? 'Private (1:1)' : t === 'partner' ? 'Partner (1:2)' : 'Small group';
+
+  const rateCardFromServices = (coachServices ?? []).map((s) => ({
+    id: s.id,
+    name: `${durationLabel(s.duration_minutes)} · ${typeLabel(s.session_type)}${s.session_type === 'small_group' ? ` (up to ${s.max_participants})` : ''}`,
+    price: Number(s.parent_price),
+  }));
+
   const { data: allProducts } = await admin
     .from('products')
     .select('id, name, slug, description, parent_price, min_participants, max_participants, display_order')
@@ -118,13 +135,15 @@ export default async function AthleteProfilePage({
     (athleteProducts || []).filter((ap) => ap.enabled === false).map((ap) => ap.product_id)
   );
   const apMap = new Map((athleteProducts || []).map((ap) => [ap.product_id, ap]));
-  const rateCardProducts = (allProducts || [])
+  const rateCardFromProducts = (allProducts || [])
     .filter((p) => !disabledIds.has(p.id))
     .map((p) => {
       const ap = apMap.get(p.id);
       const price = ap?.custom_parent_price != null ? Number(ap.custom_parent_price) : Number(p.parent_price);
-      return { ...p, price };
+      return { id: p.id, name: p.name, price };
     });
+
+  const rateCardProducts = rateCardFromServices.length > 0 ? rateCardFromServices : rateCardFromProducts;
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-5xl">

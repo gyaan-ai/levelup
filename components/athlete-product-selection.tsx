@@ -89,7 +89,15 @@ export function AthleteProductSelection() {
   }
 
   if (products.length === 0) {
-    return null;
+    return (
+      <Card>
+        <CardContent className="py-8 text-center">
+          <p className="text-muted-foreground">
+            No session types are configured yet. Your organization can add products in Admin → Products &amp; Pricing; they will appear here for you to enable.
+          </p>
+        </CardContent>
+      </Card>
+    );
   }
 
   return (

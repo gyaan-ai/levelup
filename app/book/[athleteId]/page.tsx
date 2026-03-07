@@ -85,30 +85,45 @@ export default async function BookPage({
     facility = facilityData;
   }
 
-  // Fetch products that this athlete offers
+  // Prefer coach-built services; else org products
   const admin = createAdminClient(tenantSlug);
-  
-  // Get all active products
-  const { data: allProducts } = await admin
-    .from('products')
-    .select('*')
+  const { data: coachServices } = await admin
+    .from('athlete_services')
+    .select('id, duration_minutes, session_type, max_participants, parent_price, athlete_payout, display_order')
+    .eq('athlete_id', athleteId)
     .eq('active', true)
-    .order('display_order', { ascending: true });
+    .order('display_order', { ascending: true })
+    .order('duration_minutes', { ascending: true });
 
-  // Get athlete's product selections
-  const { data: athleteProducts } = await admin
-    .from('athlete_products')
-    .select('product_id, enabled')
-    .eq('athlete_id', athleteId);
+  let products: Array<{ id: string; slug: string; name: string; parent_price: number; athlete_payout: number; min_participants: number; max_participants: number }> = [];
 
-  // Filter to only enabled products (default to enabled if no record exists)
-  const disabledProductIds = new Set(
-    (athleteProducts || [])
-      .filter(ap => ap.enabled === false)
-      .map(ap => ap.product_id)
-  );
-  
-  const products = (allProducts || []).filter(p => !disabledProductIds.has(p.id));
+  if (coachServices && coachServices.length > 0) {
+    const durationLabel = (m: number) => m === 30 ? '30 min' : m === 60 ? '1 hr' : m === 90 ? '1 hr 30 min' : m === 120 ? '2 hr' : `${m} min`;
+    const typeLabel = (t: string) => t === 'private' ? 'Private (1:1)' : t === 'partner' ? 'Partner (1:2)' : 'Small group';
+    products = coachServices.map((s) => ({
+      id: s.id,
+      slug: `service-${s.id}`,
+      name: `${durationLabel(s.duration_minutes)} · ${typeLabel(s.session_type)}${s.session_type === 'small_group' ? ` (up to ${s.max_participants})` : ''}`,
+      parent_price: Number(s.parent_price),
+      athlete_payout: Number(s.athlete_payout),
+      min_participants: s.session_type === 'private' ? 1 : s.session_type === 'partner' ? 2 : 3,
+      max_participants: s.max_participants,
+    }));
+  } else {
+    const { data: allProducts } = await admin
+      .from('products')
+      .select('*')
+      .eq('active', true)
+      .order('display_order', { ascending: true });
+    const { data: athleteProducts } = await admin
+      .from('athlete_products')
+      .select('product_id, enabled')
+      .eq('athlete_id', athleteId);
+    const disabledProductIds = new Set(
+      (athleteProducts || []).filter(ap => ap.enabled === false).map(ap => ap.product_id)
+    );
+    products = (allProducts || []).filter(p => !disabledProductIds.has(p.id));
+  }
 
   return (
     <BookingFlow

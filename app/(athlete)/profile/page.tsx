@@ -28,7 +28,7 @@ import {
 } from '@/components/ui/select';
 import { Plus, X, ArrowLeft, Globe, Lock } from 'lucide-react';
 import Link from 'next/link';
-import { AthleteProductSelection } from '@/components/athlete-product-selection';
+import { ServiceBuilder } from '@/components/service-builder';
 
 const profileSchema = z.object({
   weightClass: z.string().optional(),
@@ -119,16 +119,16 @@ export default function ProfilePage() {
     }
   }, [user, form]);
 
-  // Scroll to rate card section when navigating via dashboard "Session types" link
+  // Scroll to rate card section when navigating via dashboard "Session types" link (after content has loaded)
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.location.hash === '#rate-card') {
+    if (!loading && typeof window !== 'undefined' && window.location.hash === '#rate-card') {
       const el = document.getElementById('rate-card');
       if (el) {
-        const t = setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 100);
+        const t = setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 150);
         return () => clearTimeout(t);
       }
     }
-  }, []);
+  }, [loading]);
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -558,10 +558,14 @@ export default function ProfilePage() {
         </CardContent>
       </Card>
 
-      {/* Product/Session Type Selection (rate card) */}
-      <div id="rate-card" className="mt-6 scroll-mt-4">
-        <AthleteProductSelection />
-      </div>
+      {/* Rate card: build your offerings (duration, type, price). Platform 10%, you get 90%. */}
+      <section id="rate-card" className="mt-6 scroll-mt-4" aria-labelledby="rate-card-title">
+        <h2 id="rate-card-title" className="text-lg font-semibold mb-1">Pricing &amp; Session Types</h2>
+        <p className="text-sm text-muted-foreground mb-4">
+          Build what you offer: duration (30m, 1hr, 1:30, 2hr), type (private, partner, small group), and price per person. Platform fee is 10%; you receive 90%.
+        </p>
+        <ServiceBuilder />
+      </section>
 
       <dialog
         ref={visibilityModalRef}

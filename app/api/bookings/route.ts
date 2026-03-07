@@ -139,13 +139,28 @@ export async function POST(req: NextRequest) {
       partner_invite_code = code;
     }
 
+    let sessionProductId: string | undefined;
+    let sessionServiceId: string | undefined;
+    let durationMinutes = 60;
+    if (productId) {
+      const { data: product } = await admin.from('products').select('id').eq('id', productId).maybeSingle();
+      const { data: service } = await admin.from('athlete_services').select('id, duration_minutes').eq('id', productId).eq('athlete_id', athleteId).maybeSingle();
+      if (product) {
+        sessionProductId = productId;
+      } else if (service) {
+        sessionServiceId = productId;
+        durationMinutes = service.duration_minutes ?? 60;
+      }
+    }
+
     const { data: session, error: sessionError } = await supabase
       .from('sessions')
       .insert({
         parent_id: user.id,
         athlete_id: athleteId,
         facility_id,
-        product_id: productId ?? undefined,
+        product_id: sessionProductId ?? undefined,
+        athlete_service_id: sessionServiceId ?? undefined,
         session_type: sessionType,
         session_mode: sessionMode,
         partner_invite_code: partner_invite_code ?? undefined,
@@ -154,7 +169,7 @@ export async function POST(req: NextRequest) {
         base_price: basePrice,
         price_per_participant: testModePenny ? 0.50 : (pricePerParticipant ?? undefined),
         scheduled_datetime: scheduledDatetime,
-        duration_minutes: 60,
+        duration_minutes: durationMinutes,
         total_price: basePrice,
         athlete_payment: athletePayment,
         org_fee: orgFee,

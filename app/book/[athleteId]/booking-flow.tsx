@@ -122,6 +122,13 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
   const totalPrice = priceInfo?.total ?? 0;
   const pricePerParticipant = priceInfo?.pricePerParticipant;
 
+  const firstPrivateProduct = products.find(p => p.slug === 'private' || (p.min_participants === 1 && p.max_participants === 1));
+  const firstPartnerProduct = products.find(p => p.slug === 'partner' || (p.min_participants <= 2 && p.max_participants >= 2));
+  const numParticipants = selectedWrestlers.length;
+  const firstSiblingProduct = numParticipants >= 2
+    ? products.find(p => p.min_participants <= numParticipants && p.max_participants >= numParticipants)
+    : null;
+
   // Auto-select product based on session type if products available
   useEffect(() => {
     if (products.length > 0 && sessionMode) {
@@ -140,7 +147,7 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
     }
   }, [sessionMode, selectedWrestlers.length, products]);
 
-  const numSelected = selectedWrestlers.length;
+  const numSelected = numParticipants;
   const oneWrestler = numSelected === 1;
   const twoPlusWrestlers = numSelected >= 2;
   const isPartner = sessionChoice === 'partner';
@@ -410,9 +417,9 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
                       }`}
                     >
                       <CardContent className="p-5">
-                        <h3 className="font-semibold text-lg">1-on-1 Private Session</h3>
+                        <h3 className="font-semibold text-lg">{firstPrivateProduct?.name ?? '1-on-1 Private Session'}</h3>
                         <p className="text-muted-foreground text-sm mb-2">Focused individual attention</p>
-                        <p className="text-2xl font-bold">${tenantPricing.oneOnOne}</p>
+                        <p className="text-2xl font-bold">${firstPrivateProduct ? firstPrivateProduct.parent_price.toFixed(0) : tenantPricing.oneOnOne}</p>
                       </CardContent>
                     </Card>
                     <Card
@@ -424,11 +431,11 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
                         sessionChoice === 'partner' ? 'ring-2 ring-accent border-accent bg-accent/10' : 'border-border hover:border-accent/50'
                       }`}
                     >
-                      <Badge className="absolute top-4 right-4 bg-accent text-black text-xs">BEST VALUE</Badge>
+                      {firstPartnerProduct && !firstPrivateProduct && <Badge className="absolute top-4 right-4 bg-accent text-black text-xs">BEST VALUE</Badge>}
                       <CardContent className="p-5 pr-24">
-                        <h3 className="font-semibold text-lg">Partner Session</h3>
+                        <h3 className="font-semibold text-lg">{firstPartnerProduct?.name ?? 'Partner Session'}</h3>
                         <p className="text-muted-foreground text-sm mb-2">Share the session with another wrestler</p>
-                        <p className="text-2xl font-bold">$40 <span className="text-base font-normal text-muted-foreground">(Save $20!)</span></p>
+                        <p className="text-2xl font-bold">${firstPartnerProduct ? firstPartnerProduct.parent_price.toFixed(0) : '40'} <span className="text-base font-normal text-muted-foreground">per person</span></p>
                       </CardContent>
                     </Card>
                   </>
@@ -444,10 +451,10 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
                     }`}
                   >
                     <CardContent className="p-5">
-                      <h3 className="font-semibold text-lg">Sibling Session</h3>
+                      <h3 className="font-semibold text-lg">{firstSiblingProduct?.name ?? 'Sibling Session'}</h3>
                       <p className="text-muted-foreground text-sm mb-2">Train together with one coach</p>
                       <p className="text-2xl font-bold">
-                        $40 per wrestler (Total: ${40 * numSelected})
+                        ${(firstSiblingProduct?.parent_price ?? 40).toFixed(0)} per wrestler (Total: ${((firstSiblingProduct?.parent_price ?? 40) * numSelected).toFixed(0)})
                       </p>
                     </CardContent>
                   </Card>
