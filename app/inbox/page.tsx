@@ -19,16 +19,18 @@ export default async function InboxPage() {
     .single();
 
   const role = userData?.role;
-  if (role !== 'parent' && role !== 'athlete') {
-    redirect(role === 'admin' ? '/admin' : '/dashboard');
+  if (role !== 'parent' && role !== 'athlete' && role !== 'admin') {
+    redirect('/dashboard');
   }
+
+  const isParentView = role === 'parent' || role === 'admin';
 
   return (
     <div className="flex flex-col h-full">
       <div className="p-4 border-b border-border">
         <h1 className="text-xl font-bold">Community</h1>
         <p className="text-sm text-muted-foreground">
-          {role === 'parent' ? 'Message coaches or join group conversations.' : 'Groups and direct conversations with parents.'}
+          {isParentView ? 'Message coaches or join group conversations.' : 'Groups and direct conversations with parents.'}
         </p>
       </div>
       <div className="flex-1 overflow-auto p-4 flex items-center justify-center">
