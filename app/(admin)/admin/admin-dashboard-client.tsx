@@ -1174,11 +1174,12 @@ export function AdminDashboardClient({
       )}
 
       <Dialog open={!!editingAthleteId} onOpenChange={(open) => { if (!open) { setEditingAthleteId(null); setAthleteEditForm(null); } }}>
-        <DialogContent>
-          <DialogHeader>
+        <DialogContent className="max-h-[90vh] flex flex-col">
+          <DialogHeader className="shrink-0">
             <DialogTitle>Edit coach</DialogTitle>
             <DialogDescription>Edit every aspect of this coach profile. Deactivated coaches are hidden from Browse.</DialogDescription>
           </DialogHeader>
+          <div className="min-h-0 overflow-y-auto pr-2 -mr-2">
           {athleteEditForm ? (
             <form onSubmit={saveAthleteEdit} className="space-y-4">
               {/* Admin: change coach photo */}
@@ -1363,6 +1364,7 @@ export function AdminDashboardClient({
               <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
           )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>
