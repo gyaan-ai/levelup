@@ -57,6 +57,7 @@ export function ServiceBuilder() {
   const [newType, setNewType] = useState<'private' | 'partner' | 'small_group'>('private');
   const [newMax, setNewMax] = useState(6);
   const [newPrice, setNewPrice] = useState('');
+  const [addError, setAddError] = useState<string | null>(null);
   const priceUpdateTimeout = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   const load = async () => {
@@ -78,6 +79,7 @@ export function ServiceBuilder() {
   const addService = async () => {
     const price = parseFloat(newPrice);
     if (Number.isNaN(price) || price < 0) return;
+    setAddError(null);
     setAdding(true);
     try {
       const r = await fetch('/api/athletes/services', {
@@ -90,13 +92,17 @@ export function ServiceBuilder() {
           parentPrice: price,
         }),
       });
-      const data = await r.json();
+      const data = await r.json().catch(() => ({}));
       if (r.ok && data.service) {
         setServices((prev) => [...prev, data.service]);
         setNewPrice('');
-        setAdding(false);
-      } else throw new Error(data.error);
+        setAddError(null);
+      } else {
+        setAddError(data.error || 'Failed to add offering');
+      }
     } catch (e) {
+      setAddError(e instanceof Error ? e.message : 'Failed to add offering');
+    } finally {
       setAdding(false);
     }
   };
@@ -271,6 +277,11 @@ export function ServiceBuilder() {
               Add
             </Button>
           </div>
+          {addError && (
+            <p className="text-sm text-destructive" role="alert">
+              {addError}
+            </p>
+          )}
           {newPrice.trim() && !Number.isNaN(parseFloat(newPrice)) && (
             <p className="text-sm text-muted-foreground">
               You’ll receive <span className="font-medium text-accent">${(parseFloat(newPrice) * 0.9).toFixed(2)}</span>/person (90% after {PLATFORM_PERCENT}% platform fee).

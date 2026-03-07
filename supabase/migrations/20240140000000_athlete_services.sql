@@ -35,12 +35,14 @@ CREATE INDEX IF NOT EXISTS idx_athlete_services_active ON public.athlete_service
 
 ALTER TABLE public.athlete_services ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Athletes can manage own services" ON public.athlete_services;
 CREATE POLICY "Athletes can manage own services"
   ON public.athlete_services FOR ALL
   TO authenticated
   USING (athlete_id = auth.uid())
   WITH CHECK (athlete_id = auth.uid());
 
+DROP POLICY IF EXISTS "Anyone can view active athlete services" ON public.athlete_services;
 CREATE POLICY "Anyone can view active athlete services"
   ON public.athlete_services FOR SELECT
   TO authenticated

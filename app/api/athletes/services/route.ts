@@ -102,7 +102,10 @@ export async function POST(req: Request) {
       .select('id, duration_minutes, session_type, max_participants, parent_price, athlete_payout, display_order, active, created_at')
       .single();
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) {
+      console.error('Athletes services POST Supabase error:', error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
 
     return NextResponse.json({
       service: {
@@ -118,7 +121,8 @@ export async function POST(req: Request) {
       },
     });
   } catch (e) {
+    const message = e instanceof Error ? e.message : String(e);
     console.error('Athletes services POST error:', e);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json({ error: message || 'Internal server error' }, { status: 500 });
   }
 }
