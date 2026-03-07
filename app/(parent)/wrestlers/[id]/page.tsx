@@ -77,7 +77,7 @@ export default async function YouthWrestlerProfilePage({
     .from('session_participants')
     .select('session_id, sessions(status)')
     .eq('youth_wrestler_id', id);
-  const completedCount = (participantRows ?? []).filter((p: { sessions?: { status: string } | null }) => (p.sessions as { status: string } | null)?.status === 'completed').length;
+  const completedCount = (participantRows ?? []).filter((p: { sessions?: { status: string }[] | null }) => p.sessions?.[0]?.status === 'completed').length;
 
   // Get sessions for this youth wrestler (sessions where they participated)
   const sessionIds = [...new Set((participantRows ?? []).map((p: { session_id: string }) => p.session_id))];
