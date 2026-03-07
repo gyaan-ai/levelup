@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
+import { createNotification } from '@/lib/notifications';
 
 export async function PATCH(
   req: NextRequest,
@@ -23,7 +25,7 @@ export async function PATCH(
 
     const { data: session } = await supabase
       .from('sessions')
-      .select('id, parent_id, current_participants, max_participants')
+      .select('id, parent_id, athlete_id, current_participants, max_participants')
       .eq('id', sessionId)
       .single();
     if (!session || (session as { parent_id?: string }).parent_id !== user.id) {
@@ -32,7 +34,7 @@ export async function PATCH(
 
     const { data: joinRequest } = await supabase
       .from('session_join_requests')
-      .select('id, session_id, requesting_parent_id, youth_wrestler_id, status')
+      .select('id, session_id, requesting_parent_id, youth_wrestler_id, status, youth_wrestlers(first_name, last_name)')
       .eq('id', requestId)
       .eq('session_id', sessionId)
       .single();
@@ -71,6 +73,48 @@ export async function PATCH(
       .update({ status: newStatus, responded_at: new Date().toISOString() })
       .eq('id', requestId);
     if (reqErr) return NextResponse.json({ error: reqErr.message }, { status: 500 });
+
+    const requestingParentId = (joinRequest as { requesting_parent_id?: string }).requesting_parent_id;
+    const coachId = (session as { athlete_id?: string }).athlete_id;
+    const ywRel = (joinRequest as { youth_wrestlers?: { first_name?: string; last_name?: string } | { first_name?: string; last_name?: string }[] }).youth_wrestlers;
+    const ywObj = Array.isArray(ywRel) ? ywRel[0] : ywRel;
+    const ywName = ywObj ? [ywObj.first_name, ywObj.last_name].filter(Boolean).join(' ') : 'A wrestler';
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (host.startsWith('localhost') ? `http://${host}` : `https://${host}`);
+    const bookingsLink = `${baseUrl}/bookings`;
+
+    try {
+      const admin = createAdminClient(tenant.slug);
+      // Notify requesting parent (and their athlete/youth if they had an account – we notify the parent who requested)
+      if (action === 'approve') {
+        await createNotification(admin, {
+          user_id: requestingParentId,
+          type: 'session_join_approved',
+          title: 'Join request approved',
+          body: 'Your wrestler was approved to join the session. Check My Bookings for details.',
+          data: { sessionId, link: bookingsLink },
+        });
+        // Notify coach so they know a new participant was added
+        if (coachId) {
+          await createNotification(admin, {
+            user_id: coachId,
+            type: 'session_join_approved',
+            title: 'New participant added to your session',
+            body: `${ywName} was approved to join. Session roster updated.`,
+            data: { sessionId, link: `${baseUrl}/sessions/${sessionId}/requests` },
+          });
+        }
+      } else {
+        await createNotification(admin, {
+          user_id: requestingParentId,
+          type: 'session_join_declined',
+          title: 'Join request declined',
+          body: 'The session owner declined the join request for this session.',
+          data: { sessionId, link: bookingsLink },
+        });
+      }
+    } catch (notifErr) {
+      console.warn('Join response notification failed:', notifErr);
+    }
 
     return NextResponse.json({ ok: true, status: newStatus });
   } catch (e) {

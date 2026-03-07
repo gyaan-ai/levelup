@@ -9,7 +9,14 @@ import { User, Calendar, MapPin, Users } from 'lucide-react';
 import { format, startOfWeek, endOfWeek, addWeeks } from 'date-fns';
 import { SchoolLogo } from '@/components/school-logo';
 
-export default async function SmallGroupSessionsPage() {
+export default async function SmallGroupSessionsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ requested?: string }>;
+}) {
+  const sp = await searchParams;
+  const requested = sp?.requested === '1';
+
   const headersList = await headers();
   const host = headersList.get('host') || '';
   const tenant = getTenantByDomain(host);
@@ -84,6 +91,12 @@ export default async function SmallGroupSessionsPage() {
         </p>
       </div>
 
+      {requested && (
+        <div className="mb-6 p-4 rounded-lg bg-green-500/10 border border-green-500/30 text-green-700 dark:text-green-400">
+          Join request sent. The session owner will review it and may approve based on skill level, weight, etc.
+        </div>
+      )}
+
       {list.length === 0 ? (
         <Card>
           <CardContent className="py-12 text-center">
@@ -156,7 +169,7 @@ export default async function SmallGroupSessionsPage() {
                     )}
                     {!isOwner(s) && openSlots > 0 && (
                       <Button asChild size="sm" variant="outline">
-                        <Link href="/partner-sessions">View open sessions to request</Link>
+                        <Link href={`/sessions/${s.id}/request-join`}>Request to join</Link>
                       </Button>
                     )}
                     <Button asChild size="sm" variant="ghost">

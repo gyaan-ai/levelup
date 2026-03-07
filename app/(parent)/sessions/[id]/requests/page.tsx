@@ -22,11 +22,15 @@ export default async function SessionRequestsPage({
 
   const { data: session } = await supabase
     .from('sessions')
-    .select('id, parent_id, session_mode, scheduled_datetime, athletes(id, first_name, last_name)')
+    .select('id, parent_id, athlete_id, session_mode, session_type, scheduled_datetime, athletes(id, first_name, last_name)')
     .eq('id', sessionId)
     .single();
   if (!session || (session as { parent_id?: string }).parent_id !== user.id) notFound();
-  if ((session as { session_mode?: string }).session_mode !== 'partner-open') notFound();
+  const mode = (session as { session_mode?: string }).session_mode;
+  const type = (session as { session_type?: string }).session_type;
+  const isPartnerOpen = mode === 'partner-open';
+  const isSmallGroup = type === 'group' || type === 'small_group';
+  if (!isPartnerOpen && !isSmallGroup) notFound();
 
   const { data: requests } = await supabase
     .from('session_join_requests')
@@ -35,6 +39,7 @@ export default async function SessionRequestsPage({
       message,
       status,
       created_at,
+      responded_at,
       youth_wrestlers(id, first_name, last_name, age, weight_class, skill_level, school)
     `)
     .eq('session_id', sessionId)
@@ -50,7 +55,7 @@ export default async function SessionRequestsPage({
       </Link>
       <h1 className="text-2xl font-bold mb-2">Join Requests</h1>
       <p className="text-muted-foreground mb-6">
-        Partner session with {athlete?.first_name} {athlete?.last_name}. Approve or decline requests below.
+        {isPartnerOpen ? 'Partner' : 'Small group'} session with {athlete?.first_name} {athlete?.last_name}. Approve or decline based on skill level, weight, etc.
       </p>
       <SessionRequestsClient
         sessionId={sessionId}

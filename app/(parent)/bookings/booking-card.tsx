@@ -20,6 +20,8 @@ export type BookingSession = {
   session_type?: string;
   session_mode?: string;
   partner_invite_code?: string | null;
+  /** Small group or partner-open session not yet filled (open slots). */
+  isTentative?: boolean;
   coach: { name: string; school: string; id: string };
   facility: string;
   wrestlers: string[];
@@ -130,7 +132,14 @@ export function BookingCard({ session, isPast = false }: BookingCardProps) {
                 Wrestler(s): {session.wrestlers.join(', ')}
               </p>
             )}
-            <div className="pt-2">{statusBadge(session.status)}</div>
+            <div className="pt-2 flex flex-wrap items-center gap-2">
+              {statusBadge(session.status)}
+              {session.isTentative && (
+                <Badge variant="outline" className="text-xs border-amber-500/60 text-amber-700 dark:text-amber-400 bg-amber-500/15">
+                  Tentative
+                </Badge>
+              )}
+            </div>
           </div>
           <div className="text-left sm:text-right flex flex-col sm:items-end gap-2 shrink-0">
             <p className={isPast ? 'font-bold' : 'text-xl font-bold'}>

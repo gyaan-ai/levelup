@@ -80,6 +80,8 @@ export default async function ParentDashboard() {
       total_price,
       session_type,
       session_mode,
+      current_participants,
+      max_participants,
       partner_invite_code,
       athletes(id, first_name, last_name, school),
       facilities(id, name, address),
@@ -236,7 +238,7 @@ export default async function ParentDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {upcomingSessions.map((s: { id: string; scheduled_datetime: string; status: string; total_price?: number; session_type?: string; session_mode?: string; partner_invite_code?: string | null; athletes?: { id: string; first_name?: string; last_name?: string; school?: string } | { id: string; first_name?: string; last_name?: string; school?: string }[]; facilities?: { id: string; name?: string; address?: string } | { id: string; name?: string; address?: string }[]; session_participants?: Array<{ youth_wrestlers?: { first_name?: string; last_name?: string } | { first_name?: string; last_name?: string }[] }> }) => {
+                  {upcomingSessions.map((s: { id: string; scheduled_datetime: string; status: string; total_price?: number; session_type?: string; session_mode?: string; current_participants?: number; max_participants?: number; partner_invite_code?: string | null; athletes?: { id: string; first_name?: string; last_name?: string; school?: string } | { id: string; first_name?: string; last_name?: string; school?: string }[]; facilities?: { id: string; name?: string; address?: string } | { id: string; name?: string; address?: string }[]; session_participants?: Array<{ youth_wrestlers?: { first_name?: string; last_name?: string } | { first_name?: string; last_name?: string }[] }> }) => {
                     const a = s.athletes;
                     const coach = Array.isArray(a) ? a[0] : a;
                     const f = s.facilities;
@@ -246,6 +248,11 @@ export default async function ParentDashboard() {
                       const o = Array.isArray(yw) ? yw[0] : yw;
                       return o ? `${o.first_name ?? ''} ${o.last_name ?? ''}`.trim() : null;
                     }).filter(Boolean) as string[];
+                    const current = s.current_participants ?? 1;
+                    const max = s.max_participants ?? 1;
+                    const isGroup = s.session_type === 'group' || s.session_type === 'small_group';
+                    const isPartnerOpen = s.session_mode === 'partner-open';
+                    const isTentative = (isGroup || isPartnerOpen) && current < max;
                     const sessionForCard: BookingSession = {
                       id: s.id,
                       scheduled_datetime: s.scheduled_datetime,
@@ -254,6 +261,7 @@ export default async function ParentDashboard() {
                       session_type: s.session_type,
                       session_mode: s.session_mode,
                       partner_invite_code: s.partner_invite_code ?? null,
+                      isTentative,
                       coach: {
                         name: coach ? `${coach.first_name ?? ''} ${coach.last_name ?? ''}`.trim() : '—',
                         school: coach?.school ?? '',

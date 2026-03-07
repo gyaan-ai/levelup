@@ -22,6 +22,7 @@ interface RequestItem {
   message?: string;
   status: string;
   created_at: string;
+  responded_at?: string | null;
   youth_wrestlers: YouthWrestlerInfo;
 }
 
@@ -31,6 +32,7 @@ export type RawRequestItem = {
   message?: string;
   status: string;
   created_at: string;
+  responded_at?: string | null;
   youth_wrestlers?: unknown;
 };
 
@@ -64,7 +66,7 @@ export function SessionRequestsClient({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed');
-      setRequests((prev) => prev.map((r) => (r.id === requestId ? { ...r, status: action === 'approve' ? 'approved' : 'declined' } : r)));
+      setRequests((prev) => prev.map((r) => (r.id === requestId ? { ...r, status: action === 'approve' ? 'approved' : 'declined', responded_at: new Date().toISOString() } : r)));
     } catch (e: unknown) {
       alert(e instanceof Error ? e.message : 'Failed');
     } finally {
@@ -145,10 +147,18 @@ export function SessionRequestsClient({
           <div className="space-y-3">
             {resolved.map((r) => {
               const yw = r.youth_wrestlers;
+              const respondedAt = r.responded_at ? format(new Date(r.responded_at), 'MMM d, yyyy h:mm a') : null;
               return (
                 <Card key={r.id}>
-                  <CardContent className="py-3 flex items-center justify-between">
-                    <span className="font-medium">{yw?.first_name} {yw?.last_name}</span>
+                  <CardContent className="py-3 flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <span className="font-medium">{yw?.first_name} {yw?.last_name}</span>
+                      {respondedAt && (
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {r.status === 'approved' ? 'Approved' : 'Declined'} on {respondedAt}
+                        </p>
+                      )}
+                    </div>
                     <Badge variant={r.status === 'approved' ? 'default' : 'secondary'}>
                       {r.status === 'approved' ? 'Approved' : 'Declined'}
                     </Badge>

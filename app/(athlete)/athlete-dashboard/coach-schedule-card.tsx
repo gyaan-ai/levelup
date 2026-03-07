@@ -15,13 +15,26 @@ export type CoachSession = {
   scheduled_datetime: string;
   total_price?: number;
   session_type?: string;
+  session_mode?: string;
   status: string;
+  current_participants?: number;
+  max_participants?: number;
   facilities?: { name?: string } | { name?: string }[] | null;
   session_participants?: Array<{
     youth_wrestler_id?: string | null;
     youth_wrestlers?: { id: string; first_name?: string; last_name?: string } | { id: string; first_name?: string; last_name?: string }[] | null;
   }> | null;
 };
+
+/** Small group or partner-open session that is not yet filled (has open slots). */
+function isTentative(s: CoachSession): boolean {
+  const current = s.current_participants ?? 1;
+  const max = s.max_participants ?? 1;
+  if (current >= max) return false;
+  const isGroup = s.session_type === 'group' || s.session_type === 'small_group';
+  const isPartnerOpen = s.session_mode === 'partner-open';
+  return isGroup || isPartnerOpen;
+}
 
 function facilityName(s: CoachSession): string {
   const f = s.facilities;
@@ -71,8 +84,23 @@ export function CoachScheduleCard({
     return map;
   }, [allSessions]);
 
-  const calendarDaysWithSessions = useMemo(() => {
-    return Array.from(sessionsByDate.keys()).map((d) => new Date(d + 'T12:00:00'));
+  const calendarDaysWithTentative = useMemo(() => {
+    const tentativeDays = new Set<string>();
+    for (const s of allSessions) {
+      if (isTentative(s)) {
+        tentativeDays.add(format(new Date(s.scheduled_datetime), 'yyyy-MM-dd'));
+      }
+    }
+    return Array.from(tentativeDays).map((d) => new Date(d + 'T12:00:00'));
+  }, [allSessions]);
+
+  const calendarDaysConfirmedOnly = useMemo(() => {
+    const confirmedDays = new Set<string>();
+    for (const [dateKey, sessList] of sessionsByDate) {
+      const anyTentative = sessList.some(isTentative);
+      if (!anyTentative) confirmedDays.add(dateKey);
+    }
+    return Array.from(confirmedDays).map((d) => new Date(d + 'T12:00:00'));
   }, [sessionsByDate]);
 
   const monthStart = startOfMonth(calendarMonth);
@@ -148,6 +176,12 @@ export function CoachScheduleCard({
                             <>
                               <span> • </span>
                               <Badge variant="secondary" className="text-xs">Pending payment</Badge>
+                            </>
+                          )}
+                          {isTentative(session) && (
+                            <>
+                              <span> • </span>
+                              <Badge variant="outline" className="text-xs border-amber-500/60 text-amber-700 dark:text-amber-400 bg-amber-500/15">Tentative</Badge>
                             </>
                           )}
                         </div>
@@ -247,9 +281,14 @@ export function CoachScheduleCard({
                       <td className="py-2 px-2">{session.session_type || '—'}</td>
                       <td className="py-2 px-2 text-right">${Number(session.total_price || 0).toFixed(2)}</td>
                       <td className="py-2 px-2">
-                        <Badge variant={session.status === 'completed' ? 'default' : session.status === 'cancelled' ? 'secondary' : 'outline'}>
-                          {session.status}
-                        </Badge>
+                        <div className="flex flex-wrap gap-1 items-center">
+                          {isTentative(session) && (
+                            <Badge variant="outline" className="text-xs border-amber-500/60 text-amber-700 dark:text-amber-400 bg-amber-500/15">Tentative</Badge>
+                          )}
+                          <Badge variant={session.status === 'completed' ? 'default' : session.status === 'cancelled' ? 'secondary' : 'outline'}>
+                            {session.status}
+                          </Badge>
+                        </div>
                       </td>
                       <td className="py-2 px-2 text-right">
                         {isUpcoming ? (
@@ -288,8 +327,14 @@ export function CoachScheduleCard({
                 month={calendarMonth}
                 onMonthChange={setCalendarMonth}
                 selected={undefined}
-                modifiers={{ hasSession: calendarDaysWithSessions }}
-                modifiersClassNames={{ hasSession: 'bg-accent/20 font-semibold' }}
+                modifiers={{
+                  tentative: calendarDaysWithTentative,
+                  confirmed: calendarDaysConfirmedOnly,
+                }}
+                modifiersClassNames={{
+                  tentative: 'bg-amber-500/25 font-semibold ring-1 ring-amber-500/40',
+                  confirmed: 'bg-accent/20 font-semibold',
+                }}
                 className="rounded-md border w-fit"
               />
             </div>
@@ -300,10 +345,13 @@ export function CoachScheduleCard({
               ) : (
                 <ul className="space-y-2">
                   {sessionsInMonth.map((session) => (
-                    <li key={session.id} className="flex items-center justify-between gap-3 p-3 border rounded-lg">
+                    <li key={session.id} className={`flex items-center justify-between gap-3 p-3 border rounded-lg ${isTentative(session) ? 'border-amber-500/40 bg-amber-500/5' : ''}`}>
                       <div className="min-w-0 flex-1">
-                        <p className="font-medium text-sm break-words">
+                        <p className="font-medium text-sm break-words flex items-center gap-2">
                           {format(new Date(session.scheduled_datetime), 'EEE, MMM d')} at {format(new Date(session.scheduled_datetime), 'h:mm a')}
+                          {isTentative(session) && (
+                            <Badge variant="outline" className="text-xs border-amber-500/60 text-amber-700 dark:text-amber-400 bg-amber-500/15 shrink-0">Tentative</Badge>
+                          )}
                         </p>
                         <p className="text-xs text-muted-foreground break-words">
                           {facilityName(session)}

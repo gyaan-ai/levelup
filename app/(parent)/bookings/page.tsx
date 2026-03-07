@@ -35,6 +35,8 @@ export default async function MyBookingsPage() {
       total_price,
       session_type,
       session_mode,
+      current_participants,
+      max_participants,
       partner_invite_code,
       athletes(id, first_name, last_name, school, photo_url),
       facilities(id, name, address),
@@ -54,6 +56,8 @@ export default async function MyBookingsPage() {
     total_price: number;
     session_type?: string;
     session_mode?: string;
+    current_participants?: number;
+    max_participants?: number;
     partner_invite_code?: string | null;
     athletes?: { id: string; first_name: string; last_name: string; school: string; photo_url?: string } | { id: string; first_name: string; last_name: string; school: string; photo_url?: string }[];
     facilities?: { id: string; name: string; address?: string } | { id: string; name: string; address?: string }[];
@@ -106,6 +110,14 @@ export default async function MyBookingsPage() {
       .filter(Boolean) as string[];
   };
 
+  const isTentative = (s: (typeof all)[0]) => {
+    const current = s.current_participants ?? 1;
+    const max = s.max_participants ?? 1;
+    const isGroup = s.session_type === 'group' || s.session_type === 'small_group';
+    const isPartnerOpen = s.session_mode === 'partner-open';
+    return (isGroup || isPartnerOpen) && current < max;
+  };
+
   // Transform sessions for BookingCard
   const transformSession = (s: (typeof all)[0]): BookingSession => ({
     id: s.id,
@@ -115,6 +127,7 @@ export default async function MyBookingsPage() {
     session_type: s.session_type,
     session_mode: s.session_mode,
     partner_invite_code: s.partner_invite_code,
+    isTentative: isTentative(s),
     coach: coach(s),
     facility: facility(s),
     wrestlers: wrestlers(s),

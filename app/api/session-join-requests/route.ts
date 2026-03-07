@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
+import { createNotification } from '@/lib/notifications';
 
 export async function POST(req: NextRequest) {
   try {
@@ -23,19 +25,19 @@ export async function POST(req: NextRequest) {
 
     const { data: session } = await supabase
       .from('sessions')
-      .select('id, parent_id, session_mode, current_participants, max_participants')
+      .select('id, parent_id, athlete_id, session_mode, session_type, current_participants, max_participants')
       .eq('id', sessionId)
       .single();
     if (!session) return NextResponse.json({ error: 'Session not found' }, { status: 404 });
-    if ((session as { session_mode?: string }).session_mode !== 'partner-open') {
-      return NextResponse.json({ error: 'Session is not open for join requests' }, { status: 400 });
-    }
-    const current = (session as { current_participants?: number }).current_participants ?? 1;
-    const max = (session as { max_participants?: number }).max_participants ?? 2;
+    const s = session as { parent_id?: string; athlete_id?: string; session_mode?: string; session_type?: string; current_participants?: number; max_participants?: number };
+    const current = s.current_participants ?? 1;
+    const max = s.max_participants ?? 2;
+    const isPartnerOpen = s.session_mode === 'partner-open';
+    const isSmallGroup = (s.session_type === 'group' || s.session_type === 'small_group') && max > 2;
+    const isJoinable = isPartnerOpen || (isSmallGroup && current < max);
+    if (!isJoinable) return NextResponse.json({ error: 'Session is not open for join requests' }, { status: 400 });
     if (current >= max) return NextResponse.json({ error: 'Session is full' }, { status: 400 });
-    if ((session as { parent_id?: string }).parent_id === user.id) {
-      return NextResponse.json({ error: 'You cannot request to join your own session' }, { status: 400 });
-    }
+    if (s.parent_id === user.id) return NextResponse.json({ error: 'You cannot request to join your own session' }, { status: 403 });
 
     const { data: yw } = await supabase
       .from('youth_wrestlers')
@@ -56,6 +58,43 @@ export async function POST(req: NextRequest) {
     if (error) {
       if (error.code === '23505') return NextResponse.json({ error: 'You already requested to join this session' }, { status: 409 });
       return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    const { data: ywNameRow } = await supabase
+      .from('youth_wrestlers')
+      .select('first_name, last_name')
+      .eq('id', youthWrestlerId)
+      .single();
+    const ywName = ywNameRow ? [ywNameRow.first_name, ywNameRow.last_name].filter(Boolean).join(' ') : 'A wrestler';
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (host.startsWith('localhost') ? `http://${host}` : `https://${host}`);
+    const link = `${baseUrl}/sessions/${sessionId}/requests`;
+    const title = 'Join request for your session';
+    const body = `${ywName} requested to join. Approve or decline based on skill level, weight, etc.`;
+
+    try {
+      const admin = createAdminClient(tenant.slug);
+      // Notify parent who established the session (small group / partner host)
+      if (s.parent_id) {
+        await createNotification(admin, {
+          user_id: s.parent_id,
+          type: 'session_join_request',
+          title,
+          body,
+          data: { sessionId, youthWrestlerId, link },
+        });
+      }
+      // Notify coach (athlete) so they see the request too
+      if (s.athlete_id && s.athlete_id !== s.parent_id) {
+        await createNotification(admin, {
+          user_id: s.athlete_id,
+          type: 'session_join_request',
+          title,
+          body,
+          data: { sessionId, youthWrestlerId, link },
+        });
+      }
+    } catch (notifErr) {
+      console.warn('Join request notification failed:', notifErr);
     }
 
     return NextResponse.json({ ok: true });
