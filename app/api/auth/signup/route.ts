@@ -110,13 +110,14 @@ export async function POST(req: NextRequest) {
     }
 
     const userId = authData.user.id;
+    const emailNormalized = (email ?? '').trim().toLowerCase();
 
-    // Insert into users table
+    // Insert into users table (one user per email address; store normalized for consistency)
     const { error: userError } = await supabaseAdmin
       .from('users')
       .insert({
         id: userId,
-        email,
+        email: emailNormalized,
         role,
       });
 
