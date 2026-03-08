@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import { createNotification } from '@/lib/notifications';
+import { DM_UNAVAILABLE_MESSAGE, isMissingTableError } from '@/lib/coach-inquiries-errors';
 
 /** GET ?parentId=&athleteId= - messages in thread + other party name */
 export async function GET(req: NextRequest) {
@@ -35,7 +36,10 @@ export async function GET(req: NextRequest) {
       .eq('athlete_id', athleteId)
       .order('created_at', { ascending: true });
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) {
+      if (isMissingTableError(error)) return NextResponse.json({ error: DM_UNAVAILABLE_MESSAGE }, { status: 503 });
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
 
     const otherId = user.id === parentId ? athleteId : parentId;
     let otherName = '';
@@ -103,7 +107,10 @@ export async function POST(req: NextRequest) {
       .select('id, parent_id, athlete_id, sender_id, body, created_at')
       .single();
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) {
+      if (isMissingTableError(error)) return NextResponse.json({ error: DM_UNAVAILABLE_MESSAGE }, { status: 503 });
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
 
     const recipientId = user.id === parentId ? athleteId : parentId;
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (host.startsWith('localhost') ? `http://${host}` : `https://${host}`);

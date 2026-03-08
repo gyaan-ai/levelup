@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
+import { DM_UNAVAILABLE_MESSAGE, isMissingTableError } from '@/lib/coach-inquiries-errors';
 
 /** POST { parentId, athleteId } - mark thread as read for current user */
 export async function POST(req: NextRequest) {
@@ -32,7 +33,10 @@ export async function POST(req: NextRequest) {
         { onConflict: 'user_id,parent_id,athlete_id' }
       );
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) {
+      if (isMissingTableError(error)) return NextResponse.json({ error: DM_UNAVAILABLE_MESSAGE }, { status: 503 });
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error('Coach inquiries mark-read error:', e);

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
+import { DM_UNAVAILABLE_MESSAGE, isMissingTableError } from '@/lib/coach-inquiries-errors';
 
 /** GET - unread thread count for current user (parent or athlete) */
 export async function GET() {
@@ -15,16 +16,25 @@ export async function GET() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { data: messages } = await supabase
+    const { data: messages, error: messagesError } = await supabase
       .from('coach_inquiries')
       .select('parent_id, athlete_id, sender_id, created_at')
       .or(`parent_id.eq.${user.id},athlete_id.eq.${user.id}`)
       .order('created_at', { ascending: false });
 
-    const { data: readRows } = await supabase
+    if (messagesError) {
+      if (isMissingTableError(messagesError)) return NextResponse.json({ error: DM_UNAVAILABLE_MESSAGE }, { status: 503 });
+      return NextResponse.json({ error: messagesError.message }, { status: 500 });
+    }
+
+    const { data: readRows, error: readError } = await supabase
       .from('coach_inquiry_thread_read')
       .select('parent_id, athlete_id, last_read_at')
       .eq('user_id', user.id);
+
+    if (readError && isMissingTableError(readError)) {
+      return NextResponse.json({ error: DM_UNAVAILABLE_MESSAGE }, { status: 503 });
+    }
 
     const readMap = new Map<string, string>();
     for (const r of readRows ?? []) {

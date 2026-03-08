@@ -3,21 +3,38 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth/use-auth';
 import { useNotificationCount } from '@/lib/hooks/use-notification-count';
 import { useInboxUnreadCount } from '@/lib/hooks/use-inbox-unread-count';
 import { NotificationBell } from '@/components/notification-bell';
 import { Button } from './ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from './ui/select';
 import { Bell, Menu, X, Mail } from 'lucide-react';
 
 const navLinkClass = 'block py-3 px-4 text-white hover:text-accent hover:bg-white/10 transition-colors font-medium min-h-[44px] flex items-center';
 
 export function Header() {
-  const { user, userRole, loading, signOut } = useAuth();
+  const { user, userRole, viewAsRole, effectiveRole, setViewAsRole, loading, signOut } = useAuth();
+  const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [notificationCount, refreshNotifications] = useNotificationCount(!!user);
-  const showInboxIcon = userRole === 'parent' || userRole === 'athlete' || userRole === 'youth_wrestler';
+  const showInboxIcon = effectiveRole === 'parent' || effectiveRole === 'athlete' || effectiveRole === 'youth_wrestler';
   const [inboxUnreadCount, refreshInboxUnread] = useInboxUnreadCount(!!user && showInboxIcon);
+
+  const handleViewAsChange = (value: string) => {
+    setViewAsRole(value === 'admin' ? null : (value as 'athlete' | 'parent' | 'youth_wrestler'));
+    if (value === 'admin') router.push('/admin');
+    else if (value === 'athlete') router.push('/athlete-dashboard');
+    else if (value === 'parent') router.push('/dashboard');
+    else if (value === 'youth_wrestler') router.push('/youth-dashboard');
+  };
 
   const handleSignOut = async () => {
     await signOut();
@@ -45,7 +62,7 @@ export function Header() {
           ) : user ? (
             <>
             <nav className="hidden md:flex items-center gap-6">
-              {userRole === 'athlete' && (
+              {effectiveRole === 'athlete' && (
                 <>
                   <Link
                     href="/athlete-dashboard"
@@ -80,7 +97,7 @@ export function Header() {
                   <NotificationBell count={notificationCount} onRefresh={refreshNotifications} />
                 </>
               )}
-              {userRole === 'youth_wrestler' && (
+              {effectiveRole === 'youth_wrestler' && (
                 <>
                   <Link
                     href="/youth-dashboard"
@@ -156,12 +173,28 @@ export function Header() {
                   </Link>
                   <NotificationBell count={notificationCount} onRefresh={refreshNotifications} />
                   {userRole === 'admin' && (
-                    <Link
-                      href="/admin"
-                      className="text-white hover:text-accent transition-colors font-medium border-l border-white/20 pl-4 ml-2"
-                    >
-                      Admin
-                    </Link>
+                    <>
+                      <Select
+                        value={viewAsRole ?? 'admin'}
+                        onValueChange={handleViewAsChange}
+                      >
+                        <SelectTrigger className="w-[130px] h-9 border-white/30 bg-white/10 text-white hover:bg-white/20 [&>span]:line-clamp-1">
+                          <SelectValue placeholder="View as" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="admin">Admin</SelectItem>
+                          <SelectItem value="athlete">Coach</SelectItem>
+                          <SelectItem value="parent">Parent</SelectItem>
+                          <SelectItem value="youth_wrestler">Youth wrestler</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Link
+                        href="/admin"
+                        className="text-white hover:text-accent transition-colors font-medium"
+                      >
+                        Admin
+                      </Link>
+                    </>
                   )}
                 </>
               )}
@@ -196,7 +229,7 @@ export function Header() {
                 aria-label="Mobile navigation"
               >
                 <div className="container mx-auto px-0 py-2">
-                  {userRole === 'athlete' && (
+                  {effectiveRole === 'athlete' && (
                     <>
                       <Link href="/athlete-dashboard" className={navLinkClass} onClick={() => setMobileOpen(false)}>Dashboard</Link>
                       <Link href="/profile" className={navLinkClass} onClick={() => setMobileOpen(false)}>Profile</Link>
@@ -251,7 +284,7 @@ export function Header() {
                       </Link>
                     </>
                   )}
-                  {(userRole === 'admin' || userRole === 'parent') && (
+                  {(effectiveRole === 'admin' || effectiveRole === 'parent') && (
                     <>
                   <Link href="/dashboard" className={navLinkClass} onClick={() => setMobileOpen(false)}>Dashboard</Link>
                   <Link href="/browse" className={navLinkClass} onClick={() => setMobileOpen(false)}>Browse Coaches</Link>
@@ -281,7 +314,23 @@ export function Header() {
                         </span>
                       </Link>
                       {userRole === 'admin' && (
-                        <Link href="/admin" className={navLinkClass} onClick={() => setMobileOpen(false)}>Admin</Link>
+                        <>
+                          <div className="px-4 py-2 border-b border-white/10">
+                            <label className="text-xs text-white/70 uppercase tracking-wide">View as</label>
+                            <Select value={viewAsRole ?? 'admin'} onValueChange={handleViewAsChange}>
+                              <SelectTrigger className="mt-1.5 w-full border-white/30 bg-white/10 text-white">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="admin">Admin</SelectItem>
+                                <SelectItem value="athlete">Coach</SelectItem>
+                                <SelectItem value="parent">Parent</SelectItem>
+                                <SelectItem value="youth_wrestler">Youth wrestler</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <Link href="/admin" className={navLinkClass} onClick={() => setMobileOpen(false)}>Admin</Link>
+                        </>
                       )}
                     </>
                   )}

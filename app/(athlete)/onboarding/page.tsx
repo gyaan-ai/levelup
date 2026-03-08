@@ -75,7 +75,16 @@ export default function OnboardingPage() {
         const response = await fetch('/api/athletes/profile?' + new Date().getTime(), {
           cache: 'no-store',
         });
-        const data = await response.json();
+        const contentType = response.headers.get('content-type') ?? '';
+        let data: { athlete?: any; facilities?: any[] } = {};
+        if (contentType.includes('application/json')) {
+          try {
+            data = await response.json();
+          } catch {
+            setError('Failed to load profile data');
+            return;
+          }
+        }
 
         if (data.athlete) {
           form.reset({
@@ -117,12 +126,19 @@ export default function OnboardingPage() {
         method: 'POST',
         body: formData,
       });
+      const uploadCt = uploadResponse.headers.get('content-type') ?? '';
+      let uploadData: { error?: string; photoUrl?: string } = {};
+      if (uploadCt.includes('application/json')) {
+        try {
+          uploadData = await uploadResponse.json();
+        } catch {
+          throw new Error('Invalid response from server. Please try again.');
+        }
+      }
       if (!uploadResponse.ok) {
-        const uploadData = await uploadResponse.json();
         throw new Error(uploadData.error || 'Failed to upload photo');
       }
-      const uploadData = await uploadResponse.json();
-      photoUrl = uploadData.photoUrl;
+      if (uploadData.photoUrl) photoUrl = uploadData.photoUrl;
     }
 
     const response = await fetch('/api/athletes/profile', {
@@ -139,7 +155,15 @@ export default function OnboardingPage() {
       }),
     });
 
-    const data = await response.json();
+    const contentType = response.headers.get('content-type') ?? '';
+    let data: { error?: string; success?: boolean } = {};
+    if (contentType.includes('application/json')) {
+      try {
+        data = await response.json();
+      } catch {
+        throw new Error('Invalid response from server. Please try again.');
+      }
+    }
     if (!response.ok) throw new Error(data.error || 'Failed to update profile');
     if (!data.success) throw new Error('Profile save did not confirm success');
   };

@@ -37,12 +37,9 @@ export default async function AthleteDashboard() {
     .eq('id', user.id)
     .single();
 
-  if (userData?.role !== 'athlete') {
-    if (userData?.role === 'parent') {
-      redirect('/browse');
-    } else if (userData?.role === 'admin') {
-      redirect('/admin');
-    }
+  if (userData?.role !== 'athlete' && userData?.role !== 'admin') {
+    if (userData?.role === 'parent') redirect('/browse');
+    redirect('/login');
   }
 
   // Get athlete profile

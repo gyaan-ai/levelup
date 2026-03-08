@@ -5,9 +5,18 @@ import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 import { User } from '@supabase/supabase-js';
 
+const VIEW_AS_STORAGE_KEY = 'levelup_view_as_role';
+
+export type ViewAsRole = 'admin' | 'athlete' | 'parent' | 'youth_wrestler';
+
 interface AuthContextType {
   user: User | null;
   userRole: 'parent' | 'athlete' | 'admin' | 'youth_wrestler' | null;
+  /** When admin uses "View as" dropdown, this is the selected role; otherwise null. */
+  viewAsRole: ViewAsRole | null;
+  /** Role to use for UI (nav, etc.). For admins with viewAsRole set, this is viewAsRole; else userRole. */
+  effectiveRole: 'parent' | 'athlete' | 'admin' | 'youth_wrestler' | null;
+  setViewAsRole: (role: ViewAsRole | null) => void;
   loading: boolean;
   signOut: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -24,9 +33,21 @@ export function AuthProvider({
 }) {
   const [user, setUser] = useState<User | null>(null);
   const [userRole, setUserRole] = useState<'parent' | 'athlete' | 'admin' | 'youth_wrestler' | null>(null);
+  const [viewAsRole, setViewAsRoleState] = useState<ViewAsRole | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const supabase = createClient(tenantSlug);
+
+  const setViewAsRole = useCallback((role: ViewAsRole | null) => {
+    setViewAsRoleState(role);
+    if (typeof window !== 'undefined') {
+      if (role) window.localStorage.setItem(VIEW_AS_STORAGE_KEY, role);
+      else window.localStorage.removeItem(VIEW_AS_STORAGE_KEY);
+    }
+  }, []);
+
+  const effectiveRole: 'parent' | 'athlete' | 'admin' | 'youth_wrestler' | null =
+    userRole === 'admin' && viewAsRole ? viewAsRole : userRole;
 
   const fetchUserRole = useCallback(async (userId: string) => {
     try {
@@ -73,6 +94,15 @@ export function AuthProvider({
   };
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const stored = window.localStorage.getItem(VIEW_AS_STORAGE_KEY) as ViewAsRole | null;
+      if (stored && ['admin', 'athlete', 'parent', 'youth_wrestler'].includes(stored)) {
+        setViewAsRoleState(stored);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
@@ -103,11 +133,13 @@ export function AuthProvider({
     await supabase.auth.signOut();
     setUser(null);
     setUserRole(null);
+    setViewAsRoleState(null);
+    if (typeof window !== 'undefined') window.localStorage.removeItem(VIEW_AS_STORAGE_KEY);
     router.push('/login');
   };
 
   return (
-    <AuthContext.Provider value={{ user, userRole, loading, signOut, refreshUser }}>
+    <AuthContext.Provider value={{ user, userRole, viewAsRole, effectiveRole, setViewAsRole, loading, signOut, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

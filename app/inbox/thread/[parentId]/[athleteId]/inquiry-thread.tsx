@@ -30,19 +30,23 @@ export function InquiryThread({
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchThread = async () => {
+    setError(null);
     try {
       const r = await fetch(
         `/api/coach-inquiries?parentId=${encodeURIComponent(parentId)}&athleteId=${encodeURIComponent(athleteId)}`
       );
-      const data = await r.json();
+      const data = await r.json().catch(() => ({}));
       if (r.ok) {
         if (Array.isArray(data.messages)) setMessages(data.messages);
         if (data.otherParty?.name) setOtherName(data.otherParty.name);
+      } else {
+        setError(data.error || 'Couldn’t load this conversation.');
       }
     } catch {
-      /* ignore */
+      setError('Couldn’t load this conversation.');
     } finally {
       setLoading(false);
     }
@@ -64,18 +68,19 @@ export function InquiryThread({
     const text = draft.trim();
     if (!text || sending) return;
     setSending(true);
+    setError(null);
     try {
       const r = await fetch('/api/coach-inquiries', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ parentId, athleteId, body: text }),
       });
-      const data = await r.json();
+      const data = await r.json().catch(() => ({}));
       if (!r.ok) throw new Error(data.error || 'Failed to send');
       setDraft('');
       await fetchThread();
     } catch (e) {
-      alert(e instanceof Error ? e.message : 'Failed to send');
+      setError(e instanceof Error ? e.message : 'Failed to send');
     } finally {
       setSending(false);
     }
@@ -106,6 +111,11 @@ export function InquiryThread({
           <CardTitle>Conversation with {otherName || '…'}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
+          {error && (
+            <div className="rounded-lg border border-destructive/50 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {error}
+            </div>
+          )}
           <div className="space-y-3 min-h-[200px] max-h-[400px] overflow-y-auto rounded-lg border bg-muted/20 p-3">
             {messages.length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8">

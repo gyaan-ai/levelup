@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
+import { DM_UNAVAILABLE_MESSAGE, isMissingTableError } from '@/lib/coach-inquiries-errors';
 
 /** GET - list threads for current user (parent or athlete) with last message and other party name */
 export async function GET() {
@@ -21,12 +22,19 @@ export async function GET() {
       .or(`parent_id.eq.${user.id},athlete_id.eq.${user.id}`)
       .order('created_at', { ascending: false });
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) {
+      if (isMissingTableError(error)) return NextResponse.json({ error: DM_UNAVAILABLE_MESSAGE }, { status: 503 });
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
 
-    const { data: readRows } = await supabase
+    const { data: readRows, error: readError } = await supabase
       .from('coach_inquiry_thread_read')
       .select('parent_id, athlete_id, last_read_at')
       .eq('user_id', user.id);
+
+    if (readError && isMissingTableError(readError)) {
+      return NextResponse.json({ error: DM_UNAVAILABLE_MESSAGE }, { status: 503 });
+    }
 
     const readMap = new Map<string, string>();
     for (const r of readRows ?? []) {
