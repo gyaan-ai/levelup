@@ -34,6 +34,8 @@ export type AdminUserRow = {
   archived_at: string | null;
   display_name?: string | null;
   school?: string | null;
+  /** For coaches: true = visible on Browse Coaches, false = hidden. null = not a coach. */
+  athlete_active?: boolean | null;
 };
 
 type SortOption = 'email_asc' | 'email_desc' | 'role' | 'created_desc' | 'created_asc' | 'login_desc' | 'login_asc';
@@ -297,6 +299,15 @@ export function AdminUsersClient({ initialUsers }: { initialUsers: AdminUserRow[
                           <Badge variant="secondary">Archived</Badge>
                         ) : (
                           <span className="text-muted-foreground">Active</span>
+                        )}
+                        {u.role === 'athlete' && u.athlete_active !== undefined && (
+                          <div className="mt-1">
+                            {u.athlete_active ? (
+                              <Badge variant="outline" className="text-xs font-normal">Visible on Browse</Badge>
+                            ) : (
+                              <Badge variant="secondary" className="text-xs font-normal">Hidden from Browse</Badge>
+                            )}
+                          </div>
                         )}
                       </td>
                       <td className="py-2 text-right">

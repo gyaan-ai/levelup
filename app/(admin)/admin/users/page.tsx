@@ -59,17 +59,19 @@ export default async function AdminUsersPage() {
   }
 
   const athleteIds = userRows.filter((u) => u.role === 'athlete').map((u) => u.id);
-  const athleteMap = new Map<string, { first_name: string; last_name: string; school: string }>();
+  const athleteMap = new Map<string, { first_name: string; last_name: string; school: string; active: boolean }>();
   if (athleteIds.length > 0) {
     const { data: athletes } = await admin
       .from('athletes')
-      .select('id, first_name, last_name, school')
+      .select('id, first_name, last_name, school, active')
       .in('id', athleteIds);
     for (const a of athletes ?? []) {
-      athleteMap.set(a.id, {
-        first_name: a.first_name ?? '',
-        last_name: a.last_name ?? '',
-        school: a.school ?? '',
+      const row = a as { id: string; first_name?: string; last_name?: string; school?: string; active?: boolean };
+      athleteMap.set(row.id, {
+        first_name: row.first_name ?? '',
+        last_name: row.last_name ?? '',
+        school: row.school ?? '',
+        active: row.active === true,
       });
     }
   }
@@ -82,6 +84,7 @@ export default async function AdminUsersPage() {
       ...u,
       display_name: display_name ?? null,
       school: profile?.school ?? null,
+      athlete_active: u.role === 'athlete' ? (profile?.active ?? false) : null,
     };
   });
 

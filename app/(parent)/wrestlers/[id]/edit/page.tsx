@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/select';
 import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
+import { useAuth } from '@/lib/auth/use-auth';
 
 const youthWrestlerSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
@@ -54,6 +55,9 @@ export default function EditYouthWrestlerPage() {
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoFocusX, setPhotoFocusX] = useState(50);
   const [photoFocusY, setPhotoFocusY] = useState(50);
+  const [deleting, setDeleting] = useState(false);
+
+  const { userRole } = useAuth();
 
   const form = useForm<YouthWrestlerFormValues>({
     resolver: zodResolver(youthWrestlerSchema),
@@ -496,6 +500,36 @@ export default function EditYouthWrestlerPage() {
                   Cancel
                 </Button>
               </div>
+
+              {userRole === 'admin' && (
+                <div className="mt-8 pt-6 border-t">
+                  <p className="text-sm font-medium text-muted-foreground mb-2">Admin</p>
+                  <Button
+                    type="button"
+                    variant="destructive"
+                    disabled={submitting || deleting}
+                    onClick={async () => {
+                      if (!window.confirm('Permanently delete this youth wrestler profile? This cannot be undone.')) return;
+                      setDeleting(true);
+                      try {
+                        const res = await fetch(`/api/youth-wrestlers/${id}`, { method: 'DELETE' });
+                        if (!res.ok) {
+                          const data = await res.json().catch(() => ({}));
+                          setError(data?.error ?? 'Failed to delete');
+                          setDeleting(false);
+                          return;
+                        }
+                        router.push('/admin');
+                      } catch {
+                        setError('Failed to delete');
+                        setDeleting(false);
+                      }
+                    }}
+                  >
+                    {deleting ? 'Deleting...' : 'Delete youth wrestler'}
+                  </Button>
+                </div>
+              )}
             </form>
           </Form>
         </CardContent>

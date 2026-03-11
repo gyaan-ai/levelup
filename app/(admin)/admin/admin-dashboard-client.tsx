@@ -40,6 +40,7 @@ import {
   Trash2,
   UserMinus,
   Building2,
+  ExternalLink,
 } from 'lucide-react';
 import Link from 'next/link';
 import { format } from 'date-fns';
@@ -109,7 +110,7 @@ export type CreditRecord = {
   expires_at?: string | null;
 };
 
-type TabId = 'sessions' | 'users' | 'billing' | 'athletes' | 'payouts' | 'credits' | 'facility_requests';
+type TabId = 'sessions' | 'users' | 'billing' | 'athletes' | 'kids' | 'payouts' | 'credits' | 'facility_requests';
 
 function ClearTestDataCard() {
   const router = useRouter();
@@ -266,7 +267,7 @@ export function AdminDashboardClient({
   const searchParams = useSearchParams();
   const tabParam = searchParams.get('tab') as TabId | null;
   const editAthleteId = searchParams.get('edit');
-  const [tab, setTab] = useState<TabId>(tabParam && ['sessions', 'users', 'billing', 'payouts', 'credits', 'facility_requests', 'athletes'].includes(tabParam) ? tabParam : 'sessions');
+  const [tab, setTab] = useState<TabId>(tabParam && ['sessions', 'users', 'billing', 'payouts', 'credits', 'facility_requests', 'athletes', 'kids'].includes(tabParam) ? tabParam : 'sessions');
   const [markingAthleteId, setMarkingAthleteId] = useState<string | null>(null);
   const [sessionDateFrom, setSessionDateFrom] = useState('');
   const [sessionDateTo, setSessionDateTo] = useState('');
@@ -319,6 +320,19 @@ export function AdminDashboardClient({
   const [facilityRequestActionId, setFacilityRequestActionId] = useState<string | null>(null);
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
   const [syncingEmails, setSyncingEmails] = useState(false);
+  const [kidsList, setKidsList] = useState<Array<{
+    id: string;
+    first_name: string;
+    last_name: string;
+    school: string | null;
+    weight_class: string | null;
+    skill_level: string | null;
+    graduation_year: number | null;
+    parent_email: string;
+    photo_url: string | null;
+    created_at: string;
+  }>>([]);
+  const [kidsLoading, setKidsLoading] = useState(false);
 
   const filteredSessions = sessions.filter((s) => {
     const d = s.scheduled_datetime.slice(0, 10);
@@ -474,8 +488,22 @@ export function AdminDashboardClient({
     { id: 'payouts', label: 'Coach payouts', icon: <Wallet className="h-4 w-4" /> },
     { id: 'credits', label: 'Credits', icon: <CreditCard className="h-4 w-4" /> },
     { id: 'facility_requests', label: 'Facility requests', icon: <Building2 className="h-4 w-4" /> },
-    { id: 'athletes', label: 'Athlete reports', icon: <BarChart3 className="h-4 w-4" /> },
+    { id: 'athletes', label: 'Coaches', icon: <BarChart3 className="h-4 w-4" /> },
+    { id: 'kids', label: 'Kids', icon: <User className="h-4 w-4" /> },
   ];
+
+  // Fetch kids when tab is selected
+  useEffect(() => {
+    if (tab !== 'kids') return;
+    setKidsLoading(true);
+    fetch('/api/admin/youth-wrestlers')
+      .then((r) => r.json())
+      .then((data) => {
+        setKidsList(data.youthWrestlers ?? []);
+      })
+      .catch(() => setKidsList([]))
+      .finally(() => setKidsLoading(false));
+  }, [tab]);
 
   // Fetch facility requests when tab is selected
   useEffect(() => {
@@ -1098,11 +1126,14 @@ export function AdminDashboardClient({
       {tab === 'athletes' && (
         <Card>
           <CardHeader>
-            <CardTitle>Reporting by athlete</CardTitle>
+            <CardTitle>Coaches</CardTitle>
             <CardDescription>
-              Sessions and earnings per coach.
+              Same coaches as on Browse Coaches. Edit profiles, visibility (show/hide on browse), and view sessions and earnings.
             </CardDescription>
-            <div className="flex flex-wrap gap-4 pt-2">
+            <div className="flex flex-wrap items-center gap-4 pt-2">
+              <Button variant="outline" size="sm" asChild>
+                <Link href="/browse">View Browse Coaches page</Link>
+              </Button>
               <div className="relative flex-1 max-w-xs">
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -1113,7 +1144,7 @@ export function AdminDashboardClient({
                 />
               </div>
               <span className="text-sm text-muted-foreground">
-                {filteredAthletes.length} athletes
+                {filteredAthletes.length} coaches
               </span>
             </div>
           </CardHeader>
@@ -1173,6 +1204,72 @@ export function AdminDashboardClient({
                 </tbody>
               </table>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {tab === 'kids' && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Kids (youth wrestlers)</CardTitle>
+            <CardDescription>
+              All youth wrestlers on the platform. Same card view as My Coaches.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {kidsLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : kidsList.length === 0 ? (
+              <div className="py-12 text-center text-muted-foreground">
+                No youth wrestlers yet.
+              </div>
+            ) : (
+              <div className="grid gap-4 sm:grid-cols-2">
+                {kidsList.map((k) => (
+                  <Card key={k.id}>
+                    <CardContent className="p-4 flex items-center gap-4">
+                      {k.photo_url ? (
+                        <img
+                          src={k.photo_url}
+                          alt={`${k.first_name} ${k.last_name}`}
+                          className="w-14 h-14 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center">
+                          <User className="h-7 w-7 text-muted-foreground" />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold truncate">
+                          {k.first_name} {k.last_name}
+                        </p>
+                        {(k.school || k.weight_class) && (
+                          <p className="text-sm text-muted-foreground truncate">
+                            {[k.school, k.weight_class].filter(Boolean).join(' · ') || '—'}
+                          </p>
+                        )}
+                        <p className="text-xs text-muted-foreground truncate" title={k.parent_email}>
+                          {k.parent_email}
+                        </p>
+                      </div>
+                      <div className="flex flex-col gap-2">
+                        <Button variant="outline" size="sm" asChild>
+                          <Link href={`/wrestlers/${k.id}`}>
+                            <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
+                            Profile
+                          </Link>
+                        </Button>
+                        <Button variant="ghost" size="sm" asChild>
+                          <Link href={`/wrestlers/${k.id}/edit`}>Edit</Link>
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

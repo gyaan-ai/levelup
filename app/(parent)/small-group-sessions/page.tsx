@@ -5,7 +5,7 @@ import { getTenantByDomain } from '@/config/tenants';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { User, MapPin, Users } from 'lucide-react';
+import { User, MapPin, Users, Plus } from 'lucide-react';
 import { format, startOfWeek, endOfWeek, addWeeks } from 'date-fns';
 import { SchoolLogo } from '@/components/school-logo';
 
@@ -124,13 +124,25 @@ export default async function SmallGroupSessionsPage({
         <Link href="/dashboard" className="text-sm text-muted-foreground hover:text-foreground mb-4 inline-block">
           ← Back to Dashboard
         </Link>
-        <h1 className="text-3xl font-bold flex items-center gap-2">
-          <Users className="h-8 w-8" />
-          Small group & partner sessions
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Find group sessions (this week and next) or open partner sessions (someone looking for a partner). Request to join; the session owner approves based on skill level, weight, etc.
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold flex items-center gap-2">
+              <Users className="h-8 w-8" />
+              Small group & partner sessions
+            </h1>
+            <p className="text-muted-foreground mt-1">
+              Find group sessions (this week and next) or open partner sessions (someone looking for a partner). Request to join; the session owner approves based on skill level, weight, etc.
+            </p>
+          </div>
+          {userData?.role === 'admin' && (
+            <Button asChild>
+              <Link href="/admin/sessions/create" className="inline-flex items-center gap-2">
+                <Plus className="h-4 w-4" />
+                Create small group session
+              </Link>
+            </Button>
+          )}
+        </div>
       </div>
 
       {requested && (
