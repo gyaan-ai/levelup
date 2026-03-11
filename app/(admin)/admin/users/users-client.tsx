@@ -32,6 +32,8 @@ export type AdminUserRow = {
   created_at: string;
   last_login_at: string | null;
   archived_at: string | null;
+  display_name?: string | null;
+  school?: string | null;
 };
 
 type SortOption = 'email_asc' | 'email_desc' | 'role' | 'created_desc' | 'created_asc' | 'login_desc' | 'login_asc';
@@ -62,7 +64,9 @@ export function AdminUsersClient({ initialUsers }: { initialUsers: AdminUserRow[
       if (roleFilter !== 'all' && u.role !== roleFilter) return false;
       if (search.trim()) {
         const q = search.toLowerCase().trim();
-        if (!u.email.toLowerCase().includes(q)) return false;
+        const matchEmail = u.email.toLowerCase().includes(q);
+        const matchName = u.display_name?.toLowerCase().includes(q);
+        if (!matchEmail && !matchName) return false;
       }
       return true;
     });
@@ -218,7 +222,7 @@ export function AdminUsersClient({ initialUsers }: { initialUsers: AdminUserRow[
             <div className="relative flex-1 min-w-[200px] max-w-xs">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search by email..."
+                placeholder="Search by email or name..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-8"
@@ -243,6 +247,7 @@ export function AdminUsersClient({ initialUsers }: { initialUsers: AdminUserRow[
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b">
+                  <th className="text-left py-2 font-medium">Profile / Name</th>
                   <th className="text-left py-2 font-medium">Email</th>
                   <th className="text-left py-2 font-medium">Role</th>
                   <th className="text-left py-2 font-medium">Created</th>
@@ -254,13 +259,23 @@ export function AdminUsersClient({ initialUsers }: { initialUsers: AdminUserRow[
               <tbody>
                 {filteredAndSorted.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="py-8 text-center text-muted-foreground">
+                    <td colSpan={7} className="py-8 text-center text-muted-foreground">
                       No users match filters.
                     </td>
                   </tr>
                 ) : (
                   filteredAndSorted.map((u) => (
                     <tr key={u.id} className={`border-b last:border-0 ${u.archived_at ? 'opacity-60' : ''}`}>
+                      <td className="py-2">
+                        {u.display_name ? (
+                          <span className="font-medium">{u.display_name}</span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                        {u.school && (
+                          <span className="block text-xs text-muted-foreground">{u.school}</span>
+                        )}
+                      </td>
                       <td className="py-2">
                         <a href={`mailto:${u.email}`} className="text-accent hover:underline">
                           {u.email}
@@ -287,12 +302,22 @@ export function AdminUsersClient({ initialUsers }: { initialUsers: AdminUserRow[
                       <td className="py-2 text-right">
                         <div className="flex flex-wrap gap-1 justify-end">
                           {viewProfileUrl(u) && (
-                            <Link href={viewProfileUrl(u)!}>
-                              <Button variant="ghost" size="sm" className="h-8">
-                                <Eye className="h-4 w-4 mr-1" />
-                                View
-                              </Button>
-                            </Link>
+                            <>
+                              <Link href={viewProfileUrl(u)!}>
+                                <Button variant="ghost" size="sm" className="h-8">
+                                  <Eye className="h-4 w-4 mr-1" />
+                                  View profile
+                                </Button>
+                              </Link>
+                              {u.role === 'athlete' && (
+                                <Link href={`/admin?tab=athletes&edit=${u.id}`}>
+                                  <Button variant="ghost" size="sm" className="h-8">
+                                    <Pencil className="h-4 w-4 mr-1" />
+                                    Edit profile
+                                  </Button>
+                                </Link>
+                              )}
+                            </>
                           )}
                           <Button
                             variant="ghost"
@@ -305,7 +330,7 @@ export function AdminUsersClient({ initialUsers }: { initialUsers: AdminUserRow[
                             }}
                           >
                             <Pencil className="h-4 w-4 mr-1" />
-                            Edit
+                            Edit role
                           </Button>
                           {u.archived_at ? (
                             <Button
@@ -359,6 +384,8 @@ export function AdminUsersClient({ initialUsers }: { initialUsers: AdminUserRow[
           <DialogHeader>
             <DialogTitle>Edit user</DialogTitle>
             <DialogDescription>
+              {editUser?.display_name && <span className="font-medium">{editUser.display_name}</span>}
+              {editUser?.display_name && editUser?.email && ' · '}
               {editUser?.email}
             </DialogDescription>
           </DialogHeader>
@@ -402,14 +429,29 @@ export function AdminUsersClient({ initialUsers }: { initialUsers: AdminUserRow[
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Delete user</DialogTitle>
-            <DialogDescription>
-              Delete {deleteUser?.email}? This will remove their user record and cannot be undone. Related data (sessions, etc.) may be affected by your database rules.
+            <DialogDescription asChild>
+              <div className="space-y-2">
+                <p>
+                  Permanently delete <strong>{deleteUser?.email}</strong>
+                  {deleteUser?.display_name && (
+                    <> ({deleteUser.display_name})</>
+                  )}?
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  This removes their user record and signs them out. Auth account is also deleted. Related data (sessions, bookings, etc.) may be affected by your database rules. This cannot be undone.
+                </p>
+                {deleteUser?.last_login_at && (
+                  <p className="text-sm text-muted-foreground">
+                    Last login: {format(new Date(deleteUser.last_login_at), 'MMM d, yyyy h:mm a')}
+                  </p>
+                )}
+              </div>
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDeleteUser(null)}>Cancel</Button>
             <Button variant="destructive" onClick={handleDelete} disabled={loading}>
-              Delete
+              Delete user
             </Button>
           </DialogFooter>
         </DialogContent>

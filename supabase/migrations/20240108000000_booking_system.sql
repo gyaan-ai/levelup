@@ -69,11 +69,13 @@ ALTER TABLE public.session_join_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
 
 -- session_participants: parent sees own; session parent sees all for that session
+DROP POLICY IF EXISTS "Participants: parent sees own" ON public.session_participants;
 CREATE POLICY "Participants: parent sees own"
   ON public.session_participants FOR SELECT
   TO authenticated
   USING (parent_id = auth.uid());
 
+DROP POLICY IF EXISTS "Participants: session parent manages" ON public.session_participants;
 CREATE POLICY "Participants: session parent manages"
   ON public.session_participants FOR ALL
   TO authenticated
@@ -85,6 +87,7 @@ CREATE POLICY "Participants: session parent manages"
   );
 
 -- session_join_requests: requester sees own; session parent sees all for that session
+DROP POLICY IF EXISTS "Join requests: select own or for my session" ON public.session_join_requests;
 CREATE POLICY "Join requests: select own or for my session"
   ON public.session_join_requests FOR SELECT
   TO authenticated
@@ -93,11 +96,13 @@ CREATE POLICY "Join requests: select own or for my session"
     EXISTS (SELECT 1 FROM public.sessions s WHERE s.id = session_id AND s.parent_id = auth.uid())
   );
 
+DROP POLICY IF EXISTS "Join requests: parent can insert own request" ON public.session_join_requests;
 CREATE POLICY "Join requests: parent can insert own request"
   ON public.session_join_requests FOR INSERT
   TO authenticated
   WITH CHECK (requesting_parent_id = auth.uid());
 
+DROP POLICY IF EXISTS "Join requests: session parent can update (approve/decline)" ON public.session_join_requests;
 CREATE POLICY "Join requests: session parent can update (approve/decline)"
   ON public.session_join_requests FOR UPDATE
   TO authenticated
@@ -105,11 +110,13 @@ CREATE POLICY "Join requests: session parent can update (approve/decline)"
   WITH CHECK (EXISTS (SELECT 1 FROM public.sessions s WHERE s.id = session_id AND s.parent_id = auth.uid()));
 
 -- notifications: user sees own
+DROP POLICY IF EXISTS "Notifications: user sees own" ON public.notifications;
 CREATE POLICY "Notifications: user sees own"
   ON public.notifications FOR SELECT
   TO authenticated
   USING (user_id = auth.uid());
 
+DROP POLICY IF EXISTS "Notifications: user updates own (mark read)" ON public.notifications;
 CREATE POLICY "Notifications: user updates own (mark read)"
   ON public.notifications FOR UPDATE
   TO authenticated
@@ -117,6 +124,7 @@ CREATE POLICY "Notifications: user updates own (mark read)"
   WITH CHECK (user_id = auth.uid());
 
 -- Service/API will insert notifications (via service role or dedicated policy if needed)
+DROP POLICY IF EXISTS "Notifications: insert for self" ON public.notifications;
 CREATE POLICY "Notifications: insert for self"
   ON public.notifications FOR INSERT
   TO authenticated

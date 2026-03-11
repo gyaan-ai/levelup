@@ -70,12 +70,12 @@ export default async function JoinByCodePage({
       <Card>
         <CardHeader>
           <CardTitle>
-            {isFull ? 'This session is already full' : 'Join this partner session'}
+            {isFull ? 'This session is already full' : 'Register for this session'}
           </CardTitle>
           <p className="text-sm text-muted-foreground">
             {isFull
               ? 'The session you were invited to has reached the maximum number of participants.'
-              : 'Complete the form below to request to join.'}
+              : 'Sign in, add your wrestler if needed, and register below. No payment online — the coach or organizer will arrange payment.'}
           </p>
         </CardHeader>
         <CardContent className="space-y-4">

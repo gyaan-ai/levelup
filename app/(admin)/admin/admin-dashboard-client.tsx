@@ -523,6 +523,10 @@ export function AdminDashboardClient({
           <Users className="h-4 w-4" />
           User Management
         </Link>
+        <Link href="/admin/sessions/create" className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground border border-border rounded-md hover:bg-muted/50">
+          <Calendar className="h-4 w-4" />
+          Create small group session
+        </Link>
       </div>
 
       <ClearTestDataCard />

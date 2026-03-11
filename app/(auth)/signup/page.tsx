@@ -58,6 +58,12 @@ export default function SignupPage() {
   const searchParams = useSearchParams();
   const inviteToken = searchParams?.get('invite')?.trim() || undefined;
   const roleParam = searchParams?.get('role')?.toLowerCase();
+  const redirectTo = searchParams?.get('redirect')?.trim();
+  const safeRedirect =
+    redirectTo &&
+    redirectTo.startsWith('/') &&
+    !redirectTo.startsWith('//') &&
+    !redirectTo.includes(':');
   const defaultRole = inviteToken ? 'parent' : (roleParam === 'athlete' ? 'athlete' : 'parent');
   const tenant = useTenant();
   const supabase = createClient(tenant.slug);
@@ -137,8 +143,15 @@ export default function SignupPage() {
         .eq('id', authData.user.id)
         .single();
 
-      // Redirect based on role (coaches go to onboarding first to complete profile)
+      // If they came from a redirect (e.g. join link), send them back after signup
       const role = userData?.role || values.role;
+      if (safeRedirect && (role === 'parent' || role === 'admin')) {
+        router.push(safeRedirect);
+        router.refresh();
+        return;
+      }
+
+      // Redirect based on role (coaches go to onboarding first to complete profile)
       if (role === 'athlete') {
         router.push('/onboarding');
       } else if (role === 'youth_wrestler') {

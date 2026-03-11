@@ -20,19 +20,25 @@ export default async function AdminUsersPage() {
   if (userData?.role !== 'admin') redirect('/');
 
   const admin = createAdminClient(tenant.slug);
-  // Select only columns that exist in base schema; last_login_at and archived_at require migrations 20240111000000, 20240134000000
   const { data: rows, error } = await admin
     .from('users')
     .select('id, email, role, created_at, last_login_at, archived_at')
     .order('created_at', { ascending: false });
 
-  let users: AdminUserRow[];
+  let userRows: Array<{
+    id: string;
+    email: string;
+    role: string;
+    created_at: string;
+    last_login_at: string | null;
+    archived_at: string | null;
+  }>;
   if (error && (error.message?.includes('last_login_at') || error.message?.includes('archived_at'))) {
     const { data: fallbackRows } = await admin
       .from('users')
       .select('id, email, role, created_at')
       .order('created_at', { ascending: false });
-    users = (fallbackRows ?? []).map((u) => ({
+    userRows = (fallbackRows ?? []).map((u) => ({
       id: u.id,
       email: u.email,
       role: u.role,
@@ -42,7 +48,7 @@ export default async function AdminUsersPage() {
     }));
   } else {
     if (error) console.error('Admin users fetch error:', error);
-    users = (rows ?? []).map((u) => ({
+    userRows = (rows ?? []).map((u) => ({
       id: u.id,
       email: u.email,
       role: u.role,
@@ -51,6 +57,33 @@ export default async function AdminUsersPage() {
       archived_at: (u as { archived_at?: string | null }).archived_at ?? null,
     }));
   }
+
+  const athleteIds = userRows.filter((u) => u.role === 'athlete').map((u) => u.id);
+  const athleteMap = new Map<string, { first_name: string; last_name: string; school: string }>();
+  if (athleteIds.length > 0) {
+    const { data: athletes } = await admin
+      .from('athletes')
+      .select('id, first_name, last_name, school')
+      .in('id', athleteIds);
+    for (const a of athletes ?? []) {
+      athleteMap.set(a.id, {
+        first_name: a.first_name ?? '',
+        last_name: a.last_name ?? '',
+        school: a.school ?? '',
+      });
+    }
+  }
+
+  const users: AdminUserRow[] = userRows.map((u) => {
+    const profile = u.role === 'athlete' ? athleteMap.get(u.id) : null;
+    const display_name =
+      profile ? [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim() || null : null;
+    return {
+      ...u,
+      display_name: display_name ?? null,
+      school: profile?.school ?? null,
+    };
+  });
 
   return (
     <div className="container mx-auto px-4 py-8">
