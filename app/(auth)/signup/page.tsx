@@ -59,11 +59,13 @@ export default function SignupPage() {
   const inviteToken = searchParams?.get('invite')?.trim() || undefined;
   const roleParam = searchParams?.get('role')?.toLowerCase();
   const redirectTo = searchParams?.get('redirect')?.trim();
-  const safeRedirect =
+  const safeRedirect: string | null =
     redirectTo &&
     redirectTo.startsWith('/') &&
     !redirectTo.startsWith('//') &&
-    !redirectTo.includes(':');
+    !redirectTo.includes(':')
+      ? redirectTo
+      : null;
   const defaultRole = inviteToken ? 'parent' : (roleParam === 'athlete' ? 'athlete' : 'parent');
   const tenant = useTenant();
   const supabase = createClient(tenant.slug);
