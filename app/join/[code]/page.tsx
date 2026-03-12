@@ -1,6 +1,7 @@
-import { redirect, notFound } from 'next/navigation';
+import { notFound } from 'next/navigation';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -23,7 +24,9 @@ export default async function JoinByCodePage({
   const supabase = await createClient(tenant.slug);
   const { data: { user } } = await supabase.auth.getUser();
 
-  const { data: session, error } = await supabase
+  // Fetch session by invite code with admin client so unauthenticated users can open the join link (RLS would otherwise block)
+  const admin = createAdminClient(tenant.slug);
+  const { data: session, error } = await admin
     .from('sessions')
     .select('*, athletes(id, first_name, last_name, school, photo_url), facilities(id, name, address)')
     .eq('partner_invite_code', code.toUpperCase())
@@ -35,7 +38,7 @@ export default async function JoinByCodePage({
   const maxParticipants = (session as { max_participants?: number }).max_participants ?? 2;
   const isFull = currentParticipants >= maxParticipants;
 
-  const { data: participants } = await supabase
+  const { data: participants } = await admin
     .from('session_participants')
     .select('*, youth_wrestlers(id, first_name, last_name, age, weight_class, skill_level)')
     .eq('session_id', session.id);
