@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -44,6 +44,16 @@ export function CreateSessionForm({
     pricePerParticipant: number;
   } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [focusAreaList, setFocusAreaList] = useState<string[]>([]);
+
+  useEffect(() => {
+    fetch('/api/focus-areas')
+      .then((r) => r.json())
+      .then((data) => data.focusAreas && data.focusAreas.length > 0 && setFocusAreaList(data.focusAreas))
+      .catch(() => {});
+  }, []);
+
+  const focusOptions = focusAreaList.length > 0 ? focusAreaList : [...SESSION_FOCUS_AREAS];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -168,7 +178,7 @@ export function CreateSessionForm({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="">None</SelectItem>
-                    {SESSION_FOCUS_AREAS.map((area) => (
+                    {focusOptions.map((area) => (
                       <SelectItem key={area} value={area}>
                         {area}
                       </SelectItem>

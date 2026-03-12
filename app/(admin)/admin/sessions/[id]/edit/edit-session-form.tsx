@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -47,6 +47,17 @@ export function EditSessionForm({
   const [time, setTime] = useState(initialTime);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [focusAreaList, setFocusAreaList] = useState<string[]>([]);
+
+  useEffect(() => {
+    fetch('/api/focus-areas')
+      .then((r) => r.json())
+      .then((data) => data.focusAreas && data.focusAreas.length > 0 && setFocusAreaList(data.focusAreas))
+      .catch(() => {});
+  }, []);
+
+  const focusOptions = focusAreaList.length > 0 ? focusAreaList : [...SESSION_FOCUS_AREAS];
+  const optionsWithCurrent = focus && !focusOptions.includes(focus) ? [focus, ...focusOptions] : focusOptions;
 
   const isGroup = sessionType === 'group' || sessionType === 'small_group';
 
@@ -126,7 +137,7 @@ export function EditSessionForm({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">None</SelectItem>
-                    {SESSION_FOCUS_AREAS.map((area) => (
+                    {optionsWithCurrent.map((area) => (
                       <SelectItem key={area} value={area}>
                         {area}
                       </SelectItem>

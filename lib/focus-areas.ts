@@ -11,6 +11,7 @@ export const SESSION_FOCUS_AREAS = [
   'Top control',
   'Bottom position',
   'Neutral',
+  'Neutral Re-Attacks',
   'Finishing',
   'Hand fighting',
   'Other',
