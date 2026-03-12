@@ -69,6 +69,7 @@ export default async function SmallGroupSessionsPage({
       session_type,
       session_mode,
       join_policy,
+      focus_area,
       current_participants,
       max_participants,
       total_price,

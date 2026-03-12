@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import {
@@ -67,10 +68,16 @@ export function SessionRegisterClient({ sessionId, isOwner, pricePerParticipant,
   };
 
   if (youthWrestlers.length === 0) {
+    const addUrl = `/wrestlers/add?redirect=${encodeURIComponent(`/sessions/${sessionId}/register`)}`;
     return (
-      <p className="text-sm text-muted-foreground">
-        Add a wrestler profile from your dashboard before registering.
-      </p>
+      <div className="space-y-3">
+        <p className="text-sm text-muted-foreground">
+          You don’t have a wrestler profile yet. Add one, then come back here to add them to this session.
+        </p>
+        <Button asChild className="bg-accent text-black hover:bg-accent-hover">
+          <Link href={addUrl}>Add a wrestler</Link>
+        </Button>
+      </div>
     );
   }
 

@@ -604,12 +604,13 @@ export function AdminDashboardClient({
                     <th className="text-left py-2 font-medium">Status</th>
                     <th className="text-right py-2 font-medium">Total</th>
                     <th className="text-right py-2 font-medium">Coach $</th>
+                    <th className="text-right py-2 font-medium"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredSessions.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-8 text-center text-muted-foreground">
+                      <td colSpan={8} className="py-8 text-center text-muted-foreground">
                         No sessions match filters.
                       </td>
                     </tr>
@@ -639,6 +640,11 @@ export function AdminDashboardClient({
                         <td className="py-2">{statusBadge(s.status)}</td>
                         <td className="py-2 text-right">${Number(s.total_price).toFixed(2)}</td>
                         <td className="py-2 text-right">${Number(s.athlete_payment).toFixed(2)}</td>
+                        <td className="py-2 text-right">
+                          <Link href={`/admin/sessions/${s.id}/edit`} className="text-accent hover:underline text-sm">
+                            Edit
+                          </Link>
+                        </td>
                       </tr>
                     ))
                   )}

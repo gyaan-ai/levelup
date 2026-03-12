@@ -1,0 +1,185 @@
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { SESSION_FOCUS_AREAS } from '@/lib/focus-areas';
+
+type Props = {
+  sessionId: string;
+  sessionType?: string;
+  focusArea: string;
+  joinPolicy: 'public' | 'private' | 'invite_only';
+  maxParticipants: number;
+  pricePerParticipant: number;
+  currentParticipants: number;
+};
+
+export function EditSessionForm({
+  sessionId,
+  sessionType,
+  focusArea,
+  joinPolicy,
+  maxParticipants,
+  pricePerParticipant,
+  currentParticipants,
+}: Props) {
+  const router = useRouter();
+  const [focus, setFocus] = useState(focusArea);
+  const [join, setJoin] = useState(joinPolicy);
+  const [max, setMax] = useState(String(maxParticipants));
+  const [price, setPrice] = useState(String(pricePerParticipant));
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const isGroup = sessionType === 'group' || sessionType === 'small_group';
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/admin/sessions/${sessionId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          focus_area: focus.trim() || null,
+          join_policy: join,
+          max_participants: Math.min(20, Math.max(1, parseInt(max, 10) || 2)),
+          price_per_participant: Math.max(0, parseFloat(price) || 0),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || 'Failed to update session');
+        return;
+      }
+      router.push('/admin');
+      router.refresh();
+    } catch {
+      setError('Something went wrong');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Session details</CardTitle>
+        <CardDescription>
+          Update topic (focus), who can join, max spots, and price. Only scheduled or pending-payment sessions can be edited.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <p className="text-sm text-destructive">{error}</p>
+          )}
+          {isGroup && (
+            <>
+              <div>
+                <Label htmlFor="focus">Topic / focus</Label>
+                <Select value={focus || 'none'} onValueChange={(v) => setFocus(v === 'none' ? '' : v)}>
+                  <SelectTrigger id="focus">
+                    <SelectValue placeholder="e.g. Takedowns, Escapes" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {SESSION_FOCUS_AREAS.map((area) => (
+                      <SelectItem key={area} value={area}>
+                        {area}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Shown on session cards as &quot;Covering: …&quot;
+                </p>
+              </div>
+              <div>
+                <Label htmlFor="join">Who can join</Label>
+                <Select value={join} onValueChange={(v) => setJoin(v as Props['joinPolicy'])}>
+                  <SelectTrigger id="join">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="public">Public — anyone can discover and pay</SelectItem>
+                    <SelectItem value="private">Private — no one else</SelectItem>
+                    <SelectItem value="invite_only">Invite only — need link, then pay</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="max">Max participants</Label>
+                  <Input
+                    id="max"
+                    type="number"
+                    min={1}
+                    max={20}
+                    value={max}
+                    onChange={(e) => setMax(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Currently {currentParticipants} registered
+                  </p>
+                </div>
+                <div>
+                  <Label htmlFor="price">Price per participant ($)</Label>
+                  <Input
+                    id="price"
+                    type="number"
+                    min={0}
+                    step={5}
+                    value={price}
+                    onChange={(e) => setPrice(e.target.value)}
+                  />
+                </div>
+              </div>
+            </>
+          )}
+          {!isGroup && (
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="max-other">Max participants</Label>
+                <Input
+                  id="max-other"
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={max}
+                  onChange={(e) => setMax(e.target.value)}
+                />
+              </div>
+              <div>
+                <Label htmlFor="price-other">Price per participant ($)</Label>
+                <Input
+                  id="price-other"
+                  type="number"
+                  min={0}
+                  step={5}
+                  value={price}
+                  onChange={(e) => setPrice(e.target.value)}
+                />
+              </div>
+            </div>
+          )}
+          <Button type="submit" disabled={loading}>
+            {loading ? 'Saving…' : 'Save changes'}
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
+  );
+}

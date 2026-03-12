@@ -66,6 +66,7 @@ export function CreateSessionForm({
           durationMinutes,
           maxParticipants,
           pricePerParticipant,
+          focusArea: focusArea || undefined,
         }),
       });
       const data = await res.json();

@@ -71,12 +71,27 @@ export default async function SessionRegisterPage({
   const pricePer = s.price_per_participant ?? 0;
   if (!isOwner && pricePer <= 0) notFound();
 
-  const { data: youthWrestlers } = await supabase
+  // Youth wrestlers this user can add (primary parent or linked parent)
+  const { data: primaryIds } = await supabase
     .from('youth_wrestlers')
-    .select('id, first_name, last_name, age, weight_class, skill_level')
+    .select('id')
     .eq('parent_id', user.id)
-    .eq('active', true)
-    .order('created_at', { ascending: false });
+    .eq('active', true);
+  const { data: linkedRows } = await supabase
+    .from('youth_wrestler_parents')
+    .select('youth_wrestler_id')
+    .eq('parent_id', user.id);
+  const linkedIds = [...new Set((linkedRows ?? []).map((r: { youth_wrestler_id: string }) => r.youth_wrestler_id))];
+  const allIds = [...new Set([...(primaryIds ?? []).map((r: { id: string }) => r.id), ...linkedIds])];
+  const { data: youthWrestlersRaw } = allIds.length > 0
+    ? await supabase
+        .from('youth_wrestlers')
+        .select('id, first_name, last_name, age, weight_class, skill_level')
+        .in('id', allIds)
+        .eq('active', true)
+        .order('created_at', { ascending: false })
+    : { data: [] };
+  const youthWrestlers = youthWrestlersRaw ?? [];
 
   const coach = Array.isArray(s.athletes) ? s.athletes[0] : s.athletes;
   const fac = Array.isArray(s.facilities) ? s.facilities[0] : s.facilities;
@@ -132,7 +147,7 @@ export default async function SessionRegisterPage({
             sessionId={sessionId}
             isOwner={!!isOwner}
             pricePerParticipant={pricePer}
-            youthWrestlers={(youthWrestlers ?? []) as Array<{ id: string; first_name?: string; last_name?: string; age?: number; weight_class?: string; skill_level?: string }>}
+            youthWrestlers={youthWrestlers as Array<{ id: string; first_name?: string; last_name?: string; age?: number; weight_class?: string; skill_level?: string }>}
           />
         </CardContent>
       </Card>

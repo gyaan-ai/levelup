@@ -1,10 +1,13 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { formatEST } from '@/lib/format-date';
+import { SchoolLogo } from '@/components/school-logo';
+import { SessionStatusPill } from '@/components/session-tile-utils';
 
 export type SmallGroupSession = {
   id: string;
@@ -104,25 +107,51 @@ export function SmallGroupSessionsClient({
               const policy = (s as SmallGroupSession).join_policy;
               const canRegister = policy === 'public' && !mine;
 
+              const coachName = coach ? `${(coach as { first_name?: string; last_name?: string }).first_name ?? ''} ${(coach as { first_name?: string; last_name?: string }).last_name ?? ''}`.trim() : '—';
+              const coachPhoto = (coach as { photo_url?: string })?.photo_url;
+              const coachSchool = (coach as { school?: string })?.school;
+              const hasRoom = current < max;
+
               return (
                 <div
                   key={s.id}
                   className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 border rounded-lg"
                 >
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium text-sm">
-                      {formatEST(dt, 'EEE, MMM d')} at {formatEST(dt, 'h:mm a')}
-                    </p>
-                    <p className="text-sm text-muted-foreground">
-                      {coach ? `${(coach as { first_name?: string; last_name?: string }).first_name ?? ''} ${(coach as { first_name?: string; last_name?: string }).last_name ?? ''}`.trim() : '—'}
-                      {(fac as { name?: string })?.name && ` · ${(fac as { name?: string }).name}`}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {current}/{max} spots
-                      {s.price_per_participant != null && s.price_per_participant > 0 && (
-                        <> · ${Number(s.price_per_participant).toFixed(0)}</>
+                  <div className="min-w-0 flex-1 flex items-start gap-3">
+                    {coachPhoto ? (
+                      <div className="relative w-10 h-10 rounded-full overflow-hidden shrink-0 bg-muted">
+                        <Image src={coachPhoto} alt="" fill className="object-cover" sizes="40px" />
+                      </div>
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-muted shrink-0" />
+                    )}
+                    <div className="min-w-0">
+                      <p className="font-medium text-sm">
+                        {formatEST(dt, 'EEE, MMM d')} at {formatEST(dt, 'h:mm a')}
+                      </p>
+                      <p className="text-sm text-muted-foreground flex items-center gap-1.5 flex-wrap">
+                        <span>{coachName}</span>
+                        {coachSchool && (
+                          <>
+                            <SchoolLogo school={coachSchool} size="sm" />
+                            <span className="text-muted-foreground">({coachSchool})</span>
+                          </>
+                        )}
+                        {(fac as { name?: string })?.name && <span> · {(fac as { name?: string }).name}</span>}
+                      </p>
+                      {(s as SmallGroupSession).focus_area && (
+                        <p className="text-xs text-muted-foreground">
+                          Covering: {(s as SmallGroupSession).focus_area}
+                        </p>
                       )}
-                    </p>
+                      <p className="text-xs text-muted-foreground flex items-center gap-2 flex-wrap">
+                        {hasRoom && <SessionStatusPill current={current} max={max} />}
+                        <span>{current}/{max} spots</span>
+                        {s.price_per_participant != null && s.price_per_participant > 0 && (
+                          <> · ${Number(s.price_per_participant).toFixed(0)}</>
+                        )}
+                      </p>
+                    </div>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     {canRegister && (
