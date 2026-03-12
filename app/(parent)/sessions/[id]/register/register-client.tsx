@@ -23,16 +23,17 @@ interface YouthWrestlerItem {
 
 interface SessionRegisterClientProps {
   sessionId: string;
+  isOwner: boolean;
   pricePerParticipant: number;
   youthWrestlers: YouthWrestlerItem[];
 }
 
-export function SessionRegisterClient({ sessionId, pricePerParticipant, youthWrestlers }: SessionRegisterClientProps) {
+export function SessionRegisterClient({ sessionId, isOwner, pricePerParticipant, youthWrestlers }: SessionRegisterClientProps) {
   const router = useRouter();
   const [selectedWrestlerId, setSelectedWrestlerId] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const handlePayAndRegister = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedWrestlerId) {
       alert('Please select a wrestler.');
@@ -46,7 +47,12 @@ export function SessionRegisterClient({ sessionId, pricePerParticipant, youthWre
         body: JSON.stringify({ youthWrestlerId: selectedWrestlerId }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed to start payment');
+      if (!res.ok) throw new Error(data.error || (isOwner ? 'Failed to add wrestler' : 'Failed to start payment'));
+      if (data.added) {
+        router.push(`/sessions/${sessionId}/register/confirmed`);
+        router.refresh();
+        return;
+      }
       if (data.url) {
         window.location.href = data.url;
         return;
@@ -54,7 +60,7 @@ export function SessionRegisterClient({ sessionId, pricePerParticipant, youthWre
       router.push(`/sessions/${sessionId}/register/confirmed`);
       router.refresh();
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : 'Payment failed');
+      alert(err instanceof Error ? err.message : (isOwner ? 'Failed to add wrestler' : 'Payment failed'));
     } finally {
       setLoading(false);
     }
@@ -69,9 +75,9 @@ export function SessionRegisterClient({ sessionId, pricePerParticipant, youthWre
   }
 
   return (
-    <form onSubmit={handlePayAndRegister} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-4">
       <div className="space-y-2">
-        <Label htmlFor="wrestler">Which wrestler is registering?</Label>
+        <Label htmlFor="wrestler">{isOwner ? 'Which wrestler do you want to add?' : 'Which wrestler is registering?'}</Label>
         <Select value={selectedWrestlerId} onValueChange={setSelectedWrestlerId} required>
           <SelectTrigger id="wrestler">
             <SelectValue placeholder="Select wrestler" />
@@ -91,7 +97,11 @@ export function SessionRegisterClient({ sessionId, pricePerParticipant, youthWre
         </Select>
       </div>
       <Button type="submit" disabled={loading} className="w-full">
-        {loading ? 'Redirecting to payment…' : `Pay $${pricePerParticipant.toFixed(2)} & register`}
+        {loading
+          ? (isOwner ? 'Adding…' : 'Redirecting to payment…')
+          : isOwner
+            ? 'Add wrestler'
+            : `Pay $${pricePerParticipant.toFixed(2)} & register`}
       </Button>
     </form>
   );

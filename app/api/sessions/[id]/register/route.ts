@@ -54,20 +54,50 @@ export async function POST(
       status?: string;
     };
 
-    if (s.parent_id === user.id) {
-      return NextResponse.json({ error: 'You cannot register for your own session' }, { status: 403 });
+    const current = s.current_participants ?? 1;
+    const max = s.max_participants ?? 2;
+    if (current >= max) {
+      return NextResponse.json({ error: 'Session is full' }, { status: 400 });
     }
+
+    const isOwner = s.parent_id === user.id;
+
+    if (isOwner) {
+      const { data: yw } = await supabase
+        .from('youth_wrestlers')
+        .select('id, parent_id')
+        .eq('id', youthWrestlerId)
+        .single();
+      const ywParentId = (yw as { parent_id?: string } | null)?.parent_id;
+      if (!yw || ywParentId !== user.id) {
+        return NextResponse.json({ error: 'Youth wrestler not found or not yours' }, { status: 400 });
+      }
+      const { data: existing } = await supabase
+        .from('session_participants')
+        .select('id')
+        .eq('session_id', sessionId)
+        .eq('youth_wrestler_id', youthWrestlerId)
+        .maybeSingle();
+      if (existing) {
+        return NextResponse.json({ error: 'This wrestler is already in this session' }, { status: 409 });
+      }
+      const { error: insertErr } = await supabase.from('session_participants').insert({
+        session_id: sessionId,
+        youth_wrestler_id: youthWrestlerId,
+        parent_id: user.id,
+        paid: true,
+        amount_paid: 0,
+      });
+      if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 });
+      await supabase.from('sessions').update({ current_participants: current + 1, updated_at: new Date().toISOString() }).eq('id', sessionId);
+      return NextResponse.json({ added: true });
+    }
+
     if (s.join_policy !== 'public' && s.join_policy !== 'invite_only') {
       return NextResponse.json({ error: 'This session is not open for registration' }, { status: 400 });
     }
     if (!['scheduled', 'pending_payment'].includes(s.status ?? '')) {
       return NextResponse.json({ error: 'Session is not open for registration' }, { status: 400 });
-    }
-
-    const current = s.current_participants ?? 1;
-    const max = s.max_participants ?? 2;
-    if (current >= max) {
-      return NextResponse.json({ error: 'Session is full' }, { status: 400 });
     }
 
     const pricePer = s.price_per_participant ?? 0;

@@ -61,15 +61,15 @@ export default async function SessionRegisterPage({
     facilities?: { id: string; name?: string; address?: string } | { id: string; name?: string; address?: string }[];
   };
 
-  if (s.parent_id === user.id) redirect('/dashboard');
-  if (s.join_policy !== 'public' && s.join_policy !== 'invite_only') notFound();
+  const isOwner = s.parent_id === user.id;
+  if (!isOwner && s.join_policy !== 'public' && s.join_policy !== 'invite_only') notFound();
 
   const current = s.current_participants ?? 1;
   const max = s.max_participants ?? 2;
   if (current >= max) notFound();
 
   const pricePer = s.price_per_participant ?? 0;
-  if (pricePer <= 0) notFound();
+  if (!isOwner && pricePer <= 0) notFound();
 
   const { data: youthWrestlers } = await supabase
     .from('youth_wrestlers')
@@ -91,10 +91,12 @@ export default async function SessionRegisterPage({
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
             <Users className="h-5 w-5" />
-            Pay & register for session
+            {isOwner ? 'Add your wrestler to this session' : 'Pay & register for session'}
           </CardTitle>
           <p className="text-sm text-muted-foreground">
-            Choose a wrestler and pay to secure the spot. You’ll complete payment on the next screen.
+            {isOwner
+              ? 'Choose a wrestler to add. No extra charge — you’re the session owner.'
+              : 'Choose a wrestler and pay to secure the spot. You’ll complete payment on the next screen.'}
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -122,11 +124,13 @@ export default async function SessionRegisterPage({
               </p>
             )}
             <p className="text-sm text-muted-foreground">
-              {current} / {max} participants · <strong>${Number(pricePer).toFixed(2)}</strong> per spot
+              {current} / {max} participants
+              {!isOwner && pricePer > 0 && <> · <strong>${Number(pricePer).toFixed(2)}</strong> per spot</>}
             </p>
           </div>
           <SessionRegisterClient
             sessionId={sessionId}
+            isOwner={!!isOwner}
             pricePerParticipant={pricePer}
             youthWrestlers={(youthWrestlers ?? []) as Array<{ id: string; first_name?: string; last_name?: string; age?: number; weight_class?: string; skill_level?: string }>}
           />

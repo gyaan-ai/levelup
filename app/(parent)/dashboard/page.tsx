@@ -545,7 +545,7 @@ export default async function ParentDashboard({
                   <Users className="h-4 w-4" />
                   Small group
                 </CardTitle>
-                <CardDescription>Group sessions this week. Owner can manage join requests.</CardDescription>
+                <CardDescription>Find sessions to join or manage ones you created.</CardDescription>
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground mb-4">

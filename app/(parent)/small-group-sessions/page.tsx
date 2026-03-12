@@ -104,7 +104,7 @@ export default async function SmallGroupSessionsPage({
               Small group & partner sessions
             </h1>
             <p className="text-muted-foreground mt-1">
-              Find group and partner sessions. Public sessions: anyone can pay & register. Invite only: use the session link to pay & register.
+              Pick a session. Click Register. Choose your kid. Pay. Done.
             </p>
           </div>
           {userData?.role === 'admin' && (
@@ -117,12 +117,6 @@ export default async function SmallGroupSessionsPage({
           )}
         </div>
       </div>
-
-      {requested && (
-        <div className="mb-6 p-4 rounded-lg bg-green-500/10 border border-green-500/30 text-green-700 dark:text-green-400">
-          Join request sent. The session owner will review it and may approve based on skill level, weight, etc.
-        </div>
-      )}
 
       <SmallGroupSessionsClient
         sessions={list}
