@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import Link from 'next/link';
 import { ArrowLeft, Send } from 'lucide-react';
+import { formatEST } from '@/lib/format-date';
 
 export type MessageRow = {
   id: string;
@@ -119,12 +120,7 @@ export function MessagesThread({
                       <p
                         className={`text-xs mt-1 ${isMe ? 'text-primary-foreground/80' : 'text-muted-foreground'}`}
                       >
-                        {new Date(m.created_at).toLocaleString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          hour: 'numeric',
-                          minute: '2-digit',
-                        })}
+                        {formatEST(new Date(m.created_at), 'MMM d, h:mm a')}
                       </p>
                     </div>
                   </div>

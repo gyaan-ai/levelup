@@ -11,7 +11,8 @@ import Link from 'next/link';
 import { ArrowLeft, User, Clock, CheckCircle, Link2, Users, UserCircle } from 'lucide-react';
 import { SchoolLogo } from '@/components/school-logo';
 import { CoachSessionBadge } from '@/components/coach-session-badge';
-import { format, startOfDay } from 'date-fns';
+import { startOfDay } from 'date-fns';
+import { formatEST } from '@/lib/format-date';
 import { YouthWrestler } from '@/types';
 import type { SessionMode } from '@/types';
 import { getSessionPrice } from '@/lib/sessions';
@@ -221,7 +222,7 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
     }
     let ok = true;
     setSlotsLoading(true);
-    const dateStr = format(selectedDate, 'yyyy-MM-dd');
+    const dateStr = formatEST(selectedDate, 'yyyy-MM-dd');
     fetch(`/api/availability/slots?athleteId=${encodeURIComponent(athlete.id)}&date=${dateStr}`)
       .then((r) => r.json())
       .then((data) => {
@@ -273,7 +274,7 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
     }
     setLoading(true);
     try {
-      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      const dateStr = formatEST(selectedDate, 'yyyy-MM-dd');
       const res = await fetch('/api/bookings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -558,7 +559,7 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
                     onSelect={setSelectedDate}
                     disabled={(date) => {
                       if (date < startOfDay(new Date())) return true;
-                      const dateStr = format(date, 'yyyy-MM-dd');
+                      const dateStr = formatEST(date, 'yyyy-MM-dd');
                       if (availabilityDates.has(dateStr)) return false;
                       if (daysWithSlots.has(getDayOfWeek(date))) return false;
                       return hasAvailability;
@@ -593,7 +594,7 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
                 )}
                 {selectedDate && selectedTime && (
                   <p className="text-sm text-muted-foreground">
-                    Selected: {format(selectedDate, 'EEEE, MMMM d, yyyy')} at {formatSlotDisplay(selectedTime)}
+                    Selected: {formatEST(selectedDate, 'EEEE, MMMM d, yyyy')} at {formatSlotDisplay(selectedTime)}
                   </p>
                 )}
                 <div className="flex gap-4 mt-6">
@@ -650,7 +651,7 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Date & Time</p>
                   <p className="mt-1">
-                    {selectedDate && selectedTime && `${format(selectedDate, 'EEEE, MMMM d, yyyy')} at ${formatSlotDisplay(selectedTime)}`}
+                    {selectedDate && selectedTime && `${formatEST(selectedDate, 'EEEE, MMMM d, yyyy')} at ${formatSlotDisplay(selectedTime)}`}
                   </p>
                 </div>
                 {facility && (
@@ -746,7 +747,7 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
                 {selectedDate && selectedTime ? (
                   <p className="text-sm flex items-center gap-1">
                     <Clock className="h-3 w-3" />
-                    {format(selectedDate, 'MMM d, yyyy')} at {formatSlotDisplay(selectedTime)}
+                    {formatEST(selectedDate, 'MMM d, yyyy')} at {formatSlotDisplay(selectedTime)}
                   </p>
                 ) : (
                   <p className="text-sm text-muted-foreground">Not selected</p>

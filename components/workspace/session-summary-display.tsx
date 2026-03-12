@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Star } from 'lucide-react';
-import { format } from 'date-fns';
+import { formatEST } from '@/lib/format-date';
 
 interface SessionSummary {
   id: string;
@@ -31,7 +31,7 @@ export function SessionSummaryDisplay({
       <CardHeader>
         <CardTitle>
           {sessionNumber ? `Session #${sessionNumber}` : 'Session Summary'} —{' '}
-          {format(new Date(sessionDate), 'MMMM d, yyyy')}
+          {formatEST(new Date(sessionDate), 'MMMM d, yyyy')}
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">

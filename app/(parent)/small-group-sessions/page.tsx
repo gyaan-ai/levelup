@@ -42,6 +42,7 @@ export default async function SmallGroupSessionsPage({
       scheduled_datetime,
       session_type,
       session_mode,
+      focus_area,
       current_participants,
       max_participants,
       total_price,

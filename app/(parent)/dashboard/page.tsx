@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { Plus, Edit, User, Calendar, DollarSign, Users, UserPlus, FolderOpen } from 'lucide-react';
 import { YouthWrestler } from '@/types';
 import { BookingCard, type BookingSession } from '@/app/(parent)/bookings/booking-card';
+import { formatEST } from '@/lib/format-date';
 import { CoachSessionBadge } from '@/components/coach-session-badge';
 
 export default async function ParentDashboard() {
@@ -176,7 +177,7 @@ export default async function ParentDashboard() {
   last6Months.forEach((m) => {
     const [y, mo] = m.split('-');
     const date = new Date(parseInt(y, 10), parseInt(mo, 10) - 1, 1);
-    monthLabels[m] = date.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+    monthLabels[m] = formatEST(date, 'MMM yy');
   });
 
   // Followed coaches for dashboard summary

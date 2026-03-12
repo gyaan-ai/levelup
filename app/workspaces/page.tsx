@@ -9,6 +9,17 @@ import { Button } from '@/components/ui/button';
 import { User, Users } from 'lucide-react';
 import { SchoolLogo } from '@/components/school-logo';
 
+/** Build display name; avoid duplicating last name when first_name already ends with it (e.g. "Liam Hickey" + "Hickey"). */
+function displayName(first: string | undefined | null, last: string | undefined | null): string {
+  const f = (first ?? '').trim();
+  const l = (last ?? '').trim();
+  if (!f && !l) return '';
+  if (!l) return f;
+  if (!f) return l;
+  if (f.endsWith(l)) return f;
+  return `${f} ${l}`.trim();
+}
+
 export default async function WorkspacesPage() {
   const headersList = await headers();
   const host = headersList.get('host') || '';
@@ -133,8 +144,8 @@ export default async function WorkspacesPage() {
           }) => {
             const yw = Array.isArray(ws.youth_wrestlers) ? ws.youth_wrestlers[0] : ws.youth_wrestlers;
             const coach = Array.isArray(ws.athletes) ? ws.athletes[0] : ws.athletes;
-            const wrestlerName = yw ? `${yw.first_name || ''} ${yw.last_name || ''}`.trim() : 'Wrestler';
-            const coachName = coach ? `${coach.first_name || ''} ${coach.last_name || ''}`.trim() : 'Coach';
+            const wrestlerName = yw ? displayName(yw.first_name, yw.last_name) || 'Wrestler' : 'Wrestler';
+            const coachName = coach ? displayName(coach.first_name, coach.last_name) || 'Coach' : 'Coach';
             const isParent = userData?.role === 'parent';
             const cardTitle = coachName || 'Coach';
             const subtitle = isParent

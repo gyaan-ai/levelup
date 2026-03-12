@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { Bell } from 'lucide-react';
-import { format } from 'date-fns';
+import { formatEST } from '@/lib/format-date';
 
 type Notification = {
   id: string;
@@ -119,13 +119,13 @@ export function NotificationBell({
                         >
                           <p className="font-medium text-sm">{n.title}</p>
                           {n.body && <p className="text-xs text-muted-foreground line-clamp-2">{n.body}</p>}
-                          <p className="text-[10px] text-muted-foreground mt-1">{format(new Date(n.created_at), 'MMM d, h:mm a')}</p>
+                          <p className="text-[10px] text-muted-foreground mt-1">{formatEST(new Date(n.created_at), 'MMM d, h:mm a')}</p>
                         </Link>
                       ) : (
                         <div className={`px-3 py-2 ${!n.read_at ? 'bg-muted/30' : ''}`}>
                           <p className="font-medium text-sm">{n.title}</p>
                           {n.body && <p className="text-xs text-muted-foreground line-clamp-2">{n.body}</p>}
-                          <p className="text-[10px] text-muted-foreground mt-1">{format(new Date(n.created_at), 'MMM d, h:mm a')}</p>
+                          <p className="text-[10px] text-muted-foreground mt-1">{formatEST(new Date(n.created_at), 'MMM d, h:mm a')}</p>
                         </div>
                       )}
                     </li>

@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Calendar, User, MapPin, Users, FolderOpen } from 'lucide-react';
 import { SchoolLogo } from '@/components/school-logo';
-import { format } from 'date-fns';
+import { formatEST } from '@/lib/format-date';
 
 export default async function YouthDashboardPage() {
   const headersList = await headers();
@@ -132,7 +132,7 @@ export default async function YouthDashboardPage() {
                     return (
                       <li key={s.id as string} className="flex flex-wrap items-center justify-between gap-2 py-2 border-b border-border/50 last:border-0">
                         <div>
-                          <p className="font-medium">{format(dt, 'EEE, MMM d')} at {format(dt, 'h:mm a')}</p>
+                          <p className="font-medium">{formatEST(dt, 'EEE, MMM d')} at {formatEST(dt, 'h:mm a')}</p>
                           <p className="text-sm text-muted-foreground flex items-center gap-1">
                             <User className="h-3.5 w-3.5" />
                             {coach ? `${coach.first_name ?? ''} ${coach.last_name ?? ''}`.trim() : '—'}
@@ -163,7 +163,7 @@ export default async function YouthDashboardPage() {
                     return (
                       <li key={s.id as string} className="flex flex-wrap items-center justify-between gap-2 py-2 border-b border-border/50 last:border-0 opacity-80">
                         <div>
-                          <p className="text-sm">{format(dt, 'EEE, MMM d')} · {coach ? `${coach.first_name ?? ''} ${coach.last_name ?? ''}`.trim() : '—'}</p>
+                          <p className="text-sm">{formatEST(dt, 'EEE, MMM d')} · {coach ? `${coach.first_name ?? ''} ${coach.last_name ?? ''}`.trim() : '—'}</p>
                           {fac && <p className="text-xs text-muted-foreground">{(fac as { name?: string }).name}</p>}
                         </div>
                         <Link href={`/workspaces/from-session/${s.id}`}>

@@ -6,6 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ArrowLeft, Send, Users, UserPlus, Pencil, Smile } from 'lucide-react';
+import { formatEST } from '@/lib/format-date';
 
 const EMOJI_QUICK = ['👍', '❤️', '😂', '🔥', '💪', '✅', '👀', '🙌'];
 
@@ -222,7 +223,7 @@ export function GroupChannelClient({
                         <p className="text-xs text-muted-foreground mb-0.5">{m.authorName}</p>
                         <p className="whitespace-pre-wrap break-words">{m.body}</p>
                         <p className="text-xs text-muted-foreground mt-1">
-                          {new Date(m.createdAt).toLocaleString()}
+                          {formatEST(new Date(m.createdAt), 'M/d/yyyy, h:mm a')}
                           {m.editedAt && ' (edited)'}
                         </p>
                       </>

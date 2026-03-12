@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { User, Calendar, MapPin } from 'lucide-react';
-import { format } from 'date-fns';
+import { formatEST } from '@/lib/format-date';
 import { JoinSessionClient } from './join-session-client';
 
 export default async function JoinByCodePage({
@@ -46,7 +46,7 @@ export default async function JoinByCodePage({
   const athlete = session.athletes as { id: string; first_name: string; last_name: string; school: string; photo_url?: string } | null;
   const facility = session.facilities as { id: string; name: string; address?: string } | null;
   const scheduledAt = session.scheduled_datetime ? new Date(session.scheduled_datetime) : null;
-  const dateTime = scheduledAt ? `${format(scheduledAt, 'EEEE, MMMM d, yyyy')} at ${format(scheduledAt, 'h:mm a')}` : '';
+  const dateTime = scheduledAt ? `${formatEST(scheduledAt, 'EEEE, MMMM d, yyyy')} at ${formatEST(scheduledAt, 'h:mm a')}` : '';
   const firstYouth = participants?.[0]?.youth_wrestlers as { first_name?: string; last_name?: string; age?: number; weight_class?: string; skill_level?: string } | null;
   const trainingWith = firstYouth
     ? `${firstYouth.first_name ?? ''} ${firstYouth.last_name ?? ''}`.trim() +

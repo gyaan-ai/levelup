@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { User, MessageSquare } from 'lucide-react';
-import { format } from 'date-fns';
+import { formatEST } from '@/lib/format-date';
 
 type YouthWrestlerInfo = {
   id: string;
@@ -118,7 +118,7 @@ export function SessionRequestsClient({
                   <p className="text-muted-foreground">{r.message}</p>
                 </div>
               )}
-              <p className="text-xs text-muted-foreground">Requested {format(new Date(r.created_at), 'MMM d, yyyy h:mm a')}</p>
+              <p className="text-xs text-muted-foreground">Requested {formatEST(new Date(r.created_at), 'MMM d, yyyy h:mm a')}</p>
               <div className="flex gap-2">
                 <Button
                   variant="outline"
@@ -147,7 +147,7 @@ export function SessionRequestsClient({
           <div className="space-y-3">
             {resolved.map((r) => {
               const yw = r.youth_wrestlers;
-              const respondedAt = r.responded_at ? format(new Date(r.responded_at), 'MMM d, yyyy h:mm a') : null;
+              const respondedAt = r.responded_at ? formatEST(new Date(r.responded_at), 'MMM d, yyyy h:mm a') : null;
               return (
                 <Card key={r.id}>
                   <CardContent className="py-3 flex flex-wrap items-center justify-between gap-2">

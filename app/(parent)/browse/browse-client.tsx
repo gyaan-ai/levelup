@@ -18,6 +18,7 @@ import {
 import { ArrowLeft, Star, User, Calendar, Trash2, Loader2 } from 'lucide-react';
 import { SchoolLogo } from '@/components/school-logo';
 import { CoachSessionBadge } from '@/components/coach-session-badge';
+import { formatEST } from '@/lib/format-date';
 import { Athlete } from '@/types';
 
 interface AthleteWithNext extends Athlete {
@@ -35,7 +36,7 @@ function formatNextAvailable(slot_date: string, start_time: string): string {
   const ampm = h < 12 ? 'AM' : 'PM';
   const timeStr = `${h12}:${String(m).padStart(2, '0')} ${ampm}`;
   const d = new Date(slot_date + 'T12:00:00');
-  const dateStr = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+  const dateStr = formatEST(d, 'EEE, MMM d');
   return `${dateStr} · ${timeStr}`;
 }
 

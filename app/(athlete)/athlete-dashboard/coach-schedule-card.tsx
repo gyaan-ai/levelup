@@ -8,7 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { Calendar } from '@/components/ui/calendar';
 import { Calendar as CalendarIcon, List, LayoutGrid, CalendarDays, MessageCircle } from 'lucide-react';
 import { UpcomingSessionActions } from './upcoming-session-actions';
-import { format, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns';
+import { startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns';
+import { formatEST } from '@/lib/format-date';
 
 export type CoachSession = {
   id: string;
@@ -77,7 +78,7 @@ export function CoachScheduleCard({
   const sessionsByDate = useMemo(() => {
     const map = new Map<string, CoachSession[]>();
     for (const s of allSessions) {
-      const key = format(new Date(s.scheduled_datetime), 'yyyy-MM-dd');
+      const key = formatEST(new Date(s.scheduled_datetime), 'yyyy-MM-dd');
       if (!map.has(key)) map.set(key, []);
       map.get(key)!.push(s);
     }
@@ -88,7 +89,7 @@ export function CoachScheduleCard({
     const tentativeDays = new Set<string>();
     for (const s of allSessions) {
       if (isTentative(s)) {
-        tentativeDays.add(format(new Date(s.scheduled_datetime), 'yyyy-MM-dd'));
+        tentativeDays.add(formatEST(new Date(s.scheduled_datetime), 'yyyy-MM-dd'));
       }
     }
     return Array.from(tentativeDays).map((d) => new Date(d + 'T12:00:00'));
@@ -160,10 +161,10 @@ export function CoachScheduleCard({
                     >
                       <div>
                         <p className="font-medium">
-                          {format(new Date(session.scheduled_datetime), 'EEEE, MMMM d, yyyy')}
+                          {formatEST(new Date(session.scheduled_datetime), 'EEEE, MMMM d, yyyy')}
                         </p>
                         <div className="text-sm text-muted-foreground flex flex-wrap items-center gap-x-1 gap-y-1">
-                          {format(new Date(session.scheduled_datetime), 'h:mm a')}
+                          {formatEST(new Date(session.scheduled_datetime), 'h:mm a')}
                           {' • '}
                           {facilityName(session)}
                           {wrestlerNames(session).length > 0 && (
@@ -216,10 +217,10 @@ export function CoachScheduleCard({
                     >
                       <div>
                         <p className="font-medium">
-                          {format(new Date(session.scheduled_datetime), 'EEE, MMM d, yyyy')}
+                          {formatEST(new Date(session.scheduled_datetime), 'EEE, MMM d, yyyy')}
                         </p>
                         <div className="text-sm text-muted-foreground flex flex-wrap items-center gap-x-1 gap-y-1">
-                          {format(new Date(session.scheduled_datetime), 'h:mm a')}
+                          {formatEST(new Date(session.scheduled_datetime), 'h:mm a')}
                           {' • '}
                           {facilityName(session)}
                           {wrestlerNames(session).length > 0 && (
@@ -274,8 +275,8 @@ export function CoachScheduleCard({
                   const isUpcoming = ['scheduled', 'pending_payment'].includes(session.status) && new Date(session.scheduled_datetime) > new Date();
                   return (
                     <tr key={session.id} className="border-b last:border-0">
-                      <td className="py-2 px-2">{format(new Date(session.scheduled_datetime), 'MMM d, yyyy')}</td>
-                      <td className="py-2 px-2">{format(new Date(session.scheduled_datetime), 'h:mm a')}</td>
+                      <td className="py-2 px-2">{formatEST(new Date(session.scheduled_datetime), 'MMM d, yyyy')}</td>
+                      <td className="py-2 px-2">{formatEST(new Date(session.scheduled_datetime), 'h:mm a')}</td>
                       <td className="py-2 px-2">{wrestlerNames(session).length > 0 ? wrestlerNames(session).join(', ') : '—'}</td>
                       <td className="py-2 px-2">{facilityName(session)}</td>
                       <td className="py-2 px-2">{session.session_type || '—'}</td>
@@ -319,7 +320,7 @@ export function CoachScheduleCard({
             <div className="flex flex-col items-center shrink-0 w-fit">
               <div className="flex items-center gap-2 mb-2">
                 <Button variant="outline" size="icon" onClick={() => setCalendarMonth((m) => subMonths(m, 1))}>←</Button>
-                <span className="font-medium min-w-[140px] text-center">{format(calendarMonth, 'MMMM yyyy')}</span>
+                <span className="font-medium min-w-[140px] text-center">{formatEST(calendarMonth, 'MMMM yyyy')}</span>
                 <Button variant="outline" size="icon" onClick={() => setCalendarMonth((m) => addMonths(m, 1))}>→</Button>
               </div>
               <Calendar
@@ -339,7 +340,7 @@ export function CoachScheduleCard({
               />
             </div>
             <div className="min-w-0 flex-1 lg:min-w-[260px] lg:max-w-[360px]">
-              <h3 className="text-sm font-semibold mb-2 break-words">Sessions in {format(calendarMonth, 'MMMM yyyy')}</h3>
+              <h3 className="text-sm font-semibold mb-2 break-words">Sessions in {formatEST(calendarMonth, 'MMMM yyyy')}</h3>
               {sessionsInMonth.length === 0 ? (
                 <p className="text-sm text-muted-foreground break-words">No sessions this month.</p>
               ) : (
@@ -348,7 +349,7 @@ export function CoachScheduleCard({
                     <li key={session.id} className={`flex items-center justify-between gap-3 p-3 border rounded-lg ${isTentative(session) ? 'border-amber-500/40 bg-amber-500/5' : ''}`}>
                       <div className="min-w-0 flex-1">
                         <p className="font-medium text-sm break-words flex items-center gap-2">
-                          {format(new Date(session.scheduled_datetime), 'EEE, MMM d')} at {format(new Date(session.scheduled_datetime), 'h:mm a')}
+                          {formatEST(new Date(session.scheduled_datetime), 'EEE, MMM d')} at {formatEST(new Date(session.scheduled_datetime), 'h:mm a')}
                           {isTentative(session) && (
                             <Badge variant="outline" className="text-xs border-amber-500/60 text-amber-700 dark:text-amber-400 bg-amber-500/15 shrink-0">Tentative</Badge>
                           )}

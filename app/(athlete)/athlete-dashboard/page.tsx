@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import Link from 'next/link';
 import { Calendar, DollarSign, TrendingUp, Clock, Trophy, Users, User, BarChart3, MessageCircle, Lightbulb } from 'lucide-react';
+import { formatEST } from '@/lib/format-date';
 import { CoachScheduleCard } from './coach-schedule-card';
 
 export default async function AthleteDashboard() {
@@ -335,7 +336,7 @@ export default async function AthleteDashboard() {
                   <div>
                     <p className="font-medium">{r.name}</p>
                     <p className="text-xs text-muted-foreground">
-                      Last session {r.lastSessionDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      Last session {formatEST(r.lastSessionDate, 'MMM d, yyyy')}
                     </p>
                   </div>
                   <Link href="/inbox">
@@ -359,7 +360,7 @@ export default async function AthleteDashboard() {
             <CardDescription>
               {athlete.commitment_sessions} sessions completed
               {athlete.commitment_deadline && (
-                <> • Complete by {new Date(athlete.commitment_deadline).toLocaleDateString()}</>
+                <> • Complete by {formatEST(new Date(athlete.commitment_deadline), 'MMM d, yyyy')}</>
               )}
             </CardDescription>
           </CardHeader>

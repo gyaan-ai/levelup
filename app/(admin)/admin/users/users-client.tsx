@@ -23,7 +23,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Eye, Pencil, Archive, ArchiveRestore, Trash2, Search } from 'lucide-react';
-import { format } from 'date-fns';
+import { formatEST } from '@/lib/format-date';
 
 export type AdminUserRow = {
   id: string;
@@ -287,11 +287,11 @@ export function AdminUsersClient({ initialUsers }: { initialUsers: AdminUserRow[
                         <Badge variant="outline">{ROLE_LABELS[u.role] ?? u.role}</Badge>
                       </td>
                       <td className="py-2 text-muted-foreground">
-                        {format(new Date(u.created_at), 'MMM d, yyyy')}
+                        {formatEST(new Date(u.created_at), 'MMM d, yyyy')}
                       </td>
                       <td className="py-2 text-muted-foreground">
                         {u.last_login_at
-                          ? format(new Date(u.last_login_at), 'MMM d, yyyy h:mm a')
+                          ? formatEST(new Date(u.last_login_at), 'MMM d, yyyy h:mm a')
                           : '—'}
                       </td>
                       <td className="py-2">
@@ -453,7 +453,7 @@ export function AdminUsersClient({ initialUsers }: { initialUsers: AdminUserRow[
                 </p>
                 {deleteUser?.last_login_at && (
                   <p className="text-sm text-muted-foreground">
-                    Last login: {format(new Date(deleteUser.last_login_at), 'MMM d, yyyy h:mm a')}
+                    Last login: {formatEST(new Date(deleteUser.last_login_at), 'MMM d, yyyy h:mm a')}
                   </p>
                 )}
               </div>

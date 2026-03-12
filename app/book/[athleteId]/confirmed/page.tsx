@@ -5,7 +5,7 @@ import { getTenantByDomain } from '@/config/tenants';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { format } from 'date-fns';
+import { formatEST } from '@/lib/format-date';
 import { CheckCircle, User, Calendar, MapPin, Copy, Share2 } from 'lucide-react';
 import { SchoolLogo } from '@/components/school-logo';
 import { BookingConfirmedClient } from '../booking-confirmed-client';
@@ -61,7 +61,7 @@ export default async function BookingConfirmedPage({
 
   const scheduledAt = session.scheduled_datetime ? new Date(session.scheduled_datetime) : null;
   const dateTime = scheduledAt
-    ? `${format(scheduledAt, 'EEEE, MMMM d, yyyy')} at ${format(scheduledAt, 'h:mm a')}`
+    ? `${formatEST(scheduledAt, 'EEEE, MMMM d, yyyy')} at ${formatEST(scheduledAt, 'h:mm a')}`
     : '';
 
   return (

@@ -11,7 +11,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
-import { format, startOfDay } from 'date-fns';
+import { startOfDay } from 'date-fns';
+import { formatEST } from '@/lib/format-date';
 import { formatSlotDisplay } from '@/lib/availability';
 
 const SLOTS_24H = [
@@ -61,7 +62,7 @@ export function AvailabilityManager() {
     }
     setAdding(true);
     try {
-      const slotDate = format(selectedDate, 'yyyy-MM-dd');
+      const slotDate = formatEST(selectedDate, 'yyyy-MM-dd');
       const r = await fetch('/api/availability/me', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -186,7 +187,7 @@ export function AvailabilityManager() {
                   className="flex items-center justify-between py-2 px-3 rounded-lg border bg-muted/30"
                 >
                   <span className="font-medium">
-                    {format(new Date(s.slot_date + 'T12:00:00'), 'EEE, MMM d, yyyy')} · {formatSlotDisplay(s.start_time)} – {formatSlotDisplay(s.end_time)}
+                    {formatEST(new Date(s.slot_date + 'T12:00:00'), 'EEE, MMM d, yyyy')} · {formatSlotDisplay(s.start_time)} – {formatSlotDisplay(s.end_time)}
                   </span>
                   <Button
                     variant="ghost"

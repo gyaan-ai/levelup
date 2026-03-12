@@ -272,6 +272,12 @@ export function Header() {
                     Book
                   </Link>
                   <Link
+                    href="/find-training"
+                    className="text-white hover:text-accent transition-colors font-medium"
+                  >
+                    Find training
+                  </Link>
+                  <Link
                     href="/my-coaches"
                     className="text-white hover:text-accent transition-colors font-medium"
                   >
@@ -482,6 +488,7 @@ export function Header() {
                       <Link href="/dashboard" className={navLinkClass} onClick={() => setMobileOpen(false)}>Dashboard</Link>
                       <Link href="/bookings" className={navLinkClass} onClick={() => setMobileOpen(false)}>Bookings</Link>
                       <Link href="/browse" className={navLinkClass} onClick={() => setMobileOpen(false)}>Book</Link>
+                      <Link href="/find-training" className={navLinkClass} onClick={() => setMobileOpen(false)}>Find training</Link>
                       <Link href="/my-coaches" className={navLinkClass} onClick={() => setMobileOpen(false)}>My Coaches</Link>
                       <Link href="/small-group-sessions" className={navLinkClass} onClick={() => setMobileOpen(false)}>Group & partner</Link>
                       <Link href="/workspaces" className={navLinkClass} onClick={() => setMobileOpen(false)}>Workspaces</Link>

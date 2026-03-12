@@ -5,7 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { format } from 'date-fns';
+import { formatEST } from '@/lib/format-date';
 
 type EarlyAccessRow = {
   id: string;
@@ -92,7 +92,7 @@ export default async function AdminEarlyAccessPage() {
                   {list.map((r) => (
                     <tr key={r.id} className="border-b last:border-0">
                       <td className="p-2 text-muted-foreground whitespace-nowrap">
-                        {format(new Date(r.created_at), 'MMM d, yyyy')}
+                        {formatEST(new Date(r.created_at), 'MMM d, yyyy')}
                       </td>
                       <td className="p-2">{r.parent_name ?? r.name ?? '—'}</td>
                       <td className="p-2">{r.email}</td>
@@ -100,7 +100,7 @@ export default async function AdminEarlyAccessPage() {
                       <td className="p-2">{r.wrestler_name ?? '—'}</td>
                       <td className="p-2">{r.school_club ?? '—'}</td>
                       <td className="p-2">{r.graduation_year ? `Class of ${r.graduation_year}` : '—'}</td>
-                      <td className="p-2">{r.dob ? format(new Date(r.dob), 'M/d/yyyy') : '—'}</td>
+                      <td className="p-2">{r.dob ? formatEST(new Date(r.dob), 'M/d/yyyy') : '—'}</td>
                       <td className="p-2">{r.weight_class ?? '—'}</td>
                       <td className="p-2">{r.experience_level ?? '—'}</td>
                       <td className="p-2">{r.interest ?? '—'}</td>

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { MessageCircle } from 'lucide-react';
+import { formatEST } from '@/lib/format-date';
 
 type Thread = {
   parentId: string;
@@ -113,12 +114,7 @@ export function InboxClient({ role }: { role: 'parent' | 'athlete' }) {
                         <p className="text-sm text-muted-foreground line-clamp-1">{t.lastBody}</p>
                       </div>
                       <span className="text-xs text-muted-foreground shrink-0">
-                        {new Date(t.lastAt).toLocaleDateString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          hour: 'numeric',
-                          minute: '2-digit',
-                        })}
+                        {formatEST(new Date(t.lastAt), 'MMM d, h:mm a')}
                       </span>
                     </div>
                   </CardContent>

@@ -9,6 +9,7 @@ import Link from 'next/link';
 import { Calendar, User, MapPin, X, FolderOpen, Share2, Check } from 'lucide-react';
 import { SchoolLogo } from '@/components/school-logo';
 import { differenceInHours } from 'date-fns';
+import { formatEST } from '@/lib/format-date';
 
 const CANCELLATION_WINDOW_HOURS = 24;
 
@@ -100,19 +101,13 @@ export function BookingCard({ session, isPast = false }: BookingCardProps) {
         <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-start sm:justify-between gap-4">
           <div className="space-y-1 flex-1 min-w-0">
             <p className="font-medium">
-              {scheduledTime.toLocaleDateString('en-US', {
-                weekday: isPast ? 'short' : 'long',
-                year: 'numeric',
-                month: isPast ? 'short' : 'long',
-                day: 'numeric',
-              })}
+              {isPast
+                ? formatEST(scheduledTime, 'EEE, MMM d, yyyy')
+                : formatEST(scheduledTime, 'EEEE, MMMM d, yyyy')}
             </p>
             <p className="text-sm text-muted-foreground flex items-center gap-1">
               <Calendar className="h-4 w-4" />
-              {scheduledTime.toLocaleTimeString('en-US', {
-                hour: 'numeric',
-                minute: '2-digit',
-              })}
+              {formatEST(scheduledTime, 'h:mm a')}
               {' · '}
               <MapPin className="h-4 w-4 inline" />
               {session.facility}

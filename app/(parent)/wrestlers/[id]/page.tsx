@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { ArrowLeft, Edit, Calendar, User, School, Target, Heart, Award } from 'lucide-react';
 import { CoachSessionBadge } from '@/components/coach-session-badge';
+import { formatEST } from '@/lib/format-date';
 import { LinkedParentsCard } from './linked-parents-card';
 
 export default async function YouthWrestlerProfilePage({
@@ -242,18 +243,10 @@ export default async function YouthWrestlerProfilePage({
                 >
                   <div>
                     <p className="font-medium">
-                      {new Date(session.scheduled_datetime).toLocaleDateString('en-US', {
-                        weekday: 'long',
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                      })}
+                      {formatEST(new Date(session.scheduled_datetime), 'EEEE, MMMM d, yyyy')}
                     </p>
                     <p className="text-sm text-muted-foreground">
-                      {new Date(session.scheduled_datetime).toLocaleTimeString('en-US', {
-                        hour: 'numeric',
-                        minute: '2-digit',
-                      })}
+                      {formatEST(new Date(session.scheduled_datetime), 'h:mm a')}
                       {' • '}
                       {session.athletes?.first_name} {session.athletes?.last_name}
                       {' • '}
@@ -289,11 +282,7 @@ export default async function YouthWrestlerProfilePage({
                 >
                   <div>
                     <p className="font-medium">
-                      {new Date(session.scheduled_datetime).toLocaleDateString('en-US', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                      })}
+                      {formatEST(new Date(session.scheduled_datetime), 'MMMM d, yyyy')}
                     </p>
                     <p className="text-sm text-muted-foreground">
                       {session.athletes?.first_name} {session.athletes?.last_name}

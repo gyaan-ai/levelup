@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { User, MapPin, Users } from 'lucide-react';
-import { format } from 'date-fns';
+import { formatEST } from '@/lib/format-date';
 import { SchoolLogo } from '@/components/school-logo';
 import {
   SessionStatusPill,
@@ -26,6 +26,7 @@ export type SmallGroupSession = {
   scheduled_datetime: string;
   session_type?: string;
   session_mode?: string;
+  focus_area?: string | null;
   current_participants?: number;
   max_participants?: number;
   total_price?: number;
@@ -155,13 +156,18 @@ export function SmallGroupSessionsClient({
                   <div key={s.id} className="p-3 border rounded-lg space-y-2">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="font-medium text-sm">
-                        {format(dt, 'EEEE, MMM d')} at {format(dt, 'h:mm a')}
+                        {formatEST(dt, 'EEEE, MMM d')} at {formatEST(dt, 'h:mm a')}
                       </p>
                       {isOwner(s) && (
                         <span className="text-xs font-normal text-accent bg-accent/20 px-2 py-0.5 rounded">You own</span>
                       )}
                       <SessionStatusPill current={current} max={max} />
                     </div>
+                    {(s as SmallGroupSession).focus_area && (
+                      <p className="text-xs font-medium text-accent">
+                        {(s as SmallGroupSession).focus_area}
+                      </p>
+                    )}
                     <div className="flex items-center gap-2 flex-wrap">
                       <ParticipantAvatars participants={participantList} maxShow={5} size="sm" />
                       <p className="text-sm flex items-center gap-1">
@@ -255,7 +261,7 @@ export function SmallGroupSessionsClient({
                   <div key={s.id} className="p-3 border rounded-lg space-y-2">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="font-medium text-sm">
-                        {format(dt, 'EEEE, MMM d')} at {format(dt, 'h:mm a')}
+                        {formatEST(dt, 'EEEE, MMM d')} at {formatEST(dt, 'h:mm a')}
                       </p>
                       {isOwner(s) && (
                         <span className="text-xs font-normal text-accent bg-accent/20 px-2 py-0.5 rounded">You own</span>

@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
       durationMinutes?: number;
       maxParticipants?: number;
       pricePerParticipant?: number;
+      focusArea?: string;
     };
     const {
       athleteId,
@@ -40,6 +41,7 @@ export async function POST(req: NextRequest) {
       durationMinutes = 60,
       maxParticipants = 8,
       pricePerParticipant = 30,
+      focusArea,
     } = body;
 
     if (!athleteId || !facilityId || !scheduledDate || !scheduledTime) {
@@ -113,6 +115,7 @@ export async function POST(req: NextRequest) {
         paid_with_credit: false,
         status: 'scheduled',
         athlete_paid: false,
+        focus_area: focusArea && String(focusArea).trim() ? String(focusArea).trim() : null,
       })
       .select('id, partner_invite_code, scheduled_datetime, max_participants, price_per_participant')
       .single();

@@ -43,7 +43,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import Link from 'next/link';
-import { format } from 'date-fns';
+import { formatEST } from '@/lib/format-date';
 
 export type AdminSession = {
   id: string;
@@ -617,10 +617,10 @@ export function AdminDashboardClient({
                     filteredSessions.map((s) => (
                       <tr key={s.id} className="border-b last:border-0">
                         <td className="py-2">
-                          {format(new Date(s.scheduled_datetime), 'MMM d, yyyy')}
+                          {formatEST(new Date(s.scheduled_datetime), 'MMM d, yyyy')}
                           <br />
                           <span className="text-muted-foreground">
-                            {format(new Date(s.scheduled_datetime), 'h:mm a')}
+                            {formatEST(new Date(s.scheduled_datetime), 'h:mm a')}
                           </span>
                         </td>
                         <td className="py-2">
@@ -746,11 +746,11 @@ export function AdminDashboardClient({
                           <Badge variant="outline">{u.role}</Badge>
                         </td>
                         <td className="py-2 text-muted-foreground">
-                          {format(new Date(u.created_at), 'MMM d, yyyy')}
+                          {formatEST(new Date(u.created_at), 'MMM d, yyyy')}
                         </td>
                         <td className="py-2 text-muted-foreground">
                           {u.last_login_at
-                            ? format(new Date(u.last_login_at), 'MMM d, yyyy h:mm a')
+                            ? formatEST(new Date(u.last_login_at), 'MMM d, yyyy h:mm a')
                             : '—'}
                         </td>
                         <td className="py-2 text-right">
@@ -983,7 +983,7 @@ export function AdminDashboardClient({
                           )}
                         </td>
                         <td className="py-2 text-muted-foreground">
-                          {format(new Date(c.created_at), 'MMM d, yyyy')}
+                          {formatEST(new Date(c.created_at), 'MMM d, yyyy')}
                         </td>
                         <td className="py-2 text-muted-foreground text-xs max-w-xs truncate">
                           {c.description ?? '—'}
@@ -1058,7 +1058,7 @@ export function AdminDashboardClient({
                             {r.status}
                           </Badge>
                         </td>
-                        <td className="py-2 text-muted-foreground">{format(new Date(r.created_at), 'MMM d, yyyy')}</td>
+                        <td className="py-2 text-muted-foreground">{formatEST(new Date(r.created_at), 'MMM d, yyyy')}</td>
                         <td className="py-2 text-right">
                           {r.status === 'pending' && (
                             <div className="flex justify-end gap-1">

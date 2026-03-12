@@ -6,7 +6,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Link from 'next/link';
 import { Copy, Check, Share2, Mail } from 'lucide-react';
-import { add, format } from 'date-fns';
+import { add } from 'date-fns';
+import { formatEST } from '@/lib/format-date';
 
 interface BookingConfirmedClientProps {
   joinUrl: string;
@@ -37,7 +38,7 @@ export function BookingConfirmedClient({
 
   const sessionDate = scheduledAt ? new Date(scheduledAt) : null;
   const deadline24h = sessionDate ? add(sessionDate, { hours: -24 }) : null;
-  const deadlineStr = deadline24h ? format(deadline24h, 'MMMM d, h:mm a') : '24 hours before the session';
+  const deadlineStr = deadline24h ? formatEST(deadline24h, 'MMMM d, h:mm a') : '24 hours before the session';
 
   return (
     <div className="space-y-6">

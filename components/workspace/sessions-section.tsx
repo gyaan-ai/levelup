@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { FileText, Plus } from 'lucide-react';
-import { format } from 'date-fns';
+import { formatEST } from '@/lib/format-date';
 import { SessionSummaryForm } from './session-summary-form';
 import { SessionSummaryDisplay } from './session-summary-display';
 
@@ -63,7 +63,7 @@ export function SessionsSection({
             <CardHeader>
               <div className="flex items-center justify-between gap-4 flex-wrap">
                 <CardTitle className="text-lg">
-                  Session #{sessionNumber} — {format(new Date(session.scheduled_datetime), 'MMM d, yyyy')}
+                  Session #{sessionNumber} — {formatEST(new Date(session.scheduled_datetime), 'MMM d, yyyy')}
                 </CardTitle>
                 {isCoach && !isWriting && (
                   <Button

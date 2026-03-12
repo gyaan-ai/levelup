@@ -8,7 +8,8 @@ import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
 import { ArrowLeft, User } from 'lucide-react';
 import { SchoolLogo } from '@/components/school-logo';
-import { format, startOfDay } from 'date-fns';
+import { startOfDay } from 'date-fns';
+import { formatEST } from '@/lib/format-date';
 import { formatSlotDisplay, getDayOfWeek } from '@/lib/availability';
 
 const TIME_SLOTS_24H = [
@@ -83,7 +84,7 @@ export function RescheduleClient({
     }
     let ok = true;
     setSlotsLoading(true);
-    const dateStr = format(selectedDate, 'yyyy-MM-dd');
+    const dateStr = formatEST(selectedDate, 'yyyy-MM-dd');
     fetch(
       `/api/availability/slots?athleteId=${encodeURIComponent(athleteId)}&date=${dateStr}&excludeSessionId=${encodeURIComponent(sessionId)}`
     )
@@ -105,7 +106,7 @@ export function RescheduleClient({
     if (!selectedDate || !selectedTime) return;
     setLoading(true);
     try {
-      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      const dateStr = formatEST(selectedDate, 'yyyy-MM-dd');
       const res = await fetch(`/api/sessions/${sessionId}/reschedule`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -161,7 +162,7 @@ export function RescheduleClient({
           </div>
           <p className="text-sm">{facilityName}</p>
           <p className="text-sm font-medium">
-            {format(currentDate, 'EEEE, MMMM d, yyyy')} at {format(currentDate, 'h:mm a')}
+            {formatEST(currentDate, 'EEEE, MMMM d, yyyy')} at {formatEST(currentDate, 'h:mm a')}
           </p>
         </CardHeader>
       </Card>
@@ -181,7 +182,7 @@ export function RescheduleClient({
               onSelect={setSelectedDate}
               disabled={(date) => {
                 if (date < startOfDay(new Date())) return true;
-                const dateStr = format(date, 'yyyy-MM-dd');
+                const dateStr = formatEST(date, 'yyyy-MM-dd');
                 if (availabilityDates.has(dateStr)) return false;
                 if (daysWithSlots.has(getDayOfWeek(date))) return false;
                 return hasAvailability;
@@ -218,7 +219,7 @@ export function RescheduleClient({
           )}
           {selectedDate && selectedTime && (
             <p className="text-sm text-muted-foreground">
-              New time: {format(selectedDate, 'EEEE, MMMM d, yyyy')} at {formatSlotDisplay(selectedTime)}
+              New time: {formatEST(selectedDate, 'EEEE, MMMM d, yyyy')} at {formatSlotDisplay(selectedTime)}
             </p>
           )}
           <div className="flex flex-col sm:flex-row gap-3 pt-4">

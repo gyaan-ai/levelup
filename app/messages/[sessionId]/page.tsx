@@ -2,6 +2,7 @@ import { redirect, notFound } from 'next/navigation';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
+import { formatEST } from '@/lib/format-date';
 import { MessagesThread, type MessageRow } from './messages-thread';
 
 export default async function MessagesPage({
@@ -42,14 +43,7 @@ export default async function MessagesPage({
   const coachName = coachObj
     ? `${(coachObj as { first_name?: string }).first_name} ${(coachObj as { last_name?: string }).last_name}`
     : 'Coach';
-  const dateStr = new Date(session.scheduled_datetime).toLocaleDateString('en-US', {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  });
+  const dateStr = formatEST(new Date(session.scheduled_datetime), 'EEE, MMM d, yyyy h:mm a');
 
   const heading = isParent
     ? `Conversation with ${coachName} · ${dateStr}`

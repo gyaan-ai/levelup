@@ -6,7 +6,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { User, Calendar, MapPin } from 'lucide-react';
-import { format } from 'date-fns';
 import { PartnerSessionsClient } from './partner-sessions-client';
 
 export default async function PartnerSessionsPage() {

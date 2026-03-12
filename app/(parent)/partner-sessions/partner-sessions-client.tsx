@@ -13,7 +13,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { User, Calendar, MapPin, X } from 'lucide-react';
-import { format } from 'date-fns';
+import { formatEST } from '@/lib/format-date';
 import { SessionStatusPill, ParticipantAvatars, getSessionAvailability } from '@/components/session-tile-utils';
 
 type StatusFilter = 'all' | 'open' | 'filling' | 'full';
@@ -263,7 +263,7 @@ export function PartnerSessionsClient({
                 {dt && (
                   <p className="flex items-center gap-2 text-sm">
                     <Calendar className="h-4 w-4" />
-                    {format(dt, 'EEEE, MMM d')} at {format(dt, 'h:mm a')}
+                    {formatEST(dt, 'EEEE, MMM d')} at {formatEST(dt, 'h:mm a')}
                   </p>
                 )}
                 {facility && (

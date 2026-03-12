@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ArrowLeft, Send } from 'lucide-react';
+import { formatEST } from '@/lib/format-date';
 
 type MessageRow = {
   id: string;
@@ -140,12 +141,7 @@ export function InquiryThread({
                         m.sender_id === currentUserId ? 'text-primary-foreground/80' : 'text-muted-foreground'
                       }`}
                     >
-                      {new Date(m.created_at).toLocaleString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        hour: 'numeric',
-                        minute: '2-digit',
-                      })}
+                      {formatEST(new Date(m.created_at), 'MMM d, h:mm a')}
                     </p>
                   </div>
                 </div>

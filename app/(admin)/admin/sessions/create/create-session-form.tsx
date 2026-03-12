@@ -13,6 +13,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Copy, Check } from 'lucide-react';
+import { formatEST } from '@/lib/format-date';
+import { SESSION_FOCUS_AREAS } from '@/lib/focus-areas';
 
 type Athlete = { id: string; name: string; school: string };
 type Facility = { id: string; name: string; school: string; address?: string | null };
@@ -31,6 +33,7 @@ export function CreateSessionForm({
   const [durationMinutes, setDurationMinutes] = useState(60);
   const [maxParticipants, setMaxParticipants] = useState(6);
   const [pricePerParticipant, setPricePerParticipant] = useState(30);
+  const [focusArea, setFocusArea] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{
@@ -116,14 +119,7 @@ export function CreateSessionForm({
           <div className="space-y-4 rounded-lg border bg-muted/30 p-4">
             <p className="font-medium text-foreground">Session created</p>
             <p className="text-sm text-muted-foreground">
-              {new Date(result.scheduledDatetime).toLocaleString('en-US', {
-                weekday: 'long',
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric',
-                hour: 'numeric',
-                minute: '2-digit',
-              })}
+              {formatEST(new Date(result.scheduledDatetime), 'EEEE, MMM d, yyyy h:mm a')}
               {' · '}
               Up to {result.maxParticipants} participants · ${Number(result.pricePerParticipant).toFixed(2)}/person
             </p>
@@ -163,9 +159,25 @@ export function CreateSessionForm({
                 </SelectContent>
               </Select>
             </div>
+<div>
+                <Label htmlFor="focus">Focus area</Label>
+                <Select value={focusArea} onValueChange={setFocusArea}>
+                  <SelectTrigger id="focus">
+                    <SelectValue placeholder="e.g. Takedowns, Escapes" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">None</SelectItem>
+                    {SESSION_FOCUS_AREAS.map((area) => (
+                      <SelectItem key={area} value={area}>
+                        {area}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             <div>
-              <Label htmlFor="facility">Facility</Label>
-              <Select value={facilityId} onValueChange={setFacilityId} required>
+                <Label htmlFor="facility">Facility</Label>
+                <Select value={facilityId} onValueChange={setFacilityId} required>
                 <SelectTrigger id="facility">
                   <SelectValue placeholder="Select facility" />
                 </SelectTrigger>

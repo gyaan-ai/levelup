@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { RequestJoinClient } from './request-join-client';
 import { User, Calendar, MapPin, Users } from 'lucide-react';
-import { format } from 'date-fns';
+import { formatEST } from '@/lib/format-date';
 import { SchoolLogo } from '@/components/school-logo';
 
 export default async function SessionRequestJoinPage({
@@ -109,7 +109,7 @@ export default async function SessionRequestJoinPage({
             {dt && (
               <p className="text-sm flex items-center gap-2 text-muted-foreground">
                 <Calendar className="h-4 w-4" />
-                {format(dt, 'EEEE, MMM d, yyyy')} at {format(dt, 'h:mm a')}
+                {formatEST(dt, 'EEEE, MMM d, yyyy')} at {formatEST(dt, 'h:mm a')}
               </p>
             )}
             {fac && (

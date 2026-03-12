@@ -7,7 +7,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Calendar } from '@/components/ui/calendar';
 import { CalendarIcon, Loader2 } from 'lucide-react';
-import { format } from 'date-fns';
+import { formatEST } from '@/lib/format-date';
 
 interface ActionItemFormProps {
   workspaceId: string;
@@ -80,7 +80,7 @@ export function ActionItemForm({ workspaceId, onSaved, onCancel }: ActionItemFor
         <div className="mt-2 rounded-lg border bg-background p-3">
           <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
             <CalendarIcon className="h-4 w-4" />
-            {dueDate ? `Due ${format(dueDate, 'PPP')}` : 'No due date selected'}
+            {dueDate ? `Due ${formatEST(dueDate, 'PPP')}` : 'No due date selected'}
           </div>
           <Calendar
             mode="single"

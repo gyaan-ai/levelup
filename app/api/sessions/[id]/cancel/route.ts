@@ -5,7 +5,8 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import { getStripeInstance } from '@/lib/stripe/webhooks';
 import { createNotification } from '@/lib/notifications';
-import { differenceInHours, format } from 'date-fns';
+import { differenceInHours } from 'date-fns';
+import { formatEST } from '@/lib/format-date';
 
 const CANCELLATION_WINDOW_HOURS = 24;
 
@@ -118,7 +119,7 @@ export async function POST(
       return NextResponse.json({ error: 'Failed to cancel session' }, { status: 500 });
     }
 
-    const when = format(new Date(session.scheduled_datetime), 'MMM d, h:mm a');
+    const when = formatEST(new Date(session.scheduled_datetime), 'MMM d, h:mm a');
     try {
       await createNotification(admin, {
         user_id: session.parent_id,

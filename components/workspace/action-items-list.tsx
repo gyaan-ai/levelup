@@ -3,7 +3,8 @@
 import { useState } from 'react';
 import { useActionItems } from '@/lib/hooks/use-action-items';
 import { Card, CardContent } from '@/components/ui/card';
-import { format, formatDistanceToNow, isPast } from 'date-fns';
+import { formatDistanceToNow, isPast } from 'date-fns';
+import { formatEST } from '@/lib/format-date';
 import { CheckCircle2, Circle, Loader2, Calendar } from 'lucide-react';
 
 interface ActionItemsListProps {
@@ -155,7 +156,7 @@ function ActionItemCard({ item, onToggle, canComplete, completingId }: ActionIte
             >
               <Calendar className="h-3 w-3" />
               {overdue ? 'Overdue: ' : 'Due: '}
-              {format(new Date(item.due_date), 'MMM d, yyyy')}
+              {formatEST(new Date(item.due_date), 'MMM d, yyyy')}
               {!isCompleted && ` (${formatDistanceToNow(new Date(item.due_date), { addSuffix: true })})`}
             </div>
           )}

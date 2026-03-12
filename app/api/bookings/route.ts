@@ -7,7 +7,7 @@ import { generateInviteCode } from '@/lib/sessions';
 import { getStripeInstance } from '@/lib/stripe/webhooks';
 import { createNotification } from '@/lib/notifications';
 import type { SessionMode } from '@/types';
-import { format } from 'date-fns';
+import { formatEST } from '@/lib/format-date';
 
 export async function POST(req: NextRequest) {
   try {
@@ -173,7 +173,7 @@ export async function POST(req: NextRequest) {
         user_id: athleteId,
         type: 'new_session',
         title: 'New session booked',
-        body: `Session on ${format(new Date(scheduledDatetime), 'MMM d, yyyy')} at ${format(new Date(scheduledDatetime), 'h:mm a')}. View your dashboard.`,
+        body: `Session on ${formatEST(new Date(scheduledDatetime), 'MMM d, yyyy')} at ${formatEST(new Date(scheduledDatetime), 'h:mm a')}. View your dashboard.`,
         data: { link: '/athlete-dashboard', session_id: session.id },
       });
     } catch (notifErr) {
