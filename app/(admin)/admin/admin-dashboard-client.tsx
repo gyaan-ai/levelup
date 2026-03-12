@@ -333,6 +333,7 @@ export function AdminDashboardClient({
     created_at: string;
   }>>([]);
   const [kidsLoading, setKidsLoading] = useState(false);
+  const [linkingKidId, setLinkingKidId] = useState<string | null>(null);
 
   const filteredSessions = sessions.filter((s) => {
     const d = s.scheduled_datetime.slice(0, 10);
@@ -1263,6 +1264,29 @@ export function AdminDashboardClient({
                         </Button>
                         <Button variant="ghost" size="sm" asChild>
                           <Link href={`/wrestlers/${k.id}/edit`}>Edit</Link>
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          disabled={linkingKidId === k.id}
+                          onClick={async () => {
+                            setLinkingKidId(k.id);
+                            try {
+                              const res = await fetch(`/api/admin/youth-wrestlers/${k.id}/link-parent`, { method: 'POST' });
+                              const data = await res.json();
+                              if (!res.ok) {
+                                alert(data.error || 'Failed to link');
+                                return;
+                              }
+                              alert(data.message ?? 'Linked to your account. Use “View as Parent” to see them in My Wrestlers.');
+                            } catch {
+                              alert('Something went wrong');
+                            } finally {
+                              setLinkingKidId(null);
+                            }
+                          }}
+                        >
+                          {linkingKidId === k.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Link to my account'}
                         </Button>
                       </div>
                     </CardContent>

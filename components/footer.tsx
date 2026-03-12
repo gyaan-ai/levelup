@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useTenant } from './theme-provider';
-import { Instagram, Facebook, Twitter } from 'lucide-react';
+import { Instagram, Facebook } from 'lucide-react';
 
 export function Footer() {
   const tenant = useTenant();
@@ -145,9 +145,11 @@ export function Footer() {
             </p>
             <div className="flex gap-4">
               <a
-                href="#"
+                href="https://www.instagram.com/WrestlingGuild/"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="p-3 -m-3 text-accent hover:text-accent-hover transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
-                aria-label="Instagram"
+                aria-label="Instagram @WrestlingGuild"
               >
                 <Instagram className="w-5 h-5" />
               </a>
@@ -157,13 +159,6 @@ export function Footer() {
                 aria-label="Facebook"
               >
                 <Facebook className="w-5 h-5" />
-              </a>
-              <a
-                href="#"
-                className="p-3 -m-3 text-accent hover:text-accent-hover transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
-                aria-label="Twitter"
-              >
-                <Twitter className="w-5 h-5" />
               </a>
             </div>
           </div>
