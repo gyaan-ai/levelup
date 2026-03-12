@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -14,6 +14,9 @@ import {
 } from '@/components/ui/select';
 import { User, Calendar, MapPin, X } from 'lucide-react';
 import { format } from 'date-fns';
+import { SessionStatusPill, ParticipantAvatars, getSessionAvailability } from '@/components/session-tile-utils';
+
+type StatusFilter = 'all' | 'open' | 'filling' | 'full';
 
 interface SessionItem {
   id: string;
@@ -23,7 +26,25 @@ interface SessionItem {
   price_per_participant?: number;
   athletes?: unknown;
   facilities?: unknown;
-  session_participants?: Array<{ youth_wrestlers?: unknown }>;
+  session_participants?: Array<{
+    youth_wrestlers?: {
+      id?: string;
+      first_name?: string;
+      last_name?: string;
+      photo_url?: string;
+      age?: number;
+      weight_class?: string;
+      skill_level?: string;
+    } | {
+      id?: string;
+      first_name?: string;
+      last_name?: string;
+      photo_url?: string;
+      age?: number;
+      weight_class?: string;
+      skill_level?: string;
+    }[];
+  }>;
 }
 
 interface YouthWrestlerItem {
@@ -40,15 +61,46 @@ interface PartnerSessionsClientProps {
   youthWrestlers: YouthWrestlerItem[];
 }
 
+function matchesFilter(s: SessionItem, filter: StatusFilter): boolean {
+  if (filter === 'all') return true;
+  const current = s.current_participants ?? 0;
+  const max = s.max_participants ?? 0;
+  const status = getSessionAvailability(current, max);
+  if (filter === 'open') return status === 'open';
+  if (filter === 'filling') return status === 'filling';
+  if (filter === 'full') return status === 'full';
+  return true;
+}
+
+function participantsFromSession(s: SessionItem): { id: string; first_name?: string | null; last_name?: string | null; photo_url?: string | null }[] {
+  const parts = s.session_participants ?? [];
+  return parts.map((p) => {
+    const yw = Array.isArray(p.youth_wrestlers) ? p.youth_wrestlers[0] : p.youth_wrestlers;
+    if (!yw) return null;
+    return {
+      id: (yw as { id?: string }).id ?? '',
+      first_name: (yw as { first_name?: string }).first_name,
+      last_name: (yw as { last_name?: string }).last_name,
+      photo_url: (yw as { photo_url?: string }).photo_url,
+    };
+  }).filter((x): x is { id: string; first_name?: string | null; last_name?: string | null; photo_url?: string | null } => Boolean(x?.id));
+}
+
 export function PartnerSessionsClient({
   initialSessions,
   youthWrestlers,
 }: PartnerSessionsClientProps) {
   const [sessions, setSessions] = useState(initialSessions);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [requestingSessionId, setRequestingSessionId] = useState<string | null>(null);
   const [selectedWrestlerId, setSelectedWrestlerId] = useState('');
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
+
+  const filteredSessions = useMemo(
+    () => sessions.filter((s) => matchesFilter(s, statusFilter)),
+    [sessions, statusFilter]
+  );
   const handleRequest = (sessionId: string) => {
     setRequestingSessionId(sessionId);
     setSelectedWrestlerId('');
@@ -108,6 +160,22 @@ export function PartnerSessionsClient({
 
   return (
     <div className="space-y-6">
+      {sessions.length > 0 && (
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Filter:</span>
+          <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v as StatusFilter)}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="Filter" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All</SelectItem>
+              <SelectItem value="open">Open</SelectItem>
+              <SelectItem value="filling">Filling up</SelectItem>
+              <SelectItem value="full">Full</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
       {requestingSessionId && (
         <Card className="border-accent/50">
           <CardHeader className="pb-2 flex flex-row items-center justify-between">
@@ -154,27 +222,38 @@ export function PartnerSessionsClient({
         </Card>
       )}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {sessions.map((s) => {
+        {filteredSessions.map((s) => {
           const athlete = (Array.isArray(s.athletes) ? s.athletes[0] : s.athletes) as { first_name?: string; last_name?: string; school?: string; photo_url?: string } | null | undefined;
           const facility = (Array.isArray(s.facilities) ? s.facilities[0] : s.facilities) as { name?: string; address?: string } | null | undefined;
           const dt = s.scheduled_datetime ? new Date(s.scheduled_datetime) : null;
           const price = s.price_per_participant ?? 40;
+          const participantList = participantsFromSession(s);
+          const current = s.current_participants ?? 0;
+          const max = s.max_participants ?? 0;
           return (
             <Card key={s.id}>
               <CardHeader className="pb-2">
-                <div className="flex items-center gap-3">
-                  {athlete?.photo_url ? (
-                    <img src={athlete.photo_url} alt="" className="w-12 h-12 rounded-full object-cover" />
-                  ) : (
-                    <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
-                      <User className="h-6 w-6 text-muted-foreground" />
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-3 min-w-0">
+                    {athlete?.photo_url ? (
+                      <img src={athlete.photo_url} alt="" className="w-12 h-12 rounded-full object-cover flex-shrink-0" />
+                    ) : (
+                      <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
+                        <User className="h-6 w-6 text-muted-foreground" />
+                      </div>
+                    )}
+                    <div className="min-w-0">
+                      <p className="font-semibold truncate">{athlete?.first_name} {athlete?.last_name}</p>
+                      <p className="text-xs text-muted-foreground">{athlete?.school}</p>
                     </div>
-                  )}
-                  <div>
-                    <p className="font-semibold">{athlete?.first_name} {athlete?.last_name}</p>
-                    <p className="text-xs text-muted-foreground">{athlete?.school}</p>
                   </div>
+                  <SessionStatusPill current={current} max={max} />
                 </div>
+                {participantList.length > 0 && (
+                  <div className="flex items-center gap-2 pt-2">
+                    <ParticipantAvatars participants={participantList} maxShow={5} size="md" />
+                  </div>
+                )}
               </CardHeader>
               <CardContent className="space-y-2">
                 {dt && (
@@ -203,6 +282,9 @@ export function PartnerSessionsClient({
           );
         })}
       </div>
+      {sessions.length > 0 && filteredSessions.length === 0 && (
+        <p className="text-sm text-muted-foreground">No sessions match the selected filter.</p>
+      )}
     </div>
   );
 }

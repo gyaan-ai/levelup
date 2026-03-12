@@ -34,7 +34,7 @@ export default async function PartnerSessionsPage() {
       price_per_participant,
       athletes(id, first_name, last_name, school, photo_url),
       facilities(id, name, address),
-      session_participants(youth_wrestlers(id, first_name, last_name, age, weight_class, skill_level))
+      session_participants(youth_wrestlers(id, first_name, last_name, photo_url, age, weight_class, skill_level))
     `)
     .eq('session_mode', 'partner-open')
     .lt('current_participants', 2);

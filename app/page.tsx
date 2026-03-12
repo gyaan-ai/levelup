@@ -2,7 +2,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, Users, Award, Shield } from 'lucide-react';
+import { CheckCircle, Users, Award, Shield, Search } from 'lucide-react';
 import { AddToHomeScreen } from '@/components/add-to-home-screen';
 import { EarlyAccessForm } from '@/app/early-access-form';
 
@@ -125,6 +125,26 @@ export default function HomePage() {
                 Learn from active competitors. Precision coaching focused on
                 technical excellence.
               </p>
+            </Card>
+          </div>
+          <div className="max-w-2xl mx-auto mt-10">
+            <Card className="p-6 sm:p-8 border-2 border-accent/30 bg-accent/5">
+              <div className="flex flex-col sm:flex-row items-center gap-4 text-center sm:text-left">
+                <div className="w-14 h-14 bg-accent/20 rounded-full flex items-center justify-center flex-shrink-0">
+                  <Search className="w-7 h-7 text-accent" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-foreground mb-1">
+                    Find open sessions to join
+                  </h3>
+                  <p className="text-muted-foreground text-sm sm:text-base">
+                    Search for small group sessions and open partner sessions. Join as a partner or enter a group—request to join and the session owner approves.
+                  </p>
+                  <Button size="sm" variant="premium" asChild className="mt-3">
+                    <Link href="/small-group-sessions">Browse small group & partner sessions</Link>
+                  </Button>
+                </div>
+              </div>
             </Card>
           </div>
           <div className="text-center mt-12">
