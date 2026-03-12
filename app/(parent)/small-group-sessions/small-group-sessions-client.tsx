@@ -39,10 +39,12 @@ export function SmallGroupSessionsClient({
   sessions,
   partnerSessions,
   userId,
+  isAdmin = false,
 }: {
   sessions: SmallGroupSession[];
   partnerSessions: PartnerSession[];
   userId: string;
+  isAdmin?: boolean;
 }) {
   const isOwner = (s: { parent_id?: string; athlete_id?: string }) =>
     s.parent_id === userId || s.athlete_id === userId;
@@ -167,6 +169,11 @@ export function SmallGroupSessionsClient({
                     )}
                     {!canRegister && !mine && policy === 'invite_only' && (
                       <span className="text-xs text-muted-foreground">Need the link</span>
+                    )}
+                    {isAdmin && (
+                      <Button asChild size="sm" variant="outline">
+                        <Link href={`/admin/sessions/${s.id}/edit`}>Edit</Link>
+                      </Button>
                     )}
                     <Button asChild size="sm" variant="ghost">
                       <Link href={`/workspaces/from-session/${s.id}`}>Workspace</Link>

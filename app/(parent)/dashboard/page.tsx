@@ -398,7 +398,8 @@ export default async function ParentDashboard({
                     const max = s.max_participants ?? 1;
                     const isGroup = s.session_type === 'group' || s.session_type === 'small_group';
                     const isPartnerOpen = s.session_mode === 'partner-open';
-                    const isTentative = (isGroup || isPartnerOpen) && current < max;
+                    // Don't show "Tentative" just because a group has open spots — the session is scheduled and the parent's spot is confirmed
+                    const isTentative = false;
                     const sessionForCard: BookingSession = {
                       id: s.id,
                       scheduled_datetime: s.scheduled_datetime,
@@ -717,7 +718,7 @@ export default async function ParentDashboard({
         />
       )}
       {activeTab === 'group' && (
-        <SmallGroupSessionsClient sessions={groupSessions} partnerSessions={partnerSessionsList} userId={user.id} />
+        <SmallGroupSessionsClient sessions={groupSessions} partnerSessions={partnerSessionsList} userId={user.id} isAdmin={userData?.role === 'admin'} />
       )}
     </div>
   );

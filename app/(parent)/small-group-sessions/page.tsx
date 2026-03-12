@@ -123,6 +123,7 @@ export default async function SmallGroupSessionsPage({
         sessions={list}
         partnerSessions={partnerList}
         userId={user.id}
+        isAdmin={userData?.role === 'admin'}
       />
     </div>
   );

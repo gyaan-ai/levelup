@@ -128,13 +128,8 @@ export default async function MyBookingsPage() {
       .filter(Boolean) as string[];
   };
 
-  const isTentative = (s: (typeof all)[0]) => {
-    const current = s.current_participants ?? 1;
-    const max = s.max_participants ?? 1;
-    const isGroup = s.session_type === 'group' || s.session_type === 'small_group';
-    const isPartnerOpen = s.session_mode === 'partner-open';
-    return (isGroup || isPartnerOpen) && current < max;
-  };
+  // Session is not "tentative" just because it's a group with open spots — once you're booked, you're confirmed
+  const isTentative = (_s: (typeof all)[0]) => false;
 
   // Transform sessions for BookingCard
   const transformSession = (s: (typeof all)[0]): BookingSession => ({
