@@ -9,42 +9,79 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Plus, Edit, User, Calendar, DollarSign, Users, UserPlus, FolderOpen } from 'lucide-react';
 import { YouthWrestler } from '@/types';
+import { Athlete } from '@/types';
 import { BookingCard, type BookingSession } from '@/app/(parent)/bookings/booking-card';
 import { formatEST } from '@/lib/format-date';
 import { CoachSessionBadge } from '@/components/coach-session-badge';
+import { ParentDashboardTabs, type ParentDashboardTab } from './parent-dashboard-tabs';
+import { BrowseAthletesClient } from '@/app/(parent)/browse/browse-client';
+import { FindTrainingClient } from '@/app/(parent)/find-training/find-training-client';
+import { SmallGroupSessionsClient } from '@/app/(parent)/small-group-sessions/small-group-sessions-client';
+import { startOfWeek, endOfWeek, addWeeks } from 'date-fns';
+import { toZonedTime } from 'date-fns-tz';
+import { APP_TIMEZONE } from '@/lib/format-date';
 
-export default async function ParentDashboard() {
+export default async function ParentDashboard({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string; date?: string; time?: string; location?: string }>;
+}) {
+  const sp = await searchParams;
+  const tabParam = sp.tab;
+  const activeTab: ParentDashboardTab = ['scheduled', 'book', 'find-training', 'group'].includes(tabParam ?? '')
+    ? (tabParam as ParentDashboardTab)
+    : 'scheduled';
+
   const headersList = await headers();
   const host = headersList.get('host') || '';
   const tenant = getTenantByDomain(host);
-  
+
   if (!tenant) {
     redirect('/404');
   }
 
   const tenantSlug = tenant.slug;
   const supabase = await createClient(tenantSlug);
-  
-  // Check authentication
+
   const { data: { user } } = await supabase.auth.getUser();
-  
-  if (!user) {
-    redirect('/login');
-  }
+  if (!user) redirect('/login');
 
-  // Check user role
-  const { data: userData } = await supabase
-    .from('users')
-    .select('role')
-    .eq('id', user.id)
-    .single();
+  const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
+  if (userData?.role === 'athlete') redirect('/athlete-dashboard');
 
-  if (userData?.role === 'athlete') {
-    redirect('/athlete-dashboard');
-  }
-  // parent and admin can both access dashboard (admin can switch to product view)
+  type ScheduledData = {
+    youthWrestlers: YouthWrestler[];
+    youthWrestlerIds: string[];
+    familySessionIds: string[];
+    sessionCounts: Record<string, number>;
+    upcomingSessions: Array<{
+      id: string;
+      scheduled_datetime: string;
+      status: string;
+      total_price?: number;
+      session_type?: string;
+      session_mode?: string;
+      current_participants?: number;
+      max_participants?: number;
+      partner_invite_code?: string | null;
+      athletes?: { id: string; first_name?: string; last_name?: string; school?: string } | { id: string; first_name?: string; last_name?: string; school?: string }[];
+      facilities?: { id: string; name?: string; address?: string } | { id: string; name?: string; address?: string }[];
+      session_participants?: Array<{ youth_wrestlers?: { first_name?: string; last_name?: string } | { first_name?: string; last_name?: string }[] }>;
+    }>;
+    totalSpent: number;
+    coachTotals: Array<{ id: string; name: string; total: number }>;
+    byKid: Record<string, number>;
+    byKidByMonth: Record<string, Record<string, number>>;
+    last6Months: string[];
+    monthLabels: Record<string, string>;
+    followedCoaches: Array<{ id: string; name: string; school: string }>;
+    openPartnerCount: number | null;
+    smallGroupCount: number | null;
+  };
+  let scheduledData: ScheduledData | null = null;
 
-  // Get youth wrestlers (primary or linked parent; RLS returns both); dedupe by id so same kid never shows twice
+  if (activeTab === 'scheduled') {
+  // Get youth wrestlers (primary or linked parent); dedupe by id
   const { data: youthWrestlersRaw } = await supabase
     .from('youth_wrestlers')
     .select('*')
@@ -215,17 +252,110 @@ export default async function ParentDashboard() {
     .gte('scheduled_datetime', weekStart.toISOString())
     .lt('scheduled_datetime', weekEnd.toISOString());
 
+  scheduledData = {
+    youthWrestlers,
+    youthWrestlerIds,
+    familySessionIds,
+    sessionCounts,
+    upcomingSessions: (upcomingSessions ?? []) as ScheduledData['upcomingSessions'],
+    totalSpent,
+    coachTotals,
+    byKid,
+    byKidByMonth,
+    last6Months,
+    monthLabels,
+    followedCoaches,
+    openPartnerCount: openPartnerCount ?? null,
+    smallGroupCount: smallGroupCount ?? null,
+  };
+  }
+
+  // Book tab: browse coaches
+  let athletesWithNext: (Athlete & { nextAvailable?: { slot_date: string; start_time: string } | null })[] = [];
+  if (activeTab === 'book') {
+    const { data: athletes } = await supabase.from('athletes').select('*').eq('active', true).order('average_rating', { ascending: false, nullsFirst: true }).order('school', { ascending: true });
+    const athletesList = (athletes ?? []) as Athlete[];
+    const athleteIds = athletesList.map((a) => a.id);
+    const today = new Date().toISOString().slice(0, 10);
+    const { data: slots } = athleteIds.length ? await supabase.from('athlete_availability_slots').select('athlete_id, slot_date, start_time').in('athlete_id', athleteIds).gte('slot_date', today).order('slot_date', { ascending: true }).order('start_time', { ascending: true }) : { data: [] };
+    const nextByAthlete = new Map<string, { slot_date: string; start_time: string }>();
+    for (const row of slots ?? []) {
+      const r = row as { athlete_id: string; slot_date: string; start_time: string };
+      if (!nextByAthlete.has(r.athlete_id)) nextByAthlete.set(r.athlete_id, { slot_date: r.slot_date, start_time: r.start_time });
+    }
+    athletesWithNext = athletesList.map((a) => ({ ...a, nextAvailable: nextByAthlete.get(a.id) ?? null }));
+  }
+
+  // Find training tab: facilities + sessions when date set
+  let findTrainingFacilities: Array<{ id: string; name?: string; school?: string; address?: string | null }> = [];
+  let findTrainingSessions: Array<{ id: string; scheduled_datetime: string; session_type: string | null; session_mode: string | null; focus_area: string | null; current_participants: number | null; max_participants: number | null; total_price: number | null; price_per_participant: number | null; athlete_id: string; facility_id: string; athletes?: unknown; facilities?: unknown }> = [];
+  if (activeTab === 'find-training') {
+    const { data: facs } = await supabase.from('facilities').select('id, name, school, address').order('name');
+    findTrainingFacilities = facs ?? [];
+    const dateParam = sp.date;
+    if (dateParam) {
+      const d = new Date(dateParam);
+      if (!Number.isNaN(d.getTime())) {
+        const dateOnly = dateParam.split('T')[0];
+        const dayStart = `${dateOnly}T00:00:00.000Z`;
+        const dayEnd = `${dateOnly}T23:59:59.999Z`;
+        const baseQuery = () => {
+          let q = supabase.from('sessions').select('id, scheduled_datetime, session_type, session_mode, focus_area, current_participants, max_participants, total_price, price_per_participant, athlete_id, facility_id, athletes(id, first_name, last_name, school), facilities(id, name, address)').in('status', ['scheduled', 'pending_payment']).gte('scheduled_datetime', dayStart).lte('scheduled_datetime', dayEnd);
+          if (sp.location && sp.location !== 'all') q = q.eq('facility_id', sp.location);
+          return q;
+        };
+        const [groupRes, partnerRes] = await Promise.all([baseQuery().in('session_type', ['group', 'small_group']).order('scheduled_datetime', { ascending: true }), baseQuery().eq('session_mode', 'partner-open').order('scheduled_datetime', { ascending: true })]);
+        const seen = new Set<string>();
+        let list: typeof findTrainingSessions = [];
+        for (const row of [...(groupRes.data ?? []), ...(partnerRes.data ?? [])]) {
+          const r = row as unknown as (typeof findTrainingSessions)[0];
+          if (seen.has(r.id)) continue;
+          seen.add(r.id);
+          list.push(r);
+        }
+        list.sort((a, b) => a.scheduled_datetime.localeCompare(b.scheduled_datetime));
+        const timeWindow = sp.time;
+        if (timeWindow && timeWindow !== 'any') {
+          const [startHour, endHour] = timeWindow === 'morning' ? [6, 12] : timeWindow === 'afternoon' ? [12, 17] : timeWindow === 'evening' ? [17, 21] : [0, 24];
+          list = list.filter((s) => {
+            const t = toZonedTime(new Date(s.scheduled_datetime), APP_TIMEZONE);
+            return t.getHours() >= startHour && t.getHours() < endHour;
+          });
+        }
+        findTrainingSessions = list.filter((s) => (s.current_participants ?? 0) < (s.max_participants ?? 1));
+      }
+    }
+  }
+
+  // Group tab: small group + partner sessions
+  let groupSessions: Parameters<typeof SmallGroupSessionsClient>[0]['sessions'] = [];
+  let partnerSessionsList: Parameters<typeof SmallGroupSessionsClient>[0]['partnerSessions'] = [];
+  if (activeTab === 'group') {
+    const now = new Date();
+    const weekStart = startOfWeek(now, { weekStartsOn: 0 });
+    const nextWeekEnd = endOfWeek(addWeeks(now, 1), { weekStartsOn: 0 });
+    const { data: sess } = await supabase.from('sessions').select('id, scheduled_datetime, session_type, session_mode, focus_area, current_participants, max_participants, total_price, parent_id, athlete_id, athletes(id, first_name, last_name, school, photo_url), facilities(id, name, address), session_participants(youth_wrestlers(id, first_name, last_name, photo_url))').in('session_type', ['group', 'small_group']).in('status', ['scheduled', 'pending_payment']).gte('scheduled_datetime', weekStart.toISOString()).lte('scheduled_datetime', nextWeekEnd.toISOString()).order('scheduled_datetime', { ascending: true });
+    const { data: partnerSess } = await supabase.from('sessions').select('id, scheduled_datetime, session_type, session_mode, current_participants, max_participants, total_price, price_per_participant, parent_id, athlete_id, athletes(id, first_name, last_name, school, photo_url), facilities(id, name, address), session_participants(youth_wrestlers(id, first_name, last_name, photo_url, age, weight_class, skill_level))').eq('session_mode', 'partner-open').in('status', ['scheduled', 'pending_payment']).gte('scheduled_datetime', now.toISOString()).order('scheduled_datetime', { ascending: true });
+    groupSessions = sess ?? [];
+    partnerSessionsList = (partnerSess ?? []).filter((s: { current_participants?: number; max_participants?: number }) => (s.current_participants ?? 1) < (s.max_participants ?? 2));
+  }
+
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-serif font-bold mb-2 text-foreground">Your Wrestlers</h1>
-          <p className="text-muted-foreground">
-            Manage profiles and book sessions with elite coaches
-          </p>
-        </div>
+      <div className="mb-6">
+        <h1 className="text-3xl font-serif font-bold text-foreground">Dashboard</h1>
+        <p className="text-muted-foreground mt-1">
+          {activeTab === 'scheduled' ? 'Your wrestlers and upcoming sessions' : activeTab === 'book' ? 'Find and book coaches' : activeTab === 'find-training' ? 'Search open sessions by date and location' : 'Group and partner sessions'}
+        </p>
+      </div>
+      <ParentDashboardTabs activeTab={activeTab} />
+
+      {activeTab === 'scheduled' && scheduledData && (
+    <>
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
+        <div />
         <div className="flex items-center gap-4">
-          {youthWrestlers && youthWrestlers.length > 0 && (
+          {scheduledData.youthWrestlers.length > 0 && (
             <Link href="/wrestlers/add">
               <Button>
                 <Plus className="h-4 w-4 mr-2" />
@@ -236,10 +366,10 @@ export default async function ParentDashboard() {
         </div>
       </div>
 
-      {youthWrestlers && youthWrestlers.length > 0 ? (
+      {scheduledData.youthWrestlers.length > 0 ? (
         <>
           {/* Upcoming Sessions first so booked sessions are visible without scrolling */}
-          {upcomingSessions && upcomingSessions.length > 0 ? (
+          {scheduledData.upcomingSessions.length > 0 ? (
             <Card className="mb-6">
               <CardHeader className="flex flex-row items-center justify-between">
                 <div>
@@ -248,13 +378,13 @@ export default async function ParentDashboard() {
                     Sessions you&apos;ve booked
                   </CardDescription>
                 </div>
-                <Link href="/bookings">
-                  <Button variant="outline" size="sm">View all</Button>
+<Link href="/dashboard">
+                <Button variant="outline" size="sm">View all</Button>
                 </Link>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {upcomingSessions.map((s: { id: string; scheduled_datetime: string; status: string; total_price?: number; session_type?: string; session_mode?: string; current_participants?: number; max_participants?: number; partner_invite_code?: string | null; athletes?: { id: string; first_name?: string; last_name?: string; school?: string } | { id: string; first_name?: string; last_name?: string; school?: string }[]; facilities?: { id: string; name?: string; address?: string } | { id: string; name?: string; address?: string }[]; session_participants?: Array<{ youth_wrestlers?: { first_name?: string; last_name?: string } | { first_name?: string; last_name?: string }[] }> }) => {
+                  {scheduledData.upcomingSessions.map((s: { id: string; scheduled_datetime: string; status: string; total_price?: number; session_type?: string; session_mode?: string; current_participants?: number; max_participants?: number; partner_invite_code?: string | null; athletes?: { id: string; first_name?: string; last_name?: string; school?: string } | { id: string; first_name?: string; last_name?: string; school?: string }[]; facilities?: { id: string; name?: string; address?: string } | { id: string; name?: string; address?: string }[]; session_participants?: Array<{ youth_wrestlers?: { first_name?: string; last_name?: string } | { first_name?: string; last_name?: string }[] }> }) => {
                     const a = s.athletes;
                     const coach = Array.isArray(a) ? a[0] : a;
                     const f = s.facilities;
@@ -295,8 +425,8 @@ export default async function ParentDashboard() {
 
           {/* Youth Wrestler Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-            {youthWrestlers.map((wrestler: YouthWrestler) => {
-              const sessionsCompleted = sessionCounts[wrestler.id] || 0;
+            {scheduledData.youthWrestlers.map((wrestler: YouthWrestler) => {
+              const sessionsCompleted = scheduledData.sessionCounts[wrestler.id] || 0;
               
               return (
                 <Card key={wrestler.id} className="overflow-hidden">
@@ -339,7 +469,7 @@ export default async function ParentDashboard() {
                     </div>
 
                     <div className="flex gap-2">
-                      <Link href={`/browse?youthWrestlerId=${wrestler.id}`} className="flex-1">
+                      <Link href={`/dashboard?tab=book&youthWrestlerId=${wrestler.id}`} className="flex-1">
                         <Button className="w-full">
                           <Calendar className="h-4 w-4 mr-2" />
                           Book Session
@@ -368,23 +498,23 @@ export default async function ParentDashboard() {
                 <CardDescription>Coaches you follow. Get notified when they add availability.</CardDescription>
               </CardHeader>
               <CardContent>
-                {followedCoaches.length > 0 ? (
+                {scheduledData.followedCoaches.length > 0 ? (
                   <ul className="text-sm space-y-1.5 mb-4">
-                    {followedCoaches.slice(0, 3).map((c) => (
+                    {scheduledData.followedCoaches.slice(0, 3).map((c) => (
                       <li key={c.id} className="truncate">{c.name}{c.school ? ` · ${c.school}` : ''}</li>
                     ))}
-                    {followedCoaches.length > 3 && (
-                      <li className="text-muted-foreground">+{followedCoaches.length - 3} more</li>
+                    {scheduledData.followedCoaches.length > 3 && (
+                      <li className="text-muted-foreground">+{scheduledData.followedCoaches.length - 3} more</li>
                     )}
                   </ul>
                 ) : (
                   <p className="text-sm text-muted-foreground mb-4">Follow coaches from Browse to see them here.</p>
                 )}
                 <div className="flex gap-2">
-                  <Link href="/my-coaches">
+                  <Link href="/dashboard?tab=book">
                     <Button variant="outline" size="sm">View all</Button>
                   </Link>
-                  <Link href="/browse">
+                  <Link href="/dashboard?tab=book">
                     <Button variant="ghost" size="sm">Browse coaches</Button>
                   </Link>
                 </div>
@@ -400,11 +530,11 @@ export default async function ParentDashboard() {
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground mb-4">
-                  {(openPartnerCount ?? 0) > 0
-                    ? `${openPartnerCount} open session${(openPartnerCount ?? 0) !== 1 ? 's' : ''} available.`
+                  {(scheduledData.openPartnerCount ?? 0) > 0
+                    ? `${scheduledData.openPartnerCount} open session${(scheduledData.openPartnerCount ?? 0) !== 1 ? 's' : ''} available.`
                     : 'No open partner sessions right now.'}
                 </p>
-                <Link href="/partner-sessions">
+                <Link href="/dashboard?tab=group">
                   <Button variant="outline" size="sm">View open sessions</Button>
                 </Link>
               </CardContent>
@@ -419,11 +549,11 @@ export default async function ParentDashboard() {
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-muted-foreground mb-4">
-                  {(smallGroupCount ?? 0) > 0
-                    ? `${smallGroupCount} group session${(smallGroupCount ?? 0) !== 1 ? 's' : ''} this week.`
+                  {(scheduledData.smallGroupCount ?? 0) > 0
+                    ? `${scheduledData.smallGroupCount} group session${(scheduledData.smallGroupCount ?? 0) !== 1 ? 's' : ''} this week.`
                     : 'No small group sessions this week.'}
                 </p>
-                <Link href="/small-group-sessions">
+                <Link href="/dashboard?tab=group">
                   <Button variant="outline" size="sm">View small group sessions</Button>
                 </Link>
               </CardContent>
@@ -458,14 +588,14 @@ export default async function ParentDashboard() {
             <CardContent className="space-y-6">
               <div>
                 <p className="text-sm text-muted-foreground">Total spent</p>
-                <p className="text-2xl font-bold text-accent">${totalSpent.toFixed(2)}</p>
+                <p className="text-2xl font-bold text-accent">${scheduledData.totalSpent.toFixed(2)}</p>
               </div>
 
-              {coachTotals.length > 0 && (
+              {scheduledData.coachTotals.length > 0 && (
                 <div>
                   <p className="text-sm font-medium mb-2">By coach</p>
                   <ul className="space-y-1.5">
-                    {coachTotals.map((c) => (
+                    {scheduledData.coachTotals.map((c) => (
                       <li key={c.id} className="flex justify-between text-sm">
                         <span>{c.name}</span>
                         <span className="font-medium">${c.total.toFixed(2)}</span>
@@ -475,21 +605,21 @@ export default async function ParentDashboard() {
                 </div>
               )}
 
-              {youthWrestlers && youthWrestlers.length > 0 && (
+              {scheduledData.youthWrestlers.length > 0 && (
                 <div>
                   <p className="text-sm font-medium mb-2">By wrestler</p>
                   <ul className="space-y-1.5">
-                    {youthWrestlers.map((w: YouthWrestler) => (
+                    {scheduledData.youthWrestlers.map((w: YouthWrestler) => (
                       <li key={w.id} className="flex justify-between text-sm">
                         <span>{w.first_name} {w.last_name}</span>
-                        <span className="font-medium">${(byKid[w.id] ?? 0).toFixed(2)}</span>
+                        <span className="font-medium">${(scheduledData.byKid[w.id] ?? 0).toFixed(2)}</span>
                       </li>
                     ))}
                   </ul>
                 </div>
               )}
 
-              {youthWrestlers && youthWrestlers.length > 0 && last6Months.some((m) => youthWrestlers.some((w: YouthWrestler) => (byKidByMonth[w.id]?.[m] ?? 0) > 0)) && (
+              {scheduledData.youthWrestlers.length > 0 && scheduledData.last6Months.some((m) => scheduledData.youthWrestlers.some((w: YouthWrestler) => (scheduledData.byKidByMonth[w.id]?.[m] ?? 0) > 0)) && (
                 <div>
                   <p className="text-sm font-medium mb-2">By wrestler, by month (last 6 months)</p>
                   <div className="overflow-x-auto">
@@ -497,20 +627,20 @@ export default async function ParentDashboard() {
                       <thead>
                         <tr className="border-b">
                           <th className="text-left py-2 pr-4 font-medium">Wrestler</th>
-                          {last6Months.map((m) => (
+                          {scheduledData.last6Months.map((m) => (
                             <th key={m} className="text-right py-2 px-2 font-medium text-muted-foreground">
-                              {monthLabels[m]}
+                              {scheduledData.monthLabels[m]}
                             </th>
                           ))}
                         </tr>
                       </thead>
                       <tbody>
-                        {youthWrestlers.map((w: YouthWrestler) => (
+                        {scheduledData.youthWrestlers.map((w: YouthWrestler) => (
                           <tr key={w.id} className="border-b border-border/50">
                             <td className="py-2 pr-4">{w.first_name} {w.last_name}</td>
-                            {last6Months.map((m) => (
+                            {scheduledData.last6Months.map((m) => (
                               <td key={m} className="text-right py-2 px-2">
-                                ${((byKidByMonth[w.id]?.[m] ?? 0)).toFixed(2)}
+                                ${((scheduledData.byKidByMonth[w.id]?.[m] ?? 0)).toFixed(2)}
                               </td>
                             ))}
                           </tr>
@@ -521,14 +651,14 @@ export default async function ParentDashboard() {
                 </div>
               )}
 
-              {totalSpent === 0 && (
+              {scheduledData.totalSpent === 0 && (
                 <p className="text-sm text-muted-foreground">No paid sessions yet. Book a session to see spending here.</p>
               )}
             </CardContent>
           </Card>
 
           {/* Upcoming Sessions empty state - only show when no sessions */}
-          {(!upcomingSessions || upcomingSessions.length === 0) && (
+          {(scheduledData.upcomingSessions.length === 0) && (
             <Card>
               <CardHeader>
                 <CardTitle>Upcoming Sessions</CardTitle>
@@ -539,13 +669,13 @@ export default async function ParentDashboard() {
               <CardContent>
                 <p className="text-muted-foreground mb-4">No upcoming sessions.</p>
                 <div className="flex flex-wrap gap-3">
-                  <Link href="/bookings">
+                  <Link href="/dashboard">
                     <Button variant="outline">View bookings</Button>
                   </Link>
                   <Link href="/inbox">
-                    <Button variant="outline">Inbox</Button>
+                    <Button variant="outline">Community</Button>
                   </Link>
-                  <Link href="/browse">
+                  <Link href="/dashboard?tab=book">
                     <Button variant="premium">Find an Elite Coach</Button>
                   </Link>
                 </div>
@@ -569,6 +699,25 @@ export default async function ParentDashboard() {
             </Link>
           </CardContent>
         </Card>
+      )}
+    </>
+      )}
+
+      {activeTab === 'book' && (
+        <BrowseAthletesClient initialAthletes={athletesWithNext} isAdmin={userData?.role === 'admin'} />
+      )}
+      {activeTab === 'find-training' && (
+        <FindTrainingClient
+          facilities={findTrainingFacilities}
+          initialSessions={findTrainingSessions as Parameters<typeof FindTrainingClient>[0]['initialSessions']}
+          initialDate={sp.date ?? ''}
+          initialTime={sp.time ?? 'any'}
+          initialLocation={sp.location ?? 'all'}
+          searchBasePath="/dashboard"
+        />
+      )}
+      {activeTab === 'group' && (
+        <SmallGroupSessionsClient sessions={groupSessions} partnerSessions={partnerSessionsList} userId={user.id} />
       )}
     </div>
   );

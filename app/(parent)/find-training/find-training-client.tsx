@@ -42,15 +42,17 @@ export function FindTrainingClient({
   initialDate,
   initialTime,
   initialLocation,
+  searchBasePath = '/find-training',
 }: {
   facilities: Facility[];
   initialSessions: SessionRow[];
   initialDate: string;
   initialTime: string;
   initialLocation: string;
+  /** When embedded in dashboard, pass '/dashboard' so search updates dashboard URL with tab=find-training */
+  searchBasePath?: string;
 }) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [date, setDate] = useState(initialDate || '');
   const [time, setTime] = useState(initialTime || 'any');
   const [location, setLocation] = useState(initialLocation || 'all');
@@ -63,10 +65,11 @@ export function FindTrainingClient({
 
   const handleSearch = () => {
     const params = new URLSearchParams();
+    if (searchBasePath === '/dashboard') params.set('tab', 'find-training');
     if (date) params.set('date', date);
     if (time && time !== 'any') params.set('time', time);
     if (location && location !== 'all') params.set('location', location);
-    router.push(`/find-training?${params.toString()}`);
+    router.push(`${searchBasePath}?${params.toString()}`);
   };
 
   const sessionTypeLabel = (s: SessionRow) => {
