@@ -37,6 +37,14 @@ export function Header() {
     else if (value === 'youth_wrestler') router.push('/youth-dashboard');
   };
 
+  const goToAdmin = () => {
+    setViewAsRole(null);
+    setMobileOpen(false);
+    router.push('/admin');
+  };
+
+  const isAdmin = userRole === 'admin';
+
   const handleSignOut = async () => {
     await signOut();
     window.location.href = '/login';
@@ -67,6 +75,31 @@ export function Header() {
             <nav className="hidden md:flex items-center gap-6">
               {effectiveRole === 'athlete' && (
                 <>
+                  {isAdmin && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={goToAdmin}
+                        className="text-accent font-semibold hover:text-accent/90 transition-colors"
+                      >
+                        Back to Admin
+                      </button>
+                      <Select
+                        value={viewAsRole ?? 'admin'}
+                        onValueChange={handleViewAsChange}
+                      >
+                        <SelectTrigger className="w-[120px] h-9 border-white/30 bg-white/10 text-white hover:bg-white/20 [&>span]:line-clamp-1">
+                          <SelectValue placeholder="Preview as" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="admin">Admin</SelectItem>
+                          <SelectItem value="athlete">Coach</SelectItem>
+                          <SelectItem value="parent">Parent</SelectItem>
+                          <SelectItem value="youth_wrestler">Youth wrestler</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </>
+                  )}
                   <Link
                     href="/athlete-dashboard"
                     className="text-white hover:text-accent transition-colors font-medium"
@@ -80,15 +113,22 @@ export function Header() {
                     Profile
                   </Link>
                   <Link
-                    href="/inbox"
+                    href="/availability"
                     className="text-white hover:text-accent transition-colors font-medium"
                   >
-                    Community
+                    Availability
+                  </Link>
+                  <Link
+                    href="/rate-card"
+                    className="text-white hover:text-accent transition-colors font-medium"
+                  >
+                    Session types
                   </Link>
                   <Link
                     href="/inbox"
                     className="relative flex items-center justify-center p-1.5 text-white hover:text-accent transition-colors font-medium rounded hover:bg-white/10"
                     aria-label={inboxUnreadCount > 0 ? `Community (${inboxUnreadCount} unread)` : 'Community'}
+                    title="Community"
                   >
                     <Mail className="h-5 w-5" />
                     {inboxUnreadCount > 0 && (
@@ -102,6 +142,31 @@ export function Header() {
               )}
               {effectiveRole === 'youth_wrestler' && (
                 <>
+                  {isAdmin && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={goToAdmin}
+                        className="text-accent font-semibold hover:text-accent/90 transition-colors"
+                      >
+                        Back to Admin
+                      </button>
+                      <Select
+                        value={viewAsRole ?? 'admin'}
+                        onValueChange={handleViewAsChange}
+                      >
+                        <SelectTrigger className="w-[120px] h-9 border-white/30 bg-white/10 text-white hover:bg-white/20 [&>span]:line-clamp-1">
+                          <SelectValue placeholder="Preview as" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="admin">Admin</SelectItem>
+                          <SelectItem value="athlete">Coach</SelectItem>
+                          <SelectItem value="parent">Parent</SelectItem>
+                          <SelectItem value="youth_wrestler">Youth wrestler</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </>
+                  )}
                   <Link
                     href="/youth-dashboard"
                     className="text-white hover:text-accent transition-colors font-medium"
@@ -109,15 +174,22 @@ export function Header() {
                     Dashboard
                   </Link>
                   <Link
-                    href="/inbox"
+                    href="/workspaces"
                     className="text-white hover:text-accent transition-colors font-medium"
                   >
-                    Community
+                    Workspaces
+                  </Link>
+                  <Link
+                    href="/small-group-sessions"
+                    className="text-white hover:text-accent transition-colors font-medium"
+                  >
+                    Group & partner
                   </Link>
                   <Link
                     href="/inbox"
                     className="relative flex items-center justify-center p-1.5 text-white hover:text-accent transition-colors font-medium rounded hover:bg-white/10"
                     aria-label={inboxUnreadCount > 0 ? `Community (${inboxUnreadCount} unread)` : 'Community'}
+                    title="Community"
                   >
                     <Mail className="h-5 w-5" />
                     {inboxUnreadCount > 0 && (
@@ -131,30 +203,19 @@ export function Header() {
               )}
               {effectiveRole === 'admin' && (
                 <>
-                  <Link
-                    href="/admin"
+                  <button
+                    type="button"
+                    onClick={goToAdmin}
                     className="text-white hover:text-accent transition-colors font-medium"
                   >
                     Admin
-                  </Link>
-                  <Link
-                    href="/browse"
-                    className="text-white hover:text-accent transition-colors font-medium"
-                  >
-                    Browse Coaches
-                  </Link>
-                  <Link
-                    href="/admin?tab=kids"
-                    className="text-white hover:text-accent transition-colors font-medium"
-                  >
-                    Athletes
-                  </Link>
+                  </button>
                   <Select
                     value={viewAsRole ?? 'admin'}
                     onValueChange={handleViewAsChange}
                   >
-                    <SelectTrigger className="w-[130px] h-9 border-white/30 bg-white/10 text-white hover:bg-white/20 [&>span]:line-clamp-1">
-                      <SelectValue placeholder="View as" />
+                    <SelectTrigger className="w-[120px] h-9 border-white/30 bg-white/10 text-white hover:bg-white/20 [&>span]:line-clamp-1">
+                      <SelectValue placeholder="Preview as" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="admin">Admin</SelectItem>
@@ -167,6 +228,31 @@ export function Header() {
               )}
               {effectiveRole === 'parent' && (
                 <>
+                  {isAdmin && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={goToAdmin}
+                        className="text-accent font-semibold hover:text-accent/90 transition-colors"
+                      >
+                        Back to Admin
+                      </button>
+                      <Select
+                        value={viewAsRole ?? 'admin'}
+                        onValueChange={handleViewAsChange}
+                      >
+                        <SelectTrigger className="w-[120px] h-9 border-white/30 bg-white/10 text-white hover:bg-white/20 [&>span]:line-clamp-1">
+                          <SelectValue placeholder="Preview as" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="admin">Admin</SelectItem>
+                          <SelectItem value="athlete">Coach</SelectItem>
+                          <SelectItem value="parent">Parent</SelectItem>
+                          <SelectItem value="youth_wrestler">Youth wrestler</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </>
+                  )}
                   <Link
                     href="/dashboard"
                     className="text-white hover:text-accent transition-colors font-medium"
@@ -174,28 +260,40 @@ export function Header() {
                     Dashboard
                   </Link>
                   <Link
-                    href="/browse"
-                    className="text-white hover:text-accent transition-colors font-medium"
-                  >
-                    Browse Coaches
-                  </Link>
-                  <Link
-                    href="/signup?role=athlete"
-                    className="text-white hover:text-accent transition-colors font-medium"
-                  >
-                    For Coaches
-                  </Link>
-                  <Link
                     href="/bookings"
                     className="text-white hover:text-accent transition-colors font-medium"
                   >
-                    My Bookings
+                    Bookings
+                  </Link>
+                  <Link
+                    href="/browse"
+                    className="text-white hover:text-accent transition-colors font-medium"
+                  >
+                    Book
+                  </Link>
+                  <Link
+                    href="/my-coaches"
+                    className="text-white hover:text-accent transition-colors font-medium"
+                  >
+                    My Coaches
                   </Link>
                   <Link
                     href="/small-group-sessions"
                     className="text-white hover:text-accent transition-colors font-medium"
                   >
-                    Small group
+                    Group & partner
+                  </Link>
+                  <Link
+                    href="/workspaces"
+                    className="text-white hover:text-accent transition-colors font-medium"
+                  >
+                    Workspaces
+                  </Link>
+                  <Link
+                    href="/dashboard#spending"
+                    className="text-white hover:text-accent transition-colors font-medium"
+                  >
+                    Spending
                   </Link>
                   <Link
                     href="/inbox"
@@ -246,8 +344,29 @@ export function Header() {
                 <div className="container mx-auto px-0 py-2">
                   {effectiveRole === 'athlete' && (
                     <>
+                      {isAdmin && (
+                    <>
+                      <button type="button" className="block py-3 px-4 text-accent font-semibold hover:bg-white/10 min-h-[44px] w-full text-left" onClick={goToAdmin}>Back to Admin</button>
+                      <div className="px-4 py-2 border-b border-white/10">
+                        <label className="text-xs text-white/70 uppercase tracking-wide">Preview as</label>
+                        <Select value={viewAsRole ?? 'admin'} onValueChange={(v) => { handleViewAsChange(v); setMobileOpen(false); }}>
+                          <SelectTrigger className="mt-1.5 w-full border-white/30 bg-white/10 text-white">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="admin">Admin</SelectItem>
+                            <SelectItem value="athlete">Coach</SelectItem>
+                            <SelectItem value="parent">Parent</SelectItem>
+                            <SelectItem value="youth_wrestler">Youth wrestler</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </>
+                  )}
                       <Link href="/athlete-dashboard" className={navLinkClass} onClick={() => setMobileOpen(false)}>Dashboard</Link>
                       <Link href="/profile" className={navLinkClass} onClick={() => setMobileOpen(false)}>Profile</Link>
+                      <Link href="/availability" className={navLinkClass} onClick={() => setMobileOpen(false)}>Availability</Link>
+                      <Link href="/rate-card" className={navLinkClass} onClick={() => setMobileOpen(false)}>Session types</Link>
                       <Link href="/inbox" className={navLinkClass} onClick={() => setMobileOpen(false)}>
                         <span className="flex items-center gap-2">
                           <Mail className="h-5 w-5 shrink-0" />
@@ -272,9 +391,30 @@ export function Header() {
                       </Link>
                     </>
                   )}
-                  {userRole === 'youth_wrestler' && (
+                  {effectiveRole === 'youth_wrestler' && (
                     <>
+                      {isAdmin && (
+                    <>
+                      <button type="button" className="block py-3 px-4 text-accent font-semibold hover:bg-white/10 min-h-[44px] w-full text-left" onClick={goToAdmin}>Back to Admin</button>
+                      <div className="px-4 py-2 border-b border-white/10">
+                        <label className="text-xs text-white/70 uppercase tracking-wide">Preview as</label>
+                        <Select value={viewAsRole ?? 'admin'} onValueChange={(v) => { handleViewAsChange(v); setMobileOpen(false); }}>
+                          <SelectTrigger className="mt-1.5 w-full border-white/30 bg-white/10 text-white">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="admin">Admin</SelectItem>
+                            <SelectItem value="athlete">Coach</SelectItem>
+                            <SelectItem value="parent">Parent</SelectItem>
+                            <SelectItem value="youth_wrestler">Youth wrestler</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </>
+                  )}
                       <Link href="/youth-dashboard" className={navLinkClass} onClick={() => setMobileOpen(false)}>Dashboard</Link>
+                      <Link href="/workspaces" className={navLinkClass} onClick={() => setMobileOpen(false)}>Workspaces</Link>
+                      <Link href="/small-group-sessions" className={navLinkClass} onClick={() => setMobileOpen(false)}>Group & partner</Link>
                       <Link href="/inbox" className={navLinkClass} onClick={() => setMobileOpen(false)}>
                         <span className="flex items-center gap-2">
                           <Mail className="h-5 w-5 shrink-0" />
@@ -301,12 +441,10 @@ export function Header() {
                   )}
                   {effectiveRole === 'admin' && (
                     <>
-                      <Link href="/admin" className={navLinkClass} onClick={() => setMobileOpen(false)}>Admin</Link>
-                      <Link href="/browse" className={navLinkClass} onClick={() => setMobileOpen(false)}>Browse Coaches</Link>
-                      <Link href="/admin?tab=kids" className={navLinkClass} onClick={() => setMobileOpen(false)}>Athletes</Link>
+                      <button type="button" className={navLinkClass} onClick={goToAdmin}>Admin</button>
                       <div className="px-4 py-2 border-b border-white/10">
-                        <label className="text-xs text-white/70 uppercase tracking-wide">View as</label>
-                        <Select value={viewAsRole ?? 'admin'} onValueChange={handleViewAsChange}>
+                        <label className="text-xs text-white/70 uppercase tracking-wide">Preview as</label>
+                        <Select value={viewAsRole ?? 'admin'} onValueChange={(v) => { handleViewAsChange(v); setMobileOpen(false); }}>
                           <SelectTrigger className="mt-1.5 w-full border-white/30 bg-white/10 text-white">
                             <SelectValue />
                           </SelectTrigger>
@@ -322,11 +460,32 @@ export function Header() {
                   )}
                   {effectiveRole === 'parent' && (
                     <>
+                      {isAdmin && (
+                    <>
+                      <button type="button" className="block py-3 px-4 text-accent font-semibold hover:bg-white/10 min-h-[44px] w-full text-left" onClick={goToAdmin}>Back to Admin</button>
+                      <div className="px-4 py-2 border-b border-white/10">
+                        <label className="text-xs text-white/70 uppercase tracking-wide">Preview as</label>
+                        <Select value={viewAsRole ?? 'admin'} onValueChange={(v) => { handleViewAsChange(v); setMobileOpen(false); }}>
+                          <SelectTrigger className="mt-1.5 w-full border-white/30 bg-white/10 text-white">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="admin">Admin</SelectItem>
+                            <SelectItem value="athlete">Coach</SelectItem>
+                            <SelectItem value="parent">Parent</SelectItem>
+                            <SelectItem value="youth_wrestler">Youth wrestler</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </>
+                  )}
                       <Link href="/dashboard" className={navLinkClass} onClick={() => setMobileOpen(false)}>Dashboard</Link>
-                      <Link href="/browse" className={navLinkClass} onClick={() => setMobileOpen(false)}>Browse Coaches</Link>
-                      <Link href="/signup?role=athlete" className={navLinkClass} onClick={() => setMobileOpen(false)}>For Coaches</Link>
-                      <Link href="/bookings" className={navLinkClass} onClick={() => setMobileOpen(false)}>My Bookings</Link>
-                      <Link href="/small-group-sessions" className={navLinkClass} onClick={() => setMobileOpen(false)}>Small group</Link>
+                      <Link href="/bookings" className={navLinkClass} onClick={() => setMobileOpen(false)}>Bookings</Link>
+                      <Link href="/browse" className={navLinkClass} onClick={() => setMobileOpen(false)}>Book</Link>
+                      <Link href="/my-coaches" className={navLinkClass} onClick={() => setMobileOpen(false)}>My Coaches</Link>
+                      <Link href="/small-group-sessions" className={navLinkClass} onClick={() => setMobileOpen(false)}>Group & partner</Link>
+                      <Link href="/workspaces" className={navLinkClass} onClick={() => setMobileOpen(false)}>Workspaces</Link>
+                      <Link href="/dashboard#spending" className={navLinkClass} onClick={() => setMobileOpen(false)}>Spending</Link>
                       <Link href="/inbox" className={navLinkClass} onClick={() => setMobileOpen(false)}>
                         <span className="flex items-center gap-2">
                           <Mail className="h-5 w-5 shrink-0" />

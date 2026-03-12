@@ -214,9 +214,9 @@ export default async function AthleteDashboard() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
-        <h1 className="text-3xl font-serif font-bold mb-2 text-foreground">Wrestler Dashboard</h1>
+        <h1 className="text-3xl font-serif font-bold mb-2 text-foreground">Coach Dashboard</h1>
         <p className="text-muted-foreground">
-          Welcome back{athlete?.first_name ? `, ${athlete.first_name}` : ''}. Your Guild wrestler dashboard.
+          Welcome back{athlete?.first_name ? `, ${athlete.first_name}` : ''}. Your schedule, earnings, and athletes.
         </p>
       </div>
 
@@ -424,7 +424,7 @@ export default async function AthleteDashboard() {
         <Link href="/availability" className="block">
           <Button variant="outline" className="w-full h-12 gap-2">
             <Calendar className="h-5 w-5 shrink-0" />
-            Set Availability
+            Availability
           </Button>
         </Link>
         <Link href="/rate-card" className="block">
@@ -436,7 +436,7 @@ export default async function AthleteDashboard() {
         <Link href="/profile" className="block">
           <Button variant="outline" className="w-full h-12 gap-2">
             <User className="h-5 w-5 shrink-0" />
-            View Profile
+            Profile
           </Button>
         </Link>
       </div>

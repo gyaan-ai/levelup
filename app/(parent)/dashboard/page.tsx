@@ -7,7 +7,7 @@ import { getTenantByDomain } from '@/config/tenants';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { Plus, Edit, User, Calendar, DollarSign, Users, UserPlus } from 'lucide-react';
+import { Plus, Edit, User, Calendar, DollarSign, Users, UserPlus, FolderOpen } from 'lucide-react';
 import { YouthWrestler } from '@/types';
 import { BookingCard, type BookingSession } from '@/app/(parent)/bookings/booking-card';
 import { CoachSessionBadge } from '@/components/coach-session-badge';
@@ -356,8 +356,8 @@ export default async function ParentDashboard() {
             })}
           </div>
 
-          {/* My Coaches, Partner Sessions, Small group – quick access from dashboard */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+          {/* My Coaches, Partner Sessions, Small group, Workspaces – quick access */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
             <Card>
               <CardHeader className="pb-2">
                 <CardTitle className="text-base flex items-center gap-2">
@@ -427,14 +427,28 @@ export default async function ParentDashboard() {
                 </Link>
               </CardContent>
             </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <FolderOpen className="h-4 w-4" />
+                  Workspaces
+                </CardTitle>
+                <CardDescription>Goals, video, session notes, and actions with each coach.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Link href="/workspaces">
+                  <Button variant="outline" size="sm">View all workspaces</Button>
+                </Link>
+              </CardContent>
+            </Card>
           </div>
 
-          {/* Spending – at bottom so dashboard leads with wrestlers and bookings */}
-          <Card className="mb-6">
+          {/* Spending & reporting – nav link targets #spending */}
+          <Card id="spending" className="mb-6 scroll-mt-4">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <DollarSign className="h-5 w-5" />
-                Spending
+                Spending & reporting
               </CardTitle>
               <CardDescription>
                 What you&apos;ve spent on sessions (paid and completed). Refunded sessions are excluded.

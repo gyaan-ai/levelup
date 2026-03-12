@@ -20,13 +20,29 @@ export default async function WorkspacesPage() {
   if (!user) redirect('/login');
 
   const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
-  if (userData?.role !== 'parent' && userData?.role !== 'athlete' && userData?.role !== 'admin') {
+  if (userData?.role !== 'parent' && userData?.role !== 'athlete' && userData?.role !== 'admin' && userData?.role !== 'youth_wrestler') {
     redirect('/');
   }
 
   const admin = createAdminClient(tenant.slug);
 
-  if (userData?.role === 'parent') {
+  if (userData?.role === 'youth_wrestler') {
+    const { data: participants } = await admin.from('session_participants').select('session_id').eq('youth_wrestler_id', user.id);
+    const sessionIds = [...new Set((participants ?? []).map((p: { session_id: string }) => p.session_id))];
+    if (sessionIds.length > 0) {
+      const { data: sessions } = await admin.from('sessions').select('id, parent_id, athlete_id').in('id', sessionIds).in('status', ['scheduled', 'completed']);
+      const seen = new Set<string>();
+      for (const p of participants ?? []) {
+        const sess = sessions?.find((s: { id: string }) => s.id === (p as { session_id: string }).session_id);
+        if (!sess) continue;
+        const key = `${sess.parent_id}-${user.id}-${sess.athlete_id}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          await admin.rpc('get_or_create_workspace', { p_parent_id: sess.parent_id, p_youth_wrestler_id: user.id, p_athlete_id: sess.athlete_id });
+        }
+      }
+    }
+  } else if (userData?.role === 'parent') {
     const { data: sessions } = await admin.from('sessions').select('id, parent_id, athlete_id').eq('parent_id', user.id).in('status', ['scheduled', 'completed']);
     if (sessions?.length) {
       const { data: participants } = await admin.from('session_participants').select('session_id, youth_wrestler_id').in('session_id', sessions.map((s) => s.id));
@@ -70,6 +86,7 @@ export default async function WorkspacesPage() {
 
   if (userData?.role === 'parent') query = query.eq('parent_id', user.id);
   else if (userData?.role === 'athlete') query = query.eq('athlete_id', user.id);
+  else if (userData?.role === 'youth_wrestler') query = query.eq('youth_wrestler_id', user.id);
 
   const { data: workspaces } = await query;
 
@@ -82,6 +99,8 @@ export default async function WorkspacesPage() {
             ? 'Collaboration spaces with your wrestler\'s coaches — goals, video, session notes, and actions'
             : userData?.role === 'athlete'
             ? 'Your coaching spaces — track goals, review video, and assign actions to your athletes'
+            : userData?.role === 'youth_wrestler'
+            ? 'Your spaces with each coach — goals, video, session notes, and actions'
             : 'All development workspaces'}
         </p>
       </div>
@@ -94,6 +113,8 @@ export default async function WorkspacesPage() {
             <p className="text-muted-foreground mb-6 max-w-md mx-auto">
               {userData?.role === 'parent'
                 ? 'Book a session with a coach to create a development workspace. You can add goals, upload video for review, and receive session summaries and action items.'
+                : userData?.role === 'youth_wrestler'
+                ? 'When your parent books sessions with a coach, a workspace is created here. You can see goals, video, and session notes.'
                 : 'When parents book sessions with you, workspaces are created. You can summarize sessions and assign actions for your athletes.'}
             </p>
             {userData?.role === 'parent' && (

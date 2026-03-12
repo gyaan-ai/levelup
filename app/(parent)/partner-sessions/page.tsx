@@ -21,7 +21,7 @@ export default async function PartnerSessionsPage() {
 
   const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
   if (userData?.role === 'athlete') redirect('/athlete-dashboard');
-  if (userData?.role !== 'parent' && userData?.role !== 'admin') redirect('/dashboard');
+  if (userData?.role !== 'parent' && userData?.role !== 'admin' && userData?.role !== 'youth_wrestler') redirect('/dashboard');
   // parent and admin can both access
 
   const { data: sessions } = await supabase

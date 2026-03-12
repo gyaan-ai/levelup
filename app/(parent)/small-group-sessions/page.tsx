@@ -27,7 +27,7 @@ export default async function SmallGroupSessionsPage({
 
   const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
   if (userData?.role === 'athlete') redirect('/athlete-dashboard');
-  if (userData?.role !== 'parent' && userData?.role !== 'admin') redirect('/dashboard');
+  if (userData?.role !== 'parent' && userData?.role !== 'admin' && userData?.role !== 'youth_wrestler') redirect('/dashboard');
 
   const now = new Date();
   const weekStart = startOfWeek(now, { weekStartsOn: 0 });
