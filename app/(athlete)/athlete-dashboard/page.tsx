@@ -129,6 +129,31 @@ export default async function AthleteDashboard() {
     .order('scheduled_datetime', { ascending: false })
     .limit(15);
 
+  // All youth wrestlers this coach has ever worked with (any session, scheduled or not)
+  const { data: coachSessionIds } = await supabase
+    .from('sessions')
+    .select('id')
+    .eq('athlete_id', user.id);
+  const sessionIds = (coachSessionIds ?? []).map((s: { id: string }) => s.id);
+  let allYouthWrestlersForCoach: Array<{ id: string; first_name: string; last_name: string; school?: string | null; weight_class?: string | null }> = [];
+  if (sessionIds.length > 0) {
+    const { data: participantRows } = await supabase
+      .from('session_participants')
+      .select('youth_wrestler_id')
+      .in('session_id', sessionIds)
+      .not('youth_wrestler_id', 'is', null);
+    const ywIds = [...new Set((participantRows ?? []).map((r: { youth_wrestler_id: string }) => r.youth_wrestler_id).filter(Boolean))];
+    if (ywIds.length > 0) {
+      const { data: ywRows } = await supabase
+        .from('youth_wrestlers')
+        .select('id, first_name, last_name, school, weight_class')
+        .in('id', ywIds)
+        .order('last_name', { ascending: true })
+        .order('first_name', { ascending: true });
+      allYouthWrestlersForCoach = (ywRows ?? []) as typeof allYouthWrestlersForCoach;
+    }
+  }
+
   // Outreach recommendations: youth wrestlers with no session in 14+ days
   const { data: completedForRecommendations } = await supabase
     .from('sessions')
@@ -343,6 +368,47 @@ export default async function AthleteDashboard() {
             <p className="text-sm text-muted-foreground">
               {athlete.commitment_fulfilled ? '✅ Commitment fulfilled!' : 'Keep going!'}
             </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* All athletes this coach has worked with (even if nothing scheduled) */}
+      {allYouthWrestlersForCoach.length > 0 && (
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Athletes you&apos;ve worked with
+            </CardTitle>
+            <CardDescription>
+              All wrestlers you&apos;ve had at least one session with, past or upcoming.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ul className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+              {allYouthWrestlersForCoach.map((yw) => (
+                <li
+                  key={yw.id}
+                  className="flex items-center justify-between gap-2 py-2 px-3 rounded-md border bg-muted/30"
+                >
+                  <div className="min-w-0">
+                    <p className="font-medium truncate">
+                      {[yw.first_name, yw.last_name].filter(Boolean).join(' ') || 'Wrestler'}
+                    </p>
+                    {(yw.school || yw.weight_class) && (
+                      <p className="text-xs text-muted-foreground truncate">
+                        {[yw.school, yw.weight_class].filter(Boolean).join(' · ')}
+                      </p>
+                    )}
+                  </div>
+                  <Link href="/inbox" className="shrink-0">
+                    <Button variant="ghost" size="sm">
+                      <MessageCircle className="h-4 w-4" />
+                    </Button>
+                  </Link>
+                </li>
+              ))}
+            </ul>
           </CardContent>
         </Card>
       )}
