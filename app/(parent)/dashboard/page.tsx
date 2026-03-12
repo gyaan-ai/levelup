@@ -300,7 +300,7 @@ export default async function ParentDashboard({
         const dayStart = `${dateOnly}T00:00:00.000Z`;
         const dayEnd = `${dateOnly}T23:59:59.999Z`;
         const baseQuery = () => {
-          let q = supabase.from('sessions').select('id, scheduled_datetime, session_type, session_mode, focus_area, current_participants, max_participants, total_price, price_per_participant, athlete_id, facility_id, athletes(id, first_name, last_name, school), facilities(id, name, address)').in('status', ['scheduled', 'pending_payment']).gte('scheduled_datetime', dayStart).lte('scheduled_datetime', dayEnd);
+          let q = supabase.from('sessions').select('id, scheduled_datetime, session_type, session_mode, join_policy, focus_area, current_participants, max_participants, total_price, price_per_participant, athlete_id, facility_id, athletes(id, first_name, last_name, school), facilities(id, name, address)').in('status', ['scheduled', 'pending_payment']).gte('scheduled_datetime', dayStart).lte('scheduled_datetime', dayEnd);
           if (sp.location && sp.location !== 'all') q = q.eq('facility_id', sp.location);
           return q;
         };
@@ -322,7 +322,7 @@ export default async function ParentDashboard({
             return t.getHours() >= startHour && t.getHours() < endHour;
           });
         }
-        findTrainingSessions = list.filter((s) => (s.current_participants ?? 0) < (s.max_participants ?? 1));
+        findTrainingSessions = list.filter((s) => (s.current_participants ?? 0) < (s.max_participants ?? 1) && (s as { join_policy?: string }).join_policy === 'public');
       }
     }
   }
@@ -334,8 +334,8 @@ export default async function ParentDashboard({
     const now = new Date();
     const weekStart = startOfWeek(now, { weekStartsOn: 0 });
     const nextWeekEnd = endOfWeek(addWeeks(now, 1), { weekStartsOn: 0 });
-    const { data: sess } = await supabase.from('sessions').select('id, scheduled_datetime, session_type, session_mode, focus_area, current_participants, max_participants, total_price, parent_id, athlete_id, athletes(id, first_name, last_name, school, photo_url), facilities(id, name, address), session_participants(youth_wrestlers(id, first_name, last_name, photo_url))').in('session_type', ['group', 'small_group']).in('status', ['scheduled', 'pending_payment']).gte('scheduled_datetime', weekStart.toISOString()).lte('scheduled_datetime', nextWeekEnd.toISOString()).order('scheduled_datetime', { ascending: true });
-    const { data: partnerSess } = await supabase.from('sessions').select('id, scheduled_datetime, session_type, session_mode, current_participants, max_participants, total_price, price_per_participant, parent_id, athlete_id, athletes(id, first_name, last_name, school, photo_url), facilities(id, name, address), session_participants(youth_wrestlers(id, first_name, last_name, photo_url, age, weight_class, skill_level))').eq('session_mode', 'partner-open').in('status', ['scheduled', 'pending_payment']).gte('scheduled_datetime', now.toISOString()).order('scheduled_datetime', { ascending: true });
+    const { data: sess } = await supabase.from('sessions').select('id, scheduled_datetime, session_type, session_mode, join_policy, focus_area, current_participants, max_participants, total_price, price_per_participant, parent_id, athlete_id, athletes(id, first_name, last_name, school, photo_url), facilities(id, name, address), session_participants(youth_wrestlers(id, first_name, last_name, photo_url))').in('session_type', ['group', 'small_group']).in('status', ['scheduled', 'pending_payment']).gte('scheduled_datetime', weekStart.toISOString()).lte('scheduled_datetime', nextWeekEnd.toISOString()).order('scheduled_datetime', { ascending: true });
+    const { data: partnerSess } = await supabase.from('sessions').select('id, scheduled_datetime, session_type, session_mode, join_policy, current_participants, max_participants, total_price, price_per_participant, parent_id, athlete_id, athletes(id, first_name, last_name, school, photo_url), facilities(id, name, address), session_participants(youth_wrestlers(id, first_name, last_name, photo_url, age, weight_class, skill_level))').eq('session_mode', 'partner-open').in('status', ['scheduled', 'pending_payment']).gte('scheduled_datetime', now.toISOString()).order('scheduled_datetime', { ascending: true });
     groupSessions = sess ?? [];
     partnerSessionsList = (partnerSess ?? []).filter((s: { current_participants?: number; max_participants?: number }) => (s.current_participants ?? 1) < (s.max_participants ?? 2));
   }

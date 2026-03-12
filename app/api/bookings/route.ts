@@ -6,7 +6,7 @@ import { getTenantByDomain } from '@/config/tenants';
 import { generateInviteCode } from '@/lib/sessions';
 import { getStripeInstance } from '@/lib/stripe/webhooks';
 import { createNotification } from '@/lib/notifications';
-import type { SessionMode } from '@/types';
+import type { SessionMode, JoinPolicy } from '@/types';
 import { formatEST } from '@/lib/format-date';
 
 export async function POST(req: NextRequest) {
@@ -33,6 +33,7 @@ export async function POST(req: NextRequest) {
       youthWrestlerIds: string[];
       sessionMode: SessionMode;
       partnerOption?: 'invite' | 'open' | 'solo';
+      joinPolicy?: JoinPolicy;
       scheduledDate: string;
       scheduledTime: string;
       totalPrice: number;
@@ -44,6 +45,7 @@ export async function POST(req: NextRequest) {
       facilityId,
       youthWrestlerIds,
       sessionMode,
+      joinPolicy: joinPolicyFromBody,
       scheduledDate,
       scheduledTime,
       totalPrice,
@@ -97,8 +99,12 @@ export async function POST(req: NextRequest) {
     const orgFee = 0;
     const stripeFee = 0;
 
+    const join_policy: JoinPolicy =
+      joinPolicyFromBody ??
+      (sessionMode === 'partner-invite' ? 'invite_only' : sessionMode === 'partner-open' ? 'public' : 'private');
+
     let partner_invite_code: string | null = null;
-    if (sessionMode === 'partner-invite') {
+    if (join_policy === 'invite_only') {
       let code = generateInviteCode();
       let { data: existing } = await supabase.from('sessions').select('id').eq('partner_invite_code', code).maybeSingle();
       while (existing) {
@@ -133,6 +139,7 @@ export async function POST(req: NextRequest) {
         athlete_service_id: sessionServiceId ?? undefined,
         session_type: sessionType,
         session_mode: sessionMode,
+        join_policy,
         partner_invite_code: partner_invite_code ?? undefined,
         max_participants: maxParticipants,
         current_participants: numParticipants,

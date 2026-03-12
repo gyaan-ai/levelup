@@ -95,7 +95,7 @@ export function Header() {
                           <SelectItem value="admin">Admin</SelectItem>
                           <SelectItem value="athlete">Coach</SelectItem>
                           <SelectItem value="parent">Parent</SelectItem>
-                          <SelectItem value="youth_wrestler">Youth wrestler</SelectItem>
+                          <SelectItem value="youth_wrestler">Athlete</SelectItem>
                         </SelectContent>
                       </Select>
                     </>
@@ -162,7 +162,7 @@ export function Header() {
                           <SelectItem value="admin">Admin</SelectItem>
                           <SelectItem value="athlete">Coach</SelectItem>
                           <SelectItem value="parent">Parent</SelectItem>
-                          <SelectItem value="youth_wrestler">Youth wrestler</SelectItem>
+                          <SelectItem value="youth_wrestler">Athlete</SelectItem>
                         </SelectContent>
                       </Select>
                     </>
@@ -221,7 +221,7 @@ export function Header() {
                       <SelectItem value="admin">Admin</SelectItem>
                       <SelectItem value="athlete">Coach</SelectItem>
                       <SelectItem value="parent">Parent</SelectItem>
-                      <SelectItem value="youth_wrestler">Youth wrestler</SelectItem>
+                      <SelectItem value="youth_wrestler">Athlete</SelectItem>
                     </SelectContent>
                   </Select>
                 </>
@@ -248,7 +248,7 @@ export function Header() {
                           <SelectItem value="admin">Admin</SelectItem>
                           <SelectItem value="athlete">Coach</SelectItem>
                           <SelectItem value="parent">Parent</SelectItem>
-                          <SelectItem value="youth_wrestler">Youth wrestler</SelectItem>
+                          <SelectItem value="youth_wrestler">Athlete</SelectItem>
                         </SelectContent>
                       </Select>
                     </>
@@ -339,7 +339,7 @@ export function Header() {
                             <SelectItem value="admin">Admin</SelectItem>
                             <SelectItem value="athlete">Coach</SelectItem>
                             <SelectItem value="parent">Parent</SelectItem>
-                            <SelectItem value="youth_wrestler">Youth wrestler</SelectItem>
+                            <SelectItem value="youth_wrestler">Athlete</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -388,7 +388,7 @@ export function Header() {
                             <SelectItem value="admin">Admin</SelectItem>
                             <SelectItem value="athlete">Coach</SelectItem>
                             <SelectItem value="parent">Parent</SelectItem>
-                            <SelectItem value="youth_wrestler">Youth wrestler</SelectItem>
+                            <SelectItem value="youth_wrestler">Athlete</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -434,7 +434,7 @@ export function Header() {
                             <SelectItem value="admin">Admin</SelectItem>
                             <SelectItem value="athlete">Coach</SelectItem>
                             <SelectItem value="parent">Parent</SelectItem>
-                            <SelectItem value="youth_wrestler">Youth wrestler</SelectItem>
+                            <SelectItem value="youth_wrestler">Athlete</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
@@ -455,7 +455,7 @@ export function Header() {
                             <SelectItem value="admin">Admin</SelectItem>
                             <SelectItem value="athlete">Coach</SelectItem>
                             <SelectItem value="parent">Parent</SelectItem>
-                            <SelectItem value="youth_wrestler">Youth wrestler</SelectItem>
+                            <SelectItem value="youth_wrestler">Athlete</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>

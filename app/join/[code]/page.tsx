@@ -78,7 +78,7 @@ export default async function JoinByCodePage({
           <p className="text-sm text-muted-foreground">
             {isFull
               ? 'The session you were invited to has reached the maximum number of participants.'
-              : 'Sign in, add your wrestler if needed, and register below. No payment online — the coach or organizer will arrange payment.'}
+              : 'Sign in, choose your wrestler, and pay to register. Payment is collected in the app.'}
           </p>
         </CardHeader>
         <CardContent className="space-y-4">

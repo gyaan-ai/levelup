@@ -26,10 +26,12 @@ export type SmallGroupSession = {
   scheduled_datetime: string;
   session_type?: string;
   session_mode?: string;
+  join_policy?: 'public' | 'private' | 'invite_only';
   focus_area?: string | null;
   current_participants?: number;
   max_participants?: number;
   total_price?: number;
+  price_per_participant?: number;
   parent_id?: string;
   athlete_id?: string;
   athletes?: { id: string; first_name?: string; last_name?: string; school?: string; photo_url?: string } | { id: string; first_name?: string; last_name?: string; school?: string; photo_url?: string }[];
@@ -191,10 +193,13 @@ export function SmallGroupSessionsClient({
                           <Link href={`/sessions/${s.id}/requests`}>Manage join requests</Link>
                         </Button>
                       )}
-                      {!isOwner(s) && openSlots > 0 && (
+                      {!isOwner(s) && openSlots > 0 && (s as SmallGroupSession).join_policy === 'public' && (
                         <Button asChild size="sm" variant="outline">
-                          <Link href={`/sessions/${s.id}/request-join`}>Request to join</Link>
+                          <Link href={`/sessions/${s.id}/register`}>Register (pay & join)</Link>
                         </Button>
+                      )}
+                      {!isOwner(s) && openSlots > 0 && (s as SmallGroupSession).join_policy === 'invite_only' && (
+                        <span className="text-xs text-muted-foreground">Invite only — use link to pay & register</span>
                       )}
                       <Button asChild size="sm" variant="ghost">
                         <Link href={`/workspaces/from-session/${s.id}`}>Workspace</Link>
@@ -294,10 +299,13 @@ export function SmallGroupSessionsClient({
                           <Link href={`/sessions/${s.id}/requests`}>Manage join requests</Link>
                         </Button>
                       )}
-                      {!isOwner(s) && (
+                      {!isOwner(s) && (s as PartnerSession).join_policy === 'public' && (
                         <Button asChild size="sm" variant="outline">
-                          <Link href={`/sessions/${s.id}/request-join`}>Request to join</Link>
+                          <Link href={`/sessions/${s.id}/register`}>Register (pay & join)</Link>
                         </Button>
+                      )}
+                      {!isOwner(s) && (s as PartnerSession).join_policy === 'invite_only' && (
+                        <span className="text-xs text-muted-foreground">Invite only — use link to pay & register</span>
                       )}
                       <Button asChild size="sm" variant="ghost">
                         <Link href={`/workspaces/from-session/${s.id}`}>Workspace</Link>

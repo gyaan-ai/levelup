@@ -42,10 +42,12 @@ export default async function SmallGroupSessionsPage({
       scheduled_datetime,
       session_type,
       session_mode,
+      join_policy,
       focus_area,
       current_participants,
       max_participants,
       total_price,
+      price_per_participant,
       parent_id,
       athlete_id,
       athletes(id, first_name, last_name, school, photo_url),
@@ -66,6 +68,7 @@ export default async function SmallGroupSessionsPage({
       scheduled_datetime,
       session_type,
       session_mode,
+      join_policy,
       current_participants,
       max_participants,
       total_price,
@@ -101,7 +104,7 @@ export default async function SmallGroupSessionsPage({
               Small group & partner sessions
             </h1>
             <p className="text-muted-foreground mt-1">
-              Find group sessions (this week and next) or open partner sessions (someone looking for a partner). Request to join; the session owner approves based on skill level, weight, etc.
+              Find group and partner sessions. Public sessions: anyone can pay & register. Invite only: use the session link to pay & register.
             </p>
           </div>
           {userData?.role === 'admin' && (

@@ -67,6 +67,7 @@ export default async function FindTrainingPage({
             scheduled_datetime,
             session_type,
             session_mode,
+            join_policy,
             focus_area,
             current_participants,
             max_participants,
@@ -115,7 +116,7 @@ export default async function FindTrainingPage({
       const current = (s: { current_participants?: number | null; max_participants?: number | null }) =>
         s.current_participants ?? 0;
       const max = (s: { max_participants?: number | null }) => s.max_participants ?? 1;
-      sessions = list.filter((s) => current(s) < max(s));
+      sessions = list.filter((s) => current(s) < max(s) && (s as { join_policy?: string }).join_policy === 'public');
     }
   }
 

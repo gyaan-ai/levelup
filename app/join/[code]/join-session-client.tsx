@@ -41,7 +41,7 @@ export function JoinSessionClient({
   const [registered, setRegistered] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleJoin = async () => {
+  const handlePayAndRegister = async () => {
     if (!selectedWrestlerId) {
       setError('Please select a youth wrestler.');
       return;
@@ -49,14 +49,18 @@ export function JoinSessionClient({
     setError(null);
     setJoining(true);
     try {
-      const res = await fetch('/api/sessions/join', {
+      const res = await fetch(`/api/sessions/${sessionId}/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: code.toUpperCase(), youthWrestlerId: selectedWrestlerId }),
+        body: JSON.stringify({ youthWrestlerId: selectedWrestlerId }),
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error || 'Failed to register');
+        setError(data.error || 'Failed to start payment');
+        return;
+      }
+      if (data.url) {
+        window.location.href = data.url;
         return;
       }
       setRegistered(true);
@@ -85,10 +89,10 @@ export function JoinSessionClient({
       <div className="space-y-4 pt-4 border-t rounded-lg bg-muted/30 p-4">
         <p className="font-medium text-foreground">You&apos;re registered. See you there.</p>
         <p className="text-sm text-muted-foreground">
-          This session is on your My Bookings page. The coach or organizer will reach out about payment if needed.
+          This session is on your Dashboard and Bookings. Payment was collected in the app.
         </p>
         <Button asChild className="w-full bg-accent text-black hover:bg-accent-hover">
-          <Link href="/bookings">View My Bookings</Link>
+          <Link href="/dashboard?tab=scheduled">View Dashboard</Link>
         </Button>
       </div>
     );
@@ -117,15 +121,12 @@ export function JoinSessionClient({
         </Select>
       </div>
       <Button
-        onClick={handleJoin}
+        onClick={handlePayAndRegister}
         disabled={!selectedWrestlerId || joining}
         className="w-full bg-accent text-black hover:bg-accent-hover"
       >
-        {joining ? 'Registering…' : 'Register for this session'}
+        {joining ? 'Redirecting to payment…' : `Pay $${pricePerParticipant.toFixed(2)} & register`}
       </Button>
-      <p className="text-xs text-muted-foreground">
-        No charge online. Payment is arranged with the coach or organizer.
-      </p>
     </div>
   );
 }

@@ -41,6 +41,8 @@ export interface Athlete {
 export type SessionType = '1-on-1' | '2-athlete' | 'group';
 export type SessionStatus = 'scheduled' | 'completed' | 'cancelled' | 'no-show' | 'pending_payment';
 export type SessionMode = 'private' | 'sibling' | 'partner-invite' | 'partner-open';
+/** Who can join this session (everyone pays in app): public = discover & pay; private = no one else; invite_only = link then pay */
+export type JoinPolicy = 'public' | 'private' | 'invite_only';
 
 export interface Session {
   id: string;
@@ -50,6 +52,7 @@ export interface Session {
   youth_wrestler_id?: string;
   session_type: SessionType;
   session_mode?: SessionMode;
+  join_policy?: JoinPolicy;
   partner_invite_code?: string;
   max_participants?: number;
   current_participants?: number;

@@ -666,7 +666,7 @@ export function AdminDashboardClient({
                   <SelectItem value="parent">Parent</SelectItem>
                   <SelectItem value="athlete">Athlete</SelectItem>
                   <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="youth_wrestler">Youth wrestler</SelectItem>
+                  <SelectItem value="youth_wrestler">Athlete</SelectItem>
                 </SelectContent>
               </Select>
               <div className="relative flex-1 max-w-xs">

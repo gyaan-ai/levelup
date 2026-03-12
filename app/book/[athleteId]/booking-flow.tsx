@@ -283,6 +283,8 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
           facilityId: facility?.id ?? null,
           youthWrestlerIds: selectedWrestlers.map((w) => w.id),
           sessionMode,
+          joinPolicy:
+            partnerOption === 'invite' ? 'invite_only' : partnerOption === 'open' ? 'public' : partnerOption === 'solo' ? 'private' : undefined,
           scheduledDate: dateStr,
           scheduledTime: is24h(selectedTime) ? selectedTime : timeTo24h(selectedTime),
           totalPrice,
@@ -506,9 +508,9 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
                   <div className="pt-4 border-t space-y-3">
                     <h4 className="font-semibold">How would you like to find a partner?</h4>
                     {[
-                      { id: 'invite' as const, Icon: Link2, title: 'Invite a Workout Partner', desc: 'Share a private link with someone you know.', sub: "They'll pay $40 when they join." },
-                      { id: 'open' as const, Icon: Users, title: 'Leave Open for Others', desc: 'Others can request to join as your partner.', sub: "You'll approve who trains with your wrestler." },
-                      { id: 'solo' as const, Icon: UserCircle, title: 'Train Solo if No Partner', desc: 'Convert to 1-on-1 ($60) if spot doesn\'t fill.', sub: "You'll only pay the extra $20 if no partner joins." },
+                      { id: 'invite' as const, Icon: Link2, title: 'Invite only', desc: 'Share a link with someone you know. Only they can pay & register.', sub: "They'll pay when they use the link." },
+                      { id: 'open' as const, Icon: Users, title: 'Public', desc: 'Anyone can find this session and pay to register.', sub: 'Listed in Find training and Group & partner.' },
+                      { id: 'solo' as const, Icon: UserCircle, title: 'Private (train solo)', desc: 'No one else can join. Just you and the coach.', sub: "You'll only pay for your spot." },
                     ].map(({ id, Icon, title, desc, sub }) => (
                       <Card
                         key={id}

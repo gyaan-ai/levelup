@@ -44,7 +44,7 @@ const ROLE_LABELS: Record<string, string> = {
   parent: 'Parent',
   athlete: 'Coach',
   admin: 'Admin',
-  youth_wrestler: 'Youth wrestler',
+  youth_wrestler: 'Athlete',
 };
 
 export function AdminUsersClient({ initialUsers }: { initialUsers: AdminUserRow[] }) {
@@ -204,7 +204,7 @@ export function AdminUsersClient({ initialUsers }: { initialUsers: AdminUserRow[
                 <SelectItem value="athlete">Coaches</SelectItem>
                 <SelectItem value="parent">Parents</SelectItem>
                 <SelectItem value="admin">Admin</SelectItem>
-                <SelectItem value="youth_wrestler">Youth wrestler</SelectItem>
+                <SelectItem value="youth_wrestler">Athlete</SelectItem>
               </SelectContent>
             </Select>
             <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortOption)}>
@@ -411,7 +411,7 @@ export function AdminUsersClient({ initialUsers }: { initialUsers: AdminUserRow[
                   <SelectItem value="parent">Parent</SelectItem>
                   <SelectItem value="athlete">Coach</SelectItem>
                   <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="youth_wrestler">Youth wrestler</SelectItem>
+                  <SelectItem value="youth_wrestler">Athlete</SelectItem>
                 </SelectContent>
               </Select>
             </div>
