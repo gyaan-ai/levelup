@@ -74,16 +74,20 @@ function matchesFilter(s: SessionItem, filter: StatusFilter): boolean {
 
 function participantsFromSession(s: SessionItem): { id: string; first_name?: string | null; last_name?: string | null; photo_url?: string | null }[] {
   const parts = s.session_participants ?? [];
-  return parts.map((p) => {
+  const result: { id: string; first_name?: string | null; last_name?: string | null; photo_url?: string | null }[] = [];
+  for (const p of parts) {
     const yw = Array.isArray(p.youth_wrestlers) ? p.youth_wrestlers[0] : p.youth_wrestlers;
-    if (!yw) return null;
-    return {
-      id: (yw as { id?: string }).id ?? '',
-      first_name: (yw as { first_name?: string }).first_name,
-      last_name: (yw as { last_name?: string }).last_name,
-      photo_url: (yw as { photo_url?: string }).photo_url,
-    };
-  }).filter((x): x is { id: string; first_name?: string | null; last_name?: string | null; photo_url?: string | null } => Boolean(x?.id));
+    if (!yw) continue;
+    const id = (yw as { id?: string }).id ?? '';
+    if (!id) continue;
+    result.push({
+      id,
+      first_name: (yw as { first_name?: string }).first_name ?? null,
+      last_name: (yw as { last_name?: string }).last_name ?? null,
+      photo_url: (yw as { photo_url?: string }).photo_url ?? null,
+    });
+  }
+  return result;
 }
 
 export function PartnerSessionsClient({
