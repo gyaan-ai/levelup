@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
+import { fromZonedTime } from 'date-fns-tz';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
+import { APP_TIMEZONE } from '@/lib/format-date';
 
 /**
  * PATCH - Admin updates a session (focus_area, join_policy, max_participants, price_per_participant).
@@ -31,6 +33,8 @@ export async function PATCH(
       join_policy?: 'public' | 'private' | 'invite_only';
       max_participants?: number;
       price_per_participant?: number;
+      scheduledDate?: string;
+      scheduledTime?: string;
     };
 
     const admin = createAdminClient(tenant.slug);
@@ -69,6 +73,13 @@ export async function PATCH(
     if (body.price_per_participant !== undefined) {
       const price = Math.max(0, Number(body.price_per_participant) ?? 0);
       updates.price_per_participant = price;
+    }
+    if (body.scheduledDate && body.scheduledTime) {
+      const [datePart] = body.scheduledDate.split('T');
+      const timePart = body.scheduledTime.includes(':') ? body.scheduledTime : `${body.scheduledTime}:00`;
+      const localIso = `${datePart}T${timePart.length === 5 ? `${timePart}:00` : timePart}`;
+      const utcDate = fromZonedTime(localIso, APP_TIMEZONE);
+      updates.scheduled_datetime = utcDate.toISOString();
     }
 
     if (Object.keys(updates).length === 0) {

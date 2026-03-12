@@ -69,7 +69,11 @@ export async function POST(
         .eq('id', youthWrestlerId)
         .single();
       const ywParentId = (yw as { parent_id?: string } | null)?.parent_id;
-      if (!yw || ywParentId !== user.id) {
+      const isPrimaryParent = yw && ywParentId === user.id;
+      const { data: link } = !isPrimaryParent && yw
+        ? await supabase.from('youth_wrestler_parents').select('id').eq('youth_wrestler_id', youthWrestlerId).eq('parent_id', user.id).maybeSingle()
+        : { data: null };
+      if (!yw || (!isPrimaryParent && !link)) {
         return NextResponse.json({ error: 'Youth wrestler not found or not yours' }, { status: 400 });
       }
       const { data: existing } = await supabase
@@ -111,7 +115,11 @@ export async function POST(
       .eq('id', youthWrestlerId)
       .single();
     const ywParentId = (yw as { parent_id?: string } | null)?.parent_id;
-    if (!yw || ywParentId !== user.id) {
+    const isPrimaryParent = yw && ywParentId === user.id;
+    const { data: link } = !isPrimaryParent && yw
+      ? await supabase.from('youth_wrestler_parents').select('id').eq('youth_wrestler_id', youthWrestlerId).eq('parent_id', user.id).maybeSingle()
+      : { data: null };
+    if (!yw || (!isPrimaryParent && !link)) {
       return NextResponse.json({ error: 'Youth wrestler not found or not yours' }, { status: 400 });
     }
 

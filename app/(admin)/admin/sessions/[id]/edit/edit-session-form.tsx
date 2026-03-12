@@ -23,6 +23,8 @@ type Props = {
   maxParticipants: number;
   pricePerParticipant: number;
   currentParticipants: number;
+  scheduledDate: string;
+  scheduledTime: string;
 };
 
 export function EditSessionForm({
@@ -33,12 +35,16 @@ export function EditSessionForm({
   maxParticipants,
   pricePerParticipant,
   currentParticipants,
+  scheduledDate: initialDate,
+  scheduledTime: initialTime,
 }: Props) {
   const router = useRouter();
   const [focus, setFocus] = useState(focusArea);
   const [join, setJoin] = useState(joinPolicy);
   const [max, setMax] = useState(String(maxParticipants));
   const [price, setPrice] = useState(String(pricePerParticipant));
+  const [date, setDate] = useState(initialDate);
+  const [time, setTime] = useState(initialTime);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -57,6 +63,8 @@ export function EditSessionForm({
           join_policy: join,
           max_participants: Math.min(20, Math.max(1, parseInt(max, 10) || 2)),
           price_per_participant: Math.max(0, parseFloat(price) || 0),
+          scheduledDate: date,
+          scheduledTime: time,
         }),
       });
       const data = await res.json();
@@ -78,7 +86,7 @@ export function EditSessionForm({
       <CardHeader>
         <CardTitle>Session details</CardTitle>
         <CardDescription>
-          Update topic (focus), who can join, max spots, and price. Only scheduled or pending-payment sessions can be edited.
+          Update date/time (Eastern), topic, who can join, max spots, and price. Only scheduled or pending-payment sessions can be edited.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -86,6 +94,28 @@ export function EditSessionForm({
           {error && (
             <p className="text-sm text-destructive">{error}</p>
           )}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="edit-date">Date</Label>
+              <Input
+                id="edit-date"
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                required
+              />
+            </div>
+            <div>
+              <Label htmlFor="edit-time">Time (Eastern)</Label>
+              <Input
+                id="edit-time"
+                type="time"
+                value={time}
+                onChange={(e) => setTime(e.target.value)}
+                required
+              />
+            </div>
+          </div>
           {isGroup && (
             <>
               <div>

@@ -1,7 +1,6 @@
 'use client';
 
 import { useMemo } from 'react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -119,9 +118,11 @@ export function SmallGroupSessionsClient({
                 >
                   <div className="min-w-0 flex-1 flex items-start gap-3">
                     {coachPhoto ? (
-                      <div className="relative w-10 h-10 rounded-full overflow-hidden shrink-0 bg-muted">
-                        <Image src={coachPhoto} alt="" fill className="object-cover" sizes="40px" />
-                      </div>
+                      <img
+                        src={coachPhoto}
+                        alt=""
+                        className="w-10 h-10 rounded-full object-cover shrink-0 bg-muted"
+                      />
                     ) : (
                       <div className="w-10 h-10 rounded-full bg-muted shrink-0" />
                     )}

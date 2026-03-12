@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
+import { fromZonedTime } from 'date-fns-tz';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import { generateInviteCode } from '@/lib/sessions';
+import { APP_TIMEZONE } from '@/lib/format-date';
 
 /**
  * POST - Admin creates a small-group session: assign coach, set time/facility, get shareable link.
@@ -52,7 +54,11 @@ export async function POST(req: NextRequest) {
     }
 
     const [datePart] = scheduledDate.split('T');
-    const scheduledDatetime = `${datePart}T${scheduledTime}`;
+    // Interpret date + time as Eastern; store UTC so display (formatEST) shows correct time
+    const timePart = scheduledTime.includes(':') ? scheduledTime : `${scheduledTime}:00`;
+    const localIso = `${datePart}T${timePart.length === 5 ? `${timePart}:00` : timePart}`;
+    const utcDate = fromZonedTime(localIso, APP_TIMEZONE);
+    const scheduledDatetime = utcDate.toISOString();
     const price = Number(pricePerParticipant) || 30;
     const max = Math.min(20, Math.max(2, Number(maxParticipants) || 6));
     const duration = Math.min(120, Math.max(30, Number(durationMinutes) || 60));

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
+import { formatEST } from '@/lib/format-date';
 import { EditSessionForm } from './edit-session-form';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
@@ -75,6 +76,8 @@ export default async function AdminEditSessionPage({
         maxParticipants={(session as { max_participants?: number }).max_participants ?? 6}
         pricePerParticipant={(session as { price_per_participant?: number }).price_per_participant ?? 0}
         currentParticipants={(session as { current_participants?: number }).current_participants ?? 0}
+        scheduledDate={formatEST((session as { scheduled_datetime?: string }).scheduled_datetime ?? '', 'yyyy-MM-dd')}
+        scheduledTime={formatEST((session as { scheduled_datetime?: string }).scheduled_datetime ?? '', 'HH:mm')}
       />
     </div>
   );
