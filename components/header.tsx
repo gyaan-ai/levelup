@@ -61,6 +61,7 @@ export function Header() {
             <div className="text-sm text-white/70">Loading...</div>
           ) : user ? (
             <>
+            {/* Post-login: nav aligned to profile (athlete = coach, parent, youth_wrestler, admin) */}
             <nav className="hidden md:flex items-center gap-6">
               {effectiveRole === 'athlete' && (
                 <>
@@ -126,7 +127,43 @@ export function Header() {
                   <NotificationBell count={notificationCount} onRefresh={refreshNotifications} />
                 </>
               )}
-              {(userRole === 'admin' || userRole === 'parent') && (
+              {effectiveRole === 'admin' && (
+                <>
+                  <Link
+                    href="/admin"
+                    className="text-white hover:text-accent transition-colors font-medium"
+                  >
+                    Admin
+                  </Link>
+                  <Link
+                    href="/browse"
+                    className="text-white hover:text-accent transition-colors font-medium"
+                  >
+                    Browse Coaches
+                  </Link>
+                  <Link
+                    href="/admin?tab=kids"
+                    className="text-white hover:text-accent transition-colors font-medium"
+                  >
+                    Athletes
+                  </Link>
+                  <Select
+                    value={viewAsRole ?? 'admin'}
+                    onValueChange={handleViewAsChange}
+                  >
+                    <SelectTrigger className="w-[130px] h-9 border-white/30 bg-white/10 text-white hover:bg-white/20 [&>span]:line-clamp-1">
+                      <SelectValue placeholder="View as" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="admin">Admin</SelectItem>
+                      <SelectItem value="athlete">Coach</SelectItem>
+                      <SelectItem value="parent">Parent</SelectItem>
+                      <SelectItem value="youth_wrestler">Youth wrestler</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </>
+              )}
+              {effectiveRole === 'parent' && (
                 <>
                   <Link
                     href="/dashboard"
@@ -172,30 +209,6 @@ export function Header() {
                     )}
                   </Link>
                   <NotificationBell count={notificationCount} onRefresh={refreshNotifications} />
-                  {userRole === 'admin' && (
-                    <>
-                      <Select
-                        value={viewAsRole ?? 'admin'}
-                        onValueChange={handleViewAsChange}
-                      >
-                        <SelectTrigger className="w-[130px] h-9 border-white/30 bg-white/10 text-white hover:bg-white/20 [&>span]:line-clamp-1">
-                          <SelectValue placeholder="View as" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="admin">Admin</SelectItem>
-                          <SelectItem value="athlete">Coach</SelectItem>
-                          <SelectItem value="parent">Parent</SelectItem>
-                          <SelectItem value="youth_wrestler">Youth wrestler</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Link
-                        href="/admin"
-                        className="text-white hover:text-accent transition-colors font-medium"
-                      >
-                        Admin
-                      </Link>
-                    </>
-                  )}
                 </>
               )}
               <div className="flex items-center gap-3 pl-4 border-l border-white/20">
@@ -284,25 +297,46 @@ export function Header() {
                       </Link>
                     </>
                   )}
-                  {(effectiveRole === 'admin' || effectiveRole === 'parent') && (
+                  {effectiveRole === 'admin' && (
                     <>
-                  <Link href="/dashboard" className={navLinkClass} onClick={() => setMobileOpen(false)}>Dashboard</Link>
-                  <Link href="/browse" className={navLinkClass} onClick={() => setMobileOpen(false)}>Browse Coaches</Link>
-                  <Link href="/signup?role=athlete" className={navLinkClass} onClick={() => setMobileOpen(false)}>For Coaches</Link>
-                  <Link href="/bookings" className={navLinkClass} onClick={() => setMobileOpen(false)}>My Bookings</Link>
-                  <Link href="/small-group-sessions" className={navLinkClass} onClick={() => setMobileOpen(false)}>Small group</Link>
-                  <Link href="/inbox" className={navLinkClass} onClick={() => setMobileOpen(false)}>
-                    <span className="flex items-center gap-2">
-                      <Mail className="h-5 w-5 shrink-0" />
-                      Community
-                      {inboxUnreadCount > 0 && (
-                        <span className="min-w-[20px] h-5 px-1.5 flex items-center justify-center text-xs font-bold bg-accent text-black rounded-full">
-                          {inboxUnreadCount > 99 ? '99+' : inboxUnreadCount}
+                      <Link href="/admin" className={navLinkClass} onClick={() => setMobileOpen(false)}>Admin</Link>
+                      <Link href="/browse" className={navLinkClass} onClick={() => setMobileOpen(false)}>Browse Coaches</Link>
+                      <Link href="/admin?tab=kids" className={navLinkClass} onClick={() => setMobileOpen(false)}>Athletes</Link>
+                      <div className="px-4 py-2 border-b border-white/10">
+                        <label className="text-xs text-white/70 uppercase tracking-wide">View as</label>
+                        <Select value={viewAsRole ?? 'admin'} onValueChange={handleViewAsChange}>
+                          <SelectTrigger className="mt-1.5 w-full border-white/30 bg-white/10 text-white">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="admin">Admin</SelectItem>
+                            <SelectItem value="athlete">Coach</SelectItem>
+                            <SelectItem value="parent">Parent</SelectItem>
+                            <SelectItem value="youth_wrestler">Youth wrestler</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </>
+                  )}
+                  {effectiveRole === 'parent' && (
+                    <>
+                      <Link href="/dashboard" className={navLinkClass} onClick={() => setMobileOpen(false)}>Dashboard</Link>
+                      <Link href="/browse" className={navLinkClass} onClick={() => setMobileOpen(false)}>Browse Coaches</Link>
+                      <Link href="/signup?role=athlete" className={navLinkClass} onClick={() => setMobileOpen(false)}>For Coaches</Link>
+                      <Link href="/bookings" className={navLinkClass} onClick={() => setMobileOpen(false)}>My Bookings</Link>
+                      <Link href="/small-group-sessions" className={navLinkClass} onClick={() => setMobileOpen(false)}>Small group</Link>
+                      <Link href="/inbox" className={navLinkClass} onClick={() => setMobileOpen(false)}>
+                        <span className="flex items-center gap-2">
+                          <Mail className="h-5 w-5 shrink-0" />
+                          Community
+                          {inboxUnreadCount > 0 && (
+                            <span className="min-w-[20px] h-5 px-1.5 flex items-center justify-center text-xs font-bold bg-accent text-black rounded-full">
+                              {inboxUnreadCount > 99 ? '99+' : inboxUnreadCount}
+                            </span>
+                          )}
                         </span>
-                      )}
-                    </span>
-                  </Link>
-                  <Link href="/notifications" className={navLinkClass} onClick={() => setMobileOpen(false)}>
+                      </Link>
+                      <Link href="/notifications" className={navLinkClass} onClick={() => setMobileOpen(false)}>
                         <span className="flex items-center gap-2">
                           <Bell className="h-5 w-5 shrink-0" />
                           Notifications
@@ -313,25 +347,6 @@ export function Header() {
                           )}
                         </span>
                       </Link>
-                      {userRole === 'admin' && (
-                        <>
-                          <div className="px-4 py-2 border-b border-white/10">
-                            <label className="text-xs text-white/70 uppercase tracking-wide">View as</label>
-                            <Select value={viewAsRole ?? 'admin'} onValueChange={handleViewAsChange}>
-                              <SelectTrigger className="mt-1.5 w-full border-white/30 bg-white/10 text-white">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="admin">Admin</SelectItem>
-                                <SelectItem value="athlete">Coach</SelectItem>
-                                <SelectItem value="parent">Parent</SelectItem>
-                                <SelectItem value="youth_wrestler">Youth wrestler</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <Link href="/admin" className={navLinkClass} onClick={() => setMobileOpen(false)}>Admin</Link>
-                        </>
-                      )}
                     </>
                   )}
                   <div className="border-t border-white/20 mt-2 pt-2 px-4">
@@ -350,6 +365,7 @@ export function Header() {
             </>
           ) : (
             <>
+            {/* Pre-login: public menu (matches signup flow: parent = Browse / Book; coach = For Coaches) */}
             <nav className="hidden md:flex items-center gap-6">
               <Link
                 href="/browse"
@@ -404,6 +420,7 @@ export function Header() {
                   <Link href="/browse" className={navLinkClass} onClick={() => setMobileOpen(false)}>Browse Coaches</Link>
                   <Link href="/signup?role=athlete" className={navLinkClass} onClick={() => setMobileOpen(false)}>For Coaches</Link>
                   <Link href="/how-it-works" className={navLinkClass} onClick={() => setMobileOpen(false)}>How It Works</Link>
+                  <Link href="/login" className={navLinkClass} onClick={() => setMobileOpen(false)}>Login</Link>
                   <Link href="/signup" className={navLinkClass} onClick={() => setMobileOpen(false)}>
                     <span className="font-semibold text-accent">Book Training</span>
                   </Link>

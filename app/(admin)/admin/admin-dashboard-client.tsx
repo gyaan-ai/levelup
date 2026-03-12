@@ -489,7 +489,7 @@ export function AdminDashboardClient({
     { id: 'credits', label: 'Credits', icon: <CreditCard className="h-4 w-4" /> },
     { id: 'facility_requests', label: 'Facility requests', icon: <Building2 className="h-4 w-4" /> },
     { id: 'athletes', label: 'Coaches', icon: <BarChart3 className="h-4 w-4" /> },
-    { id: 'kids', label: 'Kids', icon: <User className="h-4 w-4" /> },
+    { id: 'kids', label: 'Athletes', icon: <User className="h-4 w-4" /> },
   ];
 
   // Fetch kids when tab is selected
@@ -1211,9 +1211,9 @@ export function AdminDashboardClient({
       {tab === 'kids' && (
         <Card>
           <CardHeader>
-            <CardTitle>Kids (youth wrestlers)</CardTitle>
+            <CardTitle>Athletes</CardTitle>
             <CardDescription>
-              All youth wrestlers on the platform. Same card view as My Coaches.
+              Youth athletes on the platform. Same card view as My Coaches.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -1223,7 +1223,7 @@ export function AdminDashboardClient({
               </div>
             ) : kidsList.length === 0 ? (
               <div className="py-12 text-center text-muted-foreground">
-                No youth wrestlers yet.
+                No athletes yet.
               </div>
             ) : (
               <div className="grid gap-4 sm:grid-cols-2">

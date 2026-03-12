@@ -80,7 +80,7 @@ export const tenants: Record<string, TenantConfig> = {
     tagline: "Mastery. Technique. Access the Elite.",
     secondaryTagline: "Elite wrestling technique instruction",
 
-    domain: "guild.ncunitedwrestling.com",
+    domain: "www.wrestlingguild.com",
     supportEmail: "info@WrestlingGuild.com",
     phone: "(919) 555-0100",
 
@@ -121,7 +121,20 @@ export const tenants: Record<string, TenantConfig> = {
 };
 
 export function getTenantByDomain(hostname: string): TenantConfig | null {
-  return tenants["nc-united"];
+  const host = hostname.split(':')[0].toLowerCase();
+  // Primary domain and localhost for dev
+  if (host === 'www.wrestlingguild.com' || host === 'wrestlingguild.com' || host === 'localhost') {
+    return tenants["nc-united"];
+  }
+  // Legacy / alternate domain (redirect to www.wrestlingguild.com in Vercel if desired)
+  if (host === 'guildwrestling.com' || host === 'www.guildwrestling.com' || host === 'guild.ncunitedwrestling.com') {
+    return tenants["nc-united"];
+  }
+  // Vercel preview and other known hosts
+  if (host.endsWith('.vercel.app')) {
+    return tenants["nc-united"];
+  }
+  return null;
 }
 
 export function getTenantConfig(slug: string): TenantConfig {
