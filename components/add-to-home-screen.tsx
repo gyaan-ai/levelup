@@ -7,7 +7,7 @@ import Image from 'next/image';
 
 type InstallState = 'idle' | 'installable' | 'ios' | 'unsupported' | 'installed';
 
-export function AddToHomeScreen() {
+export function AddToHomeScreen({ variant = 'default' }: { variant?: 'default' | 'toolbar' }) {
   const [state, setState] = useState<InstallState>('idle');
   const [deferredPrompt, setDeferredPrompt] = useState<{
     prompt: () => Promise<{ outcome: string }>;
@@ -68,17 +68,31 @@ export function AddToHomeScreen() {
 
   if (state !== 'installable' && state !== 'ios') return null;
 
+  const isToolbar = variant === 'toolbar';
+
   return (
     <>
-      <Button
-        variant="outline"
-        size="lg"
-        onClick={handleClick}
-        className="gap-2 bg-white/10 border-white/40 text-white hover:bg-white hover:text-black"
-      >
-        <Smartphone className="h-5 w-5" />
-        Add to Home Screen
-      </Button>
+      {isToolbar ? (
+        <button
+          type="button"
+          onClick={handleClick}
+          className="flex items-center justify-center p-2 rounded-md text-white hover:text-accent hover:bg-white/10 transition-colors"
+          title="Add to Home Screen"
+          aria-label="Add to Home Screen"
+        >
+          <Smartphone className="h-5 w-5" />
+        </button>
+      ) : (
+        <Button
+          variant="outline"
+          size="lg"
+          onClick={handleClick}
+          className="gap-2 bg-white/10 border-white/40 text-white hover:bg-white hover:text-black"
+        >
+          <Smartphone className="h-5 w-5" />
+          Add to Home Screen
+        </Button>
+      )}
 
       {showIosModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80" onClick={() => setShowIosModal(false)}>

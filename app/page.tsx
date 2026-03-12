@@ -3,7 +3,6 @@ import Image from 'next/image';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, Users, Award, Shield, Search } from 'lucide-react';
-import { AddToHomeScreen } from '@/components/add-to-home-screen';
 import { EarlyAccessForm } from '@/app/early-access-form';
 
 export const metadata = {
@@ -60,7 +59,6 @@ export default function HomePage() {
                   >
                     <Link href="/#how-it-works">How It Works</Link>
                   </Button>
-                  <AddToHomeScreen />
                 </div>
               </div>
               <div className="relative flex items-center justify-center min-h-[280px] lg:min-h-[360px]">

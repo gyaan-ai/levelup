@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from './ui/select';
 import { Bell, Menu, X, Mail } from 'lucide-react';
+import { AddToHomeScreen } from '@/components/add-to-home-screen';
 
 const navLinkClass = 'block py-3 px-4 text-white hover:text-accent hover:bg-white/10 transition-colors font-medium min-h-[44px] flex items-center';
 
@@ -45,7 +46,7 @@ export function Header() {
     <header className="bg-primary text-white border-b border-accent/20 sticky top-0 z-50">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-14 sm:h-16">
-          <div className="flex items-center gap-4 min-w-0">
+          <div className="flex items-center gap-2 min-w-0">
             <Link href="/" className="flex items-center group shrink-0" onClick={() => setMobileOpen(false)}>
               <Image
                 src="/logos/guild-g.png"
@@ -55,6 +56,7 @@ export function Header() {
                 className="h-9 w-9 sm:h-10 sm:w-10 object-contain"
               />
             </Link>
+            <AddToHomeScreen variant="toolbar" />
           </div>
 
           {loading ? (
