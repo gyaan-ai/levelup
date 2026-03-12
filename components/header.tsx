@@ -203,6 +203,12 @@ export function Header() {
               )}
               {effectiveRole === 'admin' && (
                 <>
+                  <Link
+                    href="/dashboard"
+                    className="text-white hover:text-accent transition-colors font-medium"
+                  >
+                    Dashboard
+                  </Link>
                   <button
                     type="button"
                     onClick={goToAdmin}
@@ -423,7 +429,8 @@ export function Header() {
                   )}
                   {effectiveRole === 'admin' && (
                     <>
-                      <button type="button" className={navLinkClass} onClick={goToAdmin}>Admin</button>
+                      <Link href="/dashboard" className={navLinkClass} onClick={() => setMobileOpen(false)}>Dashboard</Link>
+                      <button type="button" className={navLinkClass} onClick={() => { goToAdmin(); setMobileOpen(false); }}>Admin</button>
                       <div className="px-4 py-2 border-b border-white/10">
                         <label className="text-xs text-white/70 uppercase tracking-wide">Preview as</label>
                         <Select value={viewAsRole ?? 'admin'} onValueChange={(v) => { handleViewAsChange(v); setMobileOpen(false); }}>

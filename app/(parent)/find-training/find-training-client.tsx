@@ -32,6 +32,7 @@ type SessionRow = {
   scheduled_datetime: string;
   session_type: string | null;
   session_mode: string | null;
+  join_policy?: string | null;
   focus_area: string | null;
   current_participants: number | null;
   max_participants: number | null;
@@ -81,6 +82,10 @@ export function FindTrainingClient({
     router.push(`${searchBasePath}?${params.toString()}`);
   };
 
+  const hasSearchCriteria = date || (location && location !== 'all');
+  const showResults = hasSearchCriteria && initialSessions.length > 0;
+  const showNoResults = hasSearchCriteria && initialSessions.length === 0;
+
   const sessionTypeLabel = (s: SessionRow) => {
     if (s.session_mode === 'partner-open') return 'Partner (open)';
     if (s.session_type === 'small_group' || s.session_type === 'group') return 'Small group';
@@ -115,7 +120,10 @@ export function FindTrainingClient({
                   >
                     <Calendar className="mr-2 h-4 w-4" />
                     {date
-                      ? formatEST(new Date(date + 'T12:00:00'), 'EEE, MMM d, yyyy')
+                      ? (() => {
+                          const [y, m, d] = date.split('-').map(Number);
+                          return formatEST(new Date(y, (m ?? 1) - 1, d ?? 1), 'EEE, MMM d, yyyy');
+                        })()
                       : 'Pick a date'}
                     <ChevronDown className="ml-auto h-4 w-4 opacity-50" />
                   </Button>
@@ -123,10 +131,18 @@ export function FindTrainingClient({
                 <PopoverContent className="w-auto p-0" align="start">
                   <CalendarComponent
                     mode="single"
-                    selected={date ? new Date(date + 'T12:00:00') : undefined}
+                    selected={date ? (() => {
+                      const [y, m, d] = date.split('-').map(Number);
+                      return new Date(y, (m ?? 1) - 1, d ?? 1);
+                    })() : undefined}
+                    defaultMonth={date ? (() => {
+                      const [y, m] = date.split('-').map(Number);
+                      return new Date(y ?? new Date().getFullYear(), (m ?? new Date().getMonth() + 1) - 1, 1);
+                    })() : new Date()}
                     onSelect={(d) => {
                       if (d) {
-                        setDate(formatEST(d, 'yyyy-MM-dd'));
+                        const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'), day = String(d.getDate()).padStart(2, '0');
+                        setDate(`${y}-${m}-${day}`);
                         setDateOpen(false);
                       }
                     }}
@@ -216,19 +232,19 @@ export function FindTrainingClient({
         </CardContent>
       </Card>
 
-      {!date ? (
+      {!hasSearchCriteria ? (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
             <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p>Choose a date and click Search to see open sessions.</p>
+            <p>Pick a date and click Search, or pick a location (e.g. UNC Wrestling Facility) and click Search to see sessions there.</p>
           </CardContent>
         </Card>
-      ) : initialSessions.length === 0 ? (
+      ) : showNoResults ? (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
             <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p>No open sessions on this date.</p>
-            <p className="text-sm mt-2">Try another date or remove the time/location filter.</p>
+            <p>No open sessions for this search.</p>
+            <p className="text-sm mt-2">Try another date or location.</p>
           </CardContent>
         </Card>
       ) : (
@@ -236,7 +252,8 @@ export function FindTrainingClient({
           <CardHeader>
             <CardTitle>Open sessions</CardTitle>
             <p className="text-sm text-muted-foreground">
-              {initialSessions.length} session{initialSessions.length !== 1 ? 's' : ''} on {formatEST(new Date(date + 'T12:00:00'), 'EEEE, MMM d, yyyy')}
+              {initialSessions.length} session{initialSessions.length !== 1 ? 's' : ''}
+              {date ? (() => { const [y, m, d] = date.split('-').map(Number); return ` on ${formatEST(new Date(y, m - 1, d), 'EEEE, MMM d, yyyy')}`; })() : ' at this location'}
             </p>
           </CardHeader>
           <CardContent>
@@ -262,6 +279,11 @@ export function FindTrainingClient({
                         {s.focus_area && (
                           <span className="text-xs bg-muted px-2 py-0.5 rounded">
                             {s.focus_area}
+                          </span>
+                        )}
+                        {s.join_policy === 'invite_only' && (
+                          <span className="text-xs bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/40 px-2 py-0.5 rounded">
+                            Invite only
                           </span>
                         )}
                         <SessionStatusPill current={current} max={max} />
@@ -291,7 +313,9 @@ export function FindTrainingClient({
                     <div className="shrink-0 flex gap-2">
                       {openSlots > 0 && (
                         <Button asChild size="sm" variant="outline">
-                          <Link href={`/sessions/${s.id}/register`}>Register (pay & join)</Link>
+                          <Link href={`/sessions/${s.id}/register`}>
+                            {s.join_policy === 'invite_only' ? 'Get link / Register' : 'Register (pay & join)'}
+                          </Link>
                         </Button>
                       )}
                       <Button asChild size="sm" variant="ghost">

@@ -116,8 +116,34 @@ export default async function FindTrainingPage({
       const current = (s: { current_participants?: number | null; max_participants?: number | null }) =>
         s.current_participants ?? 0;
       const max = (s: { max_participants?: number | null }) => s.max_participants ?? 1;
-      sessions = list.filter((s) => current(s) < max(s) && (s as { join_policy?: string }).join_policy === 'public');
+      sessions = list.filter((s) => current(s) < max(s) && ((s as { join_policy?: string }).join_policy === 'public' || (s as { join_policy?: string }).join_policy === 'invite_only'));
     }
+  }
+  /* When only location is set (no date), show sessions at that facility in the next 14 days */
+  if (!dateParam && sp.location && sp.location !== 'all') {
+    const nowLoc = new Date();
+    const dayStart = nowLoc.toISOString();
+    const twoWeeks = new Date(nowLoc);
+    twoWeeks.setDate(twoWeeks.getDate() + 14);
+    const dayEnd = twoWeeks.toISOString();
+    const baseQ = () => {
+      let q = supabase.from('sessions').select('id, scheduled_datetime, session_type, session_mode, join_policy, focus_area, current_participants, max_participants, total_price, price_per_participant, athlete_id, facility_id, athletes(id, first_name, last_name, school), facilities(id, name, address)').in('status', ['scheduled', 'pending_payment']).eq('facility_id', sp.location).gte('scheduled_datetime', dayStart).lte('scheduled_datetime', dayEnd);
+      return q;
+    };
+    const [groupRes2, partnerRes2] = await Promise.all([
+      baseQ().in('session_type', ['group', 'small_group']).order('scheduled_datetime', { ascending: true }),
+      baseQ().eq('session_mode', 'partner-open').order('scheduled_datetime', { ascending: true }),
+    ]);
+    const seen2 = new Set<string>();
+    let list2: typeof sessions = [];
+    for (const row of [...(groupRes2.data ?? []), ...(partnerRes2.data ?? [])]) {
+      const r = row as unknown as (typeof sessions)[0];
+      if (seen2.has(r.id)) continue;
+      seen2.add(r.id);
+      list2.push(r);
+    }
+    list2.sort((a, b) => a.scheduled_datetime.localeCompare(b.scheduled_datetime));
+    sessions = list2.filter((s) => (s.current_participants ?? 0) < (s.max_participants ?? 1) && ((s as { join_policy?: string }).join_policy === 'public' || (s as { join_policy?: string }).join_policy === 'invite_only'));
   }
 
   return (
