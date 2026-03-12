@@ -1,6 +1,7 @@
 import { headers } from 'next/headers';
 import { Playfair_Display } from 'next/font/google';
 import { getTenantByDomain } from '@/config/tenants';
+import { Analytics } from '@vercel/analytics/next';
 import { ThemeProvider } from '@/components/theme-provider';
 import { AuthProvider } from '@/lib/auth/auth-provider';
 import { Header } from '@/components/header';
@@ -58,6 +59,7 @@ export default async function RootLayout({
               <p className="text-muted-foreground">Unable to resolve tenant for domain: {host}</p>
             </div>
           </div>
+          <Analytics />
         </body>
       </html>
     );
@@ -75,6 +77,7 @@ export default async function RootLayout({
             <Footer />
           </AuthProvider>
         </ThemeProvider>
+        <Analytics />
       </body>
     </html>
   );
