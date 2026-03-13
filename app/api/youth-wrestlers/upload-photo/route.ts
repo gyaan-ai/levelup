@@ -103,6 +103,17 @@ export async function POST(req: NextRequest) {
       .from('athlete-photos')
       .getPublicUrl(data.path);
 
+    // Persist to DB immediately so the photo shows even if form save fails or is skipped
+    const { error: updateError } = await db
+      .from('youth_wrestlers')
+      .update({ photo_url: urlData.publicUrl })
+      .eq('id', youthWrestlerId);
+
+    if (updateError) {
+      console.error('Failed to save photo_url to youth_wrestlers:', updateError);
+      // Still return the URL so the client can retry update with it
+    }
+
     return NextResponse.json({ photoUrl: urlData.publicUrl });
   } catch (error: any) {
     console.error('Error uploading photo:', error);

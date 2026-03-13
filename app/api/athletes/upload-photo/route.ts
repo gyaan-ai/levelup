@@ -81,6 +81,17 @@ export async function POST(req: NextRequest) {
       .from('athlete-photos')
       .getPublicUrl(data.path);
 
+    // Persist to DB immediately so the photo shows even if profile save fails or is skipped
+    const { error: updateError } = await supabase
+      .from('athletes')
+      .update({ photo_url: urlData.publicUrl })
+      .eq('id', user.id);
+
+    if (updateError) {
+      console.error('Failed to save photo_url to athletes:', updateError);
+      // Still return the URL so the client can retry profile save with it
+    }
+
     return NextResponse.json({ photoUrl: urlData.publicUrl });
   } catch (error: any) {
     console.error('Error uploading photo:', error);
