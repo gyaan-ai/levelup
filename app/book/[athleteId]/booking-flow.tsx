@@ -45,6 +45,8 @@ interface Athlete {
   last_name: string;
   school: string;
   photo_url?: string;
+  photo_focus_x?: number;
+  photo_focus_y?: number;
   total_sessions?: number;
 }
 

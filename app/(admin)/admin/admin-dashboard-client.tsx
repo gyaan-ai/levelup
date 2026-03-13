@@ -331,6 +331,8 @@ export function AdminDashboardClient({
     graduation_year: number | null;
     parent_email: string;
     photo_url: string | null;
+    photo_focus_x?: number;
+    photo_focus_y?: number;
     created_at: string;
   }>>([]);
   const [kidsLoading, setKidsLoading] = useState(false);
