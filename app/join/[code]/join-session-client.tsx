@@ -92,7 +92,7 @@ export function JoinSessionClient({
           This session is on your Dashboard and Bookings. Payment was collected in the app.
         </p>
         <Button asChild className="w-full bg-accent text-black hover:bg-accent-hover">
-          <Link href="/dashboard?tab=scheduled">View Dashboard</Link>
+          <Link href="/dashboard">View Home</Link>
         </Button>
       </div>
     );

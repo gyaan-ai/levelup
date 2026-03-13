@@ -74,14 +74,22 @@ interface BookingFlowProps {
   youthWrestlers: YouthWrestler[];
   tenantPricing: { oneOnOne: number; twoAthlete: number; groupRate: number };
   products?: Product[];
+  /** When set, pre-select this wrestler so the parent doesn't have to choose again (e.g. from Home "Book session" for a specific kid). */
+  preselectedYouthWrestlerId?: string | null;
 }
 
 type AvailabilityByDay = { day_of_week: number; start_time: string; end_time: string }[];
 
-export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, products = [] }: BookingFlowProps) {
+export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, products = [], preselectedYouthWrestlerId = null }: BookingFlowProps) {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
-  const [selectedWrestlers, setSelectedWrestlers] = useState<YouthWrestler[]>([]);
+  const [selectedWrestlers, setSelectedWrestlers] = useState<YouthWrestler[]>(() => {
+    if (preselectedYouthWrestlerId && youthWrestlers.length > 0) {
+      const found = youthWrestlers.find((w) => w.id === preselectedYouthWrestlerId);
+      if (found) return [found];
+    }
+    return [];
+  });
   const [sessionChoice, setSessionChoice] = useState<'1-on-1' | 'partner' | 'sibling' | null>(null);
   const [partnerOption, setPartnerOption] = useState<'invite' | 'open' | 'solo' | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);

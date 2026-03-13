@@ -7,10 +7,14 @@ import { BookingFlow } from './booking-flow';
 
 export default async function BookPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ athleteId: string }>;
+  searchParams: Promise<{ youthWrestlerId?: string }>;
 }) {
   const { athleteId } = await params;
+  const sp = await searchParams;
+  const preselectedYouthWrestlerId = sp.youthWrestlerId ?? null;
   const headersList = await headers();
   const host = headersList.get('host') || '';
   const tenant = getTenantByDomain(host);
@@ -132,6 +136,7 @@ export default async function BookPage({
       youthWrestlers={youthWrestlers || []}
       tenantPricing={tenant.pricing}
       products={products}
+      preselectedYouthWrestlerId={preselectedYouthWrestlerId}
     />
   );
 }

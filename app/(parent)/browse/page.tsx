@@ -11,7 +11,12 @@ export const metadata = {
     'Train with NCAA wrestlers and elite coaches in your community. View profiles, credentials, and reviews. Book private technique sessions.',
 };
 
-export default async function BrowsePage() {
+export default async function BrowsePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ youthWrestlerId?: string }>;
+}) {
+  const sp = await searchParams;
   const headersList = await headers();
   const host = headersList.get('host') || '';
   const tenant = getTenantByDomain(host);
@@ -83,5 +88,11 @@ export default async function BrowsePage() {
   }));
 
   const isAdmin = userData?.role === 'admin';
-  return <BrowseAthletesClient initialAthletes={athletesWithNext} isAdmin={!!isAdmin} />;
+  return (
+    <BrowseAthletesClient
+      initialAthletes={athletesWithNext}
+      isAdmin={!!isAdmin}
+      initialYouthWrestlerId={sp.youthWrestlerId ?? undefined}
+    />
+  );
 }

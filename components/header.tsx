@@ -468,14 +468,14 @@ export function Header() {
                       </div>
                     </>
                   )}
-                      <Link href="/dashboard" className={navLinkClass} onClick={() => setMobileOpen(false)}>Dashboard</Link>
-                      <Link href="/inbox" className={navLinkClass} onClick={() => setMobileOpen(false)}>Community</Link>
-                      <Link href="/workspaces" className={navLinkClass} onClick={() => setMobileOpen(false)}>Workspaces</Link>
-                      <Link href="/dashboard#spending" className={navLinkClass} onClick={() => setMobileOpen(false)}>Spending</Link>
+                      <Link href="/dashboard" className={navLinkClass} onClick={() => setMobileOpen(false)}>Home</Link>
+                      <Link href="/find-training" className={navLinkClass} onClick={() => setMobileOpen(false)}>Find Training</Link>
+                      <Link href="/browse" className={navLinkClass} onClick={() => setMobileOpen(false)}>Coaches</Link>
+                      <Link href="/bookings" className={navLinkClass} onClick={() => setMobileOpen(false)}>My Sessions</Link>
                       <Link href="/inbox" className={navLinkClass} onClick={() => setMobileOpen(false)}>
                         <span className="flex items-center gap-2">
                           <Mail className="h-5 w-5 shrink-0" />
-                          Community
+                          Messages
                           {inboxUnreadCount > 0 && (
                             <span className="min-w-[20px] h-5 px-1.5 flex items-center justify-center text-xs font-bold bg-accent text-black rounded-full">
                               {inboxUnreadCount > 99 ? '99+' : inboxUnreadCount}
@@ -483,6 +483,7 @@ export function Header() {
                           )}
                         </span>
                       </Link>
+                      <Link href="/account" className={navLinkClass} onClick={() => setMobileOpen(false)}>Account</Link>
                       <Link href="/notifications" className={navLinkClass} onClick={() => setMobileOpen(false)}>
                         <span className="flex items-center gap-2">
                           <Bell className="h-5 w-5 shrink-0" />

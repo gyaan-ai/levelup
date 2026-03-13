@@ -90,10 +90,10 @@ export function SmallGroupSessionsClient({
             <p className="text-muted-foreground mb-4">No sessions right now.</p>
             <div className="flex flex-wrap justify-center gap-2">
               <Button asChild variant="outline" size="sm">
-                <Link href="/dashboard?tab=find-training">Find by date</Link>
+                <Link href="/find-training">Find by date</Link>
               </Button>
               <Button asChild size="sm">
-                <Link href="/dashboard?tab=book">Book a coach</Link>
+                <Link href="/browse">Book a coach</Link>
               </Button>
             </div>
           </div>

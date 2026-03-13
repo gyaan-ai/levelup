@@ -6,6 +6,7 @@ import { ThemeProvider } from '@/components/theme-provider';
 import { AuthProvider } from '@/lib/auth/auth-provider';
 import { Header } from '@/components/header';
 import { Footer } from '@/components/footer';
+import { ParentBottomNavWrapper } from '@/components/parent-bottom-nav-wrapper';
 import './globals.css';
 
 const playfair = Playfair_Display({
@@ -72,7 +73,9 @@ export default async function RootLayout({
           <AuthProvider tenantSlug={tenant.slug}>
             <Header />
             <main className="flex-1 pb-[env(safe-area-inset-bottom)]">
-              {children}
+              <ParentBottomNavWrapper>
+                {children}
+              </ParentBottomNavWrapper>
             </main>
             <Footer />
           </AuthProvider>

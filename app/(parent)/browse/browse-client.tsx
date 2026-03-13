@@ -29,6 +29,8 @@ interface AthleteWithNext extends Athlete {
 interface BrowseAthletesClientProps {
   initialAthletes: AthleteWithNext[];
   isAdmin?: boolean;
+  /** When set, pass through to athlete profile and book flow so that wrestler is pre-selected when booking. */
+  initialYouthWrestlerId?: string;
 }
 
 function formatNextAvailable(slot_date: string, start_time: string): string {
@@ -65,7 +67,7 @@ const SCHOOL_COLORS: Record<string, { bg: string; text: string }> = {
   'North Carolina State': { bg: 'bg-red-600', text: 'text-white' },
 };
 
-export function BrowseAthletesClient({ initialAthletes, isAdmin }: BrowseAthletesClientProps) {
+export function BrowseAthletesClient({ initialAthletes, isAdmin, initialYouthWrestlerId }: BrowseAthletesClientProps) {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSchool, setSelectedSchool] = useState<string>('all');
@@ -138,7 +140,7 @@ export function BrowseAthletesClient({ initialAthletes, isAdmin }: BrowseAthlete
         className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-6"
       >
         <ArrowLeft className="h-4 w-4 mr-2" />
-        Back to Dashboard
+        Back to Home
       </Link>
 
       <div className="mb-8">
@@ -283,7 +285,7 @@ export function BrowseAthletesClient({ initialAthletes, isAdmin }: BrowseAthlete
                     {deletingId === athlete.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                   </Button>
                 )}
-                <Link href={`/athlete/${athlete.id}`}>
+                <Link href={initialYouthWrestlerId ? `/athlete/${athlete.id}?youthWrestlerId=${encodeURIComponent(initialYouthWrestlerId)}` : `/athlete/${athlete.id}`}>
                   <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
                     <CardHeader>
                       <div className="flex items-center gap-4">

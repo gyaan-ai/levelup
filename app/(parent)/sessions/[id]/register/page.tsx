@@ -99,7 +99,7 @@ export default async function SessionRegisterPage({
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-lg">
-      <Link href="/dashboard?tab=group" className="text-sm text-muted-foreground hover:text-foreground mb-4 inline-block">
+      <Link href="/find-training" className="text-sm text-muted-foreground hover:text-foreground mb-4 inline-block">
         ← Back to Dashboard
       </Link>
       <Card className="mb-6">

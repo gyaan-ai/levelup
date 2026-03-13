@@ -148,13 +148,11 @@ export default async function MyBookingsPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold mb-2">My Bookings</h1>
-          <p className="text-muted-foreground">
-            Upcoming and past sessions for your wrestlers
-          </p>
-        </div>
+      <div className="mb-6 md:mb-8">
+        <h1 className="text-2xl font-bold text-foreground md:text-3xl mb-1">My Sessions</h1>
+        <p className="text-muted-foreground text-sm md:text-base">
+          Upcoming and past sessions for your wrestlers
+        </p>
       </div>
 
       <div className="space-y-8">

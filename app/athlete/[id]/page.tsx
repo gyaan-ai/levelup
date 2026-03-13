@@ -25,10 +25,14 @@ const SCHOOL_COLORS: Record<string, { bg: string; text: string }> = {
 
 export default async function AthleteProfilePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ youthWrestlerId?: string }>;
 }) {
   const { id } = await params;
+  const sp = await searchParams;
+  const youthWrestlerId = sp.youthWrestlerId ?? undefined;
   const headersList = await headers();
   const host = headersList.get('host') || '';
   const tenant = getTenantByDomain(host);
@@ -256,7 +260,7 @@ export default async function AthleteProfilePage({
 
               {/* Book + Message + Follow + Edit */}
               <div className="flex flex-wrap items-center gap-3">
-                <Link href={`/book/${athlete.id}`}>
+                <Link href={youthWrestlerId ? `/book/${athlete.id}?youthWrestlerId=${encodeURIComponent(youthWrestlerId)}` : `/book/${athlete.id}`}>
                   <Button
                     size="lg"
                     variant="premium"

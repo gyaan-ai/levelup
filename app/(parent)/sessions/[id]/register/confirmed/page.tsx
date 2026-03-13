@@ -36,7 +36,7 @@ export default async function SessionRegisterConfirmedPage({
         </CardHeader>
         <CardContent>
           <Button asChild>
-            <Link href="/dashboard?tab=scheduled">Go to Dashboard</Link>
+            <Link href="/dashboard">Go to Home</Link>
           </Button>
         </CardContent>
       </Card>
