@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { Calendar, User, MapPin, X, FolderOpen, Share2, Check } from 'lucide-react';
+import { Calendar, User, MapPin, X, FolderOpen, Share2, Check, ExternalLink } from 'lucide-react';
 import { SchoolLogo } from '@/components/school-logo';
 import { differenceInHours } from 'date-fns';
 import { formatEST } from '@/lib/format-date';
@@ -142,6 +142,14 @@ export function BookingCard({ session, isPast = false }: BookingCardProps) {
             </p>
             <p className="text-xs text-muted-foreground">{session.session_type ?? '—'}</p>
             <div className="flex flex-wrap gap-2 sm:justify-end">
+              {!isPast && (
+                <Link href={`/sessions/${session.id}/reschedule`} className="min-h-[44px] inline-flex">
+                  <Button size="sm" className="min-h-[44px] px-4">
+                    <ExternalLink className="h-4 w-4 mr-1 shrink-0" />
+                    View Session
+                  </Button>
+                </Link>
+              )}
               {session.partner_invite_code && !isPast && (
                 <Button variant="outline" size="sm" className="min-h-[44px] px-4" onClick={handleCopyShareLink} title="Copy invite link to share">
                   {linkCopied ? <Check className="h-4 w-4 mr-1 text-green-600 shrink-0" /> : <Share2 className="h-4 w-4 mr-1 shrink-0" />}

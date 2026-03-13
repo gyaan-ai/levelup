@@ -2,9 +2,8 @@ import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
-import { Card, CardContent } from '@/components/ui/card';
-import Link from 'next/link';
 import { BookingCard, type BookingSession } from './booking-card';
+import { BookingsTabsClient } from './bookings-tabs-client';
 
 export default async function MyBookingsPage() {
   const headersList = await headers();
@@ -146,46 +145,19 @@ export default async function MyBookingsPage() {
     wrestlers: wrestlers(s),
   });
 
+  const upcomingSessions = upcoming.map(transformSession);
+  const pastSessions = past.map(transformSession);
+
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-6 md:mb-8">
-        <h1 className="text-2xl font-bold text-foreground md:text-3xl mb-1">My Sessions</h1>
+    <div className="container mx-auto px-4 py-5 pb-8 md:py-8 max-w-full">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-foreground md:text-3xl mb-1">Sessions</h1>
         <p className="text-muted-foreground text-sm md:text-base">
           Upcoming and past sessions for your wrestlers
         </p>
       </div>
 
-      <div className="space-y-8">
-        <section>
-          <h2 className="text-lg font-semibold mb-4">Upcoming</h2>
-          {upcoming.length === 0 ? (
-            <Card>
-              <CardContent className="py-8 text-center text-muted-foreground">
-                No upcoming sessions. <Link href="/browse" className="text-accent underline">Browse coaches</Link> to book.
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="space-y-4">
-              {upcoming.map((s) => (
-                <BookingCard key={s.id} session={transformSession(s)} />
-              ))}
-            </div>
-          )}
-        </section>
-
-        <section>
-          <h2 className="text-lg font-semibold mb-4">Past</h2>
-          {past.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4">No past sessions yet.</p>
-          ) : (
-            <div className="space-y-4">
-              {past.map((s) => (
-                <BookingCard key={s.id} session={transformSession(s)} isPast />
-              ))}
-            </div>
-          )}
-        </section>
-      </div>
+      <BookingsTabsClient upcoming={upcomingSessions} past={pastSessions} />
     </div>
   );
 }

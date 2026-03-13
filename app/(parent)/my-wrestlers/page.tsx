@@ -39,25 +39,48 @@ export default async function ParentDashboard() {
     redirect('/athlete-dashboard');
   }
   // parent and admin can both access (admin sees empty state if no wrestlers)
-  // RLS on youth_wrestlers restricts to parent_id = auth.uid() OR linked parent; no explicit filter so linked parents see their kids
+  // RLS on youth_wrestlers restricts to parent_id = auth.uid() OR linked parent
   const { data: youthWrestlersRaw } = await supabase
     .from('youth_wrestlers')
     .select('*')
     .order('created_at', { ascending: false });
   const youthWrestlers = youthWrestlersRaw ?? [];
+  const youthWrestlerIds = youthWrestlers.map((yw: YouthWrestler) => yw.id);
 
-  // Get upcoming sessions for all youth wrestlers
-  const youthWrestlerIds = youthWrestlers?.map(yw => yw.id) || [];
-  const { data: upcomingSessions } = youthWrestlerIds.length > 0
+  // Sessions are linked via session_participants, not sessions.youth_wrestler_id
+  let familySessionIds: string[] = [];
+  if (youthWrestlerIds.length > 0) {
+    const { data: partRows } = await supabase
+      .from('session_participants')
+      .select('session_id')
+      .in('youth_wrestler_id', youthWrestlerIds);
+    familySessionIds = [...new Set((partRows ?? []).map((r: { session_id: string }) => r.session_id))];
+  }
+
+  const { data: upcomingSessionsRaw } = familySessionIds.length > 0
     ? await supabase
         .from('sessions')
-        .select('*, youth_wrestlers(id, first_name, last_name)')
-        .in('youth_wrestler_id', youthWrestlerIds)
+        .select('id, session_participants(youth_wrestler_id)')
+        .in('id', familySessionIds)
         .eq('status', 'scheduled')
         .gte('scheduled_datetime', new Date().toISOString())
         .order('scheduled_datetime', { ascending: true })
-        .limit(10)
+        .limit(50)
     : { data: [] };
+
+  // Per-wrestler upcoming count from session_participants
+  const upcomingCountByWrestler: Record<string, number> = {};
+  youthWrestlerIds.forEach((id: string) => {
+    upcomingCountByWrestler[id] = 0;
+  });
+  for (const s of upcomingSessionsRaw ?? []) {
+    const parts = (s as { session_participants?: Array<{ youth_wrestler_id: string }> }).session_participants ?? [];
+    for (const p of parts) {
+      if (upcomingCountByWrestler[p.youth_wrestler_id] !== undefined) {
+        upcomingCountByWrestler[p.youth_wrestler_id]++;
+      }
+    }
+  }
 
   return (
     <div className="container mx-auto px-4 py-5 pb-8 md:py-8 max-w-full">
@@ -79,9 +102,7 @@ export default async function ParentDashboard() {
       {youthWrestlers && youthWrestlers.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
           {youthWrestlers.map((wrestler: YouthWrestler) => {
-            const wrestlerSessions = upcomingSessions?.filter(
-              (s: any) => s.youth_wrestler_id === wrestler.id
-            ) || [];
+            const upcomingCount = upcomingCountByWrestler[wrestler.id] ?? 0;
 
             return (
               <Card key={wrestler.id}>
@@ -110,12 +131,12 @@ export default async function ParentDashboard() {
                           {wrestler.graduation_year && ` • Class of ${wrestler.graduation_year}`}
                         </p>
                       )}
-                      {wrestlerSessions.length > 0 && (
+                      {upcomingCount > 0 && (
                         <div className="mt-2 p-2 bg-muted rounded-md inline-block">
                           <div className="flex items-center gap-2 text-xs sm:text-sm">
                             <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
                             <span className="font-medium">
-                              {wrestlerSessions.length} upcoming session{wrestlerSessions.length !== 1 ? 's' : ''}
+                              {upcomingCount} upcoming session{upcomingCount !== 1 ? 's' : ''}
                             </span>
                           </div>
                         </div>

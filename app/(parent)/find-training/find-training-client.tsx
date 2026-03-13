@@ -44,12 +44,16 @@ type SessionRow = {
   facilities?: { id: string; name?: string; address?: string } | null;
 };
 
+type CoachOption = { id: string; first_name?: string; last_name?: string; school?: string };
+
 export function FindTrainingClient({
   facilities,
   initialSessions,
   initialDate,
   initialTime,
   initialLocation,
+  initialCoach = '',
+  coaches = [],
   searchBasePath = '/find-training',
 }: {
   facilities: Facility[];
@@ -57,6 +61,9 @@ export function FindTrainingClient({
   initialDate: string;
   initialTime: string;
   initialLocation: string;
+  initialCoach?: string;
+  /** For Training page: show coach filter. */
+  coaches?: CoachOption[];
   /** When embedded in dashboard, pass '/dashboard' so search updates dashboard URL with tab=find-training */
   searchBasePath?: string;
 }) {
@@ -64,6 +71,7 @@ export function FindTrainingClient({
   const [date, setDate] = useState(initialDate || '');
   const [time, setTime] = useState(initialTime || 'any');
   const [location, setLocation] = useState(initialLocation || 'all');
+  const [coach, setCoach] = useState(initialCoach || 'all');
   const [dateOpen, setDateOpen] = useState(false);
   const [timeOpen, setTimeOpen] = useState(false);
 
@@ -71,18 +79,21 @@ export function FindTrainingClient({
     setDate(initialDate || '');
     setTime(initialTime || 'any');
     setLocation(initialLocation || 'all');
-  }, [initialDate, initialTime, initialLocation]);
+    setCoach(initialCoach || 'all');
+  }, [initialDate, initialTime, initialLocation, initialCoach]);
 
   const handleSearch = () => {
     const params = new URLSearchParams();
     if (searchBasePath === '/dashboard') params.set('tab', 'find-training');
+    if (searchBasePath === '/training') params.set('tab', 'available');
     if (date) params.set('date', date);
     if (time && time !== 'any') params.set('time', time);
     if (location && location !== 'all') params.set('location', location);
+    if (coach && coach !== 'all') params.set('coach', coach);
     router.push(`${searchBasePath}?${params.toString()}`);
   };
 
-  const hasSearchCriteria = date || (location && location !== 'all');
+  const hasSearchCriteria = date || (location && location !== 'all') || (coach && coach !== 'all');
   const showResults = hasSearchCriteria && initialSessions.length > 0;
   const showNoResults = hasSearchCriteria && initialSessions.length === 0;
 
@@ -201,12 +212,12 @@ export function FindTrainingClient({
               </Popover>
             </div>
             <div>
-              <Label htmlFor="find-location">Location</Label>
+              <Label htmlFor="find-location">Facility</Label>
               <Select
                 value={location}
                 onValueChange={setLocation}
               >
-                <SelectTrigger id="find-location">
+                <SelectTrigger id="find-location" className="min-h-[44px]">
                   <SelectValue placeholder="All locations" />
                 </SelectTrigger>
                 <SelectContent>
@@ -220,6 +231,30 @@ export function FindTrainingClient({
                 </SelectContent>
               </Select>
             </div>
+            {coaches.length > 0 && (
+              <div>
+                <Label htmlFor="find-coach">Coach</Label>
+                <Select
+                  value={coach}
+                  onValueChange={setCoach}
+                >
+                  <SelectTrigger id="find-coach" className="min-h-[44px]">
+                    <SelectValue placeholder="Any coach" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Any coach</SelectItem>
+                    {coaches.map((c) => (
+                      <SelectItem key={c.id} value={c.id}>
+                        <span className="flex items-center gap-2">
+                          {[c.first_name, c.last_name].filter(Boolean).join(' ')}
+                          {c.school && <span className="text-muted-foreground">({c.school})</span>}
+                        </span>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <div className="flex items-end">
               <Button
                 onClick={handleSearch}

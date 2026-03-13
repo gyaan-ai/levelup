@@ -6,15 +6,17 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { User, Users, UserPlus } from 'lucide-react';
 import { BrowseAthletesClient } from '@/app/(parent)/browse/browse-client';
+import { FindTrainingClient } from '@/app/(parent)/find-training/find-training-client';
 import type { Athlete } from '@/types';
 
-type TabId = 'private' | 'partner' | 'group' | 'coaches';
+type TabId = 'available' | 'private' | 'partner' | 'group' | 'coaches';
 
 interface AthleteWithNext extends Athlete {
   nextAvailable?: { slot_date: string; start_time: string } | null;
 }
 
 const TABS: { id: TabId; label: string }[] = [
+  { id: 'available', label: 'Available' },
   { id: 'private', label: 'Private' },
   { id: 'partner', label: 'Partner' },
   { id: 'group', label: 'Small Group' },
@@ -25,10 +27,43 @@ type Props = {
   initialTab: string;
   athletesWithNext: AthleteWithNext[];
   isAdmin: boolean;
+  facilities: { id: string; name?: string; school?: string; address?: string | null }[];
+  availabilitySessions: Array<{
+    id: string;
+    scheduled_datetime: string;
+    session_type: string | null;
+    session_mode: string | null;
+    join_policy?: string | null;
+    focus_area: string | null;
+    current_participants: number | null;
+    max_participants: number | null;
+    total_price: number | null;
+    price_per_participant: number | null;
+    athlete_id: string;
+    facility_id: string;
+    athletes?: { id: string; first_name?: string; last_name?: string; school?: string } | null;
+    facilities?: { id: string; name?: string; address?: string } | null;
+  }>;
+  availabilityDate: string;
+  availabilityTime: string;
+  availabilityLocation: string;
+  availabilityCoach: string;
+  coaches: { id: string; first_name?: string; last_name?: string; school?: string }[];
 };
 
-export function TrainingClient({ initialTab, athletesWithNext, isAdmin }: Props) {
-  const tab = (['private', 'partner', 'group', 'coaches'].includes(initialTab) ? initialTab : 'private') as TabId;
+export function TrainingClient({
+  initialTab,
+  athletesWithNext,
+  isAdmin,
+  facilities,
+  availabilitySessions,
+  availabilityDate,
+  availabilityTime,
+  availabilityLocation,
+  availabilityCoach,
+  coaches,
+}: Props) {
+  const tab = (['available', 'private', 'partner', 'group', 'coaches'].includes(initialTab) ? initialTab : 'available') as TabId;
   const [activeTab, setActiveTab] = useState<TabId>(tab);
 
   return (
@@ -49,6 +84,19 @@ export function TrainingClient({ initialTab, athletesWithNext, isAdmin }: Props)
           </button>
         ))}
       </div>
+
+      {activeTab === 'available' && (
+        <FindTrainingClient
+          facilities={facilities}
+          initialSessions={availabilitySessions}
+          initialDate={availabilityDate}
+          initialTime={availabilityTime}
+          initialLocation={availabilityLocation}
+          initialCoach={availabilityCoach}
+          coaches={coaches}
+          searchBasePath="/training"
+        />
+      )}
 
       {activeTab === 'private' && (
         <Card>

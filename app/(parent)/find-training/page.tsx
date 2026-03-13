@@ -14,7 +14,7 @@ export const metadata = {
 export default async function FindTrainingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ date?: string; time?: string; location?: string }>;
+  searchParams: Promise<{ date?: string; time?: string; location?: string; coach?: string }>;
 }) {
   const sp = await searchParams;
   const headersList = await headers();
@@ -84,6 +84,9 @@ export default async function FindTrainingPage({
         if (sp.location && sp.location !== 'all') {
           q = q.eq('facility_id', sp.location);
         }
+        if (sp.coach && sp.coach !== 'all') {
+          q = q.eq('athlete_id', sp.coach);
+        }
         return q;
       };
 
@@ -128,6 +131,7 @@ export default async function FindTrainingPage({
     const dayEnd = twoWeeks.toISOString();
     const baseQ = () => {
       let q = supabase.from('sessions').select('id, scheduled_datetime, session_type, session_mode, join_policy, focus_area, current_participants, max_participants, total_price, price_per_participant, athlete_id, facility_id, athletes(id, first_name, last_name, school), facilities(id, name, address)').in('status', ['scheduled', 'pending_payment']).eq('facility_id', sp.location).gte('scheduled_datetime', dayStart).lte('scheduled_datetime', dayEnd);
+      if (sp.coach && sp.coach !== 'all') q = q.eq('athlete_id', sp.coach);
       return q;
     };
     const [groupRes2, partnerRes2] = await Promise.all([
@@ -146,12 +150,18 @@ export default async function FindTrainingPage({
     sessions = list2.filter((s) => (s.current_participants ?? 0) < (s.max_participants ?? 1) && ((s as { join_policy?: string }).join_policy === 'public' || (s as { join_policy?: string }).join_policy === 'invite_only'));
   }
 
+  const { data: athletes } = await supabase
+    .from('athletes')
+    .select('id, first_name, last_name, school')
+    .eq('active', true)
+    .order('school', { ascending: true });
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-serif font-bold text-foreground">Find training</h1>
         <p className="text-muted-foreground mt-1">
-          Search by date and time to see all open sessions. Filter by location.
+          Search by date and time to see all open sessions. Filter by facility and coach.
         </p>
       </div>
       <FindTrainingClient
@@ -160,6 +170,9 @@ export default async function FindTrainingPage({
         initialDate={dateParam ?? ''}
         initialTime={sp.time ?? 'any'}
         initialLocation={sp.location ?? 'all'}
+        initialCoach={sp.coach ?? 'all'}
+        coaches={athletes ?? []}
+        searchBasePath="/find-training"
       />
     </div>
   );
