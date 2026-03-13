@@ -4,15 +4,16 @@ import { headers } from 'next/headers';
 export const dynamic = 'force-dynamic';
 import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { Plus, Edit, User, Calendar, CalendarSearch, Users } from 'lucide-react';
+import { Edit, User, Calendar, CalendarSearch, Users } from 'lucide-react';
 import { YouthWrestler } from '@/types';
 import { BookingCard, type BookingSession } from '@/app/(parent)/bookings/booking-card';
 import { CoachSessionBadge } from '@/components/coach-session-badge';
 import { ProfileImage } from '@/components/profile-image';
 
+/** Parent sees only their own wrestlers (primary or linked). RLS on youth_wrestlers enforces this. */
 export default async function HomePage() {
   const headersList = await headers();
   const host = headersList.get('host') || '';
@@ -27,6 +28,7 @@ export default async function HomePage() {
   const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
   if (userData?.role === 'athlete') redirect('/athlete-dashboard');
 
+  // RLS restricts to parent_id = auth.uid() OR linked parent; no explicit filter so linked parents see their kids
   const { data: youthWrestlersRaw } = await supabase
     .from('youth_wrestlers')
     .select('*')
@@ -135,135 +137,119 @@ export default async function HomePage() {
     <div className="container mx-auto px-4 py-5 pb-8 md:py-8 max-w-full">
       <h1 className="text-2xl font-serif font-bold text-foreground md:text-3xl">Home</h1>
       <p className="text-muted-foreground mt-1 text-sm md:text-base">
-        Your wrestlers and next session
+        Next session, quick actions, and your wrestlers
       </p>
 
-      {youthWrestlers.length > 0 && (
-        <div className="mt-4 mb-2">
-          <Link href="/wrestlers/add" className="block w-full sm:w-auto sm:inline-block">
-            <Button variant="outline" className="w-full min-h-[44px] touch-manipulation sm:w-auto">
-              <Plus className="h-4 w-4 mr-2 shrink-0" />
-              Add wrestler
+      {/* A. Next Session first */}
+      <section className="mt-6 mb-6">
+        <h2 className="text-lg font-semibold text-foreground mb-3">Next Session</h2>
+        {nextSession ? (
+          <BookingCard session={toBookingSession(nextSession)} />
+        ) : (
+          <Card>
+            <CardContent className="py-8 text-center">
+              <p className="text-muted-foreground mb-4">No upcoming sessions.</p>
+              <Link href="/training">
+                <Button className="min-h-[44px] touch-manipulation">Find training</Button>
+              </Link>
+            </CardContent>
+          </Card>
+        )}
+      </section>
+
+      {/* B. Quick Actions */}
+      <section className="mb-6">
+        <h2 className="text-lg font-semibold text-foreground mb-3">Quick Actions</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <Link href="/training?tab=private">
+            <Button variant="outline" className="w-full min-h-[48px] touch-manipulation flex flex-col sm:flex-row gap-1 sm:gap-2">
+              <Calendar className="h-5 w-5 shrink-0" />
+              <span>Book Private</span>
+            </Button>
+          </Link>
+          <Link href="/training?tab=partner">
+            <Button variant="outline" className="w-full min-h-[48px] touch-manipulation flex flex-col sm:flex-row gap-1 sm:gap-2">
+              <CalendarSearch className="h-5 w-5 shrink-0" />
+              <span>Find Partner</span>
+            </Button>
+          </Link>
+          <Link href="/training?tab=group">
+            <Button variant="outline" className="w-full min-h-[48px] touch-manipulation flex flex-col sm:flex-row gap-1 sm:gap-2">
+              <Users className="h-5 w-5 shrink-0" />
+              <span>Join Small Group</span>
             </Button>
           </Link>
         </div>
-      )}
+      </section>
 
-      {youthWrestlers.length > 0 ? (
-        <>
-          <section className="mb-6">
-            <h2 className="text-lg font-semibold text-foreground mb-3">Your wrestlers</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {youthWrestlers.map((wrestler: YouthWrestler) => {
-                const sessionsCompleted = sessionCounts[wrestler.id] || 0;
-                return (
-                  <Card key={wrestler.id}>
-                    <CardContent className="p-4 flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-4">
-                      <div className="flex items-center gap-4 min-w-0 flex-1">
-                        <ProfileImage
-                          src={wrestler.photo_url}
-                          alt={`${wrestler.first_name} ${wrestler.last_name}`}
-                          focusX={wrestler.photo_focus_x ?? 50}
-                          focusY={wrestler.photo_focus_y ?? 50}
-                          className="w-16 h-16 sm:w-20 sm:h-20 shrink-0"
-                          fallbackIconClassName="h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground"
-                        />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <CardTitle className="text-lg sm:text-xl">
-                              {wrestler.first_name} {wrestler.last_name}
-                            </CardTitle>
-                            <CoachSessionBadge totalSessions={sessionsCompleted} size="sm" />
-                          </div>
-                          <CardDescription className="mt-0.5 text-sm">
-                            {wrestler.age && <span>{wrestler.age} years</span>}
-                            {wrestler.weight_class && <span> • {wrestler.weight_class}</span>}
-                            {wrestler.skill_level && (
-                              <span className="capitalize"> • {wrestler.skill_level}</span>
-                            )}
-                          </CardDescription>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            {sessionsCompleted} session{sessionsCompleted !== 1 ? 's' : ''} completed
-                          </p>
-                        </div>
+      {/* C. Your Wrestlers (only RLS-scoped; Add Wrestler lives in Account) */}
+      <section>
+        <h2 className="text-lg font-semibold text-foreground mb-3">Your Wrestlers</h2>
+        {youthWrestlers.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {youthWrestlers.map((wrestler: YouthWrestler) => {
+              const sessionsCompleted = sessionCounts[wrestler.id] || 0;
+              return (
+                <Card key={wrestler.id}>
+                  <CardContent className="p-4 flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-4">
+                    <div className="flex items-center gap-4 min-w-0 flex-1">
+                      <ProfileImage
+                        src={wrestler.photo_url}
+                        alt={`${wrestler.first_name} ${wrestler.last_name}`}
+                        focusX={wrestler.photo_focus_x ?? 50}
+                        focusY={wrestler.photo_focus_y ?? 50}
+                        className="w-16 h-16 sm:w-20 sm:h-20 shrink-0"
+                        fallbackIconClassName="h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <CardTitle className="text-lg sm:text-xl">
+                          {wrestler.first_name} {wrestler.last_name}
+                        </CardTitle>
+                        <CardDescription className="mt-0.5 text-sm">
+                          {wrestler.age != null && <span>{wrestler.age}</span>}
+                          {wrestler.weight_class && <span> · {wrestler.weight_class} lbs</span>}
+                          {wrestler.skill_level && (
+                            <span className="capitalize"> · Skill: {wrestler.skill_level}</span>
+                          )}
+                        </CardDescription>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Sessions: {sessionsCompleted}
+                        </p>
                       </div>
-                      <div className="flex gap-2 w-full sm:w-auto sm:ml-auto">
-                        <Link href={`/browse?youthWrestlerId=${wrestler.id}`} className="flex-1 min-w-0">
-                          <Button className="w-full min-h-[44px] touch-manipulation">
-                            <Calendar className="h-4 w-4 mr-2 shrink-0" />
-                            Book session
-                          </Button>
-                        </Link>
-                        <Link href={`/wrestlers/${wrestler.id}/edit`} className="shrink-0">
-                          <Button variant="outline" size="icon" className="min-h-[44px] min-w-[44px] touch-manipulation">
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                        </Link>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          </section>
-
-          <section className="mb-6">
-            <h2 className="text-lg font-semibold text-foreground mb-3">Next session</h2>
-            {nextSession ? (
-              <BookingCard session={toBookingSession(nextSession)} />
-            ) : (
-              <Card>
-                <CardContent className="py-8 text-center">
-                  <p className="text-muted-foreground mb-4">No upcoming sessions.</p>
-                  <Link href="/find-training">
-                    <Button className="min-h-[44px] touch-manipulation">Find training</Button>
-                  </Link>
-                </CardContent>
-              </Card>
-            )}
-          </section>
-
-          <section>
-            <h2 className="text-lg font-semibold text-foreground mb-3">Quick actions</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <Link href="/browse">
-                <Button variant="outline" className="w-full min-h-[48px] touch-manipulation flex flex-col sm:flex-row gap-1 sm:gap-2">
-                  <Calendar className="h-5 w-5 shrink-0" />
-                  <span>Book private</span>
-                </Button>
+                    </div>
+                    <div className="flex gap-2 w-full sm:w-auto sm:ml-auto">
+                      <Link href={`/browse?youthWrestlerId=${wrestler.id}`} className="flex-1 min-w-0">
+                        <Button className="w-full min-h-[44px] touch-manipulation">
+                          <Calendar className="h-4 w-4 mr-2 shrink-0" />
+                          Book Training
+                        </Button>
+                      </Link>
+                      <Link href={`/wrestlers/${wrestler.id}/edit`} className="shrink-0">
+                        <Button variant="outline" size="icon" className="min-h-[44px] min-w-[44px] touch-manipulation">
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      </Link>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        ) : (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-16">
+              <User className="h-16 w-16 text-muted-foreground mb-4" />
+              <h3 className="text-xl font-semibold mb-2">Add your first wrestler</h3>
+              <p className="text-muted-foreground mb-6 text-center max-w-md text-sm">
+                Create a profile to start booking training with coaches.
+              </p>
+              <Link href="/wrestlers/add">
+                <Button className="min-h-[48px] touch-manipulation">Add wrestler</Button>
               </Link>
-              <Link href="/find-training">
-                <Button variant="outline" className="w-full min-h-[48px] touch-manipulation flex flex-col sm:flex-row gap-1 sm:gap-2">
-                  <CalendarSearch className="h-5 w-5 shrink-0" />
-                  <span>Find partner session</span>
-                </Button>
-              </Link>
-              <Link href="/find-training">
-                <Button variant="outline" className="w-full min-h-[48px] touch-manipulation flex flex-col sm:flex-row gap-1 sm:gap-2">
-                  <Users className="h-5 w-5 shrink-0" />
-                  <span>Join small group</span>
-                </Button>
-              </Link>
-            </div>
-          </section>
-        </>
-      ) : (
-        <Card className="mt-6">
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <User className="h-16 w-16 text-muted-foreground mb-4" />
-            <h3 className="text-xl font-semibold mb-2">Add your first wrestler</h3>
-            <p className="text-muted-foreground mb-6 text-center max-w-md text-sm">
-              Create a profile to start booking training with coaches.
-            </p>
-            <Link href="/wrestlers/add">
-              <Button size="lg" className="min-h-[48px] touch-manipulation">
-                <Plus className="h-4 w-4 mr-2" />
-                Add wrestler
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-      )}
+            </CardContent>
+          </Card>
+        )}
+      </section>
     </div>
   );
 }

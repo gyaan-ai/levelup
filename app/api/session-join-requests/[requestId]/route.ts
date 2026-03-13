@@ -28,7 +28,10 @@ export async function PATCH(
       .select('id, parent_id, athlete_id, current_participants, max_participants')
       .eq('id', sessionId)
       .single();
-    if (!session || (session as { parent_id?: string }).parent_id !== user.id) {
+    const s = session as { parent_id?: string; athlete_id?: string } | null;
+    const isParent = s?.parent_id === user.id;
+    const isCoach = s?.athlete_id === user.id;
+    if (!session || (!isParent && !isCoach)) {
       return NextResponse.json({ error: 'Session not found or not yours' }, { status: 404 });
     }
 

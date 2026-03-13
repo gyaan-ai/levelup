@@ -3,9 +3,11 @@
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth/use-auth';
 import { ParentBottomNav } from './parent-bottom-nav';
+import { CoachBottomNav } from './coach-bottom-nav';
 
 const PARENT_ROUTES = [
   '/dashboard',
+  '/training',
   '/find-training',
   '/browse',
   '/bookings',
@@ -19,6 +21,19 @@ const PARENT_ROUTES = [
   '/sessions',
 ];
 
+const COACH_ROUTES = [
+  '/athlete-dashboard',
+  '/availability',
+  '/coach-sessions',
+  '/inbox',
+  '/profile',
+  '/rate-card',
+  '/small-group-sessions',
+  '/notifications',
+  '/messages',
+  '/workspaces',
+];
+
 function isParentRoute(pathname: string | null): boolean {
   if (!pathname) return false;
   return PARENT_ROUTES.some(
@@ -26,10 +41,21 @@ function isParentRoute(pathname: string | null): boolean {
   );
 }
 
+function isCoachRoute(pathname: string | null): boolean {
+  if (!pathname) return false;
+  return COACH_ROUTES.some(
+    (route) =>
+      pathname === route ||
+      (route !== '/athlete-dashboard' && pathname.startsWith(route + '/'))
+  );
+}
+
 export function ParentBottomNavWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { effectiveRole } = useAuth();
-  const showNav = effectiveRole === 'parent' && isParentRoute(pathname);
+  const showParentNav = effectiveRole === 'parent' && isParentRoute(pathname);
+  const showCoachNav = effectiveRole === 'athlete' && isCoachRoute(pathname);
+  const showNav = showParentNav || showCoachNav;
 
   return (
     <>
@@ -40,7 +66,8 @@ export function ParentBottomNavWrapper({ children }: { children: React.ReactNode
       ) : (
         children
       )}
-      {showNav && <ParentBottomNav />}
+      {showParentNav && <ParentBottomNav />}
+      {showCoachNav && <CoachBottomNav />}
     </>
   );
 }

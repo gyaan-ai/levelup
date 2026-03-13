@@ -104,19 +104,25 @@ export function Header() {
                     href="/athlete-dashboard"
                     className="text-white hover:text-accent transition-colors font-medium"
                   >
-                    Dashboard
+                    Home
+                  </Link>
+                  <Link
+                    href="/availability"
+                    className="text-white hover:text-accent transition-colors font-medium"
+                  >
+                    Schedule
+                  </Link>
+                  <Link
+                    href="/coach-sessions"
+                    className="text-white hover:text-accent transition-colors font-medium"
+                  >
+                    Sessions
                   </Link>
                   <Link
                     href="/profile"
                     className="text-white hover:text-accent transition-colors font-medium"
                   >
                     Profile
-                  </Link>
-                  <Link
-                    href="/availability"
-                    className="text-white hover:text-accent transition-colors font-medium"
-                  >
-                    Availability
                   </Link>
                   <Link
                     href="/rate-card"
@@ -127,8 +133,8 @@ export function Header() {
                   <Link
                     href="/inbox"
                     className="relative flex items-center justify-center min-h-[44px] min-w-[44px] p-1.5 text-white hover:text-accent transition-colors font-medium rounded hover:bg-white/10"
-                    aria-label={inboxUnreadCount > 0 ? `Community (${inboxUnreadCount} unread)` : 'Community'}
-                    title="Community"
+                    aria-label={inboxUnreadCount > 0 ? `Messages (${inboxUnreadCount} unread)` : 'Messages'}
+                    title="Messages"
                   >
                     <Mail className="h-5 w-5" />
                     {inboxUnreadCount > 0 && (
@@ -259,35 +265,14 @@ export function Header() {
                       </Select>
                     </>
                   )}
-                  <Link
-                    href="/dashboard"
-                    className="text-white hover:text-accent transition-colors font-medium"
-                  >
-                    Dashboard
-                  </Link>
-                  <Link
-                    href="/inbox"
-                    className="text-white hover:text-accent transition-colors font-medium"
-                  >
-                    Community
-                  </Link>
-                  <Link
-                    href="/workspaces"
-                    className="text-white hover:text-accent transition-colors font-medium"
-                  >
-                    Workspaces
-                  </Link>
-                  <Link
-                    href="/dashboard#spending"
-                    className="text-white hover:text-accent transition-colors font-medium"
-                  >
-                    Spending
-                  </Link>
+                  <Link href="/dashboard" className="text-white hover:text-accent transition-colors font-medium">Home</Link>
+                  <Link href="/training" className="text-white hover:text-accent transition-colors font-medium">Training</Link>
+                  <Link href="/bookings" className="text-white hover:text-accent transition-colors font-medium">Sessions</Link>
                   <Link
                     href="/inbox"
                     className="relative flex items-center justify-center min-h-[44px] min-w-[44px] p-1.5 text-white hover:text-accent transition-colors font-medium rounded hover:bg-white/10"
-                    aria-label={inboxUnreadCount > 0 ? `Community (${inboxUnreadCount} unread)` : 'Community'}
-                    title="Community"
+                    aria-label={inboxUnreadCount > 0 ? `Messages (${inboxUnreadCount} unread)` : 'Messages'}
+                    title="Messages"
                   >
                     <Mail className="h-5 w-5" />
                     {inboxUnreadCount > 0 && (
@@ -296,6 +281,7 @@ export function Header() {
                       </span>
                     )}
                   </Link>
+                  <Link href="/account" className="text-white hover:text-accent transition-colors font-medium">Account</Link>
                   <NotificationBell count={notificationCount} onRefresh={refreshNotifications} />
                 </>
               )}
@@ -312,18 +298,20 @@ export function Header() {
               </div>
             </nav>
 
-            {/* Mobile menu */}
-            <div className="md:hidden flex items-center">
-              <button
-                type="button"
-                className="p-2 -mr-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-white hover:bg-white/10 rounded"
-                aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
-                aria-expanded={mobileOpen}
-                onClick={() => setMobileOpen(!mobileOpen)}
-              >
-                {mobileOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-              </button>
-            </div>
+            {/* Mobile menu: hidden for parents (they use bottom nav only per PRD) */}
+            {effectiveRole !== 'parent' && (
+              <div className="md:hidden flex items-center">
+                <button
+                  type="button"
+                  className="p-2 -mr-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-white hover:bg-white/10 rounded"
+                  aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
+                  aria-expanded={mobileOpen}
+                  onClick={() => setMobileOpen(!mobileOpen)}
+                >
+                  {mobileOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+                </button>
+              </div>
+            )}
             {mobileOpen && (
               <nav
                 className="absolute left-0 right-0 top-full bg-primary border-b border-accent/20 shadow-lg md:hidden"

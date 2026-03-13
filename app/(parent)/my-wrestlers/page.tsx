@@ -39,13 +39,12 @@ export default async function ParentDashboard() {
     redirect('/athlete-dashboard');
   }
   // parent and admin can both access (admin sees empty state if no wrestlers)
-
-  // Get youth wrestlers
-  const { data: youthWrestlers } = await supabase
+  // RLS on youth_wrestlers restricts to parent_id = auth.uid() OR linked parent; no explicit filter so linked parents see their kids
+  const { data: youthWrestlersRaw } = await supabase
     .from('youth_wrestlers')
     .select('*')
-    .eq('parent_id', user.id)
     .order('created_at', { ascending: false });
+  const youthWrestlers = youthWrestlersRaw ?? [];
 
   // Get upcoming sessions for all youth wrestlers
   const youthWrestlerIds = youthWrestlers?.map(yw => yw.id) || [];

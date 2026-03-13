@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { User, CreditCard, Calendar, DollarSign } from 'lucide-react';
+import { AccountSignOut } from '@/components/account-sign-out';
 
 export const dynamic = 'force-dynamic';
 
@@ -79,11 +80,14 @@ export default async function AccountPage() {
             </CardTitle>
             <CardDescription>Manage your wrestler profiles</CardDescription>
           </CardHeader>
-          <CardContent>
-            <Link href="/my-wrestlers">
+          <CardContent className="space-y-2">
+            <Link href="/my-wrestlers" className="block">
               <Button variant="outline" className="w-full min-h-[44px] touch-manipulation">
                 View wrestlers
               </Button>
+            </Link>
+            <Link href="/wrestlers/add" className="block">
+              <Button className="w-full min-h-[44px] touch-manipulation">Add wrestler</Button>
             </Link>
           </CardContent>
         </Card>
@@ -146,6 +150,12 @@ export default async function AccountPage() {
                 <p className="text-lg font-semibold">${lastMonthSpent.toFixed(2)}</p>
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="pt-6">
+            <AccountSignOut />
           </CardContent>
         </Card>
       </div>

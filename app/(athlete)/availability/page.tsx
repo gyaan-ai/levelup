@@ -36,13 +36,13 @@ export default async function AvailabilityPage() {
         className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-6"
       >
         <ArrowLeft className="h-4 w-4 mr-2" />
-        Back to Dashboard
+        Back to Home
       </Link>
-      <Card className="mb-8">
+      <Card className="mb-6">
         <CardHeader>
-          <CardTitle>Set Your Availability</CardTitle>
+          <CardTitle>Schedule</CardTitle>
           <CardDescription>
-            Manage when you&apos;re available for sessions. Parents will only see these slots when booking.
+            Add when you&apos;re available. Parents see these slots when they book.
           </CardDescription>
         </CardHeader>
       </Card>

@@ -31,6 +31,8 @@ interface BrowseAthletesClientProps {
   isAdmin?: boolean;
   /** When set, pass through to athlete profile and book flow so that wrestler is pre-selected when booking. */
   initialYouthWrestlerId?: string;
+  /** When true, hide back link and top title (e.g. when embedded in Training tab). */
+  embedded?: boolean;
 }
 
 function formatNextAvailable(slot_date: string, start_time: string): string {
@@ -67,7 +69,7 @@ const SCHOOL_COLORS: Record<string, { bg: string; text: string }> = {
   'North Carolina State': { bg: 'bg-red-600', text: 'text-white' },
 };
 
-export function BrowseAthletesClient({ initialAthletes, isAdmin, initialYouthWrestlerId }: BrowseAthletesClientProps) {
+export function BrowseAthletesClient({ initialAthletes, isAdmin, initialYouthWrestlerId, embedded }: BrowseAthletesClientProps) {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSchool, setSelectedSchool] = useState<string>('all');
@@ -134,21 +136,24 @@ export function BrowseAthletesClient({ initialAthletes, isAdmin, initialYouthWre
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <Link 
-        href="/dashboard" 
-        className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-6"
-      >
-        <ArrowLeft className="h-4 w-4 mr-2" />
-        Back to Home
-      </Link>
-
-      <div className="mb-8">
-        <h1 className="text-3xl font-serif font-bold mb-2 text-foreground">Browse Elite Coaches</h1>
-        <p className="text-muted-foreground">
-          Find NCAA athletes and elite coaches to refine your technique
-        </p>
-      </div>
+    <div className={embedded ? '' : 'container mx-auto px-4 py-8'}>
+      {!embedded && (
+        <>
+          <Link 
+            href="/dashboard" 
+            className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-6"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back to Home
+          </Link>
+          <div className="mb-8">
+            <h1 className="text-3xl font-serif font-bold mb-2 text-foreground">Browse Elite Coaches</h1>
+            <p className="text-muted-foreground">
+              Find NCAA athletes and elite coaches to refine your technique
+            </p>
+          </div>
+        </>
+      )}
 
       {/* Filters */}
       <div className="mb-6 space-y-4">
