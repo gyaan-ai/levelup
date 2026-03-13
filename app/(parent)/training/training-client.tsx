@@ -42,6 +42,7 @@ type Props = {
   availabilityLocation: string;
   availabilityCoach: string;
   coaches: { id: string; first_name?: string; last_name?: string; school?: string }[];
+  preselectedWrestlerId?: string;
 };
 
 export function TrainingClient({
@@ -55,6 +56,7 @@ export function TrainingClient({
   availabilityLocation,
   availabilityCoach,
   coaches,
+  preselectedWrestlerId = '',
 }: Props) {
   const tab = (initialTab === 'coaches' ? 'coaches' : 'sessions') as TabId;
   const [activeTab, setActiveTab] = useState<TabId>(tab);
@@ -89,6 +91,7 @@ export function TrainingClient({
           coaches={coaches}
           searchBasePath="/training"
           defaultRangeLabel="Next 7 days"
+          preselectedWrestlerId={preselectedWrestlerId}
         />
       )}
 

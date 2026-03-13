@@ -8,6 +8,7 @@ import { Calendar, DollarSign, MessageCircle, CalendarPlus, Users, FolderOpen } 
 import { formatEST } from '@/lib/format-date';
 import { differenceInHours, differenceInDays } from 'date-fns';
 import { AddToCalendarButton } from '@/components/add-to-calendar-button';
+import { SessionTypeBadge } from '@/components/session-type-badge';
 import type { CoachSession } from './coach-schedule-card';
 
 function facilityName(s: CoachSession): string {
@@ -92,6 +93,9 @@ export function CoachHomeClient({
                 <CardContent className="p-4">
                   <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2 mb-1">
+                        <SessionTypeBadge sessionType={session.session_type} sessionMode={session.session_mode} />
+                      </div>
                       <p className="font-medium text-foreground">
                         {formatEST(new Date(session.scheduled_datetime), 'EEE, MMM d')} · {formatEST(new Date(session.scheduled_datetime), 'h:mm a')}
                       </p>

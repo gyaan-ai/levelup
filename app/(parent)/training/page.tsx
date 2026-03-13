@@ -32,7 +32,7 @@ type SessionRow = {
 export default async function TrainingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; date?: string; time?: string; location?: string; coach?: string }>;
+  searchParams: Promise<{ tab?: string; date?: string; time?: string; location?: string; coach?: string; wrestler?: string }>;
 }) {
   const sp = await searchParams;
   const tab = sp.tab ?? 'sessions';
@@ -176,6 +176,7 @@ export default async function TrainingPage({
         availabilityLocation={sp.location ?? 'all'}
         availabilityCoach={sp.coach ?? 'all'}
         coaches={athletesList.map((a) => ({ id: a.id, first_name: a.first_name, last_name: a.last_name, school: a.school }))}
+        preselectedWrestlerId={sp.wrestler ?? ''}
       />
     </div>
   );

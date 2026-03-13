@@ -73,8 +73,18 @@ Full review of the product and codebase for **simplicity** and **opening the pla
 
 ---
 
-## 6. Summary
+## 6. Repeat booking & multi-session (implementation notes)
+
+- **Past sessions:** Support **Book again** with coach, facility, and wrestler preselected when possible (see [REPEAT_BOOKING_AND_MULTI_SESSION.md](./REPEAT_BOOKING_AND_MULTI_SESSION.md)).
+- **After a successful booking:** Confirmation screens offer **Book another with this coach**, **Book another session**, and **Done — Back to Sessions**.
+- **Current limitation:** One booking per action / checkout; no cart. Multiple sessions = repeat the flow or use “Book another.”
+- **Future:** True multi-session cart (add multiple sessions, single checkout, assign wrestler per session, handle availability before payment) is a planned enhancement; requirements are documented in the same doc.
+
+---
+
+## 7. Summary
 
 - **Coach scope:** Copy and requirements updated so the platform is **coaches** (NCAA + club). Schema unchanged; `school` and optional `year` support both. Testing: club coach + UNC athletes.
 - **Simplicity:** Session types and durations are already simple; keep rate card and small-group setup minimal; avoid extra workspace sections until needed.
+- **Repeat booking:** Book again (past sessions) and Book another (post-confirmation) are in place; multi-session cart is future.
 - **Next:** Keep defaulting to fewer options and one clear path per flow; re-check before adding new features.

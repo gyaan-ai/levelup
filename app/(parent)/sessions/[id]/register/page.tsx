@@ -11,10 +11,14 @@ import { SchoolLogo } from '@/components/school-logo';
 
 export default async function SessionRegisterPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ wrestler?: string }>;
 }) {
   const { id: sessionId } = await params;
+  const sp = await searchParams;
+  const preselectedWrestlerId = sp.wrestler?.trim() || '';
   const headersList = await headers();
   const host = headersList.get('host') || '';
   const tenant = getTenantByDomain(host);
@@ -148,6 +152,7 @@ export default async function SessionRegisterPage({
             isOwner={!!isOwner}
             pricePerParticipant={pricePer}
             youthWrestlers={youthWrestlers as Array<{ id: string; first_name?: string; last_name?: string; age?: number; weight_class?: string; skill_level?: string }>}
+            initialWrestlerId={preselectedWrestlerId && youthWrestlers.some((yw) => yw.id === preselectedWrestlerId) ? preselectedWrestlerId : ''}
           />
         </CardContent>
       </Card>

@@ -27,11 +27,13 @@ interface SessionRegisterClientProps {
   isOwner: boolean;
   pricePerParticipant: number;
   youthWrestlers: YouthWrestlerItem[];
+  /** Preselect this wrestler (e.g. from Book again); must be in youthWrestlers. */
+  initialWrestlerId?: string;
 }
 
-export function SessionRegisterClient({ sessionId, isOwner, pricePerParticipant, youthWrestlers }: SessionRegisterClientProps) {
+export function SessionRegisterClient({ sessionId, isOwner, pricePerParticipant, youthWrestlers, initialWrestlerId = '' }: SessionRegisterClientProps) {
   const router = useRouter();
-  const [selectedWrestlerId, setSelectedWrestlerId] = useState('');
+  const [selectedWrestlerId, setSelectedWrestlerId] = useState(initialWrestlerId);
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {

@@ -25,6 +25,7 @@ import { startOfDay } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { SchoolLogo } from '@/components/school-logo';
 import { SessionStatusPill } from '@/components/session-tile-utils';
+import { SessionTypeBadge } from '@/components/session-type-badge';
 
 type Facility = { id: string; name?: string; school?: string; address?: string | null };
 type SessionRow = {
@@ -56,6 +57,7 @@ export function FindTrainingClient({
   coaches = [],
   searchBasePath = '/find-training',
   defaultRangeLabel,
+  preselectedWrestlerId = '',
 }: {
   facilities: Facility[];
   initialSessions: SessionRow[];
@@ -67,6 +69,8 @@ export function FindTrainingClient({
   searchBasePath?: string;
   /** e.g. "Next 7 days" — when set, show results without requiring date (smart default) */
   defaultRangeLabel?: string;
+  /** Preselect this wrestler on the register page (e.g. from Book again) */
+  preselectedWrestlerId?: string;
 }) {
   const router = useRouter();
   const [date, setDate] = useState(initialDate || '');
@@ -98,12 +102,6 @@ export function FindTrainingClient({
   const showResults = initialSessions.length > 0 && (hasSearchCriteria || !!defaultRangeLabel);
   const showNoResults = (hasSearchCriteria || !!defaultRangeLabel) && initialSessions.length === 0;
 
-  const sessionTypeLabel = (s: SessionRow) => {
-    if (s.session_mode === 'partner-open') return 'Partner (open)';
-    if (s.session_type === 'small_group' || s.session_type === 'group') return 'Small group';
-    return 'Session';
-  };
-
   return (
     <div className="space-y-6">
       <Card>
@@ -120,7 +118,7 @@ export function FindTrainingClient({
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div>
               <Label htmlFor="find-date">Date</Label>
-              <Popover open={dateOpen} onOpenChange={setDateOpen}>
+              <Popover open={dateOpen} onOpenChange={setDateOpen} modal>
                 <PopoverTrigger asChild>
                   <Button
                     id="find-date"
@@ -140,27 +138,36 @@ export function FindTrainingClient({
                     <ChevronDown className="ml-auto h-4 w-4 opacity-50" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start" sideOffset={8}>
-                  <CalendarComponent
-                    mode="single"
-                    selected={date ? (() => {
-                      const [y, m, d] = date.split('-').map(Number);
-                      return new Date(y, (m ?? 1) - 1, d ?? 1);
-                    })() : undefined}
-                    defaultMonth={date ? (() => {
-                      const [y, m] = date.split('-').map(Number);
-                      return new Date(y ?? new Date().getFullYear(), (m ?? new Date().getMonth() + 1) - 1, 1);
-                    })() : new Date()}
-                    onSelect={(d) => {
-                      if (d) {
-                        const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'), day = String(d.getDate()).padStart(2, '0');
-                        setDate(`${y}-${m}-${day}`);
-                        setDateOpen(false);
-                      }
-                    }}
-                    disabled={(d) => d < startOfDay(new Date())}
-                    initialFocus
-                  />
+                <PopoverContent
+                  className="z-[100] w-auto p-0 bg-background text-foreground border border-border shadow-xl rounded-md overflow-visible"
+                  align="start"
+                  side="bottom"
+                  sideOffset={8}
+                  collisionPadding={16}
+                  avoidCollisions
+                >
+                  <div className="bg-background rounded-md">
+                    <CalendarComponent
+                      mode="single"
+                      selected={date ? (() => {
+                        const [y, m, d] = date.split('-').map(Number);
+                        return new Date(y, (m ?? 1) - 1, d ?? 1);
+                      })() : undefined}
+                      defaultMonth={date ? (() => {
+                        const [y, m] = date.split('-').map(Number);
+                        return new Date(y ?? new Date().getFullYear(), (m ?? new Date().getMonth() + 1) - 1, 1);
+                      })() : new Date()}
+                      onSelect={(d) => {
+                        if (d) {
+                          const y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, '0'), day = String(d.getDate()).padStart(2, '0');
+                          setDate(`${y}-${m}-${day}`);
+                          setDateOpen(false);
+                        }
+                      }}
+                      disabled={(d) => d < startOfDay(new Date())}
+                      initialFocus
+                    />
+                  </div>
                 </PopoverContent>
               </Popover>
             </div>
@@ -309,58 +316,52 @@ export function FindTrainingClient({
                 return (
                   <div
                     key={s.id}
-                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 border rounded-lg"
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-lg border border-border bg-card"
                   >
-                    <div className="space-y-1 min-w-0">
+                    <div className="space-y-2 min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-xs font-medium text-accent uppercase tracking-wide">
-                          {sessionTypeLabel(s)}
-                        </span>
-                        {s.focus_area && (
-                          <span className="text-xs bg-muted px-2 py-0.5 rounded">
-                            {s.focus_area}
-                          </span>
-                        )}
+                        <SessionTypeBadge sessionType={s.session_type} sessionMode={s.session_mode} />
+                        <SessionStatusPill current={current} max={max} />
                         {s.join_policy === 'invite_only' && (
-                          <span className="text-xs bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/40 px-2 py-0.5 rounded">
+                          <span className="text-[10px] font-medium uppercase tracking-wide text-amber-600 dark:text-amber-400 border border-amber-500/40 rounded px-1.5 py-0.5">
                             Invite only
                           </span>
                         )}
-                        <SessionStatusPill current={current} max={max} />
                       </div>
-                      <p className="font-medium">
-                        {formatEST(dt, 'h:mm a')}
+                      <p className="font-semibold text-foreground">
+                        {formatEST(dt, 'EEE, MMM d')} · {formatEST(dt, 'h:mm a')}
                         {coach && (
-                          <span className="text-muted-foreground font-normal ml-2">
+                          <span className="font-normal text-muted-foreground ml-1">
                             · {[coach.first_name, coach.last_name].filter(Boolean).join(' ')}
                             {coach.school && <SchoolLogo school={coach.school} size="sm" className="ml-1 inline" />}
                           </span>
                         )}
                       </p>
                       {fac && (
-                        <p className="text-sm text-muted-foreground flex items-center gap-1">
-                          <MapPin className="h-3.5 w-3.5" />
+                        <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+                          <MapPin className="h-3.5 w-3.5 shrink-0" />
                           {fac.name}
                         </p>
                       )}
                       <p className="text-xs text-muted-foreground">
-                        {current} / {max} participants
+                        {s.focus_area && <span>{s.focus_area} · </span>}
+                        <span>{current}/{max} participants</span>
                         {s.price_per_participant != null && (
-                          <> · ${Number(s.price_per_participant).toFixed(2)}/person</>
+                          <span> · ${Number(s.price_per_participant).toFixed(2)}/person</span>
                         )}
                       </p>
                     </div>
-                    <div className="shrink-0 flex gap-2">
+                    <div className="shrink-0 flex flex-col sm:items-end gap-2">
                       {openSlots > 0 && (
-                        <Button asChild size="sm" variant="outline">
-                          <Link href={`/sessions/${s.id}/register`}>
-                            {s.join_policy === 'invite_only' ? 'Get link / Register' : 'Register (pay & join)'}
+                        <Button asChild size="sm" className="min-h-[40px]">
+                          <Link href={`/sessions/${s.id}/register${preselectedWrestlerId ? `?wrestler=${encodeURIComponent(preselectedWrestlerId)}` : ''}`}>
+                            {s.join_policy === 'invite_only' ? 'Get link' : 'Book'}
                           </Link>
                         </Button>
                       )}
-                      <Button asChild size="sm" variant="ghost">
-                        <Link href={`/workspaces/from-session/${s.id}`}>Workspace</Link>
-                      </Button>
+                      <Link href={`/workspaces/from-session/${s.id}`} className="text-sm text-muted-foreground hover:text-foreground underline">
+                        Workspace
+                      </Link>
                     </div>
                   </div>
                 );

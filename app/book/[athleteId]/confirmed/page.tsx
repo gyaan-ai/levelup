@@ -115,9 +115,9 @@ export default async function BookingConfirmedPage({
                 )}
                 <p className="text-lg font-semibold">${Number(session.total_price).toFixed(2)}</p>
               </div>
-              <div className="flex gap-3">
+              <div className="flex gap-3 mb-6">
                 <Button asChild variant="outline" className="flex-1">
-                  <Link href="/dashboard">View My Sessions</Link>
+                  <Link href="/bookings">View My Sessions</Link>
                 </Button>
                 <Button asChild className="flex-1">
                   <a href={`https://calendar.google.com/calendar/render?action=TEMPLATE&text=Wrestling+Session&dates=${scheduledAt?.toISOString().replace(/[-:]/g, '').slice(0, 15)}/${scheduledAt?.toISOString().replace(/[-:]/g, '').slice(0, 15)}`} target="_blank" rel="noopener noreferrer">
@@ -125,17 +125,41 @@ export default async function BookingConfirmedPage({
                   </a>
                 </Button>
               </div>
+              <div className="space-y-3 border-t pt-4">
+                <Button asChild className="w-full">
+                  <Link href={`/book/${athleteId}`}>Book another with this coach</Link>
+                </Button>
+                <Button asChild variant="outline" className="w-full">
+                  <Link href="/training">Book another session</Link>
+                </Button>
+                <Button asChild variant="outline" className="w-full">
+                  <Link href="/bookings">Done — Back to Sessions</Link>
+                </Button>
+              </div>
             </>
           )}
 
           {sessionMode === 'partner-invite' && joinUrl && (
-            <BookingConfirmedClient
-              joinUrl={joinUrl}
-              dateTime={dateTime}
-              facilityName={facility?.name}
-              athleteName={`${athlete?.first_name ?? ''} ${athlete?.last_name ?? ''}`.trim()}
-              scheduledAt={scheduledAt?.toISOString() ?? ''}
-            />
+            <>
+              <BookingConfirmedClient
+                joinUrl={joinUrl}
+                dateTime={dateTime}
+                facilityName={facility?.name}
+                athleteName={`${athlete?.first_name ?? ''} ${athlete?.last_name ?? ''}`.trim()}
+                scheduledAt={scheduledAt?.toISOString() ?? ''}
+              />
+              <div className="space-y-3 border-t pt-4 mt-4">
+                <Button asChild className="w-full">
+                  <Link href={`/book/${athleteId}`}>Book another with this coach</Link>
+                </Button>
+                <Button asChild variant="outline" className="w-full">
+                  <Link href="/training">Book another session</Link>
+                </Button>
+                <Button asChild variant="outline" className="w-full">
+                  <Link href="/bookings">Done — Back to Sessions</Link>
+                </Button>
+              </div>
+            </>
           )}
 
           {sessionMode === 'partner-open' && (
@@ -143,9 +167,20 @@ export default async function BookingConfirmedPage({
               <p className="text-muted-foreground mb-4">
                 Your session is open for others to join. You&apos;ll receive notifications when someone requests to join.
               </p>
-              <Button asChild>
+              <Button asChild className="mb-4">
                 <Link href="/partner-sessions">View Open Partner Sessions</Link>
               </Button>
+              <div className="space-y-3 border-t pt-4">
+                <Button asChild className="w-full">
+                  <Link href={`/book/${athleteId}`}>Book another with this coach</Link>
+                </Button>
+                <Button asChild variant="outline" className="w-full">
+                  <Link href="/training">Book another session</Link>
+                </Button>
+                <Button asChild variant="outline" className="w-full">
+                  <Link href="/bookings">Done — Back to Sessions</Link>
+                </Button>
+              </div>
             </>
           )}
         </CardContent>

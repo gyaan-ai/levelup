@@ -22,6 +22,13 @@ export default async function SessionRegisterConfirmedPage({
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect(`/login?redirect=/sessions/${sessionId}/register/confirmed`);
 
+  const { data: session } = await supabase
+    .from('sessions')
+    .select('athlete_id')
+    .eq('id', sessionId)
+    .single();
+  const coachId = (session as { athlete_id?: string } | null)?.athlete_id ?? '';
+
   return (
     <div className="container mx-auto px-4 py-8 max-w-lg">
       <Card>
@@ -31,12 +38,20 @@ export default async function SessionRegisterConfirmedPage({
             You’re registered
           </CardTitle>
           <p className="text-sm text-muted-foreground">
-            Payment completed. Your wrestler is signed up for this session. You’ll see it under Dashboard → Scheduled and in Bookings.
+            Payment completed. Your wrestler is signed up for this session. You’ll see it under Sessions and in Bookings.
           </p>
         </CardHeader>
-        <CardContent>
-          <Button asChild>
-            <Link href="/dashboard">Go to Home</Link>
+        <CardContent className="space-y-3">
+          {coachId && (
+            <Button asChild className="w-full">
+              <Link href={`/training?tab=sessions&coach=${coachId}`}>Book another with this coach</Link>
+            </Button>
+          )}
+          <Button asChild variant={coachId ? 'outline' : 'default'} className="w-full">
+            <Link href="/training">Book another session</Link>
+          </Button>
+          <Button asChild variant="outline" className="w-full">
+            <Link href="/bookings">Done — Back to Sessions</Link>
           </Button>
         </CardContent>
       </Card>

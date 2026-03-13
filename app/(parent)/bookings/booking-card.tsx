@@ -6,10 +6,11 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { Calendar, User, MapPin, X, FolderOpen, Share2, Check, ExternalLink } from 'lucide-react';
+import { Calendar, User, MapPin, X, FolderOpen, Share2, Check, ExternalLink, RotateCcw } from 'lucide-react';
 import { SchoolLogo } from '@/components/school-logo';
 import { differenceInHours } from 'date-fns';
 import { formatEST } from '@/lib/format-date';
+import { SessionTypeBadge } from '@/components/session-type-badge';
 
 const CANCELLATION_WINDOW_HOURS = 24;
 
@@ -25,7 +26,11 @@ export type BookingSession = {
   isTentative?: boolean;
   coach: { name: string; school: string; id: string };
   facility: string;
+  /** Facility ID for Book again (preselect location). */
+  facility_id?: string | null;
   wrestlers: string[];
+  /** First participant's youth_wrestler_id for Book again (preselect wrestler). */
+  primaryWrestlerId?: string | null;
 };
 
 interface BookingCardProps {
@@ -97,37 +102,11 @@ export function BookingCard({ session, isPast = false }: BookingCardProps) {
 
   return (
     <Card className={isPast ? 'bg-muted/20' : ''}>
-      <CardContent className="p-4 sm:p-6">
+      <CardContent className="p-4 sm:p-5">
         <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-start sm:justify-between gap-4">
-          <div className="space-y-1 flex-1 min-w-0">
-            <p className="font-medium">
-              {isPast
-                ? formatEST(scheduledTime, 'EEE, MMM d, yyyy')
-                : formatEST(scheduledTime, 'EEEE, MMMM d, yyyy')}
-            </p>
-            <p className="text-sm text-muted-foreground flex items-center gap-1">
-              <Calendar className="h-4 w-4" />
-              {formatEST(scheduledTime, 'h:mm a')}
-              {' · '}
-              <MapPin className="h-4 w-4 inline" />
-              {session.facility}
-            </p>
-            <p className="text-sm flex items-center gap-1">
-              <User className="h-4 w-4" />
-              {session.coach.name}
-              {session.coach.school && (
-                <span className="flex items-center gap-1">
-                  <SchoolLogo school={session.coach.school} size="sm" />
-                  ({session.coach.school})
-                </span>
-              )}
-            </p>
-            {session.wrestlers.length > 0 && (
-              <p className="text-sm text-muted-foreground">
-                Wrestler(s): {session.wrestlers.join(', ')}
-              </p>
-            )}
-            <div className="pt-2 flex flex-wrap items-center gap-2">
+          <div className="space-y-2 flex-1 min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <SessionTypeBadge sessionType={session.session_type} sessionMode={session.session_mode} />
               {statusBadge(session.status)}
               {session.isTentative && (
                 <Badge variant="outline" className="text-xs border-amber-500/60 text-amber-700 dark:text-amber-400 bg-amber-500/15">
@@ -135,12 +114,37 @@ export function BookingCard({ session, isPast = false }: BookingCardProps) {
                 </Badge>
               )}
             </div>
+            <p className="font-semibold text-foreground">
+              {isPast
+                ? formatEST(scheduledTime, 'EEE, MMM d, yyyy')
+                : formatEST(scheduledTime, 'EEEE, MMM d, yyyy')}
+              {' · '}
+              {formatEST(scheduledTime, 'h:mm a')}
+            </p>
+            <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+              <MapPin className="h-3.5 w-3.5 shrink-0" />
+              {session.facility}
+            </p>
+            <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+              <User className="h-3.5 w-3.5 shrink-0" />
+              {session.coach.name}
+              {session.coach.school && (
+                <span className="flex items-center gap-1">
+                  <SchoolLogo school={session.coach.school} size="sm" />
+                  <span className="text-muted-foreground/80">({session.coach.school})</span>
+                </span>
+              )}
+            </p>
+            {session.wrestlers.length > 0 && (
+              <p className="text-sm text-muted-foreground">
+                {session.wrestlers.join(', ')}
+              </p>
+            )}
           </div>
           <div className="text-left sm:text-right flex flex-col sm:items-end gap-2 shrink-0">
             <p className={isPast ? 'font-bold' : 'text-xl font-bold'}>
               ${Number(session.total_price).toFixed(2)}
             </p>
-            <p className="text-xs text-muted-foreground">{session.session_type ?? '—'}</p>
             <div className="flex flex-col gap-2 sm:items-end">
               {!isPast && (
                 <Link href={`/sessions/${session.id}/reschedule`} className="inline-flex">
@@ -166,6 +170,21 @@ export function BookingCard({ session, isPast = false }: BookingCardProps) {
                     </Button>
                   )}
                 </div>
+              )}
+              {isPast && session.coach.id && (
+                <Link
+                  href={
+                    `/training?tab=sessions&coach=${session.coach.id}` +
+                    (session.facility_id ? `&location=${session.facility_id}` : '') +
+                    (session.primaryWrestlerId ? `&wrestler=${session.primaryWrestlerId}` : '')
+                  }
+                  className="inline-flex"
+                >
+                  <Button variant="outline" size="sm" className="min-h-[40px] px-3">
+                    <RotateCcw className="h-4 w-4 mr-1 shrink-0" />
+                    Book again
+                  </Button>
+                </Link>
               )}
               <div className="flex items-center gap-3 text-sm text-muted-foreground">
                 <Link href={`/workspaces/from-session/${session.id}`} className="hover:text-foreground underline">

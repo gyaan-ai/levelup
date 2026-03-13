@@ -116,6 +116,19 @@ export default async function MyBookingsPage() {
     return o?.name ?? '—';
   };
 
+  const facilityId = (s: (typeof all)[0]) => {
+    const f = s.facilities;
+    if (!f) return null;
+    const o = Array.isArray(f) ? f[0] : f;
+    return (o as { id?: string })?.id ?? null;
+  };
+
+  const primaryWrestlerId = (s: (typeof all)[0]) => {
+    const parts = s.session_participants ?? [];
+    const first = parts[0];
+    return first ? (first as { youth_wrestler_id?: string }).youth_wrestler_id ?? null : null;
+  };
+
   const wrestlers = (s: (typeof all)[0]) => {
     const parts = s.session_participants ?? [];
     return parts
@@ -130,7 +143,7 @@ export default async function MyBookingsPage() {
   // Session is not "tentative" just because it's a group with open spots — once you're booked, you're confirmed
   const isTentative = (_s: (typeof all)[0]) => false;
 
-  // Transform sessions for BookingCard
+  // Transform sessions for BookingCard (include facility_id and primaryWrestlerId for Book again)
   const transformSession = (s: (typeof all)[0]): BookingSession => ({
     id: s.id,
     scheduled_datetime: s.scheduled_datetime,
@@ -142,7 +155,9 @@ export default async function MyBookingsPage() {
     isTentative: isTentative(s),
     coach: coach(s),
     facility: facility(s),
+    facility_id: facilityId(s),
     wrestlers: wrestlers(s),
+    primaryWrestlerId: primaryWrestlerId(s),
   });
 
   const upcomingSessions = upcoming.map(transformSession);
