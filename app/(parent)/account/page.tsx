@@ -8,6 +8,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { User, CreditCard, Calendar, DollarSign } from 'lucide-react';
 import { AccountSignOut } from '@/components/account-sign-out';
+import { RedeemCodeCard } from './redeem-code-card';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,6 +28,12 @@ export default async function AccountPage() {
 
   // Parent sees only their wrestlers (primary or linked).
   const youthWrestlerIds = await getParentYouthWrestlerIds(supabase, user.id);
+
+  const { data: entitlements } = await supabase
+    .from('early_adopter_entitlements')
+    .select('id')
+    .eq('parent_id', user.id);
+  const hasEarlyAdopterEntitlements = (entitlements?.length ?? 0) > 0;
 
   let familySessionIds: string[] = [];
   if (youthWrestlerIds.length > 0) {
@@ -89,6 +96,8 @@ export default async function AccountPage() {
             </Link>
           </CardContent>
         </Card>
+
+        <RedeemCodeCard hasEntitlements={hasEarlyAdopterEntitlements} />
 
         <Card>
           <CardHeader className="pb-2">

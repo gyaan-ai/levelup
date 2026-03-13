@@ -22,7 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Eye, Pencil, Archive, ArchiveRestore, Trash2, Search } from 'lucide-react';
+import { Eye, Pencil, Archive, ArchiveRestore, Trash2, Search, Gift } from 'lucide-react';
 import { formatEST } from '@/lib/format-date';
 
 export type AdminUserRow = {
@@ -59,6 +59,7 @@ export function AdminUsersClient({ initialUsers }: { initialUsers: AdminUserRow[
   const [deleteUser, setDeleteUser] = useState<AdminUserRow | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [grantingId, setGrantingId] = useState<string | null>(null);
 
   const filteredAndSorted = useMemo(() => {
     let list = users.filter((u) => {
@@ -101,6 +102,29 @@ export function AdminUsersClient({ initialUsers }: { initialUsers: AdminUserRow[
     list.sort(cmp);
     return list;
   }, [users, roleFilter, sortBy, includeArchived, search]);
+
+  const handleGrantEarlyAdopter = async (u: AdminUserRow) => {
+    if (u.role !== 'parent') return;
+    setGrantingId(u.id);
+    setError(null);
+    try {
+      const res = await fetch('/api/admin/grant-early-adopter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ parent_id: u.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || 'Failed to grant');
+        return;
+      }
+      router.refresh();
+    } catch {
+      setError('Request failed');
+    } finally {
+      setGrantingId(null);
+    }
+  };
 
   const handleArchive = async (u: AdminUserRow, archive: boolean) => {
     setLoading(true);
@@ -329,6 +353,25 @@ export function AdminUsersClient({ initialUsers }: { initialUsers: AdminUserRow[
                                 </Link>
                               )}
                             </>
+                          )}
+                          {u.role === 'parent' && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8"
+                              onClick={() => handleGrantEarlyAdopter(u)}
+                              disabled={loading || grantingId === u.id}
+                              title="Grant 1 free private + 1 free small group session"
+                            >
+                              {grantingId === u.id ? (
+                                'Granting…'
+                              ) : (
+                                <>
+                                  <Gift className="h-4 w-4 mr-1" />
+                                  Grant early adopter
+                                </>
+                              )}
+                            </Button>
                           )}
                           <Button
                             variant="ghost"

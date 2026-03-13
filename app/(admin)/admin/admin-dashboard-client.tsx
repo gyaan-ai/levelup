@@ -41,6 +41,7 @@ import {
   UserMinus,
   Building2,
   ExternalLink,
+  Tag,
 } from 'lucide-react';
 import Link from 'next/link';
 import { ProfileImage } from '@/components/profile-image';
@@ -550,6 +551,10 @@ export function AdminDashboardClient({
         <Link href="/admin/early-access" className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground border border-border rounded-md hover:bg-muted/50">
           <ClipboardList className="h-4 w-4" />
           Early Access
+        </Link>
+        <Link href="/admin/discount-codes" className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground border border-border rounded-md hover:bg-muted/50">
+          <Tag className="h-4 w-4" />
+          Discount codes
         </Link>
         <Link href="/admin/users" className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground border border-border rounded-md hover:bg-muted/50">
           <Users className="h-4 w-4" />

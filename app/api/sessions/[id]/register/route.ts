@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import { getStripeInstance } from '@/lib/stripe/webhooks';
 import { formatEST } from '@/lib/format-date';
 
 /**
  * POST - Pay & register a youth wrestler for a session (public or invite_only).
- * Creates Stripe Checkout; on success webhook adds participant and marks paid.
+ * - Session owner: add for free.
+ * - Non-owner + early adopter entitlement (1 free small group): add for free and consume entitlement.
+ * - Non-owner otherwise: Creates Stripe Checkout; on success webhook adds participant and marks paid.
  */
 export async function POST(
   req: NextRequest,
@@ -35,7 +38,7 @@ export async function POST(
 
     const { data: session, error: sessionErr } = await supabase
       .from('sessions')
-      .select('id, parent_id, athlete_id, join_policy, session_mode, partner_invite_code, current_participants, max_participants, price_per_participant, scheduled_datetime, status')
+      .select('id, parent_id, athlete_id, join_policy, session_mode, session_type, partner_invite_code, current_participants, max_participants, price_per_participant, scheduled_datetime, status')
       .eq('id', sessionId)
       .single();
 
@@ -47,6 +50,7 @@ export async function POST(
       parent_id?: string;
       join_policy?: string;
       session_mode?: string;
+      session_type?: string;
       current_participants?: number;
       max_participants?: number;
       price_per_participant?: number;
@@ -102,6 +106,41 @@ export async function POST(
     }
     if (!['scheduled', 'pending_payment'].includes(s.status ?? '')) {
       return NextResponse.json({ error: 'Session is not open for registration' }, { status: 400 });
+    }
+
+    const isSmallGroup = s.session_type === 'group' || s.session_type === 'small_group';
+    const admin = createAdminClient(tenant.slug);
+
+    // Early adopter: 1 free small group join (uses '2-athlete' entitlement)
+    if (isSmallGroup) {
+      const { data: entitlement } = await admin
+        .from('early_adopter_entitlements')
+        .select('id, remaining')
+        .eq('parent_id', user.id)
+        .eq('session_type', '2-athlete')
+        .gt('remaining', 0)
+        .limit(1)
+        .maybeSingle();
+
+      if (entitlement?.id && (entitlement.remaining ?? 0) > 0) {
+        const { error: insertErr } = await admin.from('session_participants').insert({
+          session_id: sessionId,
+          youth_wrestler_id: youthWrestlerId,
+          parent_id: user.id,
+          paid: true,
+          amount_paid: 0,
+        });
+        if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 });
+        await admin.from('sessions').update({
+          current_participants: current + 1,
+          updated_at: new Date().toISOString(),
+          early_adopter_entitlement_id: entitlement.id,
+        }).eq('id', sessionId);
+        await admin.from('early_adopter_entitlements').update({
+          remaining: (entitlement.remaining ?? 1) - 1,
+        }).eq('id', entitlement.id);
+        return NextResponse.json({ added: true });
+      }
     }
 
     const pricePer = s.price_per_participant ?? 0;

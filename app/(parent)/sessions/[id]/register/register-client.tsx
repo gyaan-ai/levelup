@@ -29,9 +29,11 @@ interface SessionRegisterClientProps {
   youthWrestlers: YouthWrestlerItem[];
   /** Preselect this wrestler (e.g. from Book again); must be in youthWrestlers. */
   initialWrestlerId?: string;
+  /** Early adopter: can join this small group for free (no payment). */
+  freeSmallGroupJoin?: boolean;
 }
 
-export function SessionRegisterClient({ sessionId, isOwner, pricePerParticipant, youthWrestlers, initialWrestlerId = '' }: SessionRegisterClientProps) {
+export function SessionRegisterClient({ sessionId, isOwner, pricePerParticipant, youthWrestlers, initialWrestlerId = '', freeSmallGroupJoin = false }: SessionRegisterClientProps) {
   const router = useRouter();
   const [selectedWrestlerId, setSelectedWrestlerId] = useState(initialWrestlerId);
   const [loading, setLoading] = useState(false);
@@ -107,10 +109,12 @@ export function SessionRegisterClient({ sessionId, isOwner, pricePerParticipant,
       </div>
       <Button type="submit" disabled={loading} className="w-full">
         {loading
-          ? (isOwner ? 'Adding…' : 'Redirecting to payment…')
+          ? (isOwner || freeSmallGroupJoin ? 'Adding…' : 'Redirecting to payment…')
           : isOwner
             ? 'Add wrestler'
-            : `Pay $${pricePerParticipant.toFixed(2)} & register`}
+            : freeSmallGroupJoin
+              ? 'Add wrestler (free — early adopter)'
+              : `Pay $${pricePerParticipant.toFixed(2)} & register`}
       </Button>
     </form>
   );

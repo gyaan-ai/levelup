@@ -79,8 +79,20 @@ Below is an evaluation of what would be required to support:
 
 ---
 
-## 5. PRD / implementation notes summary
+## 5. Early adopter / beta: free small group link and no charge
+
+**Incentive:** 1 free small group join + 1 free private/partner session for early adopter beta testers (parents who sign up with a valid discount code).
+
+- **Private/partner:** Already supported. Booking flow checks `early_adopter_entitlements` (1-on-1 and 2-athlete); when the parent has a matching entitlement, the session is created and no Stripe checkout is used.
+- **Small group link:** When you share the small group session link with other parents/kids, they are **not charged** if they have an early adopter entitlement. The register API (`POST /api/sessions/[id]/register`) checks for a `2-athlete` entitlement when the session is `group` or `small_group`; if the parent has one, the participant is added for free and the entitlement is consumed. The register page shows “Join this session (free — early adopter)” and the button says “Add wrestler (free — early adopter)” so it’s clear no payment will be taken.
+- **Session owner:** Adding your own wrestler to your small group is always free (unchanged).
+- **No entitlement:** If a parent uses the link and has no early adopter entitlement, they go through normal payment (Stripe) as before.
+
+---
+
+## 6. PRD / implementation notes summary
 
 - **Past sessions** support **Book again** with coach, facility, and wrestler preselected where possible.
 - **Successful booking confirmation** (group register and private/partner) supports **Book another** (with this coach, or any session) and **Done — Back to Sessions**.
+- **Early adopter beta:** Parents with a discount-code signup get 1 free small group join + 1 free private/partner; small group link join is free when they have the entitlement (see §5).
 - **True multi-session checkout** (cart, single checkout, wrestler per session, conflict handling) is a **future enhancement**; see §4 above for requirements.
