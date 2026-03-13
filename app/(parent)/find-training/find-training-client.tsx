@@ -26,6 +26,7 @@ import { cn } from '@/lib/utils';
 import { SchoolLogo } from '@/components/school-logo';
 import { SessionStatusPill } from '@/components/session-tile-utils';
 import { SessionTypeBadge } from '@/components/session-type-badge';
+import { ProfileImage } from '@/components/profile-image';
 
 type Facility = { id: string; name?: string; school?: string; address?: string | null };
 type SessionRow = {
@@ -41,7 +42,7 @@ type SessionRow = {
   price_per_participant: number | null;
   athlete_id: string;
   facility_id: string;
-  athletes?: { id: string; first_name?: string; last_name?: string; school?: string } | null;
+  athletes?: { id: string; first_name?: string; last_name?: string; school?: string; photo_url?: string } | null;
   facilities?: { id: string; name?: string; address?: string } | null;
 };
 
@@ -118,7 +119,7 @@ export function FindTrainingClient({
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <div>
               <Label htmlFor="find-date">Date</Label>
-              <Popover open={dateOpen} onOpenChange={setDateOpen} modal>
+              <Popover open={dateOpen} onOpenChange={setDateOpen}>
                 <PopoverTrigger asChild>
                   <Button
                     id="find-date"
@@ -139,14 +140,14 @@ export function FindTrainingClient({
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent
-                  className="z-[100] w-auto p-0 bg-background text-foreground border border-border shadow-xl rounded-md overflow-visible"
+                  className="z-[100] w-auto max-w-[min(100vw-2rem,360px)] max-h-[85vh] overflow-auto p-0 border border-border shadow-xl rounded-lg bg-card text-card-foreground"
                   align="start"
                   side="bottom"
                   sideOffset={8}
                   collisionPadding={16}
                   avoidCollisions
                 >
-                  <div className="bg-background rounded-md">
+                  <div className="p-2 bg-card text-card-foreground rounded-lg">
                     <CalendarComponent
                       mode="single"
                       selected={date ? (() => {
@@ -166,6 +167,7 @@ export function FindTrainingClient({
                       }}
                       disabled={(d) => d < startOfDay(new Date())}
                       initialFocus
+                      className="rounded-md"
                     />
                   </div>
                 </PopoverContent>
@@ -318,6 +320,13 @@ export function FindTrainingClient({
                     key={s.id}
                     className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-lg border border-border bg-card"
                   >
+                    <div className="flex gap-3 min-w-0 flex-1">
+                      <ProfileImage
+                        src={(coach as { photo_url?: string })?.photo_url}
+                        alt={coach ? [coach.first_name, coach.last_name].filter(Boolean).join(' ') : 'Coach'}
+                        className="w-12 h-12 shrink-0 rounded-full object-cover border border-border"
+                        fallbackIconClassName="h-6 w-6 text-muted-foreground"
+                      />
                     <div className="space-y-2 min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <SessionTypeBadge sessionType={s.session_type} sessionMode={s.session_mode} />
@@ -350,6 +359,7 @@ export function FindTrainingClient({
                           <span> · ${Number(s.price_per_participant).toFixed(2)}/person</span>
                         )}
                       </p>
+                    </div>
                     </div>
                     <div className="shrink-0 flex flex-col sm:items-end gap-2">
                       {openSlots > 0 && (

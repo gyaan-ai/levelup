@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
+import { getParentYouthWrestlerIds } from '@/lib/parent-wrestlers';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -38,14 +39,12 @@ export default async function ParentDashboard() {
   if (userData?.role === 'athlete') {
     redirect('/athlete-dashboard');
   }
-  // parent and admin can both access (admin sees empty state if no wrestlers)
-  // RLS on youth_wrestlers restricts to parent_id = auth.uid() OR linked parent
-  const { data: youthWrestlersRaw } = await supabase
-    .from('youth_wrestlers')
-    .select('*')
-    .order('created_at', { ascending: false });
+  // Parent sees only their wrestlers (primary or linked). Explicit filter so parents never see other users' kids.
+  const youthWrestlerIds = await getParentYouthWrestlerIds(supabase, user.id);
+  const { data: youthWrestlersRaw } = youthWrestlerIds.length > 0
+    ? await supabase.from('youth_wrestlers').select('*').in('id', youthWrestlerIds).order('created_at', { ascending: false })
+    : { data: [] };
   const youthWrestlers = youthWrestlersRaw ?? [];
-  const youthWrestlerIds = youthWrestlers.map((yw: YouthWrestler) => yw.id);
 
   // Sessions are linked via session_participants, not sessions.youth_wrestler_id
   let familySessionIds: string[] = [];

@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
+import { getParentYouthWrestlerIds } from '@/lib/parent-wrestlers';
 
 export const dynamic = 'force-dynamic';
 import { createClient } from '@/lib/supabase/server';
@@ -28,13 +29,12 @@ export default async function HomePage() {
   const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
   if (userData?.role === 'athlete') redirect('/athlete-dashboard');
 
-  // RLS restricts to parent_id = auth.uid() OR linked parent; no explicit filter so linked parents see their kids
-  const { data: youthWrestlersRaw } = await supabase
-    .from('youth_wrestlers')
-    .select('*')
-    .order('created_at', { ascending: false });
+  // Parent sees only their wrestlers (primary or linked). Explicit filter so parents never see other users' kids.
+  const youthWrestlerIds = await getParentYouthWrestlerIds(supabase, user.id);
+  const { data: youthWrestlersRaw } = youthWrestlerIds.length > 0
+    ? await supabase.from('youth_wrestlers').select('*').in('id', youthWrestlerIds).order('created_at', { ascending: false })
+    : { data: [] };
   const youthWrestlers = [...new Map((youthWrestlersRaw ?? []).map((yw: YouthWrestler) => [yw.id, yw])).values()];
-  const youthWrestlerIds = youthWrestlers.map((yw) => yw.id);
 
   let familySessionIds: string[] = [];
   if (youthWrestlerIds.length > 0) {
@@ -77,7 +77,7 @@ export default async function HomePage() {
           current_participants,
           max_participants,
           partner_invite_code,
-          athletes(id, first_name, last_name, school),
+          athletes(id, first_name, last_name, school, photo_url),
           facilities(id, name, address),
           session_participants(youth_wrestler_id, youth_wrestlers(id, first_name, last_name))
         `)
@@ -127,6 +127,7 @@ export default async function HomePage() {
         name: coach ? `${coach.first_name ?? ''} ${coach.last_name ?? ''}`.trim() : '—',
         school: coach?.school ?? '',
         id: coach?.id ?? '',
+        photo_url: (coach as { photo_url?: string })?.photo_url,
       },
       facility: fac?.name ?? '—',
       wrestlers,

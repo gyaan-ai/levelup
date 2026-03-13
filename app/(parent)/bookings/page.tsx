@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
+import { getParentYouthWrestlerIds } from '@/lib/parent-wrestlers';
 import { BookingCard, type BookingSession } from './booking-card';
 import { BookingsTabsClient } from './bookings-tabs-client';
 
@@ -23,13 +24,8 @@ export default async function MyBookingsPage() {
     .single();
 
   if (userData?.role === 'athlete') redirect('/athlete-dashboard');
-  // parent and admin can both access; parents see all sessions for their kids (shared with linked parent)
-
-  const { data: youthWrestlers } = await supabase
-    .from('youth_wrestlers')
-    .select('id')
-    .order('created_at', { ascending: false });
-  const youthWrestlerIds = (youthWrestlers ?? []).map((yw: { id: string }) => yw.id);
+  // Parent sees only their wrestlers (primary or linked). Explicit filter so parents never see other users' kids.
+  const youthWrestlerIds = await getParentYouthWrestlerIds(supabase, user.id);
 
   let familySessionIds: string[] = [];
   if (youthWrestlerIds.length > 0) {
@@ -100,12 +96,13 @@ export default async function MyBookingsPage() {
 
   const coach = (s: (typeof all)[0]) => {
     const a = s.athletes;
-    if (!a) return { name: '—', school: '', id: '' };
+    if (!a) return { name: '—', school: '', id: '', photo_url: undefined };
     const o = Array.isArray(a) ? a[0] : a;
     return {
       name: o ? `${o.first_name} ${o.last_name}` : '—',
       school: o?.school ?? '',
       id: o?.id ?? '',
+      photo_url: (o as { photo_url?: string })?.photo_url,
     };
   };
 

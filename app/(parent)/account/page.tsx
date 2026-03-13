@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
+import { getParentYouthWrestlerIds } from '@/lib/parent-wrestlers';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -24,11 +25,8 @@ export default async function AccountPage() {
   if (userData?.role === 'athlete') redirect('/athlete-dashboard');
   if (userData?.role !== 'parent' && userData?.role !== 'admin') redirect('/dashboard');
 
-  const { data: youthWrestlers } = await supabase
-    .from('youth_wrestlers')
-    .select('id')
-    .order('created_at', { ascending: false });
-  const youthWrestlerIds = (youthWrestlers ?? []).map((r: { id: string }) => r.id);
+  // Parent sees only their wrestlers (primary or linked).
+  const youthWrestlerIds = await getParentYouthWrestlerIds(supabase, user.id);
 
   let familySessionIds: string[] = [];
   if (youthWrestlerIds.length > 0) {

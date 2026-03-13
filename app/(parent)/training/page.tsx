@@ -118,7 +118,7 @@ export default async function TrainingPage({
       .select(`
         id, scheduled_datetime, session_type, session_mode, join_policy, focus_area,
         current_participants, max_participants, total_price, price_per_participant,
-        athlete_id, facility_id, athletes(id, first_name, last_name, school), facilities(id, name, address)
+        athlete_id, facility_id, athletes(id, first_name, last_name, school, photo_url), facilities(id, name, address)
       `)
       .in('status', ['scheduled', 'pending_payment'])
       .gte('scheduled_datetime', dayStart)

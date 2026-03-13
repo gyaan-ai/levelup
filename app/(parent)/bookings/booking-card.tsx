@@ -11,6 +11,7 @@ import { SchoolLogo } from '@/components/school-logo';
 import { differenceInHours } from 'date-fns';
 import { formatEST } from '@/lib/format-date';
 import { SessionTypeBadge } from '@/components/session-type-badge';
+import { ProfileImage } from '@/components/profile-image';
 
 const CANCELLATION_WINDOW_HOURS = 24;
 
@@ -24,7 +25,7 @@ export type BookingSession = {
   partner_invite_code?: string | null;
   /** Small group or partner-open session not yet filled (open slots). */
   isTentative?: boolean;
-  coach: { name: string; school: string; id: string };
+  coach: { name: string; school: string; id: string; photo_url?: string | null };
   facility: string;
   /** Facility ID for Book again (preselect location). */
   facility_id?: string | null;
@@ -104,7 +105,14 @@ export function BookingCard({ session, isPast = false }: BookingCardProps) {
     <Card className={isPast ? 'bg-muted/20' : ''}>
       <CardContent className="p-4 sm:p-5">
         <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-start sm:justify-between gap-4">
-          <div className="space-y-2 flex-1 min-w-0">
+          <div className="flex gap-3 flex-1 min-w-0">
+            <ProfileImage
+              src={session.coach.photo_url}
+              alt={session.coach.name}
+              className="w-12 h-12 shrink-0 rounded-full object-cover border border-border"
+              fallbackIconClassName="h-6 w-6 text-muted-foreground"
+            />
+            <div className="space-y-2 min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <SessionTypeBadge sessionType={session.session_type} sessionMode={session.session_mode} />
               {statusBadge(session.status)}
@@ -140,6 +148,7 @@ export function BookingCard({ session, isPast = false }: BookingCardProps) {
                 {session.wrestlers.join(', ')}
               </p>
             )}
+            </div>
           </div>
           <div className="text-left sm:text-right flex flex-col sm:items-end gap-2 shrink-0">
             <p className={isPast ? 'font-bold' : 'text-xl font-bold'}>
