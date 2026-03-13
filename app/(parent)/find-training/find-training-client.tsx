@@ -55,6 +55,7 @@ export function FindTrainingClient({
   initialCoach = '',
   coaches = [],
   searchBasePath = '/find-training',
+  defaultRangeLabel,
 }: {
   facilities: Facility[];
   initialSessions: SessionRow[];
@@ -62,10 +63,10 @@ export function FindTrainingClient({
   initialTime: string;
   initialLocation: string;
   initialCoach?: string;
-  /** For Training page: show coach filter. */
   coaches?: CoachOption[];
-  /** When embedded in dashboard, pass '/dashboard' so search updates dashboard URL with tab=find-training */
   searchBasePath?: string;
+  /** e.g. "Next 7 days" — when set, show results without requiring date (smart default) */
+  defaultRangeLabel?: string;
 }) {
   const router = useRouter();
   const [date, setDate] = useState(initialDate || '');
@@ -85,7 +86,7 @@ export function FindTrainingClient({
   const handleSearch = () => {
     const params = new URLSearchParams();
     if (searchBasePath === '/dashboard') params.set('tab', 'find-training');
-    if (searchBasePath === '/training') params.set('tab', 'available');
+    if (searchBasePath === '/training') params.set('tab', 'sessions');
     if (date) params.set('date', date);
     if (time && time !== 'any') params.set('time', time);
     if (location && location !== 'all') params.set('location', location);
@@ -94,8 +95,8 @@ export function FindTrainingClient({
   };
 
   const hasSearchCriteria = date || (location && location !== 'all') || (coach && coach !== 'all');
-  const showResults = hasSearchCriteria && initialSessions.length > 0;
-  const showNoResults = hasSearchCriteria && initialSessions.length === 0;
+  const showResults = initialSessions.length > 0 && (hasSearchCriteria || !!defaultRangeLabel);
+  const showNoResults = (hasSearchCriteria || !!defaultRangeLabel) && initialSessions.length === 0;
 
   const sessionTypeLabel = (s: SessionRow) => {
     if (s.session_mode === 'partner-open') return 'Partner (open)';
@@ -267,18 +268,18 @@ export function FindTrainingClient({
         </CardContent>
       </Card>
 
-      {!hasSearchCriteria ? (
+      {!showResults && !showNoResults ? (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
             <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p>Pick a date and click Search, or pick a location (e.g. UNC Wrestling Facility) and click Search to see sessions there.</p>
+            <p>Pick a date and click Search, or pick a location and click Search to see sessions.</p>
           </CardContent>
         </Card>
       ) : showNoResults ? (
         <Card>
           <CardContent className="py-12 text-center text-muted-foreground">
             <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
-            <p>No open sessions for this search.</p>
+            <p>{defaultRangeLabel ? `No open sessions ${defaultRangeLabel.toLowerCase()}.` : 'No open sessions for this search.'}</p>
             <p className="text-sm mt-2">Try another date or location.</p>
           </CardContent>
         </Card>
@@ -288,7 +289,11 @@ export function FindTrainingClient({
             <CardTitle>Open sessions</CardTitle>
             <p className="text-sm text-muted-foreground">
               {initialSessions.length} session{initialSessions.length !== 1 ? 's' : ''}
-              {date ? (() => { const [y, m, d] = date.split('-').map(Number); return ` on ${formatEST(new Date(y, m - 1, d), 'EEEE, MMM d, yyyy')}`; })() : ' at this location'}
+              {date
+                ? (() => { const [y, m, d] = date.split('-').map(Number); return ` on ${formatEST(new Date(y, m - 1, d), 'EEEE, MMM d, yyyy')}`; })()
+                : defaultRangeLabel
+                  ? ` · ${defaultRangeLabel}`
+                  : ' at this location'}
             </p>
           </CardHeader>
           <CardContent>

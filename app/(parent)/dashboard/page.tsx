@@ -7,7 +7,7 @@ import { getTenantByDomain } from '@/config/tenants';
 import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { Edit, User, Calendar, CalendarSearch, Users } from 'lucide-react';
+import { Edit, User, Calendar } from 'lucide-react';
 import { YouthWrestler } from '@/types';
 import { BookingCard, type BookingSession } from '@/app/(parent)/bookings/booking-card';
 import { CoachSessionBadge } from '@/components/coach-session-badge';
@@ -157,29 +157,14 @@ export default async function HomePage() {
         )}
       </section>
 
-      {/* B. Quick Actions */}
+      {/* B. Find sessions — one primary path */}
       <section className="mb-6">
-        <h2 className="text-lg font-semibold text-foreground mb-3">Quick Actions</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <Link href="/training?tab=private">
-            <Button variant="outline" className="w-full min-h-[48px] touch-manipulation flex flex-col sm:flex-row gap-1 sm:gap-2">
-              <Calendar className="h-5 w-5 shrink-0" />
-              <span>Book Private</span>
-            </Button>
-          </Link>
-          <Link href="/training?tab=partner">
-            <Button variant="outline" className="w-full min-h-[48px] touch-manipulation flex flex-col sm:flex-row gap-1 sm:gap-2">
-              <CalendarSearch className="h-5 w-5 shrink-0" />
-              <span>Find Partner</span>
-            </Button>
-          </Link>
-          <Link href="/training?tab=group">
-            <Button variant="outline" className="w-full min-h-[48px] touch-manipulation flex flex-col sm:flex-row gap-1 sm:gap-2">
-              <Users className="h-5 w-5 shrink-0" />
-              <span>Join Small Group</span>
-            </Button>
-          </Link>
-        </div>
+        <Link href="/training">
+          <Button className="w-full min-h-[52px] touch-manipulation text-base font-medium">
+            <Calendar className="h-5 w-5 shrink-0 mr-2" />
+            Find sessions
+          </Button>
+        </Link>
       </section>
 
       {/* C. Your Wrestlers (only RLS-scoped; Add Wrestler lives in Account) */}
@@ -218,10 +203,10 @@ export default async function HomePage() {
                       </div>
                     </div>
                     <div className="flex gap-2 w-full sm:w-auto sm:ml-auto">
-                      <Link href={`/browse?youthWrestlerId=${wrestler.id}`} className="flex-1 min-w-0">
+                      <Link href="/training" className="flex-1 min-w-0">
                         <Button className="w-full min-h-[44px] touch-manipulation">
                           <Calendar className="h-4 w-4 mr-2 shrink-0" />
-                          Book Training
+                          Book training
                         </Button>
                       </Link>
                       <Link href={`/wrestlers/${wrestler.id}/edit`} className="shrink-0">

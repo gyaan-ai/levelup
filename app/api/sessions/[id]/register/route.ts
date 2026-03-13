@@ -146,7 +146,7 @@ export async function POST(
     const stripe = getStripeInstance(tenant.slug);
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (host.startsWith('localhost') ? `http://${host}` : `https://${host}`);
     const successUrl = `${baseUrl}/sessions/${sessionId}/register/confirmed`;
-    const cancelUrl = req.headers.get('referer') || `${baseUrl}/dashboard?tab=group`;
+    const cancelUrl = req.headers.get('referer') || `${baseUrl}/training`;
 
     const dt = s.scheduled_datetime ? new Date(s.scheduled_datetime) : null;
     const desc = dt

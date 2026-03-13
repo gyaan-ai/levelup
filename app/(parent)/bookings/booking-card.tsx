@@ -141,43 +141,50 @@ export function BookingCard({ session, isPast = false }: BookingCardProps) {
               ${Number(session.total_price).toFixed(2)}
             </p>
             <p className="text-xs text-muted-foreground">{session.session_type ?? '—'}</p>
-            <div className="flex flex-wrap gap-2 sm:justify-end">
+            <div className="flex flex-col gap-2 sm:items-end">
               {!isPast && (
-                <Link href={`/sessions/${session.id}/reschedule`} className="min-h-[44px] inline-flex">
+                <Link href={`/sessions/${session.id}/reschedule`} className="inline-flex">
                   <Button size="sm" className="min-h-[44px] px-4">
                     <ExternalLink className="h-4 w-4 mr-1 shrink-0" />
-                    View Session
+                    View
                   </Button>
                 </Link>
               )}
-              {session.partner_invite_code && !isPast && (
-                <Button variant="outline" size="sm" className="min-h-[44px] px-4" onClick={handleCopyShareLink} title="Copy invite link to share">
-                  {linkCopied ? <Check className="h-4 w-4 mr-1 text-green-600 shrink-0" /> : <Share2 className="h-4 w-4 mr-1 shrink-0" />}
-                  {linkCopied ? 'Copied!' : 'Share link'}
-                </Button>
-              )}
-              <Link href={`/workspaces/from-session/${session.id}`} className="min-h-[44px] inline-flex">
-                <Button variant="outline" size="sm" className="min-h-[44px] px-4">
-                  <FolderOpen className="h-4 w-4 mr-1 shrink-0" />
-                  Workspace
-                </Button>
-              </Link>
               {!isPast && (
-                <Link href={`/sessions/${session.id}/reschedule`} className="min-h-[44px] inline-flex">
-                  <Button variant="outline" size="sm" className="min-h-[44px] px-4">Reschedule</Button>
+                <div className="flex flex-wrap gap-2">
+                  <Link href={`/sessions/${session.id}/reschedule`}>
+                    <Button variant="outline" size="sm" className="min-h-[40px] px-3">Reschedule</Button>
+                  </Link>
+                  {canCancel && !showConfirm && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowConfirm(true)}
+                      className="min-h-[40px] px-3 text-destructive border-destructive hover:bg-destructive hover:text-destructive-foreground"
+                    >
+                      Cancel
+                    </Button>
+                  )}
+                </div>
+              )}
+              <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                <Link href={`/workspaces/from-session/${session.id}`} className="hover:text-foreground underline">
+                  Workspace
                 </Link>
-              )}
-              {canCancel && !showConfirm && (
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => setShowConfirm(true)}
-                  className="min-h-[44px] px-4 text-destructive border-destructive hover:bg-destructive hover:text-destructive-foreground"
-                >
-                  <X className="h-4 w-4 mr-1 shrink-0" />
-                  Cancel
-                </Button>
-              )}
+                {session.partner_invite_code && !isPast && (
+                  <>
+                    <span>·</span>
+                    <button
+                      type="button"
+                      onClick={handleCopyShareLink}
+                      className="hover:text-foreground underline"
+                      title="Copy invite link"
+                    >
+                      {linkCopied ? 'Copied!' : 'Share link'}
+                    </button>
+                  </>
+                )}
+              </div>
             </div>
             
             {/* Cancel confirmation */}

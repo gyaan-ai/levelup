@@ -113,7 +113,7 @@ export function AvailabilityManager() {
         <CardHeader>
           <CardTitle>Add a time slot</CardTitle>
           <CardDescription>
-            Pick a date and start/end time. Parents will only see these slots when booking.
+            Pick a date, pick start and end time, then tap Add. That is it. Parents see these when they book.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">

@@ -35,7 +35,7 @@ export default async function TrainingPage({
   searchParams: Promise<{ tab?: string; date?: string; time?: string; location?: string; coach?: string }>;
 }) {
   const sp = await searchParams;
-  const tab = sp.tab ?? 'available';
+  const tab = sp.tab ?? 'sessions';
 
   const headersList = await headers();
   const host = headersList.get('host') || '';
@@ -87,97 +87,75 @@ export default async function TrainingPage({
     nextAvailable: nextByAthlete.get(a.id) ?? null,
   }));
 
+  // Sessions list: smart default = next 7 days when no date; optional filters for facility/coach/time
   let availabilitySessions: SessionRow[] = [];
   const dateParam = sp.date;
-  if (dateParam) {
-    const d = new Date(dateParam);
-    if (!Number.isNaN(d.getTime())) {
-      const dateOnly = dateParam.split('T')[0];
-      const dayStart = `${dateOnly}T00:00:00.000Z`;
-      const dayEnd = `${dateOnly}T23:59:59.999Z`;
-      const baseQuery = () => {
-        let q = supabase
-          .from('sessions')
-          .select(`
-            id, scheduled_datetime, session_type, session_mode, join_policy, focus_area,
-            current_participants, max_participants, total_price, price_per_participant,
-            athlete_id, facility_id, athletes(id, first_name, last_name, school), facilities(id, name, address)
-          `)
-          .in('status', ['scheduled', 'pending_payment'])
-          .gte('scheduled_datetime', dayStart)
-          .lte('scheduled_datetime', dayEnd);
-        if (sp.location && sp.location !== 'all') q = q.eq('facility_id', sp.location);
-        if (sp.coach && sp.coach !== 'all') q = q.eq('athlete_id', sp.coach);
-        return q;
-      };
-      const [groupRes, partnerRes] = await Promise.all([
-        baseQuery().in('session_type', ['group', 'small_group']).order('scheduled_datetime', { ascending: true }),
-        baseQuery().eq('session_mode', 'partner-open').order('scheduled_datetime', { ascending: true }),
-      ]);
-      const seen = new Set<string>();
-      let list: SessionRow[] = [];
-      for (const row of [...(groupRes.data ?? []), ...(partnerRes.data ?? [])]) {
-        const r = row as unknown as SessionRow;
-        if (seen.has(r.id)) continue;
-        seen.add(r.id);
-        list.push(r);
-      }
-      list.sort((a, b) => a.scheduled_datetime.localeCompare(b.scheduled_datetime));
-      const timeWindow = sp.time;
-      if (timeWindow && timeWindow !== 'any') {
-        const [startHour, endHour] =
-          timeWindow === 'morning' ? [6, 12] : timeWindow === 'afternoon' ? [12, 17] : timeWindow === 'evening' ? [17, 21] : [0, 24];
-        list = list.filter((s) => {
-          const t = toZonedTime(new Date(s.scheduled_datetime), APP_TIMEZONE);
-          const h = t.getHours();
-          return h >= startHour && h < endHour;
-        });
-      }
-      availabilitySessions = list.filter(
-        (s) =>
-          (s.current_participants ?? 0) < (s.max_participants ?? 1) &&
-          ((s as { join_policy?: string }).join_policy === 'public' || (s as { join_policy?: string }).join_policy === 'invite_only')
-      );
-    }
+  const now = new Date();
+  const dayStart = dateParam
+    ? (() => {
+        const d = new Date(dateParam);
+        if (Number.isNaN(d.getTime())) return now.toISOString();
+        const dateOnly = dateParam.split('T')[0];
+        return `${dateOnly}T00:00:00.000Z`;
+      })()
+    : now.toISOString();
+  const dayEnd = dateParam
+    ? (() => {
+        const d = new Date(dateParam);
+        if (Number.isNaN(d.getTime())) return now.toISOString();
+        const dateOnly = dateParam.split('T')[0];
+        return `${dateOnly}T23:59:59.999Z`;
+      })()
+    : (() => {
+        const end = new Date(now);
+        end.setDate(end.getDate() + 7);
+        return end.toISOString();
+      })();
+
+  const baseQuery = () => {
+    let q = supabase
+      .from('sessions')
+      .select(`
+        id, scheduled_datetime, session_type, session_mode, join_policy, focus_area,
+        current_participants, max_participants, total_price, price_per_participant,
+        athlete_id, facility_id, athletes(id, first_name, last_name, school), facilities(id, name, address)
+      `)
+      .in('status', ['scheduled', 'pending_payment'])
+      .gte('scheduled_datetime', dayStart)
+      .lte('scheduled_datetime', dayEnd);
+    if (sp.location && sp.location !== 'all') q = q.eq('facility_id', sp.location);
+    if (sp.coach && sp.coach !== 'all') q = q.eq('athlete_id', sp.coach);
+    return q;
+  };
+
+  const [groupRes, partnerRes] = await Promise.all([
+    baseQuery().in('session_type', ['group', 'small_group']).order('scheduled_datetime', { ascending: true }),
+    baseQuery().eq('session_mode', 'partner-open').order('scheduled_datetime', { ascending: true }),
+  ]);
+  const seen = new Set<string>();
+  let list: SessionRow[] = [];
+  for (const row of [...(groupRes.data ?? []), ...(partnerRes.data ?? [])]) {
+    const r = row as unknown as SessionRow;
+    if (seen.has(r.id)) continue;
+    seen.add(r.id);
+    list.push(r);
   }
-  if (!dateParam && sp.location && sp.location !== 'all') {
-    const nowLoc = new Date();
-    const dayStart = nowLoc.toISOString();
-    const twoWeeks = new Date(nowLoc);
-    twoWeeks.setDate(twoWeeks.getDate() + 14);
-    const dayEnd = twoWeeks.toISOString();
-    const baseQ = () => {
-      let q = supabase
-        .from('sessions')
-        .select(
-          'id, scheduled_datetime, session_type, session_mode, join_policy, focus_area, current_participants, max_participants, total_price, price_per_participant, athlete_id, facility_id, athletes(id, first_name, last_name, school), facilities(id, name, address)'
-        )
-        .in('status', ['scheduled', 'pending_payment'])
-        .eq('facility_id', sp.location)
-        .gte('scheduled_datetime', dayStart)
-        .lte('scheduled_datetime', dayEnd);
-      if (sp.coach && sp.coach !== 'all') q = q.eq('athlete_id', sp.coach);
-      return q;
-    };
-    const [groupRes2, partnerRes2] = await Promise.all([
-      baseQ().in('session_type', ['group', 'small_group']).order('scheduled_datetime', { ascending: true }),
-      baseQ().eq('session_mode', 'partner-open').order('scheduled_datetime', { ascending: true }),
-    ]);
-    const seen2 = new Set<string>();
-    let list2: SessionRow[] = [];
-    for (const row of [...(groupRes2.data ?? []), ...(partnerRes2.data ?? [])]) {
-      const r = row as unknown as SessionRow;
-      if (seen2.has(r.id)) continue;
-      seen2.add(r.id);
-      list2.push(r);
-    }
-    list2.sort((a, b) => a.scheduled_datetime.localeCompare(b.scheduled_datetime));
-    availabilitySessions = list2.filter(
-      (s) =>
-        (s.current_participants ?? 0) < (s.max_participants ?? 1) &&
-        ((s as { join_policy?: string }).join_policy === 'public' || (s as { join_policy?: string }).join_policy === 'invite_only')
-    );
+  list.sort((a, b) => a.scheduled_datetime.localeCompare(b.scheduled_datetime));
+  const timeWindow = sp.time;
+  if (timeWindow && timeWindow !== 'any') {
+    const [startHour, endHour] =
+      timeWindow === 'morning' ? [6, 12] : timeWindow === 'afternoon' ? [12, 17] : timeWindow === 'evening' ? [17, 21] : [0, 24];
+    list = list.filter((s) => {
+      const t = toZonedTime(new Date(s.scheduled_datetime), APP_TIMEZONE);
+      const h = t.getHours();
+      return h >= startHour && h < endHour;
+    });
   }
+  availabilitySessions = list.filter(
+    (s) =>
+      (s.current_participants ?? 0) < (s.max_participants ?? 1) &&
+      ((s as { join_policy?: string }).join_policy === 'public' || (s as { join_policy?: string }).join_policy === 'invite_only')
+  );
 
   const isAdmin = userData?.role === 'admin';
 
@@ -185,7 +163,7 @@ export default async function TrainingPage({
     <div className="container mx-auto px-4 py-5 pb-8 md:py-8 max-w-full">
       <h1 className="text-2xl font-bold text-foreground md:text-3xl mb-1">Training</h1>
       <p className="text-muted-foreground text-sm md:text-base mb-6">
-        Find sessions by day, time, facility, and coach — or browse private, partner, and small group options
+        Find sessions to join or browse coaches to book private
       </p>
       <TrainingClient
         initialTab={tab}

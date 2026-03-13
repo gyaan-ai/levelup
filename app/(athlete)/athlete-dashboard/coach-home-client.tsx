@@ -62,11 +62,11 @@ export function CoachHomeClient({
         {coachFirstName ? `Hey ${coachFirstName}, here’s what’s up.` : 'Your schedule and quick actions.'}
       </p>
 
-      {/* Next session reminder */}
+      {/* Next session reminder — prominent so college kids do not forget */}
       {reminderLabel && (
-        <div className="rounded-lg border border-accent/40 bg-accent/10 px-4 py-3">
-          <p className="text-sm font-medium text-foreground">{reminderLabel}</p>
-          <p className="text-xs text-muted-foreground mt-0.5">We’ll remind you before the session.</p>
+        <div className="rounded-lg border-2 border-accent/50 bg-accent/15 px-4 py-4">
+          <p className="font-medium text-foreground">{reminderLabel}</p>
+          <p className="text-sm text-muted-foreground mt-1.5">We’ll remind you the day before and 1 hour before so you do not forget.</p>
         </div>
       )}
 
@@ -74,9 +74,15 @@ export function CoachHomeClient({
       <section>
         <h2 className="text-lg font-semibold text-foreground mb-3">Upcoming</h2>
         {upcomingSessions.length === 0 ? (
-          <Card>
-            <CardContent className="py-8 text-center text-muted-foreground text-sm">
-              No upcoming sessions. Add availability so parents can book.
+          <Card className="border-dashed">
+            <CardContent className="py-8 text-center">
+              <p className="text-muted-foreground font-medium mb-1">No sessions yet</p>
+              <p className="text-sm text-muted-foreground mb-4">
+                Parents can only book when you add times. Set your schedule below ↓
+              </p>
+              <Link href="/availability">
+                <Button className="min-h-[44px] touch-manipulation">Set your schedule</Button>
+              </Link>
             </CardContent>
           </Card>
         ) : (
@@ -129,16 +135,16 @@ export function CoachHomeClient({
         )}
       </section>
 
-      {/* Session requests */}
+      {/* Session requests — simple language for college kids */}
       {pendingRequestsCount > 0 && (
-        <Card>
+        <Card className="border-amber-500/40 bg-amber-500/5">
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
               <Users className="h-4 w-4" />
-              Session requests
+              Someone wants to join
             </CardTitle>
             <CardDescription>
-              {pendingRequestsCount} parent{pendingRequestsCount !== 1 ? 's' : ''} want{pendingRequestsCount === 1 ? 's' : ''} to join your sessions. Approve or decline.
+              {pendingRequestsCount} parent{pendingRequestsCount !== 1 ? 's' : ''} want{pendingRequestsCount === 1 ? 's' : ''} to join your session{pendingRequestsCount !== 1 ? 's' : ''}. Tap below to say yes or no.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -149,26 +155,28 @@ export function CoachHomeClient({
         </Card>
       )}
 
-      {/* Quick actions */}
+      {/* Quick actions — super simple labels */}
       <section>
         <h2 className="text-lg font-semibold text-foreground mb-3">Quick actions</h2>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <Link href="/availability">
-            <Button variant="outline" className="w-full min-h-[48px] touch-manipulation flex flex-col sm:flex-row gap-1 sm:gap-2">
+            <Button variant="outline" className="w-full min-h-[48px] touch-manipulation flex flex-col gap-0.5">
               <Calendar className="h-5 w-5 shrink-0" />
-              <span>Add availability</span>
+              <span>Set your schedule</span>
+              <span className="text-xs font-normal text-muted-foreground">When can you coach?</span>
             </Button>
           </Link>
           <Link href="/small-group-sessions">
-            <Button variant="outline" className="w-full min-h-[48px] touch-manipulation flex flex-col sm:flex-row gap-1 sm:gap-2">
+            <Button variant="outline" className="w-full min-h-[48px] touch-manipulation flex flex-col gap-0.5">
               <Users className="h-5 w-5 shrink-0" />
-              <span>Create small group</span>
+              <span>Create group session</span>
             </Button>
           </Link>
           <Link href="/profile">
-            <Button variant="outline" className="w-full min-h-[48px] touch-manipulation flex flex-col sm:flex-row gap-1 sm:gap-2">
+            <Button variant="outline" className="w-full min-h-[48px] touch-manipulation flex flex-col gap-0.5">
               <DollarSign className="h-5 w-5 shrink-0" />
-              <span>Earnings · ${thisMonthEarnings.toFixed(0)}</span>
+              <span>Earnings</span>
+              <span className="text-xs font-normal text-muted-foreground">${thisMonthEarnings.toFixed(0)} this month</span>
             </Button>
           </Link>
         </div>

@@ -30,13 +30,13 @@ export function CoachBottomNav() {
             key={href}
             href={href}
             className={cn(
-              'flex flex-col items-center justify-center min-h-[44px] min-w-[48px] flex-1 py-2 px-1 touch-manipulation text-xs font-medium transition-colors',
+              'flex flex-col items-center justify-center min-h-[44px] min-w-0 flex-1 py-2 px-2 touch-manipulation text-[11px] font-medium transition-colors whitespace-nowrap overflow-visible',
               isActive ? 'text-accent' : 'text-muted-foreground'
             )}
             aria-current={isActive ? 'page' : undefined}
           >
             <Icon className="h-5 w-5 shrink-0 mb-0.5" aria-hidden />
-            <span className="truncate max-w-full">{label}</span>
+            <span className="overflow-visible whitespace-nowrap">{label}</span>
           </Link>
         );
       })}

@@ -114,14 +114,14 @@ export default async function AccountPage() {
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
               <Calendar className="h-4 w-4" />
-              Session history
+              Sessions
             </CardTitle>
-            <CardDescription>Upcoming and past sessions</CardDescription>
+            <CardDescription>Upcoming and past</CardDescription>
           </CardHeader>
           <CardContent>
             <Link href="/bookings">
               <Button variant="outline" className="w-full min-h-[44px] touch-manipulation">
-                My sessions
+                View sessions
               </Button>
             </Link>
           </CardContent>

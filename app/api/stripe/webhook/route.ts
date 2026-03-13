@@ -3,6 +3,8 @@ import Stripe from 'stripe';
 import { getStripeInstance, getWebhookSecret } from '@/lib/stripe/webhooks';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
+import { createNotification } from '@/lib/notifications';
+import { formatEST } from '@/lib/format-date';
 import { headers } from 'next/headers';
 
 export async function POST(req: NextRequest) {
@@ -71,6 +73,24 @@ export async function POST(req: NextRequest) {
         if (upErr) {
           console.error('Webhook: failed to increment current_participants', upErr);
         }
+        // Notify coach so they see it (college kids need reminders)
+        const { data: sessRow } = await supabase
+          .from('sessions')
+          .select('athlete_id, scheduled_datetime')
+          .eq('id', sessionId)
+          .single();
+        const coachId = (sessRow as { athlete_id?: string } | null)?.athlete_id;
+        const dt = (sessRow as { scheduled_datetime?: string } | null)?.scheduled_datetime;
+        if (coachId) {
+          const dateStr = dt ? formatEST(new Date(dt), 'EEE MMM d, h:mm a') : 'your session';
+          await createNotification(supabase, {
+            user_id: coachId,
+            type: 'session_booked',
+            title: 'Someone just booked your session',
+            body: `New booking for ${dateStr}. Check your Sessions tab.`,
+            data: { session_id: sessionId },
+          }).catch((e) => console.warn('Webhook: coach notification failed', e));
+        }
         return NextResponse.json({ received: true });
       }
 
@@ -95,6 +115,25 @@ export async function POST(req: NextRequest) {
 
       if (participantsError) {
         console.error('Webhook: failed to update session_participants', participantsError);
+      }
+
+      // Notify coach when parent pays for a session (e.g. private booking)
+      const { data: sessRow } = await supabase
+        .from('sessions')
+        .select('athlete_id, scheduled_datetime')
+        .eq('id', sessionId)
+        .single();
+      const coachId = (sessRow as { athlete_id?: string } | null)?.athlete_id;
+      const dt = (sessRow as { scheduled_datetime?: string } | null)?.scheduled_datetime;
+      if (coachId) {
+        const dateStr = dt ? formatEST(new Date(dt), 'EEE MMM d, h:mm a') : 'your session';
+        await createNotification(supabase, {
+          user_id: coachId,
+          type: 'session_booked',
+          title: 'New booking',
+          body: `Someone booked ${dateStr}. Check your Sessions tab.`,
+          data: { session_id: sessionId },
+        }).catch((e) => console.warn('Webhook: coach notification failed', e));
       }
 
       if (earlyAdopterEntitlementId) {

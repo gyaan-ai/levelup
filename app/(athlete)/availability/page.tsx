@@ -40,9 +40,9 @@ export default async function AvailabilityPage() {
       </Link>
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle>Schedule</CardTitle>
+          <CardTitle>When can you coach?</CardTitle>
           <CardDescription>
-            Add when you&apos;re available. Parents see these slots when they book.
+            Add the times you are free. Parents can only book when you add slots. More times = more bookings.
           </CardDescription>
         </CardHeader>
       </Card>
