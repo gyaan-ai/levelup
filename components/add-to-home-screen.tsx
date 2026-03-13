@@ -102,7 +102,7 @@ export function AddToHomeScreen({ variant = 'default' }: { variant?: 'default' |
           >
             <button
               onClick={() => setShowIosModal(false)}
-              className="absolute top-4 right-4 text-white/70 hover:text-white p-1"
+              className="absolute top-2 right-2 flex items-center justify-center min-h-[44px] min-w-[44px] text-white/70 hover:text-white rounded"
               aria-label="Close"
             >
               <X className="h-6 w-6" />

@@ -15,6 +15,7 @@ import {
 import { User, Calendar, MapPin, X } from 'lucide-react';
 import { formatEST } from '@/lib/format-date';
 import { SessionStatusPill, ParticipantAvatars, getSessionAvailability } from '@/components/session-tile-utils';
+import { ProfileImage } from '@/components/profile-image';
 
 type StatusFilter = 'all' | 'open' | 'filling' | 'full';
 
@@ -239,13 +240,14 @@ export function PartnerSessionsClient({
               <CardHeader className="pb-2">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-3 min-w-0">
-                    {athlete?.photo_url ? (
-                      <img src={athlete.photo_url} alt="" className="w-12 h-12 rounded-full object-cover flex-shrink-0" />
-                    ) : (
-                      <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
-                        <User className="h-6 w-6 text-muted-foreground" />
-                      </div>
-                    )}
+                    <ProfileImage
+                      src={athlete?.photo_url}
+                      alt={athlete ? `${athlete.first_name} ${athlete.last_name}` : 'Coach'}
+                      focusX={(athlete as { photo_focus_x?: number })?.photo_focus_x}
+                      focusY={(athlete as { photo_focus_y?: number })?.photo_focus_y}
+                      className="w-12 h-12 flex-shrink-0"
+                      fallbackIconClassName="h-6 w-6 text-muted-foreground"
+                    />
                     <div className="min-w-0">
                       <p className="font-semibold truncate">{athlete?.first_name} {athlete?.last_name}</p>
                       <p className="text-xs text-muted-foreground">{athlete?.school}</p>

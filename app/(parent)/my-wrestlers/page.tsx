@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Plus, Edit, User, Calendar } from 'lucide-react';
 import { YouthWrestler } from '@/types';
+import { ProfileImage } from '@/components/profile-image';
 
 export default async function ParentDashboard() {
   const headersList = await headers();
@@ -86,18 +87,15 @@ export default async function ParentDashboard() {
             return (
               <Card key={wrestler.id} className="overflow-hidden">
                 <div className="relative h-48 bg-gradient-to-br from-accent/20 to-accent/40">
-                  {wrestler.photo_url ? (
-                    <img
-                      src={wrestler.photo_url}
-                      alt={`${wrestler.first_name} ${wrestler.last_name}`}
-                      className="w-full h-full object-cover"
-                      style={{ objectPosition: `${wrestler.photo_focus_x ?? 50}% ${wrestler.photo_focus_y ?? 50}%` }}
-                    />
-                  ) : (
-                    <div className="flex items-center justify-center h-full">
-                      <User className="h-16 w-16 text-muted-foreground" />
-                    </div>
-                  )}
+                  <ProfileImage
+                    src={wrestler.photo_url}
+                    alt={`${wrestler.first_name} ${wrestler.last_name}`}
+                    focusX={wrestler.photo_focus_x}
+                    focusY={wrestler.photo_focus_y}
+                    rounded="none"
+                    className="w-full h-full"
+                    fallbackIconClassName="h-16 w-16 text-muted-foreground"
+                  />
                 </div>
                 <CardHeader>
                   <CardTitle>

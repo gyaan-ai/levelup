@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { formatEST } from '@/lib/format-date';
 import { SchoolLogo } from '@/components/school-logo';
+import { ProfileImage } from '@/components/profile-image';
 import { SessionStatusPill } from '@/components/session-tile-utils';
 
 export type SmallGroupSession = {
@@ -119,15 +120,12 @@ export function SmallGroupSessionsClient({
                   className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 border rounded-lg"
                 >
                   <div className="min-w-0 flex-1 flex items-start gap-3">
-                    {coachPhoto ? (
-                      <img
-                        src={coachPhoto}
-                        alt=""
-                        className="w-10 h-10 rounded-full object-cover shrink-0 bg-muted"
-                      />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full bg-muted shrink-0" />
-                    )}
+                    <ProfileImage
+                      src={coachPhoto}
+                      alt={coachName || 'Coach'}
+                      className="w-10 h-10 shrink-0"
+                      fallbackIconClassName="h-5 w-5 text-muted-foreground"
+                    />
                     <div className="min-w-0">
                       <p className="font-medium text-sm">
                         {formatEST(dt, 'EEE, MMM d')} at {formatEST(dt, 'h:mm a')}

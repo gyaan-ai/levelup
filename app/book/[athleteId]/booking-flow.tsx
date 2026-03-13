@@ -11,6 +11,7 @@ import Link from 'next/link';
 import { ArrowLeft, User, Clock, CheckCircle, Link2, Users, UserCircle } from 'lucide-react';
 import { SchoolLogo } from '@/components/school-logo';
 import { CoachSessionBadge } from '@/components/coach-session-badge';
+import { ProfileImage } from '@/components/profile-image';
 import { startOfDay } from 'date-fns';
 import { formatEST } from '@/lib/format-date';
 import { YouthWrestler } from '@/types';
@@ -328,13 +329,14 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
           Back to Profile
         </Link>
         <div className="flex items-center gap-4 mb-2">
-          {athlete.photo_url ? (
-            <img src={athlete.photo_url} alt="" className="w-16 h-16 rounded-full object-cover" />
-          ) : (
-            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
-              <User className="h-8 w-8 text-muted-foreground" />
-            </div>
-          )}
+          <ProfileImage
+            src={athlete.photo_url}
+            alt={`${athlete.first_name} ${athlete.last_name}`}
+            focusX={athlete.photo_focus_x}
+            focusY={athlete.photo_focus_y}
+            className="w-16 h-16 shrink-0"
+            fallbackIconClassName="h-8 w-8 text-muted-foreground"
+          />
           <div>
             <h1 className="text-2xl font-bold">
               Book a Session with {athlete.first_name} {athlete.last_name}
@@ -384,18 +386,14 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
                         }`}
                       >
                         <CardContent className="p-4 flex items-center gap-4">
-                          {w.photo_url ? (
-                            <img
-                              src={w.photo_url}
-                              alt=""
-                              className="w-14 h-14 rounded-full object-cover shrink-0"
-                              style={{ objectPosition: `${w.photo_focus_x ?? 50}% ${w.photo_focus_y ?? 50}%` }}
-                            />
-                          ) : (
-                            <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center shrink-0">
-                              <User className="h-7 w-7 text-muted-foreground" />
-                            </div>
-                          )}
+                          <ProfileImage
+                            src={w.photo_url}
+                            alt={`${w.first_name} ${w.last_name}`}
+                            focusX={w.photo_focus_x}
+                            focusY={w.photo_focus_y}
+                            className="w-14 h-14 shrink-0"
+                            fallbackIconClassName="h-7 w-7 text-muted-foreground"
+                          />
                           <div className="flex-1 min-w-0">
                             <h3 className="font-semibold">{w.first_name} {w.last_name}</h3>
                             <p className="text-sm text-muted-foreground">
@@ -620,13 +618,14 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Coach</p>
                   <div className="flex items-center gap-3 mt-1">
-                    {athlete.photo_url ? (
-                      <img src={athlete.photo_url} alt="" className="w-12 h-12 rounded-full object-cover" />
-                    ) : (
-                      <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
-                        <User className="h-6 w-6 text-muted-foreground" />
-                      </div>
-                    )}
+                    <ProfileImage
+                      src={athlete.photo_url}
+                      alt={`${athlete.first_name} ${athlete.last_name}`}
+                      focusX={athlete.photo_focus_x}
+                      focusY={athlete.photo_focus_y}
+                      className="w-12 h-12 shrink-0"
+                      fallbackIconClassName="h-6 w-6 text-muted-foreground"
+                    />
                     <span className="font-medium flex items-center gap-2">
                       <CoachSessionBadge totalSessions={athlete.total_sessions ?? 0} size="sm" />
                       {athlete.first_name} {athlete.last_name}
@@ -701,13 +700,14 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center gap-3 pb-4 border-b">
-                {athlete.photo_url ? (
-                  <img src={athlete.photo_url} alt="" className="w-12 h-12 rounded-full object-cover" />
-                ) : (
-                  <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
-                    <User className="h-6 w-6 text-muted-foreground" />
-                  </div>
-                )}
+                <ProfileImage
+                  src={athlete.photo_url}
+                  alt={`${athlete.first_name} ${athlete.last_name}`}
+                  focusX={athlete.photo_focus_x}
+                  focusY={athlete.photo_focus_y}
+                  className="w-12 h-12 shrink-0"
+                  fallbackIconClassName="h-6 w-6 text-muted-foreground"
+                />
                 <div>
                   <p className="font-medium flex items-center gap-2">
                     <CoachSessionBadge totalSessions={athlete.total_sessions ?? 0} size="sm" />

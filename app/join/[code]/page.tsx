@@ -6,7 +6,8 @@ import { getTenantByDomain } from '@/config/tenants';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { User, Calendar, MapPin } from 'lucide-react';
+import { Calendar, MapPin } from 'lucide-react';
+import { ProfileImage } from '@/components/profile-image';
 import { formatEST } from '@/lib/format-date';
 import { JoinSessionClient } from './join-session-client';
 
@@ -89,13 +90,14 @@ export default async function JoinByCodePage({
           ) : (
             <>
               <div className="flex items-center gap-4">
-                {athlete?.photo_url ? (
-                  <img src={athlete.photo_url} alt="" className="w-16 h-16 rounded-full object-cover" />
-                ) : (
-                  <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
-                    <User className="h-8 w-8 text-muted-foreground" />
-                  </div>
-                )}
+                <ProfileImage
+                  src={athlete?.photo_url}
+                  alt={athlete ? `${athlete.first_name} ${athlete.last_name}` : 'Coach'}
+                  focusX={(athlete as { photo_focus_x?: number })?.photo_focus_x}
+                  focusY={(athlete as { photo_focus_y?: number })?.photo_focus_y}
+                  className="w-16 h-16 shrink-0"
+                  fallbackIconClassName="h-8 w-8 text-muted-foreground"
+                />
                 <div>
                   <p className="font-semibold">{athlete?.first_name} {athlete?.last_name}</p>
                   <p className="text-sm text-muted-foreground">{athlete?.school}</p>

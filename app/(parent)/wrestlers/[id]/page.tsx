@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { ArrowLeft, Edit, Calendar, User, School, Target, Heart, Award } from 'lucide-react';
 import { CoachSessionBadge } from '@/components/coach-session-badge';
+import { ProfileImage } from '@/components/profile-image';
 import { formatEST } from '@/lib/format-date';
 import { LinkedParentsCard } from './linked-parents-card';
 
@@ -109,18 +110,14 @@ export default async function YouthWrestlerProfilePage({
       <Card className="mb-6">
         <CardContent className="p-6">
           <div className="flex items-start gap-6">
-            {youthWrestler.photo_url ? (
-              <img
-                src={youthWrestler.photo_url}
-                alt={`${youthWrestler.first_name} ${youthWrestler.last_name}`}
-                className="w-32 h-32 rounded-full object-cover border-4 border-accent/30"
-                style={{ objectPosition: `${youthWrestler.photo_focus_x ?? 50}% ${youthWrestler.photo_focus_y ?? 50}%` }}
-              />
-            ) : (
-              <div className="w-32 h-32 rounded-full bg-muted flex items-center justify-center border-4 border-accent/30">
-                <User className="h-16 w-16 text-muted-foreground" />
-              </div>
-            )}
+            <ProfileImage
+              src={youthWrestler.photo_url}
+              alt={`${youthWrestler.first_name} ${youthWrestler.last_name}`}
+              focusX={youthWrestler.photo_focus_x}
+              focusY={youthWrestler.photo_focus_y}
+              className="w-32 h-32 border-4 border-accent/30"
+              fallbackIconClassName="h-16 w-16 text-muted-foreground"
+            />
             <div className="flex-1">
               <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
                 <div className="flex items-center gap-3">

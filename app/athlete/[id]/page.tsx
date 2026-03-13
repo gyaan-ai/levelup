@@ -14,6 +14,7 @@ import { SchoolLogo } from '@/components/school-logo';
 import { CoachSessionBadge } from '@/components/coach-session-badge';
 import { FollowCoachButton } from '@/components/follow-coach-button';
 import { DeleteAthleteProfileButton } from '@/components/delete-athlete-profile-button';
+import { ProfileImage } from '@/components/profile-image';
 
 const SCHOOL_COLORS: Record<string, { bg: string; text: string }> = {
   'UNC': { bg: 'bg-blue-600', text: 'text-white' },
@@ -182,18 +183,14 @@ export default async function AthleteProfilePage({
           <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
             {/* Photo */}
             <div className="flex-shrink-0">
-              {athlete.photo_url ? (
-                <img
-                  src={athlete.photo_url}
-                  alt={`${athlete.first_name} ${athlete.last_name}`}
-                  className="w-32 h-32 md:w-40 md:h-40 rounded-full object-cover border-4 border-accent/30"
-                  style={{ objectPosition: `${athlete.photo_focus_x ?? 50}% ${athlete.photo_focus_y ?? 50}%` }}
-                />
-              ) : (
-                <div className="w-32 h-32 md:w-40 md:h-40 rounded-full bg-muted flex items-center justify-center border-4 border-accent/30">
-                  <User className="h-16 w-16 md:h-20 md:w-20 text-muted-foreground" />
-                </div>
-              )}
+              <ProfileImage
+                src={athlete.photo_url}
+                alt={`${athlete.first_name} ${athlete.last_name}`}
+                focusX={athlete.photo_focus_x}
+                focusY={athlete.photo_focus_y}
+                className="w-32 h-32 md:w-40 md:h-40 border-4 border-accent/30"
+                fallbackIconClassName="h-16 w-16 md:h-20 md:w-20 text-muted-foreground"
+              />
             </div>
 
             {/* Name and Info */}

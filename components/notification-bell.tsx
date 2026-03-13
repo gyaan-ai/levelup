@@ -73,7 +73,7 @@ export function NotificationBell({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="relative flex items-center justify-center p-1.5 text-white hover:text-accent transition-colors font-medium rounded hover:bg-white/10"
+        className="relative flex items-center justify-center min-h-[44px] min-w-[44px] p-1.5 text-white hover:text-accent transition-colors font-medium rounded hover:bg-white/10"
         aria-label={count > 0 ? `Notifications (${count} unread)` : 'Notifications'}
       >
         <Bell className="h-5 w-5" />
@@ -84,7 +84,7 @@ export function NotificationBell({
         )}
       </button>
       {open && (
-        <div className="absolute right-0 top-full mt-1 w-[320px] max-h-[400px] overflow-hidden rounded-lg border border-border bg-background text-foreground shadow-lg z-50 flex flex-col">
+        <div className="absolute right-0 top-full mt-1 w-[320px] max-w-[calc(100vw-2rem)] max-h-[400px] overflow-hidden rounded-lg border border-border bg-background text-foreground shadow-lg z-50 flex flex-col">
           <div className="flex items-center justify-between px-3 py-2 border-b">
             <span className="font-semibold text-sm">Notifications</span>
             {list.some((n) => !n.read_at) && (

@@ -18,6 +18,7 @@ import {
 import { ArrowLeft, Star, User, Calendar, Trash2, Loader2 } from 'lucide-react';
 import { SchoolLogo } from '@/components/school-logo';
 import { CoachSessionBadge } from '@/components/coach-session-badge';
+import { ProfileImage } from '@/components/profile-image';
 import { formatEST } from '@/lib/format-date';
 import { Athlete } from '@/types';
 
@@ -286,18 +287,14 @@ export function BrowseAthletesClient({ initialAthletes, isAdmin }: BrowseAthlete
                   <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
                     <CardHeader>
                       <div className="flex items-center gap-4">
-                        {athlete.photo_url ? (
-                        <img
+                        <ProfileImage
                           src={athlete.photo_url}
                           alt={`${athlete.first_name} ${athlete.last_name}`}
-                          className="w-24 h-24 rounded-full object-cover border-2 border-accent/30"
-                          style={{ objectPosition: `${athlete.photo_focus_x ?? 50}% ${athlete.photo_focus_y ?? 50}%` }}
+                          focusX={athlete.photo_focus_x}
+                          focusY={athlete.photo_focus_y}
+                          className="w-24 h-24 border-2 border-accent/30"
+                          fallbackIconClassName="h-12 w-12 text-muted-foreground"
                         />
-                      ) : (
-                        <div className="w-24 h-24 rounded-full bg-muted flex items-center justify-center border-2 border-accent/30">
-                          <User className="h-12 w-12 text-muted-foreground" />
-                        </div>
-                      )}
                       <div className="flex-1 min-w-0">
                         <h3 className="text-lg font-semibold truncate">
                           {athlete.first_name} {athlete.last_name}

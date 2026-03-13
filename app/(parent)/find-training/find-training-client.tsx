@@ -128,7 +128,7 @@ export function FindTrainingClient({
                     <ChevronDown className="ml-auto h-4 w-4 opacity-50" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
+                <PopoverContent className="w-auto p-0" align="start" sideOffset={8}>
                   <CalendarComponent
                     mode="single"
                     selected={date ? (() => {
@@ -190,7 +190,7 @@ export function FindTrainingClient({
                         setTimeOpen(false);
                       }}
                       className={cn(
-                        'w-full rounded-md px-3 py-2.5 text-left text-sm transition-colors hover:bg-accent/20 focus:bg-accent/20 focus:outline-none',
+                        'w-full min-h-[44px] rounded-md px-3 py-2.5 text-left text-sm transition-colors hover:bg-accent/20 focus:bg-accent/20 focus:outline-none',
                         time === opt.value && 'bg-accent/30 font-medium'
                       )}
                     >

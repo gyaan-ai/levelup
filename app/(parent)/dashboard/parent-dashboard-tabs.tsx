@@ -27,7 +27,7 @@ export function ParentDashboardTabs({ activeTab }: { activeTab: ParentDashboardT
               key={tab.id}
               href={href}
               className={`
-                flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors -mb-px
+                flex items-center gap-2 px-4 py-3 min-h-[44px] text-sm font-medium border-b-2 transition-colors -mb-px
                 ${isActive
                   ? 'border-primary text-foreground'
                   : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'

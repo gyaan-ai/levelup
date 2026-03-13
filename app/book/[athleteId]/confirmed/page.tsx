@@ -6,8 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { formatEST } from '@/lib/format-date';
-import { CheckCircle, User, Calendar, MapPin, Copy, Share2 } from 'lucide-react';
+import { CheckCircle, Calendar, MapPin, Copy, Share2 } from 'lucide-react';
 import { SchoolLogo } from '@/components/school-logo';
+import { ProfileImage } from '@/components/profile-image';
 import { BookingConfirmedClient } from '../booking-confirmed-client';
 
 export default async function BookingConfirmedPage({
@@ -81,13 +82,14 @@ export default async function BookingConfirmedPage({
             <>
               <div className="space-y-4 mb-6">
                 <div className="flex items-center gap-3">
-                  {athlete?.photo_url ? (
-                    <img src={athlete.photo_url} alt="" className="w-14 h-14 rounded-full object-cover" />
-                  ) : (
-                    <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center">
-                      <User className="h-7 w-7 text-muted-foreground" />
-                    </div>
-                  )}
+                  <ProfileImage
+                    src={athlete?.photo_url}
+                    alt={athlete ? `${athlete.first_name} ${athlete.last_name}` : 'Coach'}
+                    focusX={(athlete as { photo_focus_x?: number })?.photo_focus_x}
+                    focusY={(athlete as { photo_focus_y?: number })?.photo_focus_y}
+                    className="w-14 h-14 shrink-0"
+                    fallbackIconClassName="h-7 w-7 text-muted-foreground"
+                  />
                   <div>
                     <p className="font-semibold">{athlete?.first_name} {athlete?.last_name}</p>
                     <p className="text-sm text-muted-foreground flex items-center gap-1">

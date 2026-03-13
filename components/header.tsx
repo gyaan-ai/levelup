@@ -51,7 +51,7 @@ export function Header() {
   };
 
   return (
-    <header className="bg-primary text-white border-b border-accent/20 sticky top-0 z-50">
+    <header className="bg-primary text-white border-b border-accent/20 sticky top-0 z-50 pt-[env(safe-area-inset-top,0px)]">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-14 sm:h-16">
           <div className="flex items-center gap-2 min-w-0">
@@ -88,7 +88,7 @@ export function Header() {
                         value={viewAsRole ?? 'admin'}
                         onValueChange={handleViewAsChange}
                       >
-                        <SelectTrigger className="w-[120px] h-9 border-white/30 bg-white/10 text-white hover:bg-white/20 [&>span]:line-clamp-1">
+                        <SelectTrigger className="w-[120px] min-h-[44px] h-9 border-white/30 bg-white/10 text-white hover:bg-white/20 [&>span]:line-clamp-1">
                           <SelectValue placeholder="Preview as" />
                         </SelectTrigger>
                         <SelectContent>
@@ -126,7 +126,7 @@ export function Header() {
                   </Link>
                   <Link
                     href="/inbox"
-                    className="relative flex items-center justify-center p-1.5 text-white hover:text-accent transition-colors font-medium rounded hover:bg-white/10"
+                    className="relative flex items-center justify-center min-h-[44px] min-w-[44px] p-1.5 text-white hover:text-accent transition-colors font-medium rounded hover:bg-white/10"
                     aria-label={inboxUnreadCount > 0 ? `Community (${inboxUnreadCount} unread)` : 'Community'}
                     title="Community"
                   >
@@ -155,7 +155,7 @@ export function Header() {
                         value={viewAsRole ?? 'admin'}
                         onValueChange={handleViewAsChange}
                       >
-                        <SelectTrigger className="w-[120px] h-9 border-white/30 bg-white/10 text-white hover:bg-white/20 [&>span]:line-clamp-1">
+                        <SelectTrigger className="w-[120px] min-h-[44px] h-9 border-white/30 bg-white/10 text-white hover:bg-white/20 [&>span]:line-clamp-1">
                           <SelectValue placeholder="Preview as" />
                         </SelectTrigger>
                         <SelectContent>
@@ -187,7 +187,7 @@ export function Header() {
                   </Link>
                   <Link
                     href="/inbox"
-                    className="relative flex items-center justify-center p-1.5 text-white hover:text-accent transition-colors font-medium rounded hover:bg-white/10"
+                    className="relative flex items-center justify-center min-h-[44px] min-w-[44px] p-1.5 text-white hover:text-accent transition-colors font-medium rounded hover:bg-white/10"
                     aria-label={inboxUnreadCount > 0 ? `Community (${inboxUnreadCount} unread)` : 'Community'}
                     title="Community"
                   >
@@ -220,7 +220,7 @@ export function Header() {
                     value={viewAsRole ?? 'admin'}
                     onValueChange={handleViewAsChange}
                   >
-                    <SelectTrigger className="w-[120px] h-9 border-white/30 bg-white/10 text-white hover:bg-white/20 [&>span]:line-clamp-1">
+                    <SelectTrigger className="w-[120px] min-h-[44px] h-9 border-white/30 bg-white/10 text-white hover:bg-white/20 [&>span]:line-clamp-1">
                       <SelectValue placeholder="Preview as" />
                     </SelectTrigger>
                     <SelectContent>
@@ -247,7 +247,7 @@ export function Header() {
                         value={viewAsRole ?? 'admin'}
                         onValueChange={handleViewAsChange}
                       >
-                        <SelectTrigger className="w-[120px] h-9 border-white/30 bg-white/10 text-white hover:bg-white/20 [&>span]:line-clamp-1">
+                        <SelectTrigger className="w-[120px] min-h-[44px] h-9 border-white/30 bg-white/10 text-white hover:bg-white/20 [&>span]:line-clamp-1">
                           <SelectValue placeholder="Preview as" />
                         </SelectTrigger>
                         <SelectContent>
@@ -285,7 +285,7 @@ export function Header() {
                   </Link>
                   <Link
                     href="/inbox"
-                    className="relative flex items-center justify-center p-1.5 text-white hover:text-accent transition-colors font-medium rounded hover:bg-white/10"
+                    className="relative flex items-center justify-center min-h-[44px] min-w-[44px] p-1.5 text-white hover:text-accent transition-colors font-medium rounded hover:bg-white/10"
                     aria-label={inboxUnreadCount > 0 ? `Community (${inboxUnreadCount} unread)` : 'Community'}
                     title="Community"
                   >

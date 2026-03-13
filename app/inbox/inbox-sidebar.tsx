@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { MessageCircle, Users, Plus, LayoutGrid } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 type Group = { id: string; name: string; athleteId: string; createdAt: string };
 type DmThread = {
@@ -29,7 +30,7 @@ function workspaceLabel(ws: WorkspaceItem): string {
   return kidName ? `${coachName} · ${kidName}` : coachName;
 }
 
-export function InboxSidebar({ role }: { role: 'parent' | 'athlete' | 'youth_wrestler' }) {
+export function InboxSidebar({ role, className }: { role: 'parent' | 'athlete' | 'youth_wrestler'; className?: string }) {
   const pathname = usePathname();
   const [groups, setGroups] = useState<Group[]>([]);
   const [threads, setThreads] = useState<DmThread[]>([]);
@@ -56,7 +57,7 @@ export function InboxSidebar({ role }: { role: 'parent' | 'athlete' | 'youth_wre
   const workspaceId = pathname?.match(/^\/workspaces\/([^/]+)/)?.[1];
 
   return (
-    <aside className="w-60 shrink-0 border-r border-border bg-card flex flex-col h-full">
+    <aside className={cn('w-60 shrink-0 border-r border-border bg-card flex flex-col h-full', className)}>
       <div className="p-3 border-b border-border">
         <h2 className="text-sm font-semibold text-foreground">Community</h2>
       </div>
@@ -66,8 +67,8 @@ export function InboxSidebar({ role }: { role: 'parent' | 'athlete' | 'youth_wre
           <div className="flex items-center justify-between px-2 py-1">
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Direct messages</span>
             {(role === 'parent' || role === 'athlete') && (
-              <Link href="/inbox/new" title="New message">
-                <Button variant="ghost" size="icon" className="h-7 w-7">
+              <Link href="/inbox/new" title="New message" className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-md hover:bg-muted/50">
+                <Button variant="ghost" size="icon" className="h-8 w-8 pointer-events-none">
                   <Plus className="h-4 w-4" />
                 </Button>
               </Link>
@@ -86,7 +87,7 @@ export function InboxSidebar({ role }: { role: 'parent' | 'athlete' | 'youth_wre
                   <li key={`${t.parentId}-${t.athleteId}`}>
                     <Link
                       href={href}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${
+                      className={`flex items-center gap-2 px-3 py-2 min-h-[44px] rounded-md text-sm transition-colors ${
                         active ? 'bg-accent/20 text-accent border-l-2 border-accent' : 'hover:bg-muted/50'
                       } ${t.unread ? 'font-medium' : ''}`}
                     >
@@ -116,7 +117,7 @@ export function InboxSidebar({ role }: { role: 'parent' | 'athlete' | 'youth_wre
                   <li key={ws.id}>
                     <Link
                       href={`/workspaces/${ws.id}`}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${
+                      className={`flex items-center gap-2 px-3 py-2 min-h-[44px] rounded-md text-sm transition-colors ${
                         workspaceId === ws.id
                           ? 'bg-accent/20 text-accent border-l-2 border-accent'
                           : 'hover:bg-muted/50'
@@ -135,8 +136,8 @@ export function InboxSidebar({ role }: { role: 'parent' | 'athlete' | 'youth_wre
           <section>
             <div className="flex items-center justify-between px-2 py-1">
               <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Groups</span>
-              <Link href="/inbox/groups/new">
-                <Button variant="ghost" size="icon" className="h-7 w-7" title="New group">
+              <Link href="/inbox/groups/new" className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-md hover:bg-muted/50" title="New group">
+                <Button variant="ghost" size="icon" className="h-8 w-8 pointer-events-none">
                   <Plus className="h-4 w-4" />
                 </Button>
               </Link>
@@ -151,7 +152,7 @@ export function InboxSidebar({ role }: { role: 'parent' | 'athlete' | 'youth_wre
                   <li key={g.id}>
                     <Link
                       href={`/inbox/groups/${g.id}`}
-                      className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition-colors ${
+                      className={`flex items-center gap-2 px-3 py-2 min-h-[44px] rounded-md text-sm transition-colors ${
                         groupId === g.id
                           ? 'bg-accent/20 text-accent border-l-2 border-accent'
                           : 'hover:bg-muted/50'

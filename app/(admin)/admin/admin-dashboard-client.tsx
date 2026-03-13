@@ -43,6 +43,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import Link from 'next/link';
+import { ProfileImage } from '@/components/profile-image';
 import { formatEST } from '@/lib/format-date';
 
 export type AdminSession = {
@@ -1240,17 +1241,14 @@ export function AdminDashboardClient({
                 {kidsList.map((k) => (
                   <Card key={k.id}>
                     <CardContent className="p-4 flex items-center gap-4">
-                      {k.photo_url ? (
-                        <img
-                          src={k.photo_url}
-                          alt={`${k.first_name} ${k.last_name}`}
-                          className="w-14 h-14 rounded-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center">
-                          <User className="h-7 w-7 text-muted-foreground" />
-                        </div>
-                      )}
+                      <ProfileImage
+                        src={k.photo_url}
+                        alt={`${k.first_name} ${k.last_name}`}
+                        focusX={k.photo_focus_x}
+                        focusY={k.photo_focus_y}
+                        className="w-14 h-14 shrink-0"
+                        fallbackIconClassName="h-7 w-7 text-muted-foreground"
+                      />
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold truncate">
                           {k.first_name} {k.last_name}
@@ -1319,17 +1317,15 @@ export function AdminDashboardClient({
               {/* Admin: change coach photo */}
               {editingAthleteId && (
                 <div className="flex items-center gap-4">
-                  <div className="w-20 h-20 rounded-full border-2 border-border overflow-hidden bg-muted flex items-center justify-center shrink-0">
-                    {athleteEditForm.photo_url ? (
-                      <img
-                        src={athleteEditForm.photo_url}
-                        alt="Coach"
-                        className="w-full h-full object-cover"
-                        style={{ objectPosition: `${athleteEditForm.photo_focus_x}% ${athleteEditForm.photo_focus_y}%` }}
-                      />
-                    ) : (
-                      <User className="h-8 w-8 text-muted-foreground" />
-                    )}
+                  <div className="w-20 h-20 rounded-full border-2 border-border overflow-hidden shrink-0">
+                    <ProfileImage
+                      src={athleteEditForm.photo_url}
+                      alt="Coach"
+                      focusX={athleteEditForm.photo_focus_x}
+                      focusY={athleteEditForm.photo_focus_y}
+                      className="w-full h-full"
+                      fallbackIconClassName="h-8 w-8 text-muted-foreground"
+                    />
                   </div>
                   <div>
                     <p className="text-sm font-medium mb-1">Profile photo</p>

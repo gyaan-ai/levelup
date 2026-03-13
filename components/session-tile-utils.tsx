@@ -1,6 +1,7 @@
 'use client';
 
 import { User } from 'lucide-react';
+import { ProfileImage } from '@/components/profile-image';
 
 export type SessionAvailability = 'open' | 'filling' | 'full';
 
@@ -93,20 +94,15 @@ export function ParticipantAvatars({
       {list.map((p) => (
         <div
           key={p.id}
-          className={`${px} rounded-full border-2 border-background bg-muted flex-shrink-0 overflow-hidden ring-1 ring-background`}
+          className={`${px} rounded-full border-2 border-background flex-shrink-0 overflow-hidden ring-1 ring-background`}
           title={[p.first_name, p.last_name].filter(Boolean).join(' ') || 'Participant'}
         >
-          {p.photo_url ? (
-            <img
-              src={p.photo_url}
-              alt=""
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center">
-              <User className={size === 'sm' ? 'h-3.5 w-3.5' : 'h-4 w-4'} />
-            </div>
-          )}
+          <ProfileImage
+            src={p.photo_url}
+            alt={[p.first_name, p.last_name].filter(Boolean).join(' ') || 'Participant'}
+            className="w-full h-full"
+            fallbackIconClassName={size === 'sm' ? 'h-3.5 w-3.5' : 'h-4 w-4'}
+          />
         </div>
       ))}
       {participants.length > maxShow && (

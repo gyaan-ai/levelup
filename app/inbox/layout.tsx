@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
-import { InboxSidebar } from './inbox-sidebar';
+import { InboxLayoutClient } from './inbox-layout-client';
 
 export default async function InboxLayout({
   children,
@@ -33,11 +33,8 @@ export default async function InboxLayout({
   const sidebarRole = role === 'admin' ? 'parent' : (role as 'parent' | 'athlete' | 'youth_wrestler');
 
   return (
-    <div className="flex h-[calc(100vh-3.5rem)] max-h-[calc(100vh-3.5rem)]">
-      <InboxSidebar role={sidebarRole} />
-      <main className="flex-1 min-w-0 flex flex-col overflow-hidden bg-background">
-        {children}
-      </main>
-    </div>
+    <InboxLayoutClient role={sidebarRole}>
+      {children}
+    </InboxLayoutClient>
   );
 }
