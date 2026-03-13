@@ -71,7 +71,7 @@ export default async function RootLayout({
         <ThemeProvider tenant={tenant}>
           <AuthProvider tenantSlug={tenant.slug}>
             <Header />
-            <main className="flex-1">
+            <main className="flex-1 pb-[env(safe-area-inset-bottom)]">
               {children}
             </main>
             <Footer />

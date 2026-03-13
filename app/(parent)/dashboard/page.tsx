@@ -362,9 +362,9 @@ export default async function ParentDashboard({
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-6">
-        <h1 className="text-3xl font-serif font-bold text-foreground">Dashboard</h1>
+    <div className="container mx-auto px-4 py-5 pb-8 md:py-8 max-w-full">
+      <div className="mb-4 md:mb-6">
+        <h1 className="text-2xl font-serif font-bold text-foreground md:text-3xl">Dashboard</h1>
         <p className="text-muted-foreground mt-1">
           {activeTab === 'scheduled' ? 'Your wrestlers and upcoming sessions' : activeTab === 'book' ? 'Find and book coaches' : activeTab === 'find-training' ? 'Search open sessions by date and location' : 'Group and partner sessions'}
         </p>
@@ -373,18 +373,15 @@ export default async function ParentDashboard({
 
       {activeTab === 'scheduled' && scheduledData && (
     <>
-      <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-        <div />
-        <div className="flex items-center gap-4">
-          {scheduledData.youthWrestlers.length > 0 && (
-            <Link href="/wrestlers/add">
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Another Wrestler
-              </Button>
-            </Link>
-          )}
-        </div>
+      <div className="mb-4 md:mb-6">
+        {scheduledData.youthWrestlers.length > 0 && (
+          <Link href="/wrestlers/add" className="block w-full sm:w-auto sm:inline-block">
+            <Button className="w-full min-h-[44px] touch-manipulation sm:w-auto">
+              <Plus className="h-4 w-4 mr-2 shrink-0" />
+              Add Another Wrestler
+            </Button>
+          </Link>
+        )}
       </div>
 
       {scheduledData.youthWrestlers.length > 0 ? (
@@ -445,57 +442,51 @@ export default async function ParentDashboard({
             </Card>
           ) : null}
 
-          {/* Youth Wrestler Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+          {/* Youth Wrestler Cards - single column on mobile, touch-friendly */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-6 md:mb-8">
             {scheduledData.youthWrestlers.map((wrestler: YouthWrestler) => {
               const sessionsCompleted = scheduledData.sessionCounts[wrestler.id] || 0;
               
               return (
-                <Card key={wrestler.id} className="overflow-hidden">
-                  <div className="relative h-48 bg-gradient-to-br from-accent/20 to-accent/40">
-                    <ProfileImage
-                      src={wrestler.photo_url}
-                      alt={`${wrestler.first_name} ${wrestler.last_name}`}
-                      focusX={wrestler.photo_focus_x ?? 50}
-                      focusY={wrestler.photo_focus_y ?? 25}
-                      rounded="none"
-                      className="w-full h-full"
-                      fallbackIconClassName="h-16 w-16 text-muted-foreground"
-                    />
-                  </div>
-                  <CardHeader>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <CardTitle className="text-xl">
-                        {wrestler.first_name} {wrestler.last_name}
-                      </CardTitle>
-                      <CoachSessionBadge totalSessions={sessionsCompleted} size="sm" />
-                    </div>
-                    <CardDescription>
-                      <div className="flex flex-wrap gap-2 text-sm">
-                        {wrestler.age && <span>{wrestler.age} years</span>}
-                        {wrestler.weight_class && <span>• {wrestler.weight_class}</span>}
-                        {wrestler.skill_level && (
-                          <span className="capitalize">• {wrestler.skill_level}</span>
-                        )}
+                <Card key={wrestler.id}>
+                  <CardContent className="p-4 flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-4">
+                    <div className="flex items-center gap-4 min-w-0 flex-1">
+                      <ProfileImage
+                        src={wrestler.photo_url}
+                        alt={`${wrestler.first_name} ${wrestler.last_name}`}
+                        focusX={wrestler.photo_focus_x ?? 50}
+                        focusY={wrestler.photo_focus_y ?? 50}
+                        className="w-16 h-16 sm:w-20 sm:h-20 shrink-0"
+                        fallbackIconClassName="h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <CardTitle className="text-lg sm:text-xl">
+                            {wrestler.first_name} {wrestler.last_name}
+                          </CardTitle>
+                          <CoachSessionBadge totalSessions={sessionsCompleted} size="sm" />
+                        </div>
+                        <CardDescription className="mt-0.5 text-sm">
+                          {wrestler.age && <span>{wrestler.age} years</span>}
+                          {wrestler.weight_class && <span> • {wrestler.weight_class}</span>}
+                          {wrestler.skill_level && (
+                            <span className="capitalize"> • {wrestler.skill_level}</span>
+                          )}
+                        </CardDescription>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          {sessionsCompleted} session{sessionsCompleted !== 1 ? 's' : ''} completed
+                        </p>
                       </div>
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="mb-4">
-                      <p className="text-sm text-muted-foreground">
-                        {sessionsCompleted} session{sessionsCompleted !== 1 ? 's' : ''} completed
-                      </p>
                     </div>
-
-                    <div className="flex gap-2">
-                      <Link href={`/dashboard?tab=book&youthWrestlerId=${wrestler.id}`} className="flex-1">
-                        <Button className="w-full">
-                          <Calendar className="h-4 w-4 mr-2" />
+                    <div className="flex gap-2 w-full sm:w-auto sm:ml-auto">
+                      <Link href={`/dashboard?tab=book&youthWrestlerId=${wrestler.id}`} className="flex-1 min-w-0">
+                        <Button className="w-full min-h-[44px] touch-manipulation">
+                          <Calendar className="h-4 w-4 mr-2 shrink-0" />
                           Book Session
                         </Button>
                       </Link>
-                      <Link href={`/wrestlers/${wrestler.id}/edit`}>
-                        <Button variant="outline" size="icon">
+                      <Link href={`/wrestlers/${wrestler.id}/edit`} className="shrink-0">
+                        <Button variant="outline" size="icon" className="min-h-[44px] min-w-[44px] touch-manipulation">
                           <Edit className="h-4 w-4" />
                         </Button>
                       </Link>

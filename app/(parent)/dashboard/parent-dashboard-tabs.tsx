@@ -16,8 +16,8 @@ export function ParentDashboardTabs({ activeTab }: { activeTab: ParentDashboardT
   const basePath = '/dashboard';
 
   return (
-    <div className="border-b border-border mb-6">
-      <nav className="flex flex-wrap gap-1" aria-label="Dashboard sections">
+    <div className="border-b border-border mb-4 md:mb-6 -mx-4 px-4 overflow-x-auto overflow-y-hidden">
+      <nav className="flex gap-0 min-w-0 flex-nowrap md:flex-wrap" aria-label="Dashboard sections">
         {TABS.map((tab) => {
           const isActive = activeTab === tab.id;
           const Icon = tab.icon;
@@ -27,15 +27,15 @@ export function ParentDashboardTabs({ activeTab }: { activeTab: ParentDashboardT
               key={tab.id}
               href={href}
               className={`
-                flex items-center gap-2 px-4 py-3 min-h-[44px] text-sm font-medium border-b-2 transition-colors -mb-px
+                flex items-center gap-2 px-4 py-3 min-h-[44px] min-w-0 shrink-0 md:shrink text-sm font-medium border-b-2 transition-colors -mb-px touch-manipulation
                 ${isActive
                   ? 'border-primary text-foreground'
                   : 'border-transparent text-muted-foreground hover:text-foreground hover:border-border'
                 }
               `}
             >
-              <Icon className="h-4 w-4" />
-              {tab.label}
+              <Icon className="h-4 w-4 shrink-0" />
+              <span className="whitespace-nowrap">{tab.label}</span>
             </Link>
           );
         })}

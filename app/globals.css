@@ -66,12 +66,20 @@
     -moz-osx-font-smoothing: grayscale;
     padding-left: env(safe-area-inset-left, 0);
     padding-right: env(safe-area-inset-right, 0);
+    padding-bottom: env(safe-area-inset-bottom, 0);
   }
-  /* Prevent zoom on input focus on iOS for better mobile UX */
-  @media screen and (max-width: 640px) {
+  /* Mobile-first: prevent zoom on input focus on iOS (iPhone) */
+  input, select, textarea {
+    font-size: 16px;
+  }
+  @media (min-width: 640px) {
     input, select, textarea {
-      font-size: 16px !important;
+      font-size: inherit;
     }
+  }
+  /* Smooth scroll on iOS */
+  .overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
   }
 
   /* Keep inputs dark when browser autofill is applied (avoids white flash) */

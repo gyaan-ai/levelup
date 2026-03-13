@@ -61,79 +61,76 @@ export default async function ParentDashboard() {
     : { data: [] };
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="mb-8 flex items-center justify-between">
+    <div className="container mx-auto px-4 py-5 pb-8 md:py-8 max-w-full">
+      <div className="mb-6 md:mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold mb-2">My Youth Wrestlers</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl font-bold mb-1 md:text-3xl md:mb-2">My Youth Wrestlers</h1>
+          <p className="text-sm text-muted-foreground md:text-base">
             Manage profiles for your wrestlers
           </p>
         </div>
-        <Link href="/wrestlers/add">
-          <Button>
-            <Plus className="h-4 w-4 mr-2" />
+        <Link href="/wrestlers/add" className="w-full sm:w-auto">
+          <Button className="w-full min-h-[44px] touch-manipulation sm:w-auto">
+            <Plus className="h-4 w-4 mr-2 shrink-0" />
             Add Youth Wrestler
           </Button>
         </Link>
       </div>
 
       {youthWrestlers && youthWrestlers.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
           {youthWrestlers.map((wrestler: YouthWrestler) => {
             const wrestlerSessions = upcomingSessions?.filter(
               (s: any) => s.youth_wrestler_id === wrestler.id
             ) || [];
 
             return (
-              <Card key={wrestler.id} className="overflow-hidden">
-                <div className="relative h-48 bg-gradient-to-br from-accent/20 to-accent/40">
-                  <ProfileImage
-                    src={wrestler.photo_url}
-                    alt={`${wrestler.first_name} ${wrestler.last_name}`}
-                    focusX={wrestler.photo_focus_x ?? 50}
-                    focusY={wrestler.photo_focus_y ?? 25}
-                    rounded="none"
-                    className="w-full h-full"
-                    fallbackIconClassName="h-16 w-16 text-muted-foreground"
-                  />
-                </div>
-                <CardHeader>
-                  <CardTitle>
-                    {wrestler.first_name} {wrestler.last_name}
-                  </CardTitle>
-                  <CardDescription>
-                    {wrestler.age && `${wrestler.age} years old`}
-                    {wrestler.skill_level && ` • ${wrestler.skill_level}`}
-                    {wrestler.weight_class && ` • ${wrestler.weight_class}`}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {wrestler.school && (
-                    <p className="text-sm text-muted-foreground mb-2">
-                      {wrestler.school}
-                      {wrestler.graduation_year && ` • Class of ${wrestler.graduation_year}`}
-                    </p>
-                  )}
-
-                  {wrestlerSessions.length > 0 && (
-                    <div className="mb-4 p-2 bg-muted rounded-md">
-                      <div className="flex items-center gap-2 text-sm">
-                        <Calendar className="h-4 w-4" />
-                        <span className="font-medium">
-                          {wrestlerSessions.length} upcoming session{wrestlerSessions.length !== 1 ? 's' : ''}
-                        </span>
-                      </div>
+              <Card key={wrestler.id}>
+                <CardContent className="p-4 flex flex-col gap-4">
+                  <div className="flex items-center gap-4 min-w-0">
+                    <ProfileImage
+                      src={wrestler.photo_url}
+                      alt={`${wrestler.first_name} ${wrestler.last_name}`}
+                      focusX={wrestler.photo_focus_x ?? 50}
+                      focusY={wrestler.photo_focus_y ?? 50}
+                      className="w-16 h-16 sm:w-20 sm:h-20 shrink-0"
+                      fallbackIconClassName="h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <CardTitle className="text-lg sm:text-xl">
+                        {wrestler.first_name} {wrestler.last_name}
+                      </CardTitle>
+                      <CardDescription className="text-sm">
+                        {wrestler.age && `${wrestler.age} years old`}
+                        {wrestler.skill_level && ` • ${wrestler.skill_level}`}
+                        {wrestler.weight_class && ` • ${wrestler.weight_class}`}
+                      </CardDescription>
+                      {wrestler.school && (
+                        <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+                          {wrestler.school}
+                          {wrestler.graduation_year && ` • Class of ${wrestler.graduation_year}`}
+                        </p>
+                      )}
+                      {wrestlerSessions.length > 0 && (
+                        <div className="mt-2 p-2 bg-muted rounded-md inline-block">
+                          <div className="flex items-center gap-2 text-xs sm:text-sm">
+                            <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0" />
+                            <span className="font-medium">
+                              {wrestlerSessions.length} upcoming session{wrestlerSessions.length !== 1 ? 's' : ''}
+                            </span>
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  )}
-
-                  <div className="flex gap-2">
-                    <Link href={`/wrestlers/${wrestler.id}`} className="flex-1">
-                      <Button variant="outline" className="w-full">
+                  </div>
+                  <div className="flex gap-2 w-full">
+                    <Link href={`/wrestlers/${wrestler.id}`} className="flex-1 min-w-0">
+                      <Button variant="outline" className="w-full min-h-[44px] touch-manipulation">
                         View Profile
                       </Button>
                     </Link>
-                    <Link href={`/wrestlers/${wrestler.id}/edit`}>
-                      <Button variant="outline" size="icon">
+                    <Link href={`/wrestlers/${wrestler.id}/edit`} className="shrink-0">
+                      <Button variant="outline" size="icon" className="min-h-[44px] min-w-[44px] touch-manipulation">
                         <Edit className="h-4 w-4" />
                       </Button>
                     </Link>
