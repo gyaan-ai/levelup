@@ -26,20 +26,47 @@ interface YouthWrestlerItem {
 interface SessionRegisterClientProps {
   sessionId: string;
   isOwner: boolean;
+  isSmallGroup?: boolean;
   pricePerParticipant: number;
   youthWrestlers: YouthWrestlerItem[];
-  /** Preselect this wrestler (e.g. from Book again); must be in youthWrestlers. */
   initialWrestlerId?: string;
-  /** Early adopter: can join this small group for free (no payment). */
   freeSmallGroupJoin?: boolean;
 }
 
-export function SessionRegisterClient({ sessionId, isOwner, pricePerParticipant, youthWrestlers, initialWrestlerId = '', freeSmallGroupJoin = false }: SessionRegisterClientProps) {
+export function SessionRegisterClient({ sessionId, isOwner, isSmallGroup = false, pricePerParticipant, youthWrestlers, initialWrestlerId = '', freeSmallGroupJoin = false }: SessionRegisterClientProps) {
   const router = useRouter();
   const [selectedWrestlerId, setSelectedWrestlerId] = useState(initialWrestlerId);
   const [promoCode, setPromoCode] = useState('');
+  const [codeApplied, setCodeApplied] = useState(false);
+  const [applyingCode, setApplyingCode] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const freeWithCode = (codeApplied || freeSmallGroupJoin) && isSmallGroup && !isOwner;
+
+  const handleApplyCode = async () => {
+    const codeTrimmed = promoCode.trim();
+    if (!codeTrimmed) return;
+    setError(null);
+    setApplyingCode(true);
+    try {
+      const redeemRes = await fetch('/api/redeem-discount-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: codeTrimmed }),
+      });
+      const data = await redeemRes.json();
+      if (redeemRes.ok && (data.success || data.alreadyUsed)) {
+        setCodeApplied(true);
+      } else {
+        setError(data.error || 'Invalid or expired promo code');
+      }
+    } catch {
+      setError('Could not apply code. Try again.');
+    } finally {
+      setApplyingCode(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -51,18 +78,19 @@ export function SessionRegisterClient({ sessionId, isOwner, pricePerParticipant,
     setLoading(true);
     try {
       const codeTrimmed = promoCode.trim();
-      if (codeTrimmed && !isOwner) {
+      if (codeTrimmed && !isOwner && !codeApplied) {
         const redeemRes = await fetch('/api/redeem-discount-code', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ code: codeTrimmed }),
         });
         const redeemData = await redeemRes.json();
-        if (!redeemRes.ok) {
+        if (!redeemRes.ok && !redeemData.alreadyUsed) {
           setError(redeemData.error || 'Invalid or expired promo code');
           setLoading(false);
           return;
         }
+        if (redeemRes.ok && (redeemData.success || redeemData.alreadyUsed)) setCodeApplied(true);
       }
 
       const res = await fetch(`/api/sessions/${sessionId}/register`, {
@@ -132,25 +160,41 @@ export function SessionRegisterClient({ sessionId, isOwner, pricePerParticipant,
           </SelectContent>
         </Select>
       </div>
-      <div className="space-y-2">
-        <Label htmlFor="promo">Promo code (optional)</Label>
-        <Input
-          id="promo"
-          type="text"
-          placeholder="e.g. GUILDLAUNCH"
-          value={promoCode}
-          onChange={(e) => { setPromoCode(e.target.value.toUpperCase()); setError(null); }}
-          className="uppercase"
-          autoComplete="off"
-        />
-      </div>
+      {!isOwner && (
+        <div className="space-y-2">
+          <Label htmlFor="promo">Promo code (optional)</Label>
+          <div className="flex gap-2">
+            <Input
+              id="promo"
+              type="text"
+              placeholder="e.g. GUILDLAUNCH"
+              value={promoCode}
+              onChange={(e) => { setPromoCode(e.target.value.toUpperCase()); setError(null); setCodeApplied(false); }}
+              className="uppercase flex-1"
+              autoComplete="off"
+              disabled={!!freeWithCode}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleApplyCode}
+              disabled={!promoCode.trim() || applyingCode || !!freeWithCode}
+            >
+              {applyingCode ? 'Applying…' : freeWithCode ? 'Applied' : 'Apply'}
+            </Button>
+          </div>
+          {freeWithCode && (
+            <p className="text-sm text-green-600 dark:text-green-400 font-medium">Promo applied — this session is free.</p>
+          )}
+        </div>
+      )}
       <Button type="submit" disabled={loading} className="w-full">
         {loading
-          ? (isOwner || freeSmallGroupJoin ? 'Adding…' : 'Redirecting to payment…')
+          ? (isOwner || freeWithCode ? 'Adding…' : 'Redirecting to payment…')
           : isOwner
             ? 'Add wrestler'
-            : freeSmallGroupJoin
-              ? 'Add wrestler (free — early adopter)'
+            : freeWithCode
+              ? 'Register free (early adopter)'
               : `Pay $${pricePerParticipant.toFixed(2)} & register`}
       </Button>
     </form>

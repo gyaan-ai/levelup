@@ -167,6 +167,7 @@ export default async function SessionRegisterPage({
           <SessionRegisterClient
             sessionId={sessionId}
             isOwner={!!isOwner}
+            isSmallGroup={isSmallGroup}
             pricePerParticipant={pricePer}
             youthWrestlers={youthWrestlers as Array<{ id: string; first_name?: string; last_name?: string; age?: number; weight_class?: string; skill_level?: string }>}
             initialWrestlerId={preselectedWrestlerId && youthWrestlers.some((yw) => yw.id === preselectedWrestlerId) ? preselectedWrestlerId : ''}

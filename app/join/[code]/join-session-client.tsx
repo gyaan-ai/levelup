@@ -26,6 +26,7 @@ interface YouthWrestlerOption {
 interface JoinSessionClientProps {
   sessionId: string;
   code: string;
+  isSmallGroup?: boolean;
   pricePerParticipant: number;
   youthWrestlers: YouthWrestlerOption[];
 }
@@ -33,15 +34,44 @@ interface JoinSessionClientProps {
 export function JoinSessionClient({
   sessionId,
   code,
+  isSmallGroup = false,
   pricePerParticipant,
   youthWrestlers,
 }: JoinSessionClientProps) {
   const router = useRouter();
   const [selectedWrestlerId, setSelectedWrestlerId] = useState<string>('');
   const [promoCode, setPromoCode] = useState('');
+  const [codeApplied, setCodeApplied] = useState(false);
+  const [applyingCode, setApplyingCode] = useState(false);
   const [joining, setJoining] = useState(false);
   const [registered, setRegistered] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const freeWithCode = codeApplied && isSmallGroup;
+
+  const handleApplyCode = async () => {
+    const codeTrimmed = promoCode.trim();
+    if (!codeTrimmed) return;
+    setError(null);
+    setApplyingCode(true);
+    try {
+      const redeemRes = await fetch('/api/redeem-discount-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: codeTrimmed }),
+      });
+      const data = await redeemRes.json();
+      if (redeemRes.ok && (data.success || data.alreadyUsed)) {
+        setCodeApplied(true);
+      } else {
+        setError(data.error || 'Invalid or expired promo code');
+      }
+    } catch {
+      setError('Could not apply code. Try again.');
+    } finally {
+      setApplyingCode(false);
+    }
+  };
 
   const handlePayAndRegister = async () => {
     if (!selectedWrestlerId) {
@@ -52,18 +82,19 @@ export function JoinSessionClient({
     setJoining(true);
     try {
       const codeTrimmed = promoCode.trim();
-      if (codeTrimmed) {
+      if (codeTrimmed && !codeApplied) {
         const redeemRes = await fetch('/api/redeem-discount-code', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ code: codeTrimmed }),
         });
         const redeemData = await redeemRes.json();
-        if (!redeemRes.ok) {
+        if (!redeemRes.ok && !redeemData.alreadyUsed) {
           setError(redeemData.error || 'Invalid or expired promo code');
           setJoining(false);
           return;
         }
+        if (redeemRes.ok && (redeemData.success || redeemData.alreadyUsed)) setCodeApplied(true);
       }
 
       const res = await fetch(`/api/sessions/${sessionId}/register`, {
@@ -139,22 +170,40 @@ export function JoinSessionClient({
       </div>
       <div className="space-y-2">
         <Label htmlFor="promo">Promo code (optional)</Label>
-        <Input
-          id="promo"
-          type="text"
-          placeholder="e.g. GUILDLAUNCH"
-          value={promoCode}
-          onChange={(e) => { setPromoCode(e.target.value.toUpperCase()); setError(null); }}
-          className="uppercase"
-          autoComplete="off"
-        />
+        <div className="flex gap-2">
+          <Input
+            id="promo"
+            type="text"
+            placeholder="e.g. GUILDLAUNCH"
+            value={promoCode}
+            onChange={(e) => { setPromoCode(e.target.value.toUpperCase()); setError(null); setCodeApplied(false); }}
+            className="uppercase flex-1"
+            autoComplete="off"
+            disabled={!!freeWithCode}
+          />
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleApplyCode}
+            disabled={!promoCode.trim() || applyingCode || !!freeWithCode}
+          >
+            {applyingCode ? 'Applying…' : freeWithCode ? 'Applied' : 'Apply'}
+          </Button>
+        </div>
+        {freeWithCode && (
+          <p className="text-sm text-green-600 dark:text-green-400 font-medium">Promo applied — this session is free.</p>
+        )}
       </div>
       <Button
         onClick={handlePayAndRegister}
         disabled={!selectedWrestlerId || joining}
         className="w-full bg-accent text-black hover:bg-accent-hover"
       >
-        {joining ? 'Redirecting to payment…' : `Pay $${pricePerParticipant.toFixed(2)} & register`}
+        {joining
+          ? (freeWithCode ? 'Adding…' : 'Redirecting to payment…')
+          : freeWithCode
+            ? 'Register free (early adopter)'
+            : `Pay $${pricePerParticipant.toFixed(2)} & register`}
       </Button>
     </div>
   );

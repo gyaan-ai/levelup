@@ -40,11 +40,13 @@ export async function POST(req: NextRequest) {
 
     if (codeErr) {
       console.error('Redeem code lookup error:', codeErr);
-      return NextResponse.json({ error: 'Invalid or expired discount code' }, { status: 400 });
+      return NextResponse.json({
+        error: "We couldn't verify this code. Make sure the code exists in the database (run Supabase migrations or add it in Admin → Discount codes).",
+      }, { status: 400 });
     }
     if (!codeRow) {
       return NextResponse.json({
-        error: 'Code not found. Check the code or ask an admin to add it in Admin → Discount codes.',
+        error: 'Code not found. Check the spelling or ask an admin to add it in Admin → Discount codes.',
       }, { status: 400 });
     }
 
@@ -63,7 +65,7 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
 
     if (existing) {
-      return NextResponse.json({ error: "You've already used this code" }, { status: 400 });
+      return NextResponse.json({ success: true, alreadyUsed: true, message: 'You already have this benefit.' }, { status: 200 });
     }
 
     const { error: ent1 } = await admin.from('early_adopter_entitlements').insert({

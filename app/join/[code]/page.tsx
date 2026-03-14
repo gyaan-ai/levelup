@@ -125,6 +125,7 @@ export default async function JoinByCodePage({
                 <JoinSessionClient
                   sessionId={session.id}
                   code={code}
+                  isSmallGroup={((session as { session_type?: string }).session_type === 'group' || (session as { session_type?: string }).session_type === 'small_group')}
                   pricePerParticipant={pricePerParticipant}
                   youthWrestlers={youthWrestlers}
                 />
