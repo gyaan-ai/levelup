@@ -74,7 +74,7 @@ export default function LoginPage() {
         return;
       }
 
-      // Respect redirect param (e.g. /book/xxx) or redirect based on role
+      // Respect redirect param (e.g. /join/CODE) or redirect based on role
       const redirectTo = searchParams.get('redirect');
       const safeRedirect =
         redirectTo &&
@@ -83,7 +83,9 @@ export default function LoginPage() {
         !redirectTo.includes(':');
 
       if (safeRedirect) {
-        router.push(redirectTo);
+        // Full navigation so the target page (e.g. join link) loads with auth cookie and shows content
+        window.location.assign(redirectTo);
+        return;
       } else {
         const role = userData.role;
         if (role === 'athlete') {

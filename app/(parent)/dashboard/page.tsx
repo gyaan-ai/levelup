@@ -4,6 +4,7 @@ import { getParentYouthWrestlerIds } from '@/lib/parent-wrestlers';
 
 export const dynamic = 'force-dynamic';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -72,6 +73,7 @@ export default async function HomePage() {
           scheduled_datetime,
           status,
           total_price,
+          parent_id,
           session_type,
           session_mode,
           current_participants,
@@ -93,6 +95,7 @@ export default async function HomePage() {
     scheduled_datetime: string;
     status: string;
     total_price?: number;
+    parent_id?: string;
     session_type?: string;
     session_mode?: string;
     current_participants?: number;
@@ -102,6 +105,27 @@ export default async function HomePage() {
     facilities?: { id: string; name?: string; address?: string } | { id: string; name?: string; address?: string }[];
     session_participants?: Array<{ youth_wrestlers?: { first_name?: string; last_name?: string } | { first_name?: string; last_name?: string }[] }>;
   }>;
+
+  // Fetch all participants for upcoming sessions (RLS only returns current user's kids; admin gives full list for the tile)
+  let allParticipantsBySession: Record<string, string[]> = {};
+  if (upcoming.length > 0) {
+    const admin = createAdminClient(tenant.slug);
+    const ids = upcoming.map((s) => s.id);
+    const { data: allParts } = await admin
+      .from('session_participants')
+      .select('session_id, youth_wrestlers(first_name, last_name)')
+      .in('session_id', ids);
+    for (const p of allParts ?? []) {
+      const row = p as { session_id: string; youth_wrestlers?: { first_name?: string; last_name?: string } | null };
+      const yw = row.youth_wrestlers;
+      const name = yw ? `${yw.first_name ?? ''} ${yw.last_name ?? ''}`.trim() : null;
+      if (name && row.session_id) {
+        if (!allParticipantsBySession[row.session_id]) allParticipantsBySession[row.session_id] = [];
+        allParticipantsBySession[row.session_id].push(name);
+      }
+    }
+  }
+
   const nextSession = upcoming[0];
 
   const toBookingSession = (s: (typeof upcoming)[0]): BookingSession => {
@@ -109,11 +133,13 @@ export default async function HomePage() {
     const coach = Array.isArray(a) ? a[0] : a;
     const f = s.facilities;
     const fac = Array.isArray(f) ? f[0] : f;
-    const wrestlers = (s.session_participants ?? []).map((p) => {
-      const yw = p.youth_wrestlers;
-      const o = Array.isArray(yw) ? yw[0] : yw;
-      return o ? `${o.first_name ?? ''} ${o.last_name ?? ''}`.trim() : null;
-    }).filter(Boolean) as string[];
+    const wrestlers =
+      allParticipantsBySession[s.id] ??
+      (s.session_participants ?? []).map((p) => {
+        const yw = p.youth_wrestlers;
+        const o = Array.isArray(yw) ? yw[0] : yw;
+        return o ? `${o.first_name ?? ''} ${o.last_name ?? ''}`.trim() : null;
+      }).filter(Boolean) as string[];
     return {
       id: s.id,
       scheduled_datetime: s.scheduled_datetime,
@@ -123,6 +149,7 @@ export default async function HomePage() {
       session_mode: s.session_mode,
       partner_invite_code: s.partner_invite_code ?? null,
       isTentative: false,
+      isOwner: s.parent_id === user.id,
       coach: {
         name: coach ? `${coach.first_name ?? ''} ${coach.last_name ?? ''}`.trim() : '—',
         school: coach?.school ?? '',
@@ -130,7 +157,9 @@ export default async function HomePage() {
         photo_url: (coach as { photo_url?: string })?.photo_url,
       },
       facility: fac?.name ?? '—',
+      facility_id: (fac as { id?: string })?.id ?? null,
       wrestlers,
+      primaryWrestlerId: (s.session_participants ?? [])[0] ? ((s.session_participants ?? [])[0] as { youth_wrestler_id?: string }).youth_wrestler_id : null,
     };
   };
 
