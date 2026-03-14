@@ -42,8 +42,8 @@ export function SessionRegisterClient({ sessionId, isOwner, isSmallGroup = false
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Small group = free. No payment.
-  const freeWithCode = isSmallGroup && !isOwner;
+  // Free when server says parent has early adopter entitlement for small group (freeSmallGroupJoin).
+  const freeWithCode = freeSmallGroupJoin;
 
   const handleApplyCode = async () => {
     const codeTrimmed = promoCode.trim();
@@ -186,7 +186,7 @@ export function SessionRegisterClient({ sessionId, isOwner, isSmallGroup = false
               {applyingCode ? 'Applying…' : freeWithCode ? 'Applied' : 'Apply'}
             </Button>
           </div>
-          {codeApplied && freeWithCode && (
+          {freeWithCode && (
             <p className="text-sm text-green-600 dark:text-green-400 font-medium">Promo applied — this session is free.</p>
           )}
           {codeApplied && !freeWithCode && isSmallGroup && (
@@ -194,7 +194,11 @@ export function SessionRegisterClient({ sessionId, isOwner, isSmallGroup = false
           )}
         </div>
       )}
-      <Button type="submit" disabled={loading} className="w-full">
+      <Button
+        type="submit"
+        disabled={loading}
+        className={`w-full ${freeWithCode ? 'bg-accent text-black hover:bg-accent-hover' : ''}`}
+      >
         {loading
           ? (isOwner || freeWithCode ? 'Adding…' : 'Redirecting to payment…')
           : isOwner

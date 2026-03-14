@@ -27,6 +27,7 @@ interface JoinSessionClientProps {
   sessionId: string;
   code: string;
   isSmallGroup?: boolean;
+  freeSmallGroupJoin?: boolean;
   pricePerParticipant: number;
   youthWrestlers: YouthWrestlerOption[];
 }
@@ -35,6 +36,7 @@ export function JoinSessionClient({
   sessionId,
   code,
   isSmallGroup = false,
+  freeSmallGroupJoin = false,
   pricePerParticipant,
   youthWrestlers,
 }: JoinSessionClientProps) {
@@ -47,7 +49,7 @@ export function JoinSessionClient({
   const [registered, setRegistered] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const freeWithCode = codeApplied && isSmallGroup;
+  const freeWithCode = freeSmallGroupJoin;
 
   const handleApplyCode = async () => {
     const codeTrimmed = promoCode.trim();
@@ -63,6 +65,7 @@ export function JoinSessionClient({
       const data = await redeemRes.json();
       if (redeemRes.ok && (data.success || data.alreadyUsed)) {
         setCodeApplied(true);
+        router.refresh();
       } else {
         setError(data.error || 'Invalid or expired promo code');
       }

@@ -63,6 +63,25 @@ export default async function JoinByCodePage({
   const dateTime = scheduledAt ? `${formatEST(scheduledAt, 'EEEE, MMMM d, yyyy')} at ${formatEST(scheduledAt, 'h:mm a')}` : '';
 
   const pricePerParticipant = (session as { price_per_participant?: number }).price_per_participant ?? 40;
+  const sessionType = (session as { session_type?: string }).session_type;
+  const isSmallGroup =
+    sessionType === 'group' ||
+    sessionType === '2-athlete' ||
+    sessionType === 'small_group' ||
+    (maxParticipants >= 2 && sessionType !== '1-on-1');
+
+  let freeSmallGroupJoin = false;
+  if (user && !isFull && isSmallGroup) {
+    const { data: ent } = await supabase
+      .from('early_adopter_entitlements')
+      .select('id')
+      .eq('parent_id', user.id)
+      .eq('session_type', '2-athlete')
+      .gt('remaining', 0)
+      .limit(1)
+      .maybeSingle();
+    freeSmallGroupJoin = !!ent?.id;
+  }
 
   let youthWrestlers: Array<{ id: string; first_name: string; last_name: string; age?: number; weight_class?: string; skill_level?: string }> = [];
   if (user && !isFull) {
@@ -136,7 +155,8 @@ export default async function JoinByCodePage({
                 <JoinSessionClient
                   sessionId={session.id}
                   code={code}
-                  isSmallGroup={((session as { session_type?: string }).session_type === 'group' || (session as { session_type?: string }).session_type === 'small_group')}
+                  isSmallGroup={isSmallGroup}
+                  freeSmallGroupJoin={freeSmallGroupJoin}
                   pricePerParticipant={pricePerParticipant}
                   youthWrestlers={youthWrestlers}
                 />
