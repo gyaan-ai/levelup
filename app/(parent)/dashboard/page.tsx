@@ -14,6 +14,7 @@ import { YouthWrestler } from '@/types';
 import { BookingCard, type BookingSession } from '@/app/(parent)/bookings/booking-card';
 import { CoachSessionBadge } from '@/components/coach-session-badge';
 import { ProfileImage } from '@/components/profile-image';
+import { formatEST } from '@/lib/format-date';
 
 /** Parent sees only their own wrestlers (primary or linked). RLS on youth_wrestlers enforces this. */
 export default async function HomePage() {
@@ -52,6 +53,7 @@ export default async function HomePage() {
   const completedIds = (completedSessions ?? []).map((s: { id: string }) => s.id);
 
   const sessionCounts: Record<string, number> = {};
+  let lastSessionByWrestler: Record<string, string> = {};
   if (youthWrestlerIds.length > 0 && completedIds.length > 0) {
     const { data: participantRows } = await supabase
       .from('session_participants')
@@ -61,6 +63,22 @@ export default async function HomePage() {
     for (const p of participantRows ?? []) {
       const yid = (p as { youth_wrestler_id: string }).youth_wrestler_id;
       sessionCounts[yid] = (sessionCounts[yid] || 0) + 1;
+    }
+    const { data: pastSessions } = await supabase
+      .from('sessions')
+      .select('id, scheduled_datetime, session_participants(youth_wrestler_id)')
+      .in('id', completedIds)
+      .order('scheduled_datetime', { ascending: false });
+    for (const sess of pastSessions ?? []) {
+      const parts = (sess as { session_participants?: Array<{ youth_wrestler_id?: string }> }).session_participants ?? [];
+      const dt = (sess as { scheduled_datetime?: string }).scheduled_datetime;
+      if (!dt) continue;
+      for (const part of parts) {
+        const yid = part.youth_wrestler_id;
+        if (yid && youthWrestlerIds.includes(yid) && !lastSessionByWrestler[yid]) {
+          lastSessionByWrestler[yid] = dt;
+        }
+      }
     }
   }
 
@@ -76,6 +94,7 @@ export default async function HomePage() {
           parent_id,
           session_type,
           session_mode,
+          focus_area,
           current_participants,
           max_participants,
           partner_invite_code,
@@ -98,6 +117,7 @@ export default async function HomePage() {
     parent_id?: string;
     session_type?: string;
     session_mode?: string;
+    focus_area?: string | null;
     current_participants?: number;
     max_participants?: number;
     partner_invite_code?: string | null;
@@ -128,6 +148,15 @@ export default async function HomePage() {
 
   const nextSession = upcoming[0];
 
+  const nextSessionByWrestler: Record<string, string> = {};
+  for (const s of upcoming) {
+    const parts = (s.session_participants ?? []) as Array<{ youth_wrestler_id?: string }>;
+    for (const p of parts) {
+      const yid = p.youth_wrestler_id;
+      if (yid && !nextSessionByWrestler[yid]) nextSessionByWrestler[yid] = s.scheduled_datetime;
+    }
+  }
+
   const toBookingSession = (s: (typeof upcoming)[0]): BookingSession => {
     const a = s.athletes;
     const coach = Array.isArray(a) ? a[0] : a;
@@ -147,6 +176,7 @@ export default async function HomePage() {
       total_price: s.total_price ?? 0,
       session_type: s.session_type,
       session_mode: s.session_mode,
+      focus_area: s.focus_area ?? null,
       partner_invite_code: s.partner_invite_code ?? null,
       isTentative: false,
       isOwner: s.parent_id === user.id,
@@ -223,12 +253,12 @@ export default async function HomePage() {
                         <CardDescription className="mt-0.5 text-sm">
                           {wrestler.age != null && <span>{wrestler.age}</span>}
                           {wrestler.weight_class && <span> · {wrestler.weight_class} lbs</span>}
-                          {wrestler.skill_level && (
-                            <span className="capitalize"> · Skill: {wrestler.skill_level}</span>
-                          )}
                         </CardDescription>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          Sessions: {sessionsCompleted}
+                          Next session: {nextSessionByWrestler[wrestler.id] ? formatEST(new Date(nextSessionByWrestler[wrestler.id]), 'MMM d, h:mm a') : '—'}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Last session: {lastSessionByWrestler[wrestler.id] ? formatEST(new Date(lastSessionByWrestler[wrestler.id]), 'MMM d, h:mm a') : '—'}
                         </p>
                       </div>
                     </div>

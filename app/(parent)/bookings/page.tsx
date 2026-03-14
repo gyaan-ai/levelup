@@ -46,6 +46,7 @@ export default async function MyBookingsPage() {
           total_price,
           session_type,
           session_mode,
+          focus_area,
           current_participants,
           max_participants,
           partner_invite_code,
@@ -70,6 +71,7 @@ export default async function MyBookingsPage() {
     parent_id?: string;
     session_type?: string;
     session_mode?: string;
+    focus_area?: string | null;
     current_participants?: number;
     max_participants?: number;
     partner_invite_code?: string | null;
@@ -149,6 +151,7 @@ export default async function MyBookingsPage() {
     total_price: s.total_price,
     session_type: s.session_type,
     session_mode: s.session_mode,
+    focus_area: s.focus_area ?? null,
     partner_invite_code: s.partner_invite_code,
     isTentative: isTentative(s),
     isOwner: s.parent_id === user.id,

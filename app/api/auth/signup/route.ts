@@ -141,7 +141,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Grant early adopter entitlements (1 free 1-on-1, 1 free 2-athlete) for parents who used a valid code
+    // Grant early adopter entitlements (1 free 1-on-1, 2 free small group spots) for parents who used a valid code
     if (discountCodeValid && role === 'parent') {
       const { error: ent1 } = await supabaseAdmin.from('early_adopter_entitlements').insert({
         parent_id: userId,
@@ -152,7 +152,7 @@ export async function POST(req: NextRequest) {
       const { error: ent2 } = await supabaseAdmin.from('early_adopter_entitlements').insert({
         parent_id: userId,
         session_type: '2-athlete',
-        remaining: 1,
+        remaining: 2,
         discount_code: discountCodeValid.code,
       });
       if (ent1 || ent2) {

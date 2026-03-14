@@ -22,6 +22,8 @@ export type BookingSession = {
   total_price: number;
   session_type?: string;
   session_mode?: string;
+  /** Session focus/topic for group/small_group (e.g. "Neutral Re-Attacks"). */
+  focus_area?: string | null;
   partner_invite_code?: string | null;
   /** Small group or partner-open session not yet filled (open slots). */
   isTentative?: boolean;
@@ -138,6 +140,11 @@ export function BookingCard({ session, isPast = false }: BookingCardProps) {
             <div className="space-y-2 min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <SessionTypeBadge sessionType={session.session_type} sessionMode={session.session_mode} />
+              {session.focus_area && (
+                <Badge variant="secondary" className="font-normal text-xs">
+                  {session.focus_area}
+                </Badge>
+              )}
               {statusBadge(session.status)}
               {session.isTentative && (
                 <Badge variant="outline" className="text-xs border-amber-500/60 text-amber-700 dark:text-amber-400 bg-amber-500/15">

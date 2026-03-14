@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 
-/** POST - Admin grants early adopter (1 free private + 1 free small group) to a parent. Body: { parent_id: string } */
+/** POST - Admin grants early adopter (1 free private + 2 free small group spots) to a parent. Body: { parent_id: string } */
 export async function POST(req: NextRequest) {
   try {
     const headersList = await headers();
@@ -52,12 +52,12 @@ export async function POST(req: NextRequest) {
     const { error: ent2 } = await admin.from('early_adopter_entitlements').insert({
       parent_id: parentId,
       session_type: '2-athlete',
-      remaining: 1,
+      remaining: 2,
       discount_code: 'ADMIN_GRANT',
     });
     if (ent2) return NextResponse.json({ error: ent2.message }, { status: 500 });
 
-    return NextResponse.json({ success: true, message: 'Early adopter benefits granted (1 free private + 1 free small group).' });
+    return NextResponse.json({ success: true, message: 'Early adopter benefits granted (1 free private + 2 free small group spots).' });
   } catch (e) {
     console.error('Admin grant early adopter error:', e);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

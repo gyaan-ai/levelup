@@ -9,7 +9,7 @@
 1. Parent selects role **Parent**.
 2. A field appears: **Discount code (optional)** with placeholder `e.g. GUILDLAUNCH`.
 3. Description: *Early adopters: enter your code for 1 free private + 1 free small group session*.
-4. They submit signup with the code; the API validates it and, if valid, grants 1 free 1-on-1 and 1 free small group (2-athlete) entitlement.
+4. They submit signup with the code; the API validates it and, if valid, grants 1 free 1-on-1 and 2 free small group spots (e.g. 2 kids in one session).
 
 Only **parents** see this field. Coaches and youth wrestlers do not.
 
@@ -19,9 +19,9 @@ If a parent **did not** enter the code at signup, they can redeem it later:
 
 1. Parent goes to **Account** (bottom nav).
 2. Card **Redeem discount code**: enter the code (e.g. GUILDLAUNCH) and tap **Redeem code**.
-3. Same validation as signup (code must exist, not over limit, and they must not have already used it). On success they get 1 free 1-on-1 + 1 free 2-athlete.
+3. Same validation as signup (code must exist, not over limit, and they must not have already used it). On success they get 1 free 1-on-1 + 2 free small group spots.
 
-If they already have early adopter entitlements, the card shows that and does not show the form.
+If they already have early adopter entitlements, the card shows that and does not show the form. **Note:** Parents who redeemed before the "2 small group spots" change only have 1 free small group spot in the DB; admins can grant an extra spot via a manual entitlement update if needed.
 
 ### 3. Admin grant (for existing parents who didn’t use a code)
 
@@ -29,7 +29,7 @@ Admins can grant early adopter benefits to any parent without a code:
 
 1. Go to **Admin → User Management** (`/admin/users`).
 2. Find the parent in the list.
-3. Click **Grant early adopter** (gift icon). This grants 1 free private + 1 free small group without using a discount code (stored as `ADMIN_GRANT`).
+3. Click **Grant early adopter** (gift icon). This grants 1 free private + 2 free small group spots without using a discount code (stored as `ADMIN_GRANT`).
 4. If the parent already has entitlements, the API returns an error and no change is made.
 
 ---
@@ -42,7 +42,7 @@ Admins can grant early adopter benefits to any parent without a code:
   - `max_redemptions` – cap on uses; `NULL` = unlimited.  
   - `redemptions` – current use count (incremented on each valid signup).
 
-- **Validation:** Signup API (`/api/auth/signup`) looks up the code (trimmed, uppercased). If not found or over limit, signup returns an error. If valid, it creates the user and inserts two rows into `early_adopter_entitlements` (1-on-1 and 2-athlete, each `remaining: 1`).
+- **Validation:** Signup API (`/api/auth/signup`) looks up the code (trimmed, uppercased). If not found or over limit, signup returns an error. If valid, it creates the user and inserts two rows into `early_adopter_entitlements`: 1-on-1 with `remaining: 1`, and 2-athlete (small group) with `remaining: 2` so families can register 2 kids for one small group for free.
 
 ---
 

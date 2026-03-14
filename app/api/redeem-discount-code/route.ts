@@ -79,7 +79,7 @@ export async function POST(req: NextRequest) {
     const { error: ent2 } = await admin.from('early_adopter_entitlements').insert({
       parent_id: user.id,
       session_type: '2-athlete',
-      remaining: 1,
+      remaining: 2,
       discount_code: codeRow.code,
     });
     if (ent2) return NextResponse.json({ error: ent2.message }, { status: 500 });
@@ -89,7 +89,7 @@ export async function POST(req: NextRequest) {
       .update({ redemptions: current + 1, updated_at: new Date().toISOString() })
       .eq('id', codeRow.id);
 
-    return NextResponse.json({ success: true, message: 'Code applied. You have 1 free private and 1 free small group session.' });
+    return NextResponse.json({ success: true, message: 'Code applied. You have 1 free private session and 2 free small group spots (e.g. 2 kids in one session).' });
   } catch (e) {
     console.error('Redeem discount code error:', e);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
