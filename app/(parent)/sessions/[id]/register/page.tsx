@@ -82,18 +82,8 @@ export default async function SessionRegisterPage({
     s.session_type === '2-athlete' ||
     s.session_type === 'small_group' ||
     (max >= 2 && s.session_type !== '1-on-1');
-  let freeSmallGroupJoin = false;
-  if (!isOwner && isSmallGroup) {
-    const { data: ent } = await supabase
-      .from('early_adopter_entitlements')
-      .select('id')
-      .eq('parent_id', user.id)
-      .eq('session_type', '2-athlete')
-      .gt('remaining', 0)
-      .limit(1)
-      .maybeSingle();
-    freeSmallGroupJoin = !!ent?.id;
-  }
+  // Small group = free for everyone (no Stripe), same as Liam's — show gold free button.
+  const freeSmallGroupJoin = !isOwner && isSmallGroup;
 
   // Youth wrestlers this user can add (primary parent or linked parent)
   const { data: primaryIds } = await supabase

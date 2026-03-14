@@ -69,19 +69,8 @@ export default async function JoinByCodePage({
     sessionType === '2-athlete' ||
     sessionType === 'small_group' ||
     (maxParticipants >= 2 && sessionType !== '1-on-1');
-
-  let freeSmallGroupJoin = false;
-  if (user && !isFull && isSmallGroup) {
-    const { data: ent } = await supabase
-      .from('early_adopter_entitlements')
-      .select('id')
-      .eq('parent_id', user.id)
-      .eq('session_type', '2-athlete')
-      .gt('remaining', 0)
-      .limit(1)
-      .maybeSingle();
-    freeSmallGroupJoin = !!ent?.id;
-  }
+  // Small group = free for everyone (no Stripe), same as Liam's — show gold free button.
+  const freeSmallGroupJoin = !isFull && isSmallGroup;
 
   let youthWrestlers: Array<{ id: string; first_name: string; last_name: string; age?: number; weight_class?: string; skill_level?: string }> = [];
   if (user && !isFull) {

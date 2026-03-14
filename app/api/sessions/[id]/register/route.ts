@@ -108,65 +108,49 @@ export async function POST(
       return NextResponse.json({ error: 'Session is not open for registration' }, { status: 400 });
     }
 
-    // Small group: free only when parent has early adopter entitlement (2-athlete). Otherwise Stripe.
+    // Small group: always free, no Stripe (same as Liam's session — register and add participant).
     const isSmallGroup =
       s.session_type === 'group' ||
       s.session_type === '2-athlete' ||
       s.session_type === 'small_group' ||
       (max >= 2 && s.session_type !== '1-on-1');
     if (isSmallGroup) {
-      const admin = createAdminClient(tenant.slug);
-      const { data: entitlement } = await admin
-        .from('early_adopter_entitlements')
-        .select('id, remaining')
-        .eq('parent_id', user.id)
-        .eq('session_type', '2-athlete')
-        .gt('remaining', 0)
-        .order('created_at', { ascending: true })
-        .limit(1)
-        .maybeSingle();
-      if (entitlement?.id && (entitlement.remaining ?? 0) > 0) {
-        const { data: yw } = await supabase
-          .from('youth_wrestlers')
-          .select('id, parent_id')
-          .eq('id', youthWrestlerId)
-          .single();
-        const ywParentId = (yw as { parent_id?: string } | null)?.parent_id;
-        const isPrimaryParent = yw && ywParentId === user.id;
-        const { data: link } = !isPrimaryParent && yw
-          ? await supabase.from('youth_wrestler_parents').select('id').eq('youth_wrestler_id', youthWrestlerId).eq('parent_id', user.id).maybeSingle()
-          : { data: null };
-        if (!yw || (!isPrimaryParent && !link)) {
-          return NextResponse.json({ error: 'Youth wrestler not found or not yours' }, { status: 400 });
-        }
-        const { data: existing } = await supabase
-          .from('session_participants')
-          .select('id')
-          .eq('session_id', sessionId)
-          .eq('youth_wrestler_id', youthWrestlerId)
-          .maybeSingle();
-        if (existing) {
-          return NextResponse.json({ error: 'This wrestler is already registered for this session' }, { status: 409 });
-        }
-        const { error: insertErr } = await admin.from('session_participants').insert({
-          session_id: sessionId,
-          youth_wrestler_id: youthWrestlerId,
-          parent_id: user.id,
-          paid: true,
-          amount_paid: 0,
-        });
-        if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 });
-        await admin.from('sessions').update({
-          current_participants: current + 1,
-          updated_at: new Date().toISOString(),
-        }).eq('id', sessionId);
-        await admin
-          .from('early_adopter_entitlements')
-          .update({ remaining: Math.max(0, (entitlement.remaining ?? 1) - 1), updated_at: new Date().toISOString() })
-          .eq('id', entitlement.id);
-        return NextResponse.json({ added: true });
+      const { data: yw } = await supabase
+        .from('youth_wrestlers')
+        .select('id, parent_id')
+        .eq('id', youthWrestlerId)
+        .single();
+      const ywParentId = (yw as { parent_id?: string } | null)?.parent_id;
+      const isPrimaryParent = yw && ywParentId === user.id;
+      const { data: link } = !isPrimaryParent && yw
+        ? await supabase.from('youth_wrestler_parents').select('id').eq('youth_wrestler_id', youthWrestlerId).eq('parent_id', user.id).maybeSingle()
+        : { data: null };
+      if (!yw || (!isPrimaryParent && !link)) {
+        return NextResponse.json({ error: 'Youth wrestler not found or not yours' }, { status: 400 });
       }
-      // No entitlement: fall through to Stripe checkout below
+      const { data: existing } = await supabase
+        .from('session_participants')
+        .select('id')
+        .eq('session_id', sessionId)
+        .eq('youth_wrestler_id', youthWrestlerId)
+        .maybeSingle();
+      if (existing) {
+        return NextResponse.json({ error: 'This wrestler is already registered for this session' }, { status: 409 });
+      }
+      const admin = createAdminClient(tenant.slug);
+      const { error: insertErr } = await admin.from('session_participants').insert({
+        session_id: sessionId,
+        youth_wrestler_id: youthWrestlerId,
+        parent_id: user.id,
+        paid: true,
+        amount_paid: 0,
+      });
+      if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 });
+      await admin.from('sessions').update({
+        current_participants: current + 1,
+        updated_at: new Date().toISOString(),
+      }).eq('id', sessionId);
+      return NextResponse.json({ added: true });
     }
 
     const pricePer = s.price_per_participant ?? 0;
