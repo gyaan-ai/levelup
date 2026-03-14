@@ -6,7 +6,7 @@ import { getTenantByDomain } from '@/config/tenants';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { Calendar, User, MapPin, Users, FolderOpen } from 'lucide-react';
+import { Calendar, User, MapPin, Users } from 'lucide-react';
 import { SchoolLogo } from '@/components/school-logo';
 import { formatEST } from '@/lib/format-date';
 
@@ -145,12 +145,6 @@ export default async function YouthDashboardPage() {
                             </p>
                           )}
                         </div>
-                        <Link href={`/workspaces/from-session/${s.id}`}>
-                          <Button variant="ghost" size="sm">
-                            <FolderOpen className="h-4 w-4 mr-1" />
-                            Workspace
-                          </Button>
-                        </Link>
                       </li>
                     );
                   })}
@@ -166,9 +160,6 @@ export default async function YouthDashboardPage() {
                           <p className="text-sm">{formatEST(dt, 'EEE, MMM d')} · {coach ? `${coach.first_name ?? ''} ${coach.last_name ?? ''}`.trim() : '—'}</p>
                           {fac && <p className="text-xs text-muted-foreground">{(fac as { name?: string }).name}</p>}
                         </div>
-                        <Link href={`/workspaces/from-session/${s.id}`}>
-                          <Button variant="ghost" size="sm">Workspace</Button>
-                        </Link>
                       </li>
                     );
                   })}
@@ -211,12 +202,6 @@ export default async function YouthDashboardPage() {
               <CardTitle className="text-base">Quick access</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              <Link href="/workspaces" className="block">
-                <Button variant="outline" className="w-full justify-start gap-2">
-                  <FolderOpen className="h-4 w-4" />
-                  Workspaces
-                </Button>
-              </Link>
               <Link href="/small-group-sessions" className="block">
                 <Button variant="outline" className="w-full justify-start gap-2">
                   <Users className="h-4 w-4" />

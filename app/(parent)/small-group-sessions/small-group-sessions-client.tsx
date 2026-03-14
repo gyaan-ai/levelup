@@ -173,9 +173,6 @@ export function SmallGroupSessionsClient({
                         <Link href={`/admin/sessions/${s.id}/edit`}>Edit</Link>
                       </Button>
                     )}
-                    <Button asChild size="sm" variant="ghost">
-                      <Link href={`/workspaces/from-session/${s.id}`}>Workspace</Link>
-                    </Button>
                   </div>
                 </div>
               );

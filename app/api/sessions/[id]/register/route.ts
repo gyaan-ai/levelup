@@ -32,9 +32,10 @@ export async function POST(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const body = (await req.json()) as { youthWrestlerId: string };
-    const { youthWrestlerId } = body;
+    const body = (await req.json()) as { youthWrestlerId: string; promoCode?: string };
+    const { youthWrestlerId, promoCode: bodyPromoCode } = body;
     if (!youthWrestlerId) return NextResponse.json({ error: 'Missing youthWrestlerId' }, { status: 400 });
+    const promoCodeTrimmed = typeof bodyPromoCode === 'string' ? bodyPromoCode.trim().toUpperCase() : '';
 
     const { data: session, error: sessionErr } = await supabase
       .from('sessions')
@@ -111,18 +112,38 @@ export async function POST(
     const isSmallGroup = s.session_type === 'group' || s.session_type === 'small_group';
     const admin = createAdminClient(tenant.slug);
 
-    // Early adopter: 1 free small group join (uses '2-athlete' entitlement)
+    // Small group: free if valid promo code at register time OR existing entitlement
     if (isSmallGroup) {
-      const { data: entitlement } = await admin
-        .from('early_adopter_entitlements')
-        .select('id, remaining')
-        .eq('parent_id', user.id)
-        .eq('session_type', '2-athlete')
-        .gt('remaining', 0)
-        .limit(1)
-        .maybeSingle();
+      let allowFree = false;
 
-      if (entitlement?.id && (entitlement.remaining ?? 0) > 0) {
+      // 1) Valid promo code in request = $0 (anyone with the code gets in free)
+      if (promoCodeTrimmed) {
+        const { data: codeRow, error: codeErr } = await admin
+          .from('discount_codes')
+          .select('id, code, max_redemptions, redemptions')
+          .eq('code', promoCodeTrimmed)
+          .maybeSingle();
+        if (!codeErr && codeRow) {
+          const max = codeRow.max_redemptions;
+          const current = codeRow.redemptions ?? 0;
+          if (max == null || current < max) allowFree = true;
+        }
+      }
+
+      // 2) Or they have early adopter entitlement with remaining > 0
+      if (!allowFree) {
+        const { data: entitlement } = await admin
+          .from('early_adopter_entitlements')
+          .select('id, remaining')
+          .eq('parent_id', user.id)
+          .eq('session_type', '2-athlete')
+          .gt('remaining', 0)
+          .limit(1)
+          .maybeSingle();
+        if (entitlement?.id && (entitlement.remaining ?? 0) > 0) allowFree = true;
+      }
+
+      if (allowFree) {
         const { error: insertErr } = await admin.from('session_participants').insert({
           session_id: sessionId,
           youth_wrestler_id: youthWrestlerId,
@@ -134,9 +155,7 @@ export async function POST(
         await admin.from('sessions').update({
           current_participants: current + 1,
           updated_at: new Date().toISOString(),
-          early_adopter_entitlement_id: entitlement.id,
         }).eq('id', sessionId);
-        // Do not decrement remaining: gold register free is unlimited until you expire it (set remaining to 0 in DB or Admin).
         return NextResponse.json({ added: true });
       }
     }

@@ -369,9 +369,6 @@ export function FindTrainingClient({
                           </Link>
                         </Button>
                       )}
-                      <Link href={`/workspaces/from-session/${s.id}`} className="text-sm text-muted-foreground hover:text-foreground underline">
-                        Workspace
-                      </Link>
                     </div>
                   </div>
                 );

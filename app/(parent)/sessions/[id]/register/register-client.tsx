@@ -42,9 +42,8 @@ export function SessionRegisterClient({ sessionId, isOwner, isSmallGroup = false
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Only show "Register free" when user actually has remaining entitlement (server-checked).
-  // codeApplied alone can be true for "already used" but remaining might be 0.
-  const freeWithCode = freeSmallGroupJoin && isSmallGroup && !isOwner;
+  // Show "Register free" when they have entitlement OR just applied the code (then refresh gets entitlement).
+  const freeWithCode = (freeSmallGroupJoin || codeApplied) && isSmallGroup && !isOwner;
 
   const handleApplyCode = async () => {
     const codeTrimmed = promoCode.trim();
@@ -60,6 +59,8 @@ export function SessionRegisterClient({ sessionId, isOwner, isSmallGroup = false
       const data = await redeemRes.json();
       if (redeemRes.ok && (data.success || data.alreadyUsed)) {
         setCodeApplied(true);
+        // Re-fetch so server sees new entitlement and freeSmallGroupJoin is true next render.
+        router.refresh();
       } else {
         setError(data.error || 'Invalid or expired promo code');
       }
@@ -98,7 +99,10 @@ export function SessionRegisterClient({ sessionId, isOwner, isSmallGroup = false
       const res = await fetch(`/api/sessions/${sessionId}/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ youthWrestlerId: selectedWrestlerId }),
+        body: JSON.stringify({
+          youthWrestlerId: selectedWrestlerId,
+          ...(promoCode.trim() && { promoCode: promoCode.trim() }),
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
