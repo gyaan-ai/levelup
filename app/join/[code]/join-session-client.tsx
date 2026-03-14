@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
   Select,
   SelectContent,
@@ -37,6 +38,7 @@ export function JoinSessionClient({
 }: JoinSessionClientProps) {
   const router = useRouter();
   const [selectedWrestlerId, setSelectedWrestlerId] = useState<string>('');
+  const [promoCode, setPromoCode] = useState('');
   const [joining, setJoining] = useState(false);
   const [registered, setRegistered] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -49,6 +51,21 @@ export function JoinSessionClient({
     setError(null);
     setJoining(true);
     try {
+      const codeTrimmed = promoCode.trim();
+      if (codeTrimmed) {
+        const redeemRes = await fetch('/api/redeem-discount-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: codeTrimmed }),
+        });
+        const redeemData = await redeemRes.json();
+        if (!redeemRes.ok) {
+          setError(redeemData.error || 'Invalid or expired promo code');
+          setJoining(false);
+          return;
+        }
+      }
+
       const res = await fetch(`/api/sessions/${sessionId}/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -105,7 +122,7 @@ export function JoinSessionClient({
       )}
       <div className="space-y-2">
         <Label htmlFor="wrestler">Select Your Wrestler</Label>
-        <Select value={selectedWrestlerId} onValueChange={setSelectedWrestlerId}>
+        <Select value={selectedWrestlerId} onValueChange={(v) => { setSelectedWrestlerId(v); setError(null); }}>
           <SelectTrigger id="wrestler">
             <SelectValue placeholder="Choose wrestler" />
           </SelectTrigger>
@@ -119,6 +136,18 @@ export function JoinSessionClient({
             ))}
           </SelectContent>
         </Select>
+      </div>
+      <div className="space-y-2">
+        <Label htmlFor="promo">Promo code (optional)</Label>
+        <Input
+          id="promo"
+          type="text"
+          placeholder="e.g. GUILDLAUNCH"
+          value={promoCode}
+          onChange={(e) => { setPromoCode(e.target.value.toUpperCase()); setError(null); }}
+          className="uppercase"
+          autoComplete="off"
+        />
       </div>
       <Button
         onClick={handlePayAndRegister}
