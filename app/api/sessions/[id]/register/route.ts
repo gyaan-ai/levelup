@@ -136,9 +136,7 @@ export async function POST(
           updated_at: new Date().toISOString(),
           early_adopter_entitlement_id: entitlement.id,
         }).eq('id', sessionId);
-        await admin.from('early_adopter_entitlements').update({
-          remaining: (entitlement.remaining ?? 1) - 1,
-        }).eq('id', entitlement.id);
+        // Do not decrement remaining: gold register free is unlimited until you expire it (set remaining to 0 in DB or Admin).
         return NextResponse.json({ added: true });
       }
     }

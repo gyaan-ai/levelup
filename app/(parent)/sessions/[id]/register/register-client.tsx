@@ -42,7 +42,9 @@ export function SessionRegisterClient({ sessionId, isOwner, isSmallGroup = false
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const freeWithCode = (codeApplied || freeSmallGroupJoin) && isSmallGroup && !isOwner;
+  // Only show "Register free" when user actually has remaining entitlement (server-checked).
+  // codeApplied alone can be true for "already used" but remaining might be 0.
+  const freeWithCode = freeSmallGroupJoin && isSmallGroup && !isOwner;
 
   const handleApplyCode = async () => {
     const codeTrimmed = promoCode.trim();
@@ -183,8 +185,11 @@ export function SessionRegisterClient({ sessionId, isOwner, isSmallGroup = false
               {applyingCode ? 'Applying…' : freeWithCode ? 'Applied' : 'Apply'}
             </Button>
           </div>
-          {freeWithCode && (
+          {codeApplied && freeWithCode && (
             <p className="text-sm text-green-600 dark:text-green-400 font-medium">Promo applied — this session is free.</p>
+          )}
+          {codeApplied && !freeWithCode && isSmallGroup && (
+            <p className="text-sm text-muted-foreground">Code applied. You have no free spots left — use the button below to pay & register.</p>
           )}
         </div>
       )}

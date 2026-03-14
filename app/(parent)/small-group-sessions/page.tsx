@@ -5,6 +5,7 @@ import { getTenantByDomain } from '@/config/tenants';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Users, Plus } from 'lucide-react';
+import { startOfWeek, endOfWeek, addWeeks } from 'date-fns';
 import { SmallGroupSessionsClient } from './small-group-sessions-client';
 
 export default async function SmallGroupSessionsPage({
@@ -29,9 +30,10 @@ export default async function SmallGroupSessionsPage({
   if (userData?.role !== 'parent' && userData?.role !== 'admin' && userData?.role !== 'youth_wrestler') redirect('/dashboard');
 
   const now = new Date();
-  const nowISO = now.toISOString();
+  const weekStart = startOfWeek(now, { weekStartsOn: 0 });
+  const nextWeekEnd = endOfWeek(addWeeks(now, 1), { weekStartsOn: 0 });
 
-  // Small group: all upcoming (no date ceiling) so users can find any session (e.g. Sabino's)
+  // Small group: this week and next week
   const { data: sessions } = await supabase
     .from('sessions')
     .select(`
@@ -53,9 +55,9 @@ export default async function SmallGroupSessionsPage({
     `)
     .in('session_type', ['group', 'small_group'])
     .in('status', ['scheduled', 'pending_payment'])
-    .gte('scheduled_datetime', nowISO)
-    .order('scheduled_datetime', { ascending: true })
-    .limit(100);
+    .gte('scheduled_datetime', weekStart.toISOString())
+    .lte('scheduled_datetime', nextWeekEnd.toISOString())
+    .order('scheduled_datetime', { ascending: true });
 
   // Open partner sessions: someone looking for a partner (any date)
   const { data: partnerSessions } = await supabase
@@ -79,7 +81,7 @@ export default async function SmallGroupSessionsPage({
     `)
     .eq('session_mode', 'partner-open')
     .in('status', ['scheduled', 'pending_payment'])
-    .gte('scheduled_datetime', nowISO)
+    .gte('scheduled_datetime', now.toISOString())
     .order('scheduled_datetime', { ascending: true });
 
   const partnerList = (partnerSessions ?? []).filter(
