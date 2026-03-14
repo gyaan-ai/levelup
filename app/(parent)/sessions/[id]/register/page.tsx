@@ -1,6 +1,7 @@
 import { redirect, notFound } from 'next/navigation';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -116,6 +117,23 @@ export default async function SessionRegisterPage({
   const fac = Array.isArray(s.facilities) ? s.facilities[0] : s.facilities;
   const dt = s.scheduled_datetime ? new Date(s.scheduled_datetime) : null;
 
+  const admin = createAdminClient(tenant.slug);
+  const { data: participants } = await admin
+    .from('session_participants')
+    .select('youth_wrestlers(id, first_name, last_name, age, weight_class, skill_level)')
+    .eq('session_id', sessionId);
+  const participantsList = (participants ?? []).map((p) => {
+    const raw = (p as { youth_wrestlers?: { first_name?: string; last_name?: string; age?: number; weight_class?: string } | { first_name?: string; last_name?: string; age?: number; weight_class?: string }[] | null }).youth_wrestlers;
+    const yw = Array.isArray(raw) ? raw[0] : raw;
+    if (!yw) return null;
+    const name = `${yw.first_name ?? ''} ${yw.last_name ?? ''}`.trim();
+    if (!name) return null;
+    const parts = [name];
+    if (yw.age != null) parts.push(`${yw.age} yrs`);
+    if (yw.weight_class) parts.push(`${yw.weight_class} lbs`);
+    return parts.join(' · ');
+  }).filter(Boolean) as string[];
+
   return (
     <div className="container mx-auto px-4 py-8 max-w-lg">
       <Link href="/find-training" className="text-sm text-muted-foreground hover:text-foreground mb-4 inline-block">
@@ -163,6 +181,16 @@ export default async function SessionRegisterPage({
               {current} / {max} participants
               {!isOwner && pricePer > 0 && <> · <strong>${Number(pricePer).toFixed(2)}</strong> per spot</>}
             </p>
+            {participantsList.length > 0 && (
+              <div className="text-sm pt-1">
+                <p className="font-medium text-foreground mb-1">Registered ({participantsList.length}):</p>
+                <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
+                  {participantsList.map((line, i) => (
+                    <li key={i}>{line}</li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
           <SessionRegisterClient
             sessionId={sessionId}

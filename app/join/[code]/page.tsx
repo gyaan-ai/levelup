@@ -44,17 +44,23 @@ export default async function JoinByCodePage({
     .select('*, youth_wrestlers(id, first_name, last_name, age, weight_class, skill_level)')
     .eq('session_id', session.id);
 
+  type YouthInfo = { first_name?: string; last_name?: string; age?: number; weight_class?: string };
+  const participantsList = (participants ?? []).map((p) => {
+    const raw = p.youth_wrestlers;
+    const yw = (Array.isArray(raw) ? raw[0] : raw) as YouthInfo | null;
+    if (!yw) return null;
+    const name = `${yw.first_name ?? ''} ${yw.last_name ?? ''}`.trim();
+    if (!name) return null;
+    const parts = [name];
+    if (yw.age != null) parts.push(`${yw.age} yrs`);
+    if (yw.weight_class) parts.push(`${yw.weight_class} lbs`);
+    return parts.join(' · ');
+  }).filter(Boolean) as string[];
+
   const athlete = session.athletes as { id: string; first_name: string; last_name: string; school: string; photo_url?: string } | null;
   const facility = session.facilities as { id: string; name: string; address?: string } | null;
   const scheduledAt = session.scheduled_datetime ? new Date(session.scheduled_datetime) : null;
   const dateTime = scheduledAt ? `${formatEST(scheduledAt, 'EEEE, MMMM d, yyyy')} at ${formatEST(scheduledAt, 'h:mm a')}` : '';
-  const firstYouth = participants?.[0]?.youth_wrestlers as { first_name?: string; last_name?: string; age?: number; weight_class?: string; skill_level?: string } | null;
-  const trainingWith = firstYouth
-    ? `${firstYouth.first_name ?? ''} ${firstYouth.last_name ?? ''}`.trim() +
-      (firstYouth.age != null ? ` (${firstYouth.age} yrs)` : '') +
-      (firstYouth.weight_class ? `, ${firstYouth.weight_class} lbs` : '') +
-      (firstYouth.skill_level ? `, ${String(firstYouth.skill_level).charAt(0).toUpperCase() + String(firstYouth.skill_level).slice(1)}` : '')
-    : '';
 
   const pricePerParticipant = (session as { price_per_participant?: number }).price_per_participant ?? 40;
 
@@ -114,10 +120,15 @@ export default async function JoinByCodePage({
                   {facility.address && ` — ${facility.address}`}
                 </p>
               )}
-              {trainingWith && (
-                <p className="text-sm">
-                  <span className="font-medium">Training with:</span> {trainingWith}
-                </p>
+              {participantsList.length > 0 && (
+                <div className="text-sm">
+                  <p className="font-medium mb-1">Registered ({participantsList.length}):</p>
+                  <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
+                    {participantsList.map((line, i) => (
+                      <li key={i}>{line}</li>
+                    ))}
+                  </ul>
+                </div>
               )}
               <p className="text-lg font-bold">${Number(pricePerParticipant).toFixed(2)} to join</p>
 
