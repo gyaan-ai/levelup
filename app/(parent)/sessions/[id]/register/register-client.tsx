@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -36,6 +37,7 @@ interface SessionRegisterClientProps {
 export function SessionRegisterClient({ sessionId, isOwner, pricePerParticipant, youthWrestlers, initialWrestlerId = '', freeSmallGroupJoin = false }: SessionRegisterClientProps) {
   const router = useRouter();
   const [selectedWrestlerId, setSelectedWrestlerId] = useState(initialWrestlerId);
+  const [promoCode, setPromoCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,6 +50,21 @@ export function SessionRegisterClient({ sessionId, isOwner, pricePerParticipant,
     setError(null);
     setLoading(true);
     try {
+      const codeTrimmed = promoCode.trim();
+      if (codeTrimmed && !isOwner) {
+        const redeemRes = await fetch('/api/redeem-discount-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: codeTrimmed }),
+        });
+        const redeemData = await redeemRes.json();
+        if (!redeemRes.ok) {
+          setError(redeemData.error || 'Invalid or expired promo code');
+          setLoading(false);
+          return;
+        }
+      }
+
       const res = await fetch(`/api/sessions/${sessionId}/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -115,6 +132,20 @@ export function SessionRegisterClient({ sessionId, isOwner, pricePerParticipant,
           </SelectContent>
         </Select>
       </div>
+      {!isOwner && (
+        <div className="space-y-2">
+          <Label htmlFor="promo">Promo code (optional)</Label>
+          <Input
+            id="promo"
+            type="text"
+            placeholder="e.g. GUILDLAUNCH"
+            value={promoCode}
+            onChange={(e) => { setPromoCode(e.target.value.toUpperCase()); setError(null); }}
+            className="uppercase"
+            autoComplete="off"
+          />
+        </div>
+      )}
       <Button type="submit" disabled={loading} className="w-full">
         {loading
           ? (isOwner || freeSmallGroupJoin ? 'Adding…' : 'Redirecting to payment…')
