@@ -42,8 +42,8 @@ export function SessionRegisterClient({ sessionId, isOwner, isSmallGroup = false
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Show "Register free" when they have entitlement OR just applied the code (then refresh gets entitlement).
-  const freeWithCode = (freeSmallGroupJoin || codeApplied) && isSmallGroup && !isOwner;
+  // Small group = free. No payment.
+  const freeWithCode = isSmallGroup && !isOwner;
 
   const handleApplyCode = async () => {
     const codeTrimmed = promoCode.trim();
@@ -99,11 +99,7 @@ export function SessionRegisterClient({ sessionId, isOwner, isSmallGroup = false
       const res = await fetch(`/api/sessions/${sessionId}/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          youthWrestlerId: selectedWrestlerId,
-          ...(promoCode.trim() && { promoCode: promoCode.trim() }),
-          ...(freeWithCode && { freeExpected: true }),
-        }),
+        body: JSON.stringify({ youthWrestlerId: selectedWrestlerId }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -117,12 +113,6 @@ export function SessionRegisterClient({ sessionId, isOwner, isSmallGroup = false
         return;
       }
       if (data.url) {
-        // If we showed "Register free" we must never send them to Stripe — server should have returned added: true.
-        if (freeWithCode) {
-          setError('Something went wrong — you should not be charged. Please refresh and try again, or contact support.');
-          setLoading(false);
-          return;
-        }
         window.location.href = data.url;
         return;
       }

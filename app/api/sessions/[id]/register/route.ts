@@ -32,10 +32,9 @@ export async function POST(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const body = (await req.json()) as { youthWrestlerId: string; promoCode?: string; freeExpected?: boolean };
-    const { youthWrestlerId, promoCode: bodyPromoCode, freeExpected } = body;
+    const body = (await req.json()) as { youthWrestlerId: string };
+    const { youthWrestlerId } = body;
     if (!youthWrestlerId) return NextResponse.json({ error: 'Missing youthWrestlerId' }, { status: 400 });
-    const promoCodeTrimmed = typeof bodyPromoCode === 'string' ? bodyPromoCode.trim().toUpperCase() : '';
 
     const { data: session, error: sessionErr } = await supabase
       .from('sessions')
@@ -109,46 +108,14 @@ export async function POST(
       return NextResponse.json({ error: 'Session is not open for registration' }, { status: 400 });
     }
 
-    // Free = valid promo code (any session) OR early-adopter entitlement (small-group only). No gate on session type for code.
-    const admin = createAdminClient(tenant.slug);
-    let allowFree = false;
-    let codeRejected = false;
-
-    if (promoCodeTrimmed) {
-      const { data: codeRow, error: codeErr } = await admin
-        .from('discount_codes')
-        .select('id, code, max_redemptions, redemptions')
-        .eq('code', promoCodeTrimmed)
-        .maybeSingle();
-      if (!codeErr && codeRow) {
-        const codeMax = codeRow.max_redemptions;
-        const codeCurrent = codeRow.redemptions ?? 0;
-        if (codeMax == null || codeCurrent < codeMax) allowFree = true;
-        else codeRejected = true;
-      } else codeRejected = true;
-    }
-
-    const isSmallGroup = max >= 2 && s.session_type !== '1-on-1';
-    if (!allowFree && isSmallGroup) {
-      const { data: entitlement } = await admin
-        .from('early_adopter_entitlements')
-        .select('id, remaining')
-        .eq('parent_id', user.id)
-        .eq('session_type', '2-athlete')
-        .gt('remaining', 0)
-        .limit(1)
-        .maybeSingle();
-      if (entitlement?.id && (entitlement.remaining ?? 0) > 0) allowFree = true;
-    }
-
-    if (promoCodeTrimmed && !allowFree) {
-      return NextResponse.json(
-        { error: codeRejected ? 'That promo code isn’t valid or has reached its limit. You can still pay to register.' : 'That promo code isn’t valid for this session.' },
-        { status: 400 }
-      );
-    }
-
-    if (allowFree) {
+    // Small group = free. Never charge. (group/2-athlete by type, or max >= 2 and not 1-on-1)
+    const isSmallGroup =
+      s.session_type === 'group' ||
+      s.session_type === '2-athlete' ||
+      s.session_type === 'small_group' ||
+      (max >= 2 && s.session_type !== '1-on-1');
+    if (isSmallGroup) {
+      const admin = createAdminClient(tenant.slug);
       const { error: insertErr } = await admin.from('session_participants').insert({
         session_id: sessionId,
         youth_wrestler_id: youthWrestlerId,
@@ -162,13 +129,6 @@ export async function POST(
         updated_at: new Date().toISOString(),
       }).eq('id', sessionId);
       return NextResponse.json({ added: true });
-    }
-
-    if (freeExpected) {
-      return NextResponse.json(
-        { error: 'Free registration could not be completed. Please refresh the page and try again, or contact support.' },
-        { status: 500 }
-      );
     }
 
     const pricePer = s.price_per_participant ?? 0;
