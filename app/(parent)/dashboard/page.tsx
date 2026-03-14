@@ -9,7 +9,7 @@ import { getTenantByDomain } from '@/config/tenants';
 import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { Edit, User, Calendar } from 'lucide-react';
+import { Edit, User, Calendar, Users, Share2 } from 'lucide-react';
 import { YouthWrestler } from '@/types';
 import { BookingCard, type BookingSession } from '@/app/(parent)/bookings/booking-card';
 import { CoachSessionBadge } from '@/components/coach-session-badge';
@@ -30,6 +30,45 @@ export default async function HomePage() {
 
   const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
   if (userData?.role === 'athlete') redirect('/athlete-dashboard');
+
+  const isAdmin = userData?.role === 'admin';
+  const nowISO = new Date().toISOString();
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (host.startsWith('localhost') ? `http://${host}` : `https://${host}`);
+
+  // Admin: fetch all upcoming sessions with participants and capacity for dashboard overview
+  type AdminUpcomingSession = {
+    id: string;
+    scheduled_datetime: string;
+    focus_area?: string | null;
+    max_participants?: number | null;
+    current_participants?: number | null;
+    partner_invite_code?: string | null;
+    athletes?: { first_name?: string; last_name?: string; school?: string } | null;
+    facilities?: { name?: string } | null;
+    session_participants?: Array<{ youth_wrestlers?: { first_name?: string; last_name?: string } | null }>;
+  };
+  let allUpcomingForAdmin: AdminUpcomingSession[] = [];
+  if (isAdmin) {
+    const admin = createAdminClient(tenant.slug);
+    const { data: adminSessions } = await admin
+      .from('sessions')
+      .select(`
+        id,
+        scheduled_datetime,
+        focus_area,
+        max_participants,
+        current_participants,
+        partner_invite_code,
+        athletes(first_name, last_name, school),
+        facilities(name),
+        session_participants(youth_wrestlers(first_name, last_name))
+      `)
+      .in('status', ['scheduled', 'pending_payment'])
+      .gte('scheduled_datetime', nowISO)
+      .order('scheduled_datetime', { ascending: true })
+      .limit(50);
+    allUpcomingForAdmin = (adminSessions ?? []) as AdminUpcomingSession[];
+  }
 
   // Parent sees only their wrestlers (primary or linked). Explicit filter so parents never see other users' kids.
   const youthWrestlerIds = await getParentYouthWrestlerIds(supabase, user.id);
@@ -82,7 +121,6 @@ export default async function HomePage() {
     }
   }
 
-  const nowISO = new Date().toISOString();
   const { data: upcomingSessions } = familySessionIds.length > 0
     ? await supabase
         .from('sessions')
@@ -199,6 +237,92 @@ export default async function HomePage() {
       <p className="text-muted-foreground mt-1 text-sm md:text-base">
         Next session, quick actions, and your wrestlers
       </p>
+
+      {/* Admin: all upcoming sessions overview */}
+      {isAdmin && (
+        <section className="mt-6 mb-6">
+          <h2 className="text-lg font-semibold text-foreground mb-3">Sessions overview</h2>
+          <Card>
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b bg-muted/30">
+                      <th className="text-left py-3 px-4 font-medium">Date & time</th>
+                      <th className="text-left py-3 px-4 font-medium">Coach</th>
+                      <th className="text-left py-3 px-4 font-medium">Facility</th>
+                      <th className="text-left py-3 px-4 font-medium">Focus</th>
+                      <th className="text-left py-3 px-4 font-medium">Registered</th>
+                      <th className="text-left py-3 px-4 font-medium">Openings</th>
+                      <th className="text-right py-3 px-4 font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {allUpcomingForAdmin.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="py-8 text-center text-muted-foreground">
+                          No upcoming sessions. Create one from <Link href="/admin/sessions/create" className="text-accent hover:underline">Admin → Create session</Link>.
+                        </td>
+                      </tr>
+                    ) : (
+                    allUpcomingForAdmin.map((s) => {
+                      const coach = Array.isArray(s.athletes) ? s.athletes[0] : s.athletes;
+                      const coachName = coach ? `${coach.first_name ?? ''} ${coach.last_name ?? ''}`.trim() || '—' : '—';
+                      const fac = Array.isArray(s.facilities) ? s.facilities[0] : s.facilities;
+                      const facilityName = fac?.name ?? '—';
+                      const max = s.max_participants ?? 0;
+                      const current = s.current_participants ?? 0;
+                      const names = (s.session_participants ?? [])
+                        .map((p) => {
+                          const yw = p.youth_wrestlers;
+                          const o = Array.isArray(yw) ? yw[0] : yw;
+                          return o ? `${o.first_name ?? ''} ${o.last_name ?? ''}`.trim() : null;
+                        })
+                        .filter(Boolean) as string[];
+                      const shareUrl = s.partner_invite_code
+                        ? `${baseUrl}/join/${s.partner_invite_code}`
+                        : null;
+                      return (
+                        <tr key={s.id} className="border-b last:border-0 hover:bg-muted/20">
+                          <td className="py-3 px-4 whitespace-nowrap">
+                            {formatEST(new Date(s.scheduled_datetime), 'EEE, MMM d')}
+                            <br />
+                            <span className="text-muted-foreground">{formatEST(new Date(s.scheduled_datetime), 'h:mm a')}</span>
+                          </td>
+                          <td className="py-3 px-4">{coachName}</td>
+                          <td className="py-3 px-4">{facilityName}</td>
+                          <td className="py-3 px-4">{s.focus_area ?? '—'}</td>
+                          <td className="py-3 px-4">
+                            {names.length > 0 ? names.join(', ') : '—'}
+                          </td>
+                          <td className="py-3 px-4">
+                            <span className="font-medium">{current}</span>
+                            <span className="text-muted-foreground"> / {max}</span>
+                            {max > 0 && current < max && (
+                              <span className="text-muted-foreground text-xs ml-1">({max - current} left)</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <Link href={`/sessions/${s.id}/reschedule`} className="text-accent hover:underline text-sm mr-2">View</Link>
+                            <Link href={`/admin/sessions/${s.id}/edit`} className="text-accent hover:underline text-sm mr-2">Edit</Link>
+                            {shareUrl && (
+                              <a href={shareUrl} target="_blank" rel="noreferrer" className="text-accent hover:underline text-sm inline-flex items-center gap-0.5">
+                                <Share2 className="h-3.5 w-3.5" /> Share
+                              </a>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+      )}
+
 
       {/* A. Next Session first */}
       <section className="mt-6 mb-6">
