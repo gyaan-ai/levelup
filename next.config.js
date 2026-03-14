@@ -9,7 +9,7 @@ const nextConfig = {
           {
             key: 'Content-Security-Policy',
             value: [
-              "script-src 'self' 'sha256-2I/UQjGvK8DC2a0IIm0Md7Cm+ZHj2NYE4a6ugk09FVw=' https://js.stripe.com",
+              "script-src 'self' 'unsafe-inline' https://js.stripe.com",
               "style-src 'self' 'unsafe-inline' https://js.stripe.com",
             ].join('; '),
           },
