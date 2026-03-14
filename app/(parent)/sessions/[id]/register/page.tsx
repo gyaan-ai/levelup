@@ -77,7 +77,7 @@ export default async function SessionRegisterPage({
   const pricePer = s.price_per_participant ?? 0;
   if (!isOwner && pricePer <= 0) notFound();
 
-  const isSmallGroup = s.session_type === 'group' || s.session_type === 'small_group';
+  const isSmallGroup = s.session_type === 'group' || s.session_type === 'small_group' || s.session_type === '2-athlete';
   let freeSmallGroupJoin = false;
   if (!isOwner && isSmallGroup) {
     const { data: ent } = await supabase

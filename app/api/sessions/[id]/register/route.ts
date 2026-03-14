@@ -109,12 +109,13 @@ export async function POST(
       return NextResponse.json({ error: 'Session is not open for registration' }, { status: 400 });
     }
 
-    const isSmallGroup = s.session_type === 'group' || s.session_type === 'small_group';
+    // --- SMALL-GROUP FREE PATH (do not "optimize" or add conditions — this matches the working Liam flow) ---
+    // Free = valid promo in request OR early-adopter entitlement. Never send to Stripe when they sent a promo; return 400 instead.
+    const isSmallGroup = s.session_type === 'group' || s.session_type === 'small_group' || s.session_type === '2-athlete';
     const admin = createAdminClient(tenant.slug);
-
-    // Small group: free if valid promo code at register time OR existing entitlement
     if (isSmallGroup) {
       let allowFree = false;
+      let codeRejected = false; // they sent a code but it wasn't valid
 
       // 1) Valid promo code in request = $0 (anyone with the code gets in free)
       if (promoCodeTrimmed) {
@@ -127,7 +128,8 @@ export async function POST(
           const max = codeRow.max_redemptions;
           const current = codeRow.redemptions ?? 0;
           if (max == null || current < max) allowFree = true;
-        }
+          else codeRejected = true; // at capacity
+        } else codeRejected = true; // not found or error
       }
 
       // 2) Or they have early adopter entitlement with remaining > 0
@@ -141,6 +143,14 @@ export async function POST(
           .limit(1)
           .maybeSingle();
         if (entitlement?.id && (entitlement.remaining ?? 0) > 0) allowFree = true;
+      }
+
+      // If they sent a promo and we're still not allowing free, don't send them to Stripe — tell them
+      if (promoCodeTrimmed && !allowFree) {
+        return NextResponse.json(
+          { error: codeRejected ? 'That promo code isn’t valid or has reached its limit. You can still pay to register.' : 'That promo code isn’t valid for this session.' },
+          { status: 400 }
+        );
       }
 
       if (allowFree) {
