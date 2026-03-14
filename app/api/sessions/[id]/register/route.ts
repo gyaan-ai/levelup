@@ -32,8 +32,8 @@ export async function POST(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const body = (await req.json()) as { youthWrestlerId: string; promoCode?: string };
-    const { youthWrestlerId, promoCode: bodyPromoCode } = body;
+    const body = (await req.json()) as { youthWrestlerId: string; promoCode?: string; freeExpected?: boolean };
+    const { youthWrestlerId, promoCode: bodyPromoCode, freeExpected } = body;
     if (!youthWrestlerId) return NextResponse.json({ error: 'Missing youthWrestlerId' }, { status: 400 });
     const promoCodeTrimmed = typeof bodyPromoCode === 'string' ? bodyPromoCode.trim().toUpperCase() : '';
 
@@ -111,7 +111,8 @@ export async function POST(
 
     // --- SMALL-GROUP FREE PATH (do not "optimize" or add conditions — this matches the working Liam flow) ---
     // Free = valid promo in request OR early-adopter entitlement. Never send to Stripe when they sent a promo; return 400 instead.
-    const isSmallGroup = s.session_type === 'group' || s.session_type === 'small_group' || s.session_type === '2-athlete';
+    // Treat ANY multi-participant session (max >= 2) as small group so promo/entitlement always applies regardless of session_type in DB.
+    const isSmallGroup = max >= 2 && s.session_type !== '1-on-1';
     const admin = createAdminClient(tenant.slug);
     if (isSmallGroup) {
       let allowFree = false;
@@ -168,6 +169,22 @@ export async function POST(
         }).eq('id', sessionId);
         return NextResponse.json({ added: true });
       }
+    }
+
+    // Client showed "Register free" but we're about to return Stripe — never do that.
+    if (freeExpected) {
+      console.error('[register] freeExpected but not allowFree', {
+        sessionId,
+        session_type: s.session_type,
+        max_participants: max,
+        isSmallGroup,
+        promoCodeTrimmed: promoCodeTrimmed || '(none)',
+        userId: user.id,
+      });
+      return NextResponse.json(
+        { error: 'Free registration could not be completed. Please refresh the page and try again, or contact support.' },
+        { status: 500 }
+      );
     }
 
     const pricePer = s.price_per_participant ?? 0;

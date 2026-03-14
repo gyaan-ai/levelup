@@ -102,6 +102,7 @@ export function SessionRegisterClient({ sessionId, isOwner, isSmallGroup = false
         body: JSON.stringify({
           youthWrestlerId: selectedWrestlerId,
           ...(promoCode.trim() && { promoCode: promoCode.trim() }),
+          ...(freeWithCode && { freeExpected: true }),
         }),
       });
       const data = await res.json();
@@ -116,6 +117,12 @@ export function SessionRegisterClient({ sessionId, isOwner, isSmallGroup = false
         return;
       }
       if (data.url) {
+        // If we showed "Register free" we must never send them to Stripe — server should have returned added: true.
+        if (freeWithCode) {
+          setError('Something went wrong — you should not be charged. Please refresh and try again, or contact support.');
+          setLoading(false);
+          return;
+        }
         window.location.href = data.url;
         return;
       }
