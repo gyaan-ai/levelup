@@ -132,20 +132,18 @@ export function SessionRegisterClient({ sessionId, isOwner, pricePerParticipant,
           </SelectContent>
         </Select>
       </div>
-      {!isOwner && (
-        <div className="space-y-2">
-          <Label htmlFor="promo">Promo code (optional)</Label>
-          <Input
-            id="promo"
-            type="text"
-            placeholder="e.g. GUILDLAUNCH"
-            value={promoCode}
-            onChange={(e) => { setPromoCode(e.target.value.toUpperCase()); setError(null); }}
-            className="uppercase"
-            autoComplete="off"
-          />
-        </div>
-      )}
+      <div className="space-y-2">
+        <Label htmlFor="promo">Promo code (optional)</Label>
+        <Input
+          id="promo"
+          type="text"
+          placeholder="e.g. GUILDLAUNCH"
+          value={promoCode}
+          onChange={(e) => { setPromoCode(e.target.value.toUpperCase()); setError(null); }}
+          className="uppercase"
+          autoComplete="off"
+        />
+      </div>
       <Button type="submit" disabled={loading} className="w-full">
         {loading
           ? (isOwner || freeSmallGroupJoin ? 'Adding…' : 'Redirecting to payment…')
