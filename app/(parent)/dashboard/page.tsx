@@ -45,8 +45,8 @@ export default async function HomePage() {
     session_mode?: string;
     focus_area?: string | null;
     partner_invite_code?: string | null;
-    athletes?: { id: string; first_name?: string; last_name?: string; school?: string; photo_url?: string } | null;
-    facilities?: { id?: string; name?: string; address?: string } | null;
+    athletes?: { id: string; first_name?: string; last_name?: string; school?: string; photo_url?: string } | { id: string; first_name?: string; last_name?: string; school?: string; photo_url?: string }[] | null;
+    facilities?: { id?: string; name?: string; address?: string } | { id?: string; name?: string; address?: string }[] | null;
     session_participants?: Array<{ youth_wrestler_id?: string; youth_wrestlers?: { first_name?: string; last_name?: string } | null }>;
   };
   let allUpcomingForAdmin: AdminUpcomingRow[] = [];
@@ -72,7 +72,7 @@ export default async function HomePage() {
       .gte('scheduled_datetime', nowISO)
       .order('scheduled_datetime', { ascending: true })
       .limit(50);
-    allUpcomingForAdmin = (adminSessions ?? []) as AdminUpcomingRow[];
+    allUpcomingForAdmin = (adminSessions ?? []) as unknown as AdminUpcomingRow[];
   }
 
   // Parent sees only their wrestlers (primary or linked). Explicit filter so parents never see other users' kids.
