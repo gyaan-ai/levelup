@@ -99,10 +99,11 @@ export async function POST(req: NextRequest) {
     const totalPrice = 0;
     const athletePayment = 0;
 
+    // Assign session to the selected coach (parent_id = athlete_id) so they own it and see it on their schedule
     const { data: session, error: sessionError } = await admin
       .from('sessions')
       .insert({
-        parent_id: user.id,
+        parent_id: athleteId,
         athlete_id: athleteId,
         facility_id: facilityId,
         session_type: 'group',

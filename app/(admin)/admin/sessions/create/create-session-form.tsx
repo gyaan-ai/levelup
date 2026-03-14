@@ -105,11 +105,7 @@ export function CreateSessionForm({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const tomorrow = (() => {
-    const d = new Date();
-    d.setDate(d.getDate() + 1);
-    return d.toISOString().slice(0, 10);
-  })();
+  const today = new Date().toISOString().slice(0, 10);
 
   return (
     <Card className="max-w-xl">
@@ -172,12 +168,15 @@ export function CreateSessionForm({
             </div>
 <div>
                 <Label htmlFor="focus">Focus area</Label>
-                <Select value={focusArea} onValueChange={setFocusArea}>
+                <Select
+                  value={focusArea || '__none__'}
+                  onValueChange={(v) => setFocusArea(v === '__none__' ? '' : v)}
+                >
                   <SelectTrigger id="focus">
                     <SelectValue placeholder="e.g. Takedowns, Escapes" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">None</SelectItem>
+                    <SelectItem value="__none__">None</SelectItem>
                     {focusOptions.map((area) => (
                       <SelectItem key={area} value={area}>
                         {area}
@@ -210,7 +209,7 @@ export function CreateSessionForm({
                   type="date"
                   value={scheduledDate}
                   onChange={(e) => setScheduledDate(e.target.value)}
-                  min={tomorrow}
+                  min={today}
                   required
                 />
               </div>
