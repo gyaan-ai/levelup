@@ -25,12 +25,12 @@ export type BookingSession = {
   partner_invite_code?: string | null;
   /** Small group or partner-open session not yet filled (open slots). */
   isTentative?: boolean;
+  /** True if current user created this session (can cancel whole session). False = participant (can leave session). */
+  isOwner?: boolean;
   coach: { name: string; school: string; id: string; photo_url?: string | null };
   facility: string;
-  /** Facility ID for Book again (preselect location). */
   facility_id?: string | null;
   wrestlers: string[];
-  /** First participant's youth_wrestler_id for Book again (preselect wrestler). */
   primaryWrestlerId?: string | null;
 };
 
@@ -42,7 +42,9 @@ interface BookingCardProps {
 export function BookingCard({ session, isPast = false }: BookingCardProps) {
   const router = useRouter();
   const [cancelling, setCancelling] = useState(false);
+  const [leaving, setLeaving] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
 
   const handleCopyShareLink = async () => {
@@ -64,7 +66,28 @@ export function BookingCard({ session, isPast = false }: BookingCardProps) {
     (session.status === 'scheduled' || session.status === 'pending_payment') &&
     scheduledTime > new Date();
   
+  const canLeave = canCancel && !session.isOwner;
   const willGetRefund = hoursUntilSession >= CANCELLATION_WINDOW_HOURS && session.status === 'scheduled';
+
+  const handleLeaveSession = async () => {
+    setLeaving(true);
+    try {
+      const res = await fetch(`/api/sessions/${session.id}/leave`, { method: 'POST' });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || 'Failed to leave session');
+        return;
+      }
+      alert(data.message);
+      setShowLeaveConfirm(false);
+      router.refresh();
+    } catch (e) {
+      console.error('Leave error:', e);
+      alert('Failed to leave session');
+    } finally {
+      setLeaving(false);
+    }
+  };
 
   const handleCancel = async () => {
     setCancelling(true);
@@ -165,10 +188,12 @@ export function BookingCard({ session, isPast = false }: BookingCardProps) {
               )}
               {!isPast && (
                 <div className="flex flex-wrap gap-2">
-                  <Link href={`/sessions/${session.id}/reschedule`}>
-                    <Button variant="outline" size="sm" className="min-h-[40px] px-3">Reschedule</Button>
-                  </Link>
-                  {canCancel && !showConfirm && (
+                  {session.isOwner && (
+                    <Link href={`/sessions/${session.id}/reschedule`}>
+                      <Button variant="outline" size="sm" className="min-h-[40px] px-3">Reschedule</Button>
+                    </Link>
+                  )}
+                  {session.isOwner && canCancel && !showConfirm && (
                     <Button
                       variant="outline"
                       size="sm"
@@ -176,6 +201,16 @@ export function BookingCard({ session, isPast = false }: BookingCardProps) {
                       className="min-h-[40px] px-3 text-destructive border-destructive hover:bg-destructive hover:text-destructive-foreground"
                     >
                       Cancel
+                    </Button>
+                  )}
+                  {canLeave && !showLeaveConfirm && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowLeaveConfirm(true)}
+                      className="min-h-[40px] px-3 text-destructive border-destructive hover:bg-destructive hover:text-destructive-foreground"
+                    >
+                      Leave session
                     </Button>
                   )}
                 </div>
@@ -215,7 +250,7 @@ export function BookingCard({ session, isPast = false }: BookingCardProps) {
               </div>
             </div>
             
-            {/* Cancel confirmation */}
+            {/* Cancel whole session (owner only) */}
             {showConfirm && (
               <div className="mt-2 p-3 border border-destructive/50 rounded-lg bg-destructive/5 text-left w-full max-w-xs">
                 <p className="text-sm font-medium mb-2">Cancel this session?</p>
@@ -241,6 +276,33 @@ export function BookingCard({ session, isPast = false }: BookingCardProps) {
                     disabled={cancelling}
                   >
                     {cancelling ? 'Cancelling...' : 'Yes, cancel'}
+                  </Button>
+                </div>
+              </div>
+            )}
+            {/* Leave session (participant: free up my spot) */}
+            {showLeaveConfirm && (
+              <div className="mt-2 p-3 border border-destructive/50 rounded-lg bg-destructive/5 text-left w-full max-w-xs">
+                <p className="text-sm font-medium mb-2">Leave this session?</p>
+                <p className="text-xs text-muted-foreground mb-3">
+                  Your spot will open back up for someone else. You won’t be charged further.
+                </p>
+                <div className="flex gap-2">
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    onClick={() => setShowLeaveConfirm(false)}
+                    disabled={leaving}
+                  >
+                    Keep my spot
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="destructive"
+                    onClick={handleLeaveSession}
+                    disabled={leaving}
+                  >
+                    {leaving ? 'Leaving…' : 'Yes, leave'}
                   </Button>
                 </div>
               </div>

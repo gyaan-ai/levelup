@@ -67,6 +67,7 @@ export default async function MyBookingsPage() {
     scheduled_datetime: string;
     status: string;
     total_price: number;
+    parent_id?: string;
     session_type?: string;
     session_mode?: string;
     current_participants?: number;
@@ -140,7 +141,7 @@ export default async function MyBookingsPage() {
   // Session is not "tentative" just because it's a group with open spots — once you're booked, you're confirmed
   const isTentative = (_s: (typeof all)[0]) => false;
 
-  // Transform sessions for BookingCard (include facility_id and primaryWrestlerId for Book again)
+  // Transform sessions for BookingCard (include facility_id, primaryWrestlerId, isOwner for Leave vs Cancel)
   const transformSession = (s: (typeof all)[0]): BookingSession => ({
     id: s.id,
     scheduled_datetime: s.scheduled_datetime,
@@ -150,6 +151,7 @@ export default async function MyBookingsPage() {
     session_mode: s.session_mode,
     partner_invite_code: s.partner_invite_code,
     isTentative: isTentative(s),
+    isOwner: s.parent_id === user.id,
     coach: coach(s),
     facility: facility(s),
     facility_id: facilityId(s),
