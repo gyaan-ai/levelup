@@ -77,6 +77,8 @@ export default async function AdminPage() {
         session_type,
         session_mode,
         partner_invite_code,
+        current_participants,
+        max_participants,
         athletes(id, first_name, last_name, school, venmo_handle, zelle_email),
         facilities(id, name)
       `)
@@ -135,6 +137,8 @@ export default async function AdminPage() {
     session_type?: string;
     session_mode?: string;
     partner_invite_code?: string | null;
+    current_participants?: number | null;
+    max_participants?: number | null;
     athletes?: { id: string; first_name: string; last_name: string; school: string; venmo_handle?: string | null; zelle_email?: string | null } | { id: string; first_name: string; last_name: string; school: string; venmo_handle?: string | null; zelle_email?: string | null }[];
     facilities?: { id: string; name: string } | { id: string; name: string }[];
   }>;
@@ -157,6 +161,8 @@ export default async function AdminPage() {
       session_type: s.session_type ?? undefined,
       session_mode: s.session_mode ?? undefined,
       partner_invite_code: s.partner_invite_code ?? null,
+      current_participants: s.current_participants ?? 0,
+      max_participants: s.max_participants ?? 1,
       parent_id: s.parent_id,
       parent_email: emailByUserId.get(s.parent_id) ?? '—',
       athlete_name: o ? `${o.first_name} ${o.last_name}` : '—',

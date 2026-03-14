@@ -102,3 +102,54 @@ export async function PATCH(
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
+
+/**
+ * DELETE - Admin permanently deletes a session.
+ * Only allowed for scheduled or pending_payment. Session participants are removed (CASCADE).
+ */
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id: sessionId } = await params;
+    const headersList = await headers();
+    const host = headersList.get('host') || '';
+    const tenant = getTenantByDomain(host);
+    if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
+
+    const supabase = await createClient(tenant.slug);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
+    if (userData?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
+    const admin = createAdminClient(tenant.slug);
+    const { data: session, error: fetchErr } = await admin
+      .from('sessions')
+      .select('id, status')
+      .eq('id', sessionId)
+      .single();
+
+    if (fetchErr || !session) {
+      return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+    }
+    if (session.status !== 'scheduled' && session.status !== 'pending_payment') {
+      return NextResponse.json(
+        { error: 'Only scheduled or pending-payment sessions can be deleted' },
+        { status: 400 }
+      );
+    }
+
+    const { error: deleteErr } = await admin.from('sessions').delete().eq('id', sessionId);
+    if (deleteErr) {
+      console.error('Admin session DELETE error:', deleteErr);
+      return NextResponse.json({ error: deleteErr.message }, { status: 500 });
+    }
+    return NextResponse.json({ ok: true });
+  } catch (e) {
+    console.error('Admin session DELETE error:', e);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}

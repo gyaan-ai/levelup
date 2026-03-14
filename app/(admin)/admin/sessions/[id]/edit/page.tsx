@@ -70,6 +70,7 @@ export default async function AdminEditSessionPage({
       </p>
       <EditSessionForm
         sessionId={sessionId}
+        sessionStatus={(session as { status?: string }).status}
         sessionType={(session as { session_type?: string }).session_type}
         focusArea={(session as { focus_area?: string | null }).focus_area ?? ''}
         joinPolicy={((session as { join_policy?: string }).join_policy as 'public' | 'private' | 'invite_only') ?? 'private'}

@@ -30,7 +30,8 @@ export default async function SessionRegisterPage({
   if (!user) redirect(`/login?redirect=/sessions/${sessionId}/register`);
 
   const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
-  if (userData?.role !== 'parent' && userData?.role !== 'admin') redirect('/dashboard');
+  const role = userData?.role;
+  if (role !== 'parent' && role !== 'admin' && role !== 'athlete' && role !== 'youth_wrestler') redirect('/dashboard');
 
   const { data: session, error: sessionErr } = await supabase
     .from('sessions')
@@ -96,7 +97,7 @@ export default async function SessionRegisterPage({
     .select('youth_wrestler_id')
     .eq('parent_id', user.id);
   const linkedIds = [...new Set((linkedRows ?? []).map((r: { youth_wrestler_id: string }) => r.youth_wrestler_id))];
-  const allIds = [...new Set([...(primaryIds ?? []).map((r: { id: string }) => r.id), ...linkedIds])];
+  const allIds = [...new Set([...(primaryIds ?? []).map((r: { id: string }) => r.id), ...linkedIds, user.id])];
   const { data: youthWrestlersRaw } = allIds.length > 0
     ? await supabase
         .from('youth_wrestlers')

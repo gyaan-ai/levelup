@@ -13,10 +13,20 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { SESSION_FOCUS_AREAS } from '@/lib/focus-areas';
+import { Loader2, Trash2 } from 'lucide-react';
 
 type Props = {
   sessionId: string;
+  sessionStatus?: string;
   sessionType?: string;
   focusArea: string;
   joinPolicy: 'public' | 'private' | 'invite_only';
@@ -29,6 +39,7 @@ type Props = {
 
 export function EditSessionForm({
   sessionId,
+  sessionStatus,
   sessionType,
   focusArea,
   joinPolicy,
@@ -48,6 +59,8 @@ export function EditSessionForm({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [focusAreaList, setFocusAreaList] = useState<string[]>([]);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   useEffect(() => {
     fetch('/api/focus-areas')
@@ -93,6 +106,7 @@ export function EditSessionForm({
   };
 
   return (
+    <>
     <Card>
       <CardHeader>
         <CardTitle>Session details</CardTitle>
@@ -216,11 +230,73 @@ export function EditSessionForm({
               </div>
             </div>
           )}
-          <Button type="submit" disabled={loading}>
-            {loading ? 'Saving…' : 'Save changes'}
-          </Button>
+          <div className="flex items-center gap-4">
+            <Button type="submit" disabled={loading}>
+              {loading ? 'Saving…' : 'Save changes'}
+            </Button>
+            {(sessionStatus === 'scheduled' || sessionStatus === 'pending_payment') && (
+              <Button
+                type="button"
+                variant="outline"
+                className="text-destructive border-destructive hover:bg-destructive/10"
+                onClick={() => setShowDeleteConfirm(true)}
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete session
+              </Button>
+            )}
+          </div>
         </form>
       </CardContent>
     </Card>
+
+    <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Delete session?</DialogTitle>
+          <DialogDescription>
+            This will permanently delete this session and all participants. This cannot be undone.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setShowDeleteConfirm(false)} disabled={deleteLoading}>
+            Cancel
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={async () => {
+              setDeleteLoading(true);
+              try {
+                const res = await fetch(`/api/admin/sessions/${sessionId}`, { method: 'DELETE' });
+                const data = await res.json();
+                if (!res.ok) {
+                  setError(data.error || 'Failed to delete session');
+                  setShowDeleteConfirm(false);
+                  return;
+                }
+                router.push('/admin');
+                router.refresh();
+              } catch {
+                setError('Failed to delete session');
+                setShowDeleteConfirm(false);
+              } finally {
+                setDeleteLoading(false);
+              }
+            }}
+            disabled={deleteLoading}
+          >
+            {deleteLoading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                Deleting…
+              </>
+            ) : (
+              'Delete'
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  </>
   );
 }

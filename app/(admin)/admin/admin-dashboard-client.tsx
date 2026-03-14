@@ -60,6 +60,8 @@ export type AdminSession = {
   session_type?: string;
   session_mode?: string;
   partner_invite_code?: string | null;
+  current_participants: number;
+  max_participants: number;
   parent_id: string;
   parent_email: string;
   athlete_name: string;
@@ -277,6 +279,8 @@ export function AdminDashboardClient({
   const [sessionDateFrom, setSessionDateFrom] = useState('');
   const [sessionDateTo, setSessionDateTo] = useState('');
   const [copiedSessionId, setCopiedSessionId] = useState<string | null>(null);
+  const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
+  const [sessionDeleteLoading, setSessionDeleteLoading] = useState(false);
   const [userRoleFilter, setUserRoleFilter] = useState<string>('all');
   const [userSearch, setUserSearch] = useState('');
   const [athleteSearch, setAthleteSearch] = useState('');
@@ -617,16 +621,18 @@ export function AdminDashboardClient({
                     <th className="text-left py-2 font-medium">Parent</th>
                     <th className="text-left py-2 font-medium">Facility</th>
                     <th className="text-left py-2 font-medium">Status</th>
+                    <th className="text-right py-2 font-medium"># registered</th>
+                    <th className="text-right py-2 font-medium"># openings</th>
                     <th className="text-right py-2 font-medium">Total</th>
                     <th className="text-right py-2 font-medium">Coach $</th>
                     <th className="text-right py-2 font-medium">Share link</th>
-                    <th className="text-right py-2 font-medium"></th>
+                    <th className="text-right py-2 font-medium">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredSessions.length === 0 ? (
                     <tr>
-                      <td colSpan={9} className="py-8 text-center text-muted-foreground">
+                      <td colSpan={11} className="py-8 text-center text-muted-foreground">
                         No sessions match filters. Clear date filters to see all.
                       </td>
                     </tr>
@@ -664,6 +670,8 @@ export function AdminDashboardClient({
                         </td>
                         <td className="py-2">{s.facility_name}</td>
                         <td className="py-2">{statusBadge(s.status)}</td>
+                        <td className="py-2 text-right">{s.current_participants}</td>
+                        <td className="py-2 text-right">{Math.max(0, (s.max_participants ?? 1) - s.current_participants)}</td>
                         <td className="py-2 text-right">${Number(s.total_price).toFixed(2)}</td>
                         <td className="py-2 text-right">${Number(s.athlete_payment).toFixed(2)}</td>
                         <td className="py-2 text-right">
@@ -682,9 +690,21 @@ export function AdminDashboardClient({
                           )}
                         </td>
                         <td className="py-2 text-right">
-                          <Link href={`/admin/sessions/${s.id}/edit`} className="text-accent hover:underline text-sm">
-                            Edit
-                          </Link>
+                          <div className="flex items-center justify-end gap-2">
+                            <Link href={`/admin/sessions/${s.id}/edit`} className="text-accent hover:underline text-sm">
+                              Edit
+                            </Link>
+                            {(s.status === 'scheduled' || s.status === 'pending_payment') && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                onClick={() => setSessionToDelete(s.id)}
+                              >
+                                Delete
+                              </Button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );})
@@ -695,6 +715,53 @@ export function AdminDashboardClient({
           </CardContent>
         </Card>
       )}
+
+      <Dialog open={!!sessionToDelete} onOpenChange={(open) => !open && setSessionToDelete(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete session?</DialogTitle>
+            <DialogDescription>
+              This will permanently delete this session and all participants. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSessionToDelete(null)} disabled={sessionDeleteLoading}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={async () => {
+                if (!sessionToDelete) return;
+                setSessionDeleteLoading(true);
+                try {
+                  const res = await fetch(`/api/admin/sessions/${sessionToDelete}`, { method: 'DELETE' });
+                  const data = await res.json();
+                  if (!res.ok) {
+                    alert(data.error || 'Failed to delete session');
+                    return;
+                  }
+                  setSessionToDelete(null);
+                  router.refresh();
+                } catch {
+                  alert('Failed to delete session');
+                } finally {
+                  setSessionDeleteLoading(false);
+                }
+              }}
+              disabled={sessionDeleteLoading}
+            >
+              {sessionDeleteLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Deleting…
+                </>
+              ) : (
+                'Delete'
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {tab === 'users' && (
         <Card>

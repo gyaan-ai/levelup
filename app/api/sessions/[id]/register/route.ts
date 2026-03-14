@@ -28,13 +28,17 @@ export async function POST(
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
-    if (userData?.role !== 'parent' && userData?.role !== 'admin') {
+    const role = userData?.role;
+    if (role !== 'parent' && role !== 'admin' && role !== 'athlete' && role !== 'youth_wrestler') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     const body = (await req.json()) as { youthWrestlerId: string };
     const { youthWrestlerId } = body;
     if (!youthWrestlerId) return NextResponse.json({ error: 'Missing youthWrestlerId' }, { status: 400 });
+    if (role === 'youth_wrestler' && youthWrestlerId !== user.id) {
+      return NextResponse.json({ error: 'Youth wrestlers can only register themselves' }, { status: 403 });
+    }
 
     const { data: session, error: sessionErr } = await supabase
       .from('sessions')
@@ -115,6 +119,7 @@ export async function POST(
       s.session_type === 'small_group' ||
       (max >= 2 && s.session_type !== '1-on-1');
     if (isSmallGroup) {
+      const isSelf = role === 'youth_wrestler' && youthWrestlerId === user.id;
       const { data: yw } = await supabase
         .from('youth_wrestlers')
         .select('id, parent_id')
@@ -122,10 +127,10 @@ export async function POST(
         .single();
       const ywParentId = (yw as { parent_id?: string } | null)?.parent_id;
       const isPrimaryParent = yw && ywParentId === user.id;
-      const { data: link } = !isPrimaryParent && yw
+      const { data: link } = !isPrimaryParent && !isSelf && yw
         ? await supabase.from('youth_wrestler_parents').select('id').eq('youth_wrestler_id', youthWrestlerId).eq('parent_id', user.id).maybeSingle()
         : { data: null };
-      if (!yw || (!isPrimaryParent && !link)) {
+      if (!yw || (!isPrimaryParent && !link && !isSelf)) {
         return NextResponse.json({ error: 'Youth wrestler not found or not yours' }, { status: 400 });
       }
       const { data: existing } = await supabase
@@ -154,6 +159,7 @@ export async function POST(
     }
 
     const pricePer = s.price_per_participant ?? 0;
+    const isSelf = role === 'youth_wrestler' && youthWrestlerId === user.id;
     if (pricePer <= 0) {
       return NextResponse.json({ error: 'Session has no price set for participants' }, { status: 400 });
     }
@@ -165,10 +171,10 @@ export async function POST(
       .single();
     const ywParentId = (yw as { parent_id?: string } | null)?.parent_id;
     const isPrimaryParent = yw && ywParentId === user.id;
-    const { data: link } = !isPrimaryParent && yw
+    const { data: link } = !isPrimaryParent && !isSelf && yw
       ? await supabase.from('youth_wrestler_parents').select('id').eq('youth_wrestler_id', youthWrestlerId).eq('parent_id', user.id).maybeSingle()
       : { data: null };
-    if (!yw || (!isPrimaryParent && !link)) {
+    if (!yw || (!isPrimaryParent && !link && !isSelf)) {
       return NextResponse.json({ error: 'Youth wrestler not found or not yours' }, { status: 400 });
     }
 

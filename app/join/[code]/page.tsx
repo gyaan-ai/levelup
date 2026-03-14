@@ -74,13 +74,27 @@ export default async function JoinByCodePage({
 
   let youthWrestlers: Array<{ id: string; first_name: string; last_name: string; age?: number; weight_class?: string; skill_level?: string }> = [];
   if (user && !isFull) {
-    const { data: yw } = await supabase
+    const { data: primaryRows } = await supabase
       .from('youth_wrestlers')
-      .select('id, first_name, last_name, age, weight_class, skill_level')
+      .select('id')
       .eq('parent_id', user.id)
-      .eq('active', true)
-      .order('created_at', { ascending: false });
-    youthWrestlers = (yw ?? []) as typeof youthWrestlers;
+      .eq('active', true);
+    const { data: linkedRows } = await supabase
+      .from('youth_wrestler_parents')
+      .select('youth_wrestler_id')
+      .eq('parent_id', user.id);
+    const primaryIds = (primaryRows ?? []).map((r: { id: string }) => r.id);
+    const linkedIds = (linkedRows ?? []).map((r: { youth_wrestler_id: string }) => r.youth_wrestler_id);
+    const allIds = [...new Set([...primaryIds, ...linkedIds, user.id])];
+    if (allIds.length > 0) {
+      const { data: yw } = await supabase
+        .from('youth_wrestlers')
+        .select('id, first_name, last_name, age, weight_class, skill_level')
+        .in('id', allIds)
+        .eq('active', true)
+        .order('created_at', { ascending: false });
+      youthWrestlers = (yw ?? []) as typeof youthWrestlers;
+    }
   }
 
   return (
