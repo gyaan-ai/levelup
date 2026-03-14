@@ -37,13 +37,15 @@ export function SessionRegisterClient({ sessionId, isOwner, pricePerParticipant,
   const router = useRouter();
   const [selectedWrestlerId, setSelectedWrestlerId] = useState(initialWrestlerId);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedWrestlerId) {
-      alert('Please select a wrestler.');
+      setError('Please select a wrestler.');
       return;
     }
+    setError(null);
     setLoading(true);
     try {
       const res = await fetch(`/api/sessions/${sessionId}/register`, {
@@ -52,7 +54,11 @@ export function SessionRegisterClient({ sessionId, isOwner, pricePerParticipant,
         body: JSON.stringify({ youthWrestlerId: selectedWrestlerId }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || (isOwner ? 'Failed to add wrestler' : 'Failed to start payment'));
+      if (!res.ok) {
+        const msg = data.error || (isOwner ? 'Failed to add wrestler' : 'Failed to start payment');
+        setError(msg);
+        return;
+      }
       if (data.added) {
         router.push(`/sessions/${sessionId}/register/confirmed`);
         router.refresh();
@@ -65,7 +71,8 @@ export function SessionRegisterClient({ sessionId, isOwner, pricePerParticipant,
       router.push(`/sessions/${sessionId}/register/confirmed`);
       router.refresh();
     } catch (err: unknown) {
-      alert(err instanceof Error ? err.message : (isOwner ? 'Failed to add wrestler' : 'Payment failed'));
+      const msg = err instanceof Error ? err.message : (isOwner ? 'Failed to add wrestler' : 'Payment failed');
+      setError(msg);
     } finally {
       setLoading(false);
     }
@@ -87,9 +94,10 @@ export function SessionRegisterClient({ sessionId, isOwner, pricePerParticipant,
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+      {error && <p className="text-sm text-destructive">{error}</p>}
       <div className="space-y-2">
         <Label htmlFor="wrestler">{isOwner ? 'Which wrestler do you want to add?' : 'Which wrestler is registering?'}</Label>
-        <Select value={selectedWrestlerId} onValueChange={setSelectedWrestlerId} required>
+        <Select value={selectedWrestlerId} onValueChange={(v) => { setSelectedWrestlerId(v); setError(null); }} required>
           <SelectTrigger id="wrestler">
             <SelectValue placeholder="Select wrestler" />
           </SelectTrigger>

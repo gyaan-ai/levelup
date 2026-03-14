@@ -38,8 +38,14 @@ export async function POST(req: NextRequest) {
       .eq('code', codeNormalized)
       .maybeSingle();
 
-    if (codeErr || !codeRow) {
+    if (codeErr) {
+      console.error('Redeem code lookup error:', codeErr);
       return NextResponse.json({ error: 'Invalid or expired discount code' }, { status: 400 });
+    }
+    if (!codeRow) {
+      return NextResponse.json({
+        error: 'Code not found. Check the code or ask an admin to add it in Admin → Discount codes.',
+      }, { status: 400 });
     }
 
     const max = codeRow.max_redemptions;

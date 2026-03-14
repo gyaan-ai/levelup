@@ -76,10 +76,22 @@ Codes are stored in `discount_codes`; the signup API already reads from that tab
 
 ---
 
+## "Code not found" / "Invalid or expired" when redeeming GUILDLAUNCH
+
+If a parent (or you in Admin) gets **Code not found** or **Invalid or expired** when entering GUILDLAUNCH:
+
+1. **Ensure the code exists in the database.** Either:
+   - **Run migrations** so the early adopter migration (and the GUILDLAUNCH seed) have run:  
+     `supabase db push` or run the SQL in the Supabase dashboard. The migration `20240157000000_seed_guildlaunch_code.sql` inserts GUILDLAUNCH if missing.
+   - **Or add it in Admin:** go to **Admin → Discount codes**, create a new code with Code = `GUILDLAUNCH`, Name = Early Adopter, Max redemptions = 50 (or leave blank for unlimited).
+2. **Same project/tenant:** Redeeming uses the same Supabase project as the app. If you use multiple environments, ensure the code exists in the project that serves the domain you’re on.
+
+---
+
 ## Summary
 
 | Question | Answer |
 |----------|--------|
-| **Where do they put the code?** | Signup page, when role is Parent: optional field **Discount code**. |
+| **Where do they put the code?** | Signup page, when role is Parent: optional field **Discount code**. Or later on **Account → Redeem discount code**. |
 | **How do we generate the code?** | You define the code string yourself. Add it via SQL or Admin → Discount codes. No auto-generation. |
 | **Current code** | `GUILDLAUNCH` (Early Adopter, max 50 redemptions), seeded in migration. |
