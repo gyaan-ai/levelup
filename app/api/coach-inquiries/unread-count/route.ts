@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
-import { DM_UNAVAILABLE_MESSAGE, isMissingTableError } from '@/lib/coach-inquiries-errors';
+import { isMissingTableError } from '@/lib/coach-inquiries-errors';
 
 /** GET - unread thread count for current user (parent or athlete) */
 export async function GET() {
@@ -23,7 +23,7 @@ export async function GET() {
       .order('created_at', { ascending: false });
 
     if (messagesError) {
-      if (isMissingTableError(messagesError)) return NextResponse.json({ error: DM_UNAVAILABLE_MESSAGE }, { status: 503 });
+      if (isMissingTableError(messagesError)) return NextResponse.json({ count: 0 });
       return NextResponse.json({ error: messagesError.message }, { status: 500 });
     }
 
@@ -33,7 +33,7 @@ export async function GET() {
       .eq('user_id', user.id);
 
     if (readError && isMissingTableError(readError)) {
-      return NextResponse.json({ error: DM_UNAVAILABLE_MESSAGE }, { status: 503 });
+      return NextResponse.json({ count: 0 });
     }
 
     const readMap = new Map<string, string>();

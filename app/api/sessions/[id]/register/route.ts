@@ -109,78 +109,62 @@ export async function POST(
       return NextResponse.json({ error: 'Session is not open for registration' }, { status: 400 });
     }
 
-    // --- SMALL-GROUP FREE PATH (do not "optimize" or add conditions — this matches the working Liam flow) ---
-    // Free = valid promo in request OR early-adopter entitlement. Never send to Stripe when they sent a promo; return 400 instead.
-    // Treat ANY multi-participant session (max >= 2) as small group so promo/entitlement always applies regardless of session_type in DB.
-    const isSmallGroup = max >= 2 && s.session_type !== '1-on-1';
+    // Free = valid promo code (any session) OR early-adopter entitlement (small-group only). No gate on session type for code.
     const admin = createAdminClient(tenant.slug);
-    if (isSmallGroup) {
-      let allowFree = false;
-      let codeRejected = false; // they sent a code but it wasn't valid
+    let allowFree = false;
+    let codeRejected = false;
 
-      // 1) Valid promo code in request = $0 (anyone with the code gets in free)
-      if (promoCodeTrimmed) {
-        const { data: codeRow, error: codeErr } = await admin
-          .from('discount_codes')
-          .select('id, code, max_redemptions, redemptions')
-          .eq('code', promoCodeTrimmed)
-          .maybeSingle();
-        if (!codeErr && codeRow) {
-          const max = codeRow.max_redemptions;
-          const current = codeRow.redemptions ?? 0;
-          if (max == null || current < max) allowFree = true;
-          else codeRejected = true; // at capacity
-        } else codeRejected = true; // not found or error
-      }
-
-      // 2) Or they have early adopter entitlement with remaining > 0
-      if (!allowFree) {
-        const { data: entitlement } = await admin
-          .from('early_adopter_entitlements')
-          .select('id, remaining')
-          .eq('parent_id', user.id)
-          .eq('session_type', '2-athlete')
-          .gt('remaining', 0)
-          .limit(1)
-          .maybeSingle();
-        if (entitlement?.id && (entitlement.remaining ?? 0) > 0) allowFree = true;
-      }
-
-      // If they sent a promo and we're still not allowing free, don't send them to Stripe — tell them
-      if (promoCodeTrimmed && !allowFree) {
-        return NextResponse.json(
-          { error: codeRejected ? 'That promo code isn’t valid or has reached its limit. You can still pay to register.' : 'That promo code isn’t valid for this session.' },
-          { status: 400 }
-        );
-      }
-
-      if (allowFree) {
-        const { error: insertErr } = await admin.from('session_participants').insert({
-          session_id: sessionId,
-          youth_wrestler_id: youthWrestlerId,
-          parent_id: user.id,
-          paid: true,
-          amount_paid: 0,
-        });
-        if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 });
-        await admin.from('sessions').update({
-          current_participants: current + 1,
-          updated_at: new Date().toISOString(),
-        }).eq('id', sessionId);
-        return NextResponse.json({ added: true });
-      }
+    if (promoCodeTrimmed) {
+      const { data: codeRow, error: codeErr } = await admin
+        .from('discount_codes')
+        .select('id, code, max_redemptions, redemptions')
+        .eq('code', promoCodeTrimmed)
+        .maybeSingle();
+      if (!codeErr && codeRow) {
+        const codeMax = codeRow.max_redemptions;
+        const codeCurrent = codeRow.redemptions ?? 0;
+        if (codeMax == null || codeCurrent < codeMax) allowFree = true;
+        else codeRejected = true;
+      } else codeRejected = true;
     }
 
-    // Client showed "Register free" but we're about to return Stripe — never do that.
-    if (freeExpected) {
-      console.error('[register] freeExpected but not allowFree', {
-        sessionId,
-        session_type: s.session_type,
-        max_participants: max,
-        isSmallGroup,
-        promoCodeTrimmed: promoCodeTrimmed || '(none)',
-        userId: user.id,
+    const isSmallGroup = max >= 2 && s.session_type !== '1-on-1';
+    if (!allowFree && isSmallGroup) {
+      const { data: entitlement } = await admin
+        .from('early_adopter_entitlements')
+        .select('id, remaining')
+        .eq('parent_id', user.id)
+        .eq('session_type', '2-athlete')
+        .gt('remaining', 0)
+        .limit(1)
+        .maybeSingle();
+      if (entitlement?.id && (entitlement.remaining ?? 0) > 0) allowFree = true;
+    }
+
+    if (promoCodeTrimmed && !allowFree) {
+      return NextResponse.json(
+        { error: codeRejected ? 'That promo code isn’t valid or has reached its limit. You can still pay to register.' : 'That promo code isn’t valid for this session.' },
+        { status: 400 }
+      );
+    }
+
+    if (allowFree) {
+      const { error: insertErr } = await admin.from('session_participants').insert({
+        session_id: sessionId,
+        youth_wrestler_id: youthWrestlerId,
+        parent_id: user.id,
+        paid: true,
+        amount_paid: 0,
       });
+      if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 });
+      await admin.from('sessions').update({
+        current_participants: current + 1,
+        updated_at: new Date().toISOString(),
+      }).eq('id', sessionId);
+      return NextResponse.json({ added: true });
+    }
+
+    if (freeExpected) {
       return NextResponse.json(
         { error: 'Free registration could not be completed. Please refresh the page and try again, or contact support.' },
         { status: 500 }
