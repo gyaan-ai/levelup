@@ -5,7 +5,6 @@ import { getTenantByDomain } from '@/config/tenants';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Users, Plus } from 'lucide-react';
-import { startOfWeek, endOfWeek, addWeeks } from 'date-fns';
 import { SmallGroupSessionsClient } from './small-group-sessions-client';
 
 export default async function SmallGroupSessionsPage({
@@ -30,11 +29,9 @@ export default async function SmallGroupSessionsPage({
   if (userData?.role !== 'parent' && userData?.role !== 'admin' && userData?.role !== 'youth_wrestler') redirect('/dashboard');
 
   const now = new Date();
-  const weekStart = startOfWeek(now, { weekStartsOn: 0 });
-  const weekEnd = endOfWeek(now, { weekStartsOn: 0 });
-  const nextWeekEnd = endOfWeek(addWeeks(now, 1), { weekStartsOn: 0 });
+  const nowISO = now.toISOString();
 
-  // Small group: session_type 'group' or 'small_group', scheduled this week or next
+  // Small group: all upcoming (no date ceiling) so users can find any session (e.g. Sabino's)
   const { data: sessions } = await supabase
     .from('sessions')
     .select(`
@@ -56,9 +53,9 @@ export default async function SmallGroupSessionsPage({
     `)
     .in('session_type', ['group', 'small_group'])
     .in('status', ['scheduled', 'pending_payment'])
-    .gte('scheduled_datetime', weekStart.toISOString())
-    .lte('scheduled_datetime', nextWeekEnd.toISOString())
-    .order('scheduled_datetime', { ascending: true });
+    .gte('scheduled_datetime', nowISO)
+    .order('scheduled_datetime', { ascending: true })
+    .limit(100);
 
   // Open partner sessions: someone looking for a partner (any date)
   const { data: partnerSessions } = await supabase
@@ -82,7 +79,7 @@ export default async function SmallGroupSessionsPage({
     `)
     .eq('session_mode', 'partner-open')
     .in('status', ['scheduled', 'pending_payment'])
-    .gte('scheduled_datetime', now.toISOString())
+    .gte('scheduled_datetime', nowISO)
     .order('scheduled_datetime', { ascending: true });
 
   const partnerList = (partnerSessions ?? []).filter(

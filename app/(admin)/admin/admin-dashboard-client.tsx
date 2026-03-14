@@ -33,6 +33,8 @@ import {
   MapPin,
   Package,
   ClipboardList,
+  Copy,
+  Check,
   Pencil,
   User,
   UserX,
@@ -57,6 +59,7 @@ export type AdminSession = {
   stripe_fee: number;
   session_type?: string;
   session_mode?: string;
+  partner_invite_code?: string | null;
   parent_id: string;
   parent_email: string;
   athlete_name: string;
@@ -273,6 +276,7 @@ export function AdminDashboardClient({
   const [markingAthleteId, setMarkingAthleteId] = useState<string | null>(null);
   const [sessionDateFrom, setSessionDateFrom] = useState('');
   const [sessionDateTo, setSessionDateTo] = useState('');
+  const [copiedSessionId, setCopiedSessionId] = useState<string | null>(null);
   const [userRoleFilter, setUserRoleFilter] = useState<string>('all');
   const [userSearch, setUserSearch] = useState('');
   const [athleteSearch, setAthleteSearch] = useState('');
@@ -577,7 +581,7 @@ export function AdminDashboardClient({
           <CardHeader>
             <CardTitle>All privates by date</CardTitle>
             <CardDescription>
-              All scheduled sessions across athletes. Filter by date range.
+              All sessions (newest first). Use &quot;Copy link&quot; to get the invite URL for a session and send to families.
             </CardDescription>
             <div className="flex flex-wrap gap-4 pt-2">
               <div className="flex items-center gap-2">
@@ -615,18 +619,29 @@ export function AdminDashboardClient({
                     <th className="text-left py-2 font-medium">Status</th>
                     <th className="text-right py-2 font-medium">Total</th>
                     <th className="text-right py-2 font-medium">Coach $</th>
+                    <th className="text-right py-2 font-medium">Share link</th>
                     <th className="text-right py-2 font-medium"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredSessions.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="py-8 text-center text-muted-foreground">
-                        No sessions match filters.
+                      <td colSpan={9} className="py-8 text-center text-muted-foreground">
+                        No sessions match filters. Clear date filters to see all.
                       </td>
                     </tr>
                   ) : (
-                    filteredSessions.map((s) => (
+                    filteredSessions.map((s) => {
+                      const shareUrl = s.partner_invite_code
+                        ? `${typeof window !== 'undefined' ? window.location.origin : ''}/join/${s.partner_invite_code}`
+                        : null;
+                      const handleCopy = () => {
+                        if (!shareUrl) return;
+                        navigator.clipboard.writeText(shareUrl);
+                        setCopiedSessionId(s.id);
+                        setTimeout(() => setCopiedSessionId(null), 2000);
+                      };
+                      return (
                       <tr key={s.id} className="border-b last:border-0">
                         <td className="py-2">
                           {formatEST(new Date(s.scheduled_datetime), 'MMM d, yyyy')}
@@ -652,12 +667,27 @@ export function AdminDashboardClient({
                         <td className="py-2 text-right">${Number(s.total_price).toFixed(2)}</td>
                         <td className="py-2 text-right">${Number(s.athlete_payment).toFixed(2)}</td>
                         <td className="py-2 text-right">
+                          {shareUrl ? (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-8 gap-1 text-accent hover:text-accent"
+                              onClick={handleCopy}
+                            >
+                              {copiedSessionId === s.id ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                              {copiedSessionId === s.id ? 'Copied' : 'Copy link'}
+                            </Button>
+                          ) : (
+                            <span className="text-muted-foreground text-xs">—</span>
+                          )}
+                        </td>
+                        <td className="py-2 text-right">
                           <Link href={`/admin/sessions/${s.id}/edit`} className="text-accent hover:underline text-sm">
                             Edit
                           </Link>
                         </td>
                       </tr>
-                    ))
+                    );})
                   )}
                 </tbody>
               </table>

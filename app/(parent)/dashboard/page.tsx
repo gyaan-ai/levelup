@@ -34,7 +34,7 @@ export default async function HomePage() {
   const isAdmin = userData?.role === 'admin';
   const nowISO = new Date().toISOString();
 
-  // Admin: fetch all upcoming sessions in same shape as family upcoming (for card format)
+  // Admin: fetch ALL scheduled/pending sessions (no date filter) so admin always sees every session
   type AdminUpcomingRow = {
     id: string;
     scheduled_datetime: string;
@@ -69,9 +69,8 @@ export default async function HomePage() {
         session_participants(youth_wrestler_id, youth_wrestlers(first_name, last_name))
       `)
       .in('status', ['scheduled', 'pending_payment'])
-      .gte('scheduled_datetime', nowISO)
       .order('scheduled_datetime', { ascending: true })
-      .limit(50);
+      .limit(100);
     allUpcomingForAdmin = (adminSessions ?? []) as unknown as AdminUpcomingRow[];
   }
 
@@ -283,7 +282,7 @@ export default async function HomePage() {
       {/* Upcoming session(s): when admin, show all as cards; otherwise show family next session */}
       <section className="mt-6 mb-6">
         <h2 className="text-lg font-semibold text-foreground mb-3">
-          {isAdmin ? 'Upcoming sessions' : 'Next Session'}
+          {isAdmin ? 'All sessions (scheduled & pending)' : 'Next Session'}
         </h2>
         {isAdmin && allUpcomingForAdmin.length > 0 ? (
           <div className="space-y-4">

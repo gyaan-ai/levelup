@@ -76,6 +76,7 @@ export default async function AdminPage() {
         stripe_fee,
         session_type,
         session_mode,
+        partner_invite_code,
         athletes(id, first_name, last_name, school, venmo_handle, zelle_email),
         facilities(id, name)
       `)
@@ -133,6 +134,7 @@ export default async function AdminPage() {
     stripe_fee: number;
     session_type?: string;
     session_mode?: string;
+    partner_invite_code?: string | null;
     athletes?: { id: string; first_name: string; last_name: string; school: string; venmo_handle?: string | null; zelle_email?: string | null } | { id: string; first_name: string; last_name: string; school: string; venmo_handle?: string | null; zelle_email?: string | null }[];
     facilities?: { id: string; name: string } | { id: string; name: string }[];
   }>;
@@ -154,6 +156,7 @@ export default async function AdminPage() {
       stripe_fee: Number(s.stripe_fee ?? 0),
       session_type: s.session_type ?? undefined,
       session_mode: s.session_mode ?? undefined,
+      partner_invite_code: s.partner_invite_code ?? null,
       parent_id: s.parent_id,
       parent_email: emailByUserId.get(s.parent_id) ?? '—',
       athlete_name: o ? `${o.first_name} ${o.last_name}` : '—',
