@@ -80,6 +80,7 @@ export function FindTrainingClient({
   const [coach, setCoach] = useState(initialCoach || 'all');
   const [dateOpen, setDateOpen] = useState(false);
   const [timeOpen, setTimeOpen] = useState(false);
+  const [sessionsTab, setSessionsTab] = useState<'open' | 'closed'>('open');
 
   useEffect(() => {
     setDate(initialDate || '');
@@ -102,6 +103,10 @@ export function FindTrainingClient({
   const hasSearchCriteria = date || (location && location !== 'all') || (coach && coach !== 'all');
   const showResults = initialSessions.length > 0 && (hasSearchCriteria || !!defaultRangeLabel);
   const showNoResults = (hasSearchCriteria || !!defaultRangeLabel) && initialSessions.length === 0;
+
+  const openSessions = initialSessions.filter((s) => (s.current_participants ?? 0) < (s.max_participants ?? 1));
+  const closedSessions = initialSessions.filter((s) => (s.current_participants ?? 0) >= (s.max_participants ?? 1));
+  const displayedSessions = sessionsTab === 'open' ? openSessions : closedSessions;
 
   return (
     <div className="space-y-6">
@@ -295,19 +300,53 @@ export function FindTrainingClient({
       ) : (
         <Card>
           <CardHeader>
-            <CardTitle>Open sessions</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              {initialSessions.length} session{initialSessions.length !== 1 ? 's' : ''}
-              {date
-                ? (() => { const [y, m, d] = date.split('-').map(Number); return ` on ${formatEST(new Date(y, m - 1, d), 'EEEE, MMM d, yyyy')}`; })()
-                : defaultRangeLabel
-                  ? ` · ${defaultRangeLabel}`
-                  : ' at this location'}
-            </p>
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <div>
+                <CardTitle>Sessions</CardTitle>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {date
+                    ? (() => { const [y, m, d] = date.split('-').map(Number); return formatEST(new Date(y, m - 1, d), 'EEEE, MMM d, yyyy'); })()
+                    : defaultRangeLabel ?? 'Select date or location'}
+                </p>
+              </div>
+              <div className="flex rounded-lg border border-border p-0.5 bg-muted/30">
+                <button
+                  type="button"
+                  onClick={() => setSessionsTab('open')}
+                  className={cn(
+                    'px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
+                    sessionsTab === 'open'
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  Open sessions ({openSessions.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSessionsTab('closed')}
+                  className={cn(
+                    'px-3 py-1.5 text-sm font-medium rounded-md transition-colors',
+                    sessionsTab === 'closed'
+                      ? 'bg-background text-foreground shadow-sm'
+                      : 'text-muted-foreground hover:text-foreground'
+                  )}
+                >
+                  Closed (at capacity) ({closedSessions.length})
+                </button>
+              </div>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {initialSessions.map((s) => {
+              {displayedSessions.length === 0 ? (
+                <p className="py-8 text-center text-muted-foreground">
+                  {sessionsTab === 'open'
+                    ? 'No open sessions for this search.'
+                    : 'No closed sessions for this search.'}
+                </p>
+              ) : (
+              displayedSessions.map((s) => {
                 const coach = Array.isArray(s.athletes) ? s.athletes[0] : s.athletes;
                 const fac = Array.isArray(s.facilities) ? s.facilities[0] : s.facilities;
                 const current = s.current_participants ?? 0;
@@ -362,17 +401,20 @@ export function FindTrainingClient({
                     </div>
                     </div>
                     <div className="shrink-0 flex flex-col sm:items-end gap-2">
-                      {openSlots > 0 && (
+                      {openSlots > 0 ? (
                         <Button asChild size="sm" className="min-h-[40px]">
                           <Link href={`/sessions/${s.id}/register${preselectedWrestlerId ? `?wrestler=${encodeURIComponent(preselectedWrestlerId)}` : ''}`}>
                             {s.join_policy === 'invite_only' ? 'Get link' : 'Book'}
                           </Link>
                         </Button>
+                      ) : (
+                        <span className="text-sm text-muted-foreground">At capacity</span>
                       )}
                     </div>
                   </div>
                 );
-              })}
+              })
+              )}
             </div>
           </CardContent>
         </Card>
