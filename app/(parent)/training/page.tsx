@@ -141,26 +141,19 @@ export default async function TrainingPage({
     current_participants, max_participants, total_price, price_per_participant,
     athlete_id, facility_id, athletes(id, first_name, last_name, school, photo_url), facilities(id, name, address)
   `;
-  const baseFilter = (q: ReturnType<typeof supabase.from>) => {
-    let q2 = q.gte('scheduled_datetime', dayStart).lte('scheduled_datetime', dayEnd);
-    if (sp.location && sp.location !== 'all') q2 = q2.eq('facility_id', sp.location);
-    if (sp.coach && sp.coach !== 'all') q2 = q2.eq('athlete_id', sp.coach);
-    return q2;
+  const sessions = () =>
+    supabase.from('sessions').select(baseSelect).gte('scheduled_datetime', dayStart).lte('scheduled_datetime', dayEnd);
+  const withOptFilters = (q: ReturnType<typeof sessions>) => {
+    if (sp.location && sp.location !== 'all') q = q.eq('facility_id', sp.location);
+    if (sp.coach && sp.coach !== 'all') q = q.eq('athlete_id', sp.coach);
+    return q;
   };
 
   const [groupUpcoming, partnerUpcoming, groupPast, partnerPast] = await Promise.all([
-    baseFilter(
-      supabase.from('sessions').select(baseSelect).in('status', ['scheduled', 'pending_payment'])
-    ).in('session_type', ['group', 'small_group']).order('scheduled_datetime', { ascending: true }),
-    baseFilter(
-      supabase.from('sessions').select(baseSelect).in('status', ['scheduled', 'pending_payment'])
-    ).eq('session_mode', 'partner-open').order('scheduled_datetime', { ascending: true }),
-    baseFilter(
-      supabase.from('sessions').select(baseSelect).in('status', ['completed', 'cancelled', 'no-show'])
-    ).in('session_type', ['group', 'small_group']).order('scheduled_datetime', { ascending: true }),
-    baseFilter(
-      supabase.from('sessions').select(baseSelect).in('status', ['completed', 'cancelled', 'no-show'])
-    ).eq('session_mode', 'partner-open').order('scheduled_datetime', { ascending: true }),
+    withOptFilters(sessions()).in('status', ['scheduled', 'pending_payment']).in('session_type', ['group', 'small_group']).order('scheduled_datetime', { ascending: true }),
+    withOptFilters(sessions()).in('status', ['scheduled', 'pending_payment']).eq('session_mode', 'partner-open').order('scheduled_datetime', { ascending: true }),
+    withOptFilters(sessions()).in('status', ['completed', 'cancelled', 'no-show']).in('session_type', ['group', 'small_group']).order('scheduled_datetime', { ascending: true }),
+    withOptFilters(sessions()).in('status', ['completed', 'cancelled', 'no-show']).eq('session_mode', 'partner-open').order('scheduled_datetime', { ascending: true }),
   ]);
   const seen = new Set<string>();
   let list: SessionRow[] = [];
