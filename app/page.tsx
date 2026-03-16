@@ -1,9 +1,11 @@
 import Link from 'next/link';
-import Image from 'next/image';
+import { headers } from 'next/headers';
+import { getTenantByDomain } from '@/config/tenants';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, Users, Award, Shield, Search } from 'lucide-react';
 import { EarlyAccessForm } from '@/app/early-access-form';
+import { HomeHeroLogo } from '@/app/home-hero-logo';
 
 export const metadata = {
   title: 'The Guild | Elite Wrestling Technique Instruction',
@@ -11,7 +13,11 @@ export const metadata = {
     'Train with NCAA wrestlers and elite coaches in your community for private technique instruction. Master your wrestling through top-level coaching.',
 };
 
-export default function HomePage() {
+export default async function HomePage() {
+  const headersList = await headers();
+  const host = headersList.get('host') || '';
+  const tenant = getTenantByDomain(host);
+  const logoSrc = tenant?.logo ?? '/logos/guild-g.png';
   return (
     <main>
       {/* Hero */}
@@ -62,14 +68,7 @@ export default function HomePage() {
                 </div>
               </div>
               <div className="relative flex items-center justify-center min-h-[280px] lg:min-h-[360px]">
-                <Image
-                  src="/logos/guild-g.png"
-                  alt="The Guild — gold G lettermark with wrestlers"
-                  width={360}
-                  height={360}
-                  className="object-contain w-full max-w-[280px] lg:max-w-[360px] h-auto"
-                  priority
-                />
+                <HomeHeroLogo src={logoSrc} alt="The Guild — gold G lettermark with wrestlers" />
               </div>
             </div>
           </div>

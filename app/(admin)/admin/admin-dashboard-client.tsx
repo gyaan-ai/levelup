@@ -44,10 +44,13 @@ import {
   Building2,
   ExternalLink,
   Tag,
+  Gauge,
+  List,
 } from 'lucide-react';
 import Link from 'next/link';
 import { ProfileImage } from '@/components/profile-image';
 import { formatEST } from '@/lib/format-date';
+import { AdminCockpitView } from './admin-cockpit-view';
 
 export type AdminSession = {
   id: string;
@@ -117,7 +120,7 @@ export type CreditRecord = {
   expires_at?: string | null;
 };
 
-type TabId = 'sessions' | 'users' | 'billing' | 'athletes' | 'kids' | 'payouts' | 'credits' | 'facility_requests';
+type TabId = 'cockpit' | 'sessions' | 'users' | 'billing' | 'athletes' | 'kids' | 'payouts' | 'credits' | 'facility_requests';
 
 type Props = {
   sessions: AdminSession[];
@@ -142,7 +145,7 @@ export function AdminDashboardClient({
   const searchParams = useSearchParams();
   const tabParam = searchParams.get('tab') as TabId | null;
   const editAthleteId = searchParams.get('edit');
-  const [tab, setTab] = useState<TabId>(tabParam && ['sessions', 'users', 'billing', 'payouts', 'credits', 'facility_requests', 'athletes', 'kids'].includes(tabParam) ? tabParam : 'sessions');
+  const [tab, setTab] = useState<TabId>(tabParam && ['cockpit', 'sessions', 'users', 'billing', 'payouts', 'credits', 'facility_requests', 'athletes', 'kids'].includes(tabParam) ? tabParam : 'cockpit');
   const [markingAthleteId, setMarkingAthleteId] = useState<string | null>(null);
   const [recordingAthleteId, setRecordingAthleteId] = useState<string | null>(null);
   const [customPayoutAmount, setCustomPayoutAmount] = useState('');
@@ -365,6 +368,7 @@ export function AdminDashboardClient({
   };
 
   const tabs: { id: TabId; label: string; icon: React.ReactNode }[] = [
+    { id: 'cockpit', label: 'Cockpit', icon: <Gauge className="h-4 w-4" /> },
     { id: 'sessions', label: 'Sessions', icon: <Calendar className="h-4 w-4" /> },
     { id: 'users', label: 'Users', icon: <Users className="h-4 w-4" /> },
     { id: 'billing', label: 'Billing', icon: <DollarSign className="h-4 w-4" /> },
@@ -401,51 +405,48 @@ export function AdminDashboardClient({
       .finally(() => setFacilityRequestsLoading(false));
   }, [tab]);
 
+  const quickLinks = [
+    { href: '/admin/facilities', label: 'Facilities', icon: MapPin },
+    { href: '/admin/products', label: 'Products', icon: Package },
+    { href: '/admin/early-access', label: 'Early Access', icon: ClipboardList },
+    { href: '/admin/discount-codes', label: 'Discount codes', icon: Tag },
+    { href: '/admin/users', label: 'User Management', icon: Users },
+    { href: '/admin/sessions/create', label: 'Create session', icon: Calendar },
+    { href: '/admin/focus-areas', label: 'Session topics', icon: List },
+  ];
+
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center gap-2 border-b border-border pb-4">
-        <div className="flex flex-wrap gap-2 mr-4">
+      <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-4 border-b border-border pb-4">
+        <div className="flex flex-wrap gap-2">
           {tabs.map((t) => (
-          <Button
-            key={t.id}
-            variant={tab === t.id ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setTab(t.id)}
-            className="gap-2"
-          >
-            {t.icon}
-            {t.label}
-          </Button>
-        ))}
+            <Button
+              key={t.id}
+              variant={tab === t.id ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setTab(t.id)}
+              className="gap-2"
+            >
+              {t.icon}
+              {t.label}
+            </Button>
+          ))}
         </div>
-        <Link href="/admin/facilities" className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground border border-border rounded-md hover:bg-muted/50">
-          <MapPin className="h-4 w-4" />
-          Facilities
-        </Link>
-        <Link href="/admin/products" className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground border border-border rounded-md hover:bg-muted/50">
-          <Package className="h-4 w-4" />
-          Products
-        </Link>
-        <Link href="/admin/early-access" className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground border border-border rounded-md hover:bg-muted/50">
-          <ClipboardList className="h-4 w-4" />
-          Early Access
-        </Link>
-        <Link href="/admin/discount-codes" className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground border border-border rounded-md hover:bg-muted/50">
-          <Tag className="h-4 w-4" />
-          Discount codes
-        </Link>
-        <Link href="/admin/users" className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground border border-border rounded-md hover:bg-muted/50">
-          <Users className="h-4 w-4" />
-          User Management
-        </Link>
-        <Link href="/admin/sessions/create" className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground border border-border rounded-md hover:bg-muted/50">
-          <Calendar className="h-4 w-4" />
-          Create small group session
-        </Link>
-        <Link href="/admin/focus-areas" className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground border border-border rounded-md hover:bg-muted/50">
-          Session topics
-        </Link>
+        <div className="flex flex-wrap items-center gap-2 border-t border-border pt-4 sm:border-l sm:border-t-0 sm:pt-0 sm:pl-4">
+          {quickLinks.map(({ href, label, icon: Icon }) => (
+            <Link
+              key={href}
+              href={href}
+              className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground border border-border rounded-md hover:bg-muted/50"
+            >
+              <Icon className="h-4 w-4 shrink-0" />
+              {label}
+            </Link>
+          ))}
+        </div>
       </div>
+
+      {tab === 'cockpit' && <AdminCockpitView />}
 
       {tab === 'sessions' && (
         <Card>

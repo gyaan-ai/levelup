@@ -18,10 +18,13 @@ import {
 } from './ui/select';
 import { Bell, Menu, X, Mail } from 'lucide-react';
 import { AddToHomeScreen } from '@/components/add-to-home-screen';
+import { useTenant } from '@/components/theme-provider';
+import { BrandLogo } from '@/components/brand-logo';
 
 const navLinkClass = 'block py-3 px-4 text-white hover:text-accent hover:bg-white/10 transition-colors font-medium min-h-[44px] flex items-center';
 
 export function Header() {
+  const tenant = useTenant();
   const { user, userRole, viewAsRole, effectiveRole, setViewAsRole, loading, signOut } = useAuth();
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -56,12 +59,13 @@ export function Header() {
         <div className="flex items-center justify-between h-14 sm:h-16">
           <div className="flex items-center gap-2 min-w-0">
             <Link href="/" className="flex items-center group shrink-0" onClick={() => setMobileOpen(false)}>
-              <Image
-                src="/logos/guild-g.png"
-                alt="The Guild"
+              <BrandLogo
+                src={tenant.logo}
+                alt={tenant.productName}
                 width={40}
                 height={40}
                 className="h-9 w-9 sm:h-10 sm:w-10 object-contain"
+                textFallback={tenant.productName}
               />
             </Link>
             <AddToHomeScreen variant="toolbar" />

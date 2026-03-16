@@ -14,6 +14,8 @@ export interface TenantConfig {
     textSecondary: string;
   };
 
+  /** Main brand logo (header + homepage hero). Place file in public/logos/ e.g. guild-g.png */
+  logo: string;
   stateOrgLogo: string;
   favicon: string;
   tagline: string;
@@ -75,6 +77,7 @@ export const tenants: Record<string, TenantConfig> = {
       textSecondary: "#6B7280",
     },
 
+    logo: "/logos/guild-g.png",
     stateOrgLogo: "/logos/nc-united.png",
     favicon: "/favicons/guild.ico",
     tagline: "Mastery. Technique. Access the Elite.",
@@ -82,7 +85,7 @@ export const tenants: Record<string, TenantConfig> = {
 
     domain: "www.wrestlingguild.com",
     supportEmail: "info@WrestlingGuild.com",
-    phone: "(919) 555-0100",
+    phone: "631.662.5409",
 
     supabaseUrl: process.env.NEXT_PUBLIC_NC_UNITED_SUPABASE_URL!,
     supabaseAnonKey: process.env.NEXT_PUBLIC_NC_UNITED_SUPABASE_ANON_KEY!,
