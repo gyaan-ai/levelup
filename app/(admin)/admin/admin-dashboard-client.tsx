@@ -402,7 +402,7 @@ export function AdminDashboardClient({
         credentials: a.credentials ?? null,
         photo_url: a.photo_url ?? null,
         photo_focus_x: typeof a.photo_focus_x === 'number' ? a.photo_focus_x : 50,
-        photo_focus_y: typeof a.photo_focus_y === 'number' ? a.photo_focus_y : 25,
+        photo_focus_y: typeof a.photo_focus_y === 'number' ? a.photo_focus_y : 15,
         venmo_handle: a.venmo_handle ?? null,
         zelle_email: a.zelle_email ?? null,
         active: a.active ?? true,

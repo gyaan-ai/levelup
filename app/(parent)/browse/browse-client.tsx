@@ -308,8 +308,6 @@ export function BrowseAthletesClient({ initialAthletes, isAdmin, initialYouthWre
                         <ProfileImage
                           src={athlete.photo_url}
                           alt={athleteDisplayName(athlete.first_name, athlete.last_name) || 'Coach'}
-                          focusX={athlete.photo_focus_x}
-                          focusY={athlete.photo_focus_y}
                           className="w-24 h-24 border-2 border-accent/30"
                           fallbackIconClassName="h-12 w-12 text-muted-foreground"
                         />

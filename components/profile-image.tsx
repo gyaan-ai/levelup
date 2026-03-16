@@ -9,7 +9,7 @@ export interface ProfileImageProps {
   alt: string;
   /** 0–100, horizontal focus (face position). Default 50 = center. */
   focusX?: number | null;
-  /** 0–100, vertical focus (face position). Default 25 = anchor high so full head fits in circle. */
+  /** 0–100, vertical focus (face position). Default 15 = anchor near top so full head fits in circle. */
   focusY?: number | null;
   /** 'full' for avatars, 'lg' for cards. Default 'full'. */
   rounded?: 'full' | 'lg' | 'md' | 'none';
@@ -21,23 +21,29 @@ export interface ProfileImageProps {
 /**
  * Profile/avatar image that:
  * - Uses <img> so external URLs (e.g. Supabase storage) always load
- * - Applies object-position from focusX/focusY so faces aren't cut off
+ * - For circular avatars (rounded='full'): always anchors vertical at 15% so professional
+ *   headshots (head at top of image) show the full head and are never cut off.
+ * - For non-circle crops (rounded='lg' etc.), uses focusX/focusY as passed.
  * - Shows a placeholder on load error so broken URLs don't show broken icon
  */
 const roundedClass = { full: 'rounded-full', lg: 'rounded-lg', md: 'rounded-md', none: '' } as const;
+
+/** Vertical position 15% = anchor near top so full head is visible in circle (professional headshots). */
+const CIRCLE_HEAD_SAFE_Y = 15;
 
 export function ProfileImage({
   src,
   alt,
   focusX = 50,
-  focusY = 25,
+  focusY = 15,
   rounded = 'full',
   className,
   fallbackIconClassName = 'h-1/3 w-1/3 text-muted-foreground',
 }: ProfileImageProps) {
   const [error, setError] = useState(false);
   const x = focusX != null ? Math.min(100, Math.max(0, focusX)) : 50;
-  const y = focusY != null ? Math.min(100, Math.max(0, focusY)) : 25;
+  // Circular avatars: always use head-safe crop so coach/headshots are never cut off
+  const y = rounded === 'full' ? CIRCLE_HEAD_SAFE_Y : (focusY != null ? Math.min(100, Math.max(0, focusY)) : 15);
   const roundedCn = roundedClass[rounded];
 
   if (!src || error) {
