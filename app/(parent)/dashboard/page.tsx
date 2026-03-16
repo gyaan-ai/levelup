@@ -40,6 +40,7 @@ export default async function HomePage() {
     scheduled_datetime: string;
     status: string;
     total_price?: number;
+    price_per_participant?: number | null;
     parent_id?: string;
     session_type?: string;
     session_mode?: string;
@@ -59,6 +60,7 @@ export default async function HomePage() {
         scheduled_datetime,
         status,
         total_price,
+        price_per_participant,
         parent_id,
         session_type,
         session_mode,
@@ -133,6 +135,7 @@ export default async function HomePage() {
           scheduled_datetime,
           status,
           total_price,
+          price_per_participant,
           parent_id,
           session_type,
           session_mode,
@@ -156,6 +159,7 @@ export default async function HomePage() {
     scheduled_datetime: string;
     status: string;
     total_price?: number;
+    price_per_participant?: number | null;
     parent_id?: string;
     session_type?: string;
     session_mode?: string;
@@ -211,11 +215,14 @@ export default async function HomePage() {
         const o = Array.isArray(yw) ? yw[0] : yw;
         return o ? `${o.first_name ?? ''} ${o.last_name ?? ''}`.trim() : null;
       }).filter(Boolean) as string[];
+    const totalPrice = s.total_price ?? 0;
+    const pricePerParticipant = s.price_per_participant != null ? Number(s.price_per_participant) : null;
     return {
       id: s.id,
       scheduled_datetime: s.scheduled_datetime,
       status: s.status,
-      total_price: s.total_price ?? 0,
+      total_price: totalPrice,
+      price_per_participant: pricePerParticipant ?? undefined,
       session_type: s.session_type,
       session_mode: s.session_mode,
       focus_area: s.focus_area ?? null,
@@ -248,11 +255,14 @@ export default async function HomePage() {
         return o ? `${o.first_name ?? ''} ${o.last_name ?? ''}`.trim() : null;
       })
       .filter(Boolean) as string[];
+    const totalPrice = s.total_price ?? 0;
+    const pricePerParticipant = s.price_per_participant != null ? Number(s.price_per_participant) : null;
     return {
       id: s.id,
       scheduled_datetime: s.scheduled_datetime,
       status: s.status,
-      total_price: s.total_price ?? 0,
+      total_price: totalPrice,
+      price_per_participant: pricePerParticipant ?? undefined,
       session_type: s.session_type,
       session_mode: s.session_mode,
       focus_area: s.focus_area ?? null,

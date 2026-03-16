@@ -114,9 +114,8 @@ export async function POST(req: NextRequest) {
 
     const orgFee = 0;
     const stripeFee = 0;
-    const athletePaymentPer = price * 0.9;
     const totalPrice = 0;
-    const athletePayment = 0;
+    const athletePayment = 0; // pay-per-person; coach payout = price × COACH_REVENUE_FRACTION × participants (5/6)
 
     // Assign session to the selected coach (parent_id = athlete_id) so they own it and see it on their schedule
     const { data: session, error: sessionError } = await admin

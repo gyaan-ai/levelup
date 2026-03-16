@@ -49,29 +49,43 @@ export async function POST(req: NextRequest) {
 
       if (isRegisterPayment && youthWrestlerId && parentId) {
         const amountPaid = amountTotal / 100;
-        const { data: sess } = await supabase
-          .from('sessions')
-          .select('current_participants')
-          .eq('id', sessionId)
-          .single();
-        const current = (sess as { current_participants?: number } | null)?.current_participants ?? 1;
-        const { error: insertErr } = await supabase.from('session_participants').insert({
-          session_id: sessionId,
-          youth_wrestler_id: youthWrestlerId,
-          parent_id: parentId,
-          paid: true,
-          amount_paid: amountPaid,
-        });
-        if (insertErr) {
-          console.error('Webhook: failed to insert session_participant (register)', insertErr);
-          return NextResponse.json({ error: 'Failed to add participant' }, { status: 500 });
-        }
-        const { error: upErr } = await supabase
-          .from('sessions')
-          .update({ current_participants: current + 1, updated_at: new Date().toISOString() })
-          .eq('id', sessionId);
-        if (upErr) {
-          console.error('Webhook: failed to increment current_participants', upErr);
+        const { data: existing } = await supabase
+          .from('session_participants')
+          .select('id')
+          .eq('session_id', sessionId)
+          .eq('youth_wrestler_id', youthWrestlerId)
+          .maybeSingle();
+        if (!existing) {
+          const { data: sess } = await supabase
+            .from('sessions')
+            .select('current_participants')
+            .eq('id', sessionId)
+            .single();
+          const current = (sess as { current_participants?: number } | null)?.current_participants ?? 0;
+          const { error: insertErr } = await supabase.from('session_participants').insert({
+            session_id: sessionId,
+            youth_wrestler_id: youthWrestlerId,
+            parent_id: parentId,
+            paid: true,
+            amount_paid: amountPaid,
+          });
+          if (insertErr) {
+            console.error('Webhook: failed to insert session_participant (register)', insertErr);
+            return NextResponse.json({ error: 'Failed to add participant' }, { status: 500 });
+          }
+          const { error: upErr } = await supabase
+            .from('sessions')
+            .update({ current_participants: current + 1, updated_at: new Date().toISOString() })
+            .eq('id', sessionId);
+          if (upErr) {
+            console.error('Webhook: failed to increment current_participants', upErr);
+          }
+        } else {
+          await supabase
+            .from('session_participants')
+            .update({ paid: true, amount_paid: amountPaid })
+            .eq('session_id', sessionId)
+            .eq('youth_wrestler_id', youthWrestlerId);
         }
         // Notify coach so they see it (college kids need reminders)
         const { data: sessRow } = await supabase

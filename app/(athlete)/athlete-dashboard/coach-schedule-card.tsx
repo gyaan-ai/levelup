@@ -11,11 +11,14 @@ import { Calendar as CalendarIcon, List, LayoutGrid, CalendarDays, MessageCircle
 import { UpcomingSessionActions } from './upcoming-session-actions';
 import { startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns';
 import { formatEST } from '@/lib/format-date';
+import { COACH_REVENUE_FRACTION } from '@/lib/pricing';
 
 export type CoachSession = {
   id: string;
   scheduled_datetime: string;
   total_price?: number;
+  athlete_payment?: number | null;
+  price_per_participant?: number | null;
   session_type?: string;
   session_mode?: string;
   status: string;
@@ -27,6 +30,26 @@ export type CoachSession = {
     youth_wrestlers?: { id: string; first_name?: string; last_name?: string } | { id: string; first_name?: string; last_name?: string }[] | null;
   }> | null;
 };
+
+/** Coach payout for this session (what they make). Uses athlete_payment when set, else 5/6 of price_per_participant × participants (guild 1/6, fees out of guild). */
+function coachPayout(session: CoachSession): number {
+  if (session.athlete_payment != null && Number(session.athlete_payment) > 0) {
+    return Math.round(Number(session.athlete_payment) * 100) / 100;
+  }
+  const per = Number(session.price_per_participant ?? 0);
+  const n = session.current_participants ?? 0;
+  return Math.round(per * COACH_REVENUE_FRACTION * n * 100) / 100;
+}
+
+/** Parent-facing total (for refund copy in cancel dialog). total_price when set, else price_per_participant × participants. */
+function parentRefundAmount(session: CoachSession): number {
+  if (session.total_price != null && Number(session.total_price) > 0) {
+    return Number(session.total_price);
+  }
+  const per = Number(session.price_per_participant ?? 0);
+  const n = session.current_participants ?? 0;
+  return Math.round(per * n * 100) / 100;
+}
 
 /** Small group or partner-open session that is not yet filled (has open slots). */
 function isTentative(s: CoachSession): boolean {
@@ -170,10 +193,10 @@ export function CoachScheduleCard({
                           {formatEST(new Date(session.scheduled_datetime), 'h:mm a')}
                           {' • '}
                           {facilityName(session)}
-                          {wrestlerNames(session).length > 0 && (
+                          {(session.current_participants ?? 0) > 0 && (
                             <>
                               <span> • </span>
-                              <span>with {wrestlerNames(session).join(', ')}</span>
+                              <span>{session.current_participants} {session.current_participants === 1 ? 'kid' : 'kids'}{wrestlerNames(session).length > 0 ? `: ${wrestlerNames(session).join(', ')}` : ''}</span>
                             </>
                           )}
                           {session.status === 'pending_payment' && (
@@ -191,12 +214,12 @@ export function CoachScheduleCard({
                         </div>
                       </div>
                       <div className="text-right flex flex-col items-end gap-1">
-                        <p className="font-medium">${Number(session.total_price || 0).toFixed(2)}</p>
+                        <p className="font-medium">You make ${coachPayout(session).toFixed(2)}</p>
                         <p className="text-xs text-muted-foreground">{session.session_type || '—'}</p>
                         <UpcomingSessionActions
                           sessionId={session.id}
                           scheduledDatetime={session.scheduled_datetime}
-                          totalPrice={Number(session.total_price || 0)}
+                          totalPrice={parentRefundAmount(session)}
                         />
                       </div>
                     </div>
@@ -226,10 +249,10 @@ export function CoachScheduleCard({
                           {formatEST(new Date(session.scheduled_datetime), 'h:mm a')}
                           {' • '}
                           {facilityName(session)}
-                          {wrestlerNames(session).length > 0 && (
+                          {(session.current_participants ?? 0) > 0 && (
                             <>
                               <span> • </span>
-                              <span>with {wrestlerNames(session).join(', ')}</span>
+                              <span>{session.current_participants} {session.current_participants === 1 ? 'kid' : 'kids'}{wrestlerNames(session).length > 0 ? `: ${wrestlerNames(session).join(', ')}` : ''}</span>
                             </>
                           )}
                           {' • '}
@@ -239,7 +262,7 @@ export function CoachScheduleCard({
                         </div>
                       </div>
                       <div className="text-right flex flex-col items-end gap-1">
-                        <p className="font-medium">${Number(session.total_price || 0).toFixed(2)}</p>
+                        <p className="font-medium">You made ${coachPayout(session).toFixed(2)}</p>
                         <p className="text-xs text-muted-foreground">{session.session_type || '—'}</p>
                         <div className="flex gap-1 flex-wrap justify-end">
                           {['scheduled', 'pending_payment'].includes(session.status) && (
@@ -288,7 +311,7 @@ export function CoachScheduleCard({
                   <th className="text-left py-2 px-2">Youth wrestler(s)</th>
                   <th className="text-left py-2 px-2">Facility</th>
                   <th className="text-left py-2 px-2">Type</th>
-                  <th className="text-right py-2 px-2">Amount</th>
+                  <th className="text-right py-2 px-2">You make</th>
                   <th className="text-left py-2 px-2">Status</th>
                   <th className="text-right py-2 px-2">Actions</th>
                 </tr>
@@ -303,7 +326,7 @@ export function CoachScheduleCard({
                       <td className="py-2 px-2">{wrestlerNames(session).length > 0 ? wrestlerNames(session).join(', ') : '—'}</td>
                       <td className="py-2 px-2">{facilityName(session)}</td>
                       <td className="py-2 px-2">{session.session_type || '—'}</td>
-                      <td className="py-2 px-2 text-right">${Number(session.total_price || 0).toFixed(2)}</td>
+                      <td className="py-2 px-2 text-right">${coachPayout(session).toFixed(2)}</td>
                       <td className="py-2 px-2">
                         <div className="flex flex-wrap gap-1 items-center">
                           {isTentative(session) && (
@@ -319,7 +342,7 @@ export function CoachScheduleCard({
                           <UpcomingSessionActions
                             sessionId={session.id}
                             scheduledDatetime={session.scheduled_datetime}
-                            totalPrice={Number(session.total_price || 0)}
+                            totalPrice={parentRefundAmount(session)}
                           />
                         ) : (
                           <div className="flex items-center justify-end gap-1 flex-wrap">
@@ -400,8 +423,8 @@ export function CoachScheduleCard({
                         </p>
                         <p className="text-xs text-muted-foreground break-words">
                           {facilityName(session)}
-                          {wrestlerNames(session).length > 0 && ` • with ${wrestlerNames(session).join(', ')}`}
-                          {' • '}${Number(session.total_price || 0).toFixed(2)}
+                          {(session.current_participants ?? 0) > 0 && ` • ${session.current_participants} ${session.current_participants === 1 ? 'kid' : 'kids'}${wrestlerNames(session).length > 0 ? `: ${wrestlerNames(session).join(', ')}` : ''}`}
+                          {' • You make $'}{coachPayout(session).toFixed(2)}
                         </p>
                       </div>
                       {['scheduled', 'pending_payment'].includes(session.status) && new Date(session.scheduled_datetime) > new Date() ? (
@@ -412,7 +435,7 @@ export function CoachScheduleCard({
                           <UpcomingSessionActions
                             sessionId={session.id}
                             scheduledDatetime={session.scheduled_datetime}
-                            totalPrice={Number(session.total_price || 0)}
+                            totalPrice={parentRefundAmount(session)}
                           />
                         </div>
                       ) : (
