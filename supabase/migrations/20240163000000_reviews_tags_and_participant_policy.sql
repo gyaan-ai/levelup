@@ -1,11 +1,5 @@
--- Reviews: add optional tags (canned + free-form); allow session participants to leave reviews
--- Run after 20240119000000_reviews_anonymous.sql
-
--- Add tags: array of short strings e.g. 'Technique', 'Great with kids', 'Punctual'
-ALTER TABLE public.reviews
-  ADD COLUMN IF NOT EXISTS tags TEXT[] DEFAULT '{}';
-
-COMMENT ON COLUMN public.reviews.tags IS 'Optional canned tags chosen by parent (e.g. Technique, Great with kids)';
+-- Reviews: allow session participants to leave reviews; view includes tags (column added in 20240162900000)
+-- Run after 20240162900000_reviews_add_tags_column.sql and 20240119000000_reviews_anonymous.sql
 
 -- Allow any parent who participated in the session to leave a review (not only session owner)
 -- Drop existing insert policy and recreate with session_participants check
