@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
       priceFromRateCard = custom != null ? Number(custom) : Number(smallGroupProduct.parent_price);
     }
     const defaultPrice = priceFromRateCard ?? 30;
-    const price = bodyPrice != null && bodyPrice !== '' ? Number(bodyPrice) || defaultPrice : defaultPrice;
+    const price = bodyPrice != null ? Number(bodyPrice) || defaultPrice : defaultPrice;
 
     const [datePart] = scheduledDate.split('T');
     // Interpret date + time as Eastern; store UTC so display (formatEST) shows correct time
