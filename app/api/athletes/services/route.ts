@@ -2,8 +2,7 @@ import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
-
-const PLATFORM_PERCENT = 0.10; // 10%
+import { coachPayoutFromParentPrice } from '@/lib/pricing';
 
 /** GET - list current user's (coach) services */
 export async function GET() {
@@ -77,7 +76,7 @@ export async function POST(req: Request) {
       maxParticipants = n;
     }
     const parentPrice = Math.max(0, Number(body.parentPrice) || 0);
-    const athletePayout = Math.round(parentPrice * (1 - PLATFORM_PERCENT) * 100) / 100;
+    const athletePayout = coachPayoutFromParentPrice(parentPrice);
 
     const { data: existing } = await supabase
       .from('athlete_services')

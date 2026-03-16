@@ -42,7 +42,7 @@ const onboardingSchema = z.object({
 
 type OnboardingFormValues = z.infer<typeof onboardingSchema>;
 
-const TOTAL_STEPS = 5;
+const TOTAL_STEPS = 6;
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -199,6 +199,11 @@ export default function OnboardingPage() {
     }
 
     if (step === 1) {
+      setStep(2);
+      return;
+    }
+
+    if (step === 2) {
       if (!values.bio?.trim()) {
         setError('Please add a bio so parents can learn about you.');
         return;
@@ -206,7 +211,7 @@ export default function OnboardingPage() {
       setSubmitting(true);
       try {
         await savePartial(values, false);
-        setStep(2);
+        setStep(3);
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : 'Failed to save');
       } finally {
@@ -215,14 +220,14 @@ export default function OnboardingPage() {
       return;
     }
 
-    if (step === 2 && facilities.length > 0) {
+    if (step === 3 && facilities.length > 0) {
       if (!values.facilityId) {
         setError('Please select a training facility.');
         return;
       }
     }
 
-    if (step === 3) {
+    if (step === 4) {
       const hasVenmo = values.venmoHandle?.trim();
       const hasZelle = values.zelleEmail?.trim();
       if (!hasVenmo && !hasZelle) {
@@ -236,7 +241,7 @@ export default function OnboardingPage() {
       setSubmitting(true);
       try {
         await savePartial(values, false);
-        setStep(4);
+        setStep(5);
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : 'Failed to save');
       } finally {
@@ -245,7 +250,7 @@ export default function OnboardingPage() {
       return;
     }
 
-    if (step === 4) {
+    if (step === 5) {
       setSubmitting(true);
       try {
         await savePartial(form.getValues(), false);
@@ -265,24 +270,25 @@ export default function OnboardingPage() {
 
   const handleSkip = () => {
     if (step === 0) setStep(1);
-    else if (step === 2 && facilities.length > 0) setStep(3);
-    else if (step === 3) setError('Add Venmo or Zelle to receive payments.');
-    else if (step === 4) {
+    else if (step === 1) setStep(2);
+    else if (step === 3 && facilities.length > 0) setStep(4);
+    else if (step === 4) setError('Add Venmo or Zelle to receive payments.');
+    else if (step === 5) {
       visibilityModalRef.current?.showModal();
     }
   };
 
   const canGoNext = (() => {
-    if (step === 1) return !!form.watch('bio')?.trim();
-    if (step === 2 && facilities.length > 0) return !!form.watch('facilityId');
-    if (step === 3) {
+    if (step === 2) return !!form.watch('bio')?.trim();
+    if (step === 3 && facilities.length > 0) return !!form.watch('facilityId');
+    if (step === 4) {
       const v = form.watch();
       return !!(v.venmoHandle?.trim() || v.zelleEmail?.trim());
     }
     return true;
   })();
 
-  const showSkip = step === 0 || (step === 2 && facilities.length > 0) || step === 4;
+  const showSkip = step === 0 || step === 1 || (step === 3 && facilities.length > 0) || step === 5;
 
   if (loading) {
     return (
@@ -302,7 +308,7 @@ export default function OnboardingPage() {
         onSkip={handleSkip}
         canGoNext={canGoNext}
         isLoading={submitting}
-        nextLabel={step === 4 ? 'Finish' : 'Continue'}
+        nextLabel={step === 5 ? 'Finish' : 'Continue'}
         showSkip={showSkip}
         skipLabel="Skip for now"
         wizardTitle="Coach profile"
@@ -321,8 +327,33 @@ export default function OnboardingPage() {
         )}
 
         <Form {...form}>
-          {/* Step 0: Photo */}
+          {/* Step 0: Earnings preview */}
           {step === 0 && (
+            <Card className="border-0 shadow-none">
+              <CardContent className="p-0">
+                <p className="text-muted-foreground mb-4">
+                  Here’s what you earn per session. You earn more when you teach groups.
+                </p>
+                <ul className="space-y-3 text-foreground">
+                  <li className="flex justify-between items-baseline gap-4">
+                    <span>Private session</span>
+                    <span className="font-semibold">$50</span>
+                  </li>
+                  <li className="flex justify-between items-baseline gap-4">
+                    <span>Partner session (2 athletes)</span>
+                    <span className="font-semibold">$75</span>
+                  </li>
+                  <li className="flex justify-between items-baseline gap-4">
+                    <span>Small group (up to 6)</span>
+                    <span className="font-semibold">Up to $150</span>
+                  </li>
+                </ul>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Step 1: Photo */}
+          {step === 1 && (
             <Card className="border-0 shadow-none">
               <CardContent className="p-0">
                 <p className="text-muted-foreground mb-4">
@@ -353,8 +384,8 @@ export default function OnboardingPage() {
             </Card>
           )}
 
-          {/* Step 1: Bio */}
-          {step === 1 && (
+          {/* Step 2: Bio */}
+          {step === 2 && (
             <Card className="border-0 shadow-none">
               <CardContent className="p-0">
                 <p className="text-muted-foreground mb-4">
@@ -383,8 +414,8 @@ export default function OnboardingPage() {
             </Card>
           )}
 
-          {/* Step 2: Facility */}
-          {step === 2 && (
+          {/* Step 3: Facility */}
+          {step === 3 && (
             <Card className="border-0 shadow-none">
               <CardContent className="p-0">
                 {facilities.length > 0 ? (
@@ -459,8 +490,8 @@ export default function OnboardingPage() {
             </Card>
           )}
 
-          {/* Step 3: Payout */}
-          {step === 3 && (
+          {/* Step 4: Payout */}
+          {step === 4 && (
             <Card className="border-0 shadow-none">
               <CardContent className="p-0 space-y-4">
                 <p className="text-muted-foreground">
@@ -498,8 +529,8 @@ export default function OnboardingPage() {
             </Card>
           )}
 
-          {/* Step 4: Rate card / Session types */}
-          {step === 4 && (
+          {/* Step 5: Rate card / Session types */}
+          {step === 5 && (
             <Card className="border-0 shadow-none">
               <CardContent className="p-0">
                 <p className="text-muted-foreground mb-4">

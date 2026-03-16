@@ -2,8 +2,7 @@ import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
-
-const PLATFORM_PERCENT = 0.10;
+import { coachPayoutFromParentPrice } from '@/lib/pricing';
 
 /** PATCH - update a service */
 export async function PATCH(
@@ -40,7 +39,7 @@ export async function PATCH(
     if (typeof body.parentPrice === 'number' || (typeof body.parentPrice === 'string' && body.parentPrice !== '')) {
       const parentPrice = Math.max(0, Number(body.parentPrice));
       updates.parent_price = parentPrice;
-      updates.athlete_payout = Math.round(parentPrice * (1 - PLATFORM_PERCENT) * 100) / 100;
+      updates.athlete_payout = coachPayoutFromParentPrice(parentPrice);
     }
     if (typeof body.active === 'boolean') updates.active = body.active;
 

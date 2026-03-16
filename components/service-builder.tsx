@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Plus, Trash2, Loader2, Users, User, UserCircle } from 'lucide-react';
+import { COACH_REVENUE_FRACTION, GUILD_PERCENT_DISPLAY } from '@/lib/pricing';
 
 const DURATIONS = [
   { value: 30, label: '30 min' },
@@ -26,8 +27,6 @@ const SESSION_TYPES = [
   { value: 'partner', label: 'Partner (1:2)', icon: Users, maxDefault: 2 },
   { value: 'small_group', label: 'Small group', icon: UserCircle, maxDefault: 6 },
 ] as const;
-
-const PLATFORM_PERCENT = 10;
 
 type Service = {
   id: string;
@@ -161,7 +160,7 @@ export function ServiceBuilder({ recommendedRates }: ServiceBuilderProps) {
   return (
     <div className="space-y-6">
       <p className="text-sm text-muted-foreground">
-        Platform fee: <strong>{PLATFORM_PERCENT}%</strong> of what the parent pays. You receive the rest. Set the price per person; for small groups, that’s the price per participant.
+        Guild share: <strong>~{GUILD_PERCENT_DISPLAY}%</strong> of what the parent pays. You receive the rest. Set the price per person; for small groups, that’s the price per participant.
       </p>
 
       {services.length > 0 && (
@@ -190,7 +189,7 @@ export function ServiceBuilder({ recommendedRates }: ServiceBuilderProps) {
                       onChange={(e) => {
                         const v = parseFloat(e.target.value);
                         if (!Number.isNaN(v) && v >= 0) {
-                          setServices((prev) => prev.map((x) => (x.id === s.id ? { ...x, parentPrice: v, athletePayout: Math.round(v * 0.9 * 100) / 100 } : x)));
+                          setServices((prev) => prev.map((x) => (x.id === s.id ? { ...x, parentPrice: v, athletePayout: Math.round(v * COACH_REVENUE_FRACTION * 100) / 100 } : x)));
                           updatePrice(s.id, v);
                         }
                       }}
@@ -222,7 +221,7 @@ export function ServiceBuilder({ recommendedRates }: ServiceBuilderProps) {
         <CardHeader>
           <CardTitle className="text-base">Add offering</CardTitle>
           <CardDescription>
-            Duration, type, and price per person. You receive 90% after the platform fee.
+            Duration, type, and price per person. You receive the rest after the guild share (~{GUILD_PERCENT_DISPLAY}%).
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -312,7 +311,7 @@ export function ServiceBuilder({ recommendedRates }: ServiceBuilderProps) {
           )}
           {newPrice.trim() && !Number.isNaN(parseFloat(newPrice)) && (
             <p className="text-sm text-muted-foreground">
-              You’ll receive <span className="font-medium text-accent">${(parseFloat(newPrice) * 0.9).toFixed(2)}</span>/person (90% after {PLATFORM_PERCENT}% platform fee).
+              You’ll receive <span className="font-medium text-accent">${(parseFloat(newPrice) * COACH_REVENUE_FRACTION).toFixed(2)}</span>/person (Guild share ~{GUILD_PERCENT_DISPLAY}%).
             </p>
           )}
         </CardContent>

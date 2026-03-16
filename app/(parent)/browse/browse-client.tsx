@@ -301,8 +301,7 @@ export function BrowseAthletesClient({ initialAthletes, isAdmin, initialYouthWre
                     {deletingId === athlete.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                   </Button>
                 )}
-                <Link href={initialYouthWrestlerId ? `/athlete/${athlete.id}?youthWrestlerId=${encodeURIComponent(initialYouthWrestlerId)}` : `/athlete/${athlete.id}`}>
-                  <Card className="hover:shadow-lg transition-shadow cursor-pointer h-full">
+                <Card className="h-full">
                     <CardHeader>
                       <div className="flex items-center gap-4">
                         <ProfileImage
@@ -312,9 +311,14 @@ export function BrowseAthletesClient({ initialAthletes, isAdmin, initialYouthWre
                           fallbackIconClassName="h-12 w-12 text-muted-foreground"
                         />
                       <div className="flex-1 min-w-0">
-                        <h3 className="text-lg font-semibold truncate">
-                          {athleteDisplayName(athlete.first_name, athlete.last_name) || 'Coach'}
-                        </h3>
+                        <Link
+                          href={initialYouthWrestlerId ? `/athlete/${athlete.id}?youthWrestlerId=${encodeURIComponent(initialYouthWrestlerId)}` : `/athlete/${athlete.id}`}
+                          className="hover:underline"
+                        >
+                          <h3 className="text-lg font-semibold truncate">
+                            {athleteDisplayName(athlete.first_name, athlete.last_name) || 'Coach'}
+                          </h3>
+                        </Link>
                         <div className="flex items-center gap-2 mt-1 flex-wrap">
                           <CoachSessionBadge totalSessions={athlete.total_sessions ?? 0} size="sm" />
                           <SchoolLogo school={athlete.school} size="sm" />
@@ -355,27 +359,25 @@ export function BrowseAthletesClient({ initialAthletes, isAdmin, initialYouthWre
 
                     <div className="flex flex-col gap-2">
                       <Button className="w-full" variant="outline" asChild>
-                        <span>View Profile</span>
+                        <Link href={initialYouthWrestlerId ? `/athlete/${athlete.id}?youthWrestlerId=${encodeURIComponent(initialYouthWrestlerId)}` : `/athlete/${athlete.id}`}>
+                          View Profile
+                        </Link>
+                      </Button>
+                      <Button className="w-full" variant="secondary" size="sm" asChild>
+                        <Link href={`/book/${athlete.id}${initialYouthWrestlerId ? `?youthWrestlerId=${encodeURIComponent(initialYouthWrestlerId)}` : ''}`}>
+                          <Calendar className="h-4 w-4 mr-2 shrink-0" />
+                          See availability
+                        </Link>
                       </Button>
                       <Link
-                        href={`/book/${athlete.id}${initialYouthWrestlerId ? `?wrestler=${encodeURIComponent(initialYouthWrestlerId)}` : ''}`}
-                        onClick={(e) => e.stopPropagation()}
-                        className="inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 h-9 px-4 w-full"
-                      >
-                        <Calendar className="h-4 w-4 shrink-0" />
-                        See availability
-                      </Link>
-                      <Link
                         href={`/training?tab=sessions&coach=${encodeURIComponent(athlete.id)}${initialYouthWrestlerId ? `&wrestler=${encodeURIComponent(initialYouthWrestlerId)}` : ''}`}
-                        onClick={(e) => e.stopPropagation()}
-                        className="text-xs text-muted-foreground hover:text-foreground underline text-center"
+                        className="text-xs text-muted-foreground hover:text-foreground underline text-center block"
                       >
                         View their group sessions
                       </Link>
                     </div>
                   </CardContent>
                 </Card>
-                </Link>
               </div>
             );
           })}
