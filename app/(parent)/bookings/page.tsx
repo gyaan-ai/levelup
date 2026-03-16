@@ -46,6 +46,7 @@ export default async function MyBookingsPage() {
           scheduled_datetime,
           status,
           total_price,
+          price_per_participant,
           session_type,
           session_mode,
           focus_area,
@@ -55,7 +56,7 @@ export default async function MyBookingsPage() {
           parent_id,
           athletes(id, first_name, last_name, school, photo_url),
           facilities(id, name, address),
-          session_participants(youth_wrestler_id, youth_wrestlers(id, first_name, last_name))
+          session_participants(youth_wrestler_id, amount_paid, youth_wrestlers(id, first_name, last_name))
         `)
         .in('id', familySessionIds)
         .order('scheduled_datetime', { ascending: false })
@@ -70,6 +71,7 @@ export default async function MyBookingsPage() {
     scheduled_datetime: string;
     status: string;
     total_price: number;
+    price_per_participant?: number | null;
     parent_id?: string;
     session_type?: string;
     session_mode?: string;
@@ -81,6 +83,7 @@ export default async function MyBookingsPage() {
     facilities?: { id: string; name: string; address?: string } | { id: string; name: string; address?: string }[];
     session_participants?: Array<{
       youth_wrestler_id: string;
+      amount_paid?: number | null;
       youth_wrestlers?: { id: string; first_name: string; last_name: string } | { id: string; first_name: string; last_name: string }[] | null;
     }>;
   }>;
@@ -161,12 +164,25 @@ export default async function MyBookingsPage() {
   // Session is not "tentative" just because it's a group with open spots — once you're booked, you're confirmed
   const isTentative = (_s: (typeof all)[0]) => false;
 
+  // Amount this family paid (sum of amount_paid for their participants in this session)
+  const amountPaid = (s: (typeof all)[0]) => {
+    const parts = s.session_participants ?? [];
+    let sum = 0;
+    for (const p of parts) {
+      const amt = (p as { amount_paid?: number | null }).amount_paid;
+      if (amt != null && Number(amt) > 0) sum += Number(amt);
+    }
+    return sum;
+  };
+
   // Transform sessions for BookingCard (include facility_id, primaryWrestlerId, isOwner for Leave vs Cancel)
   const transformSession = (s: (typeof all)[0]): BookingSession => ({
     id: s.id,
     scheduled_datetime: s.scheduled_datetime,
     status: s.status,
     total_price: s.total_price,
+    price_per_participant: s.price_per_participant ?? undefined,
+    amountPaid: amountPaid(s) || undefined,
     session_type: s.session_type,
     session_mode: s.session_mode,
     focus_area: s.focus_area ?? null,

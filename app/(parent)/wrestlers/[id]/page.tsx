@@ -86,10 +86,26 @@ export default async function YouthWrestlerProfilePage({
   const { data: sessions } = sessionIds.length > 0
     ? await supabase
         .from('sessions')
-        .select('*, athletes(first_name, last_name, photo_url), facilities(name)')
+        .select('*, athletes(first_name, last_name, photo_url), facilities(name), session_participants(youth_wrestler_id, amount_paid)')
         .in('id', sessionIds)
         .order('scheduled_datetime', { ascending: false })
     : { data: [] };
+
+  const amountPaidForWrestler = (session: any) => {
+    const parts = session.session_participants ?? [];
+    const row = parts.find((p: any) => p.youth_wrestler_id === id);
+    const amt = row?.amount_paid;
+    return amt != null && Number(amt) > 0 ? Number(amt) : null;
+  };
+
+  const displayPrice = (session: any) => {
+    const paid = amountPaidForWrestler(session);
+    if (paid != null) return paid;
+    const total = Number(session.total_price);
+    if (total > 0) return total;
+    const per = session.price_per_participant != null ? Number(session.price_per_participant) : 0;
+    return per;
+  };
 
   const upcomingSessions = sessions?.filter(
     (s: any) => s.status === 'scheduled' && new Date(s.scheduled_datetime) >= new Date()
@@ -251,7 +267,7 @@ export default async function YouthWrestlerProfilePage({
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="font-medium">${Number(session.total_price).toFixed(2)}</p>
+                    <p className="font-medium">${displayPrice(session).toFixed(2)}</p>
                     <p className="text-xs text-muted-foreground">{session.session_type}</p>
                   </div>
                 </div>
@@ -290,7 +306,7 @@ export default async function YouthWrestlerProfilePage({
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="font-medium">${Number(session.total_price).toFixed(2)}</p>
+                    <p className="font-medium">${displayPrice(session).toFixed(2)}</p>
                     <p className="text-xs text-muted-foreground">{session.session_type}</p>
                   </div>
                 </div>

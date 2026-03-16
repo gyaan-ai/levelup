@@ -145,7 +145,7 @@ export default async function HomePage() {
           partner_invite_code,
           athletes(id, first_name, last_name, school, photo_url),
           facilities(id, name, address),
-          session_participants(youth_wrestler_id, youth_wrestlers(id, first_name, last_name))
+          session_participants(youth_wrestler_id, amount_paid, youth_wrestlers(id, first_name, last_name))
         `)
         .in('id', familySessionIds)
         .in('status', ['scheduled', 'pending_payment'])
@@ -169,7 +169,7 @@ export default async function HomePage() {
     partner_invite_code?: string | null;
     athletes?: { id: string; first_name?: string; last_name?: string; school?: string } | { id: string; first_name?: string; last_name?: string; school?: string }[];
     facilities?: { id: string; name?: string; address?: string } | { id: string; name?: string; address?: string }[];
-    session_participants?: Array<{ youth_wrestlers?: { first_name?: string; last_name?: string } | { first_name?: string; last_name?: string }[] }>;
+    session_participants?: Array<{ youth_wrestler_id?: string; amount_paid?: number | null; youth_wrestlers?: { first_name?: string; last_name?: string } | { first_name?: string; last_name?: string }[] }>;
   }>;
 
   // Fetch all participants for upcoming sessions (RLS only returns current user's kids; admin gives full list for the tile)
@@ -203,6 +203,16 @@ export default async function HomePage() {
     }
   }
 
+  const amountPaidForSession = (s: (typeof upcoming)[0]) => {
+    const parts = s.session_participants ?? [];
+    let sum = 0;
+    for (const p of parts) {
+      const amt = (p as { amount_paid?: number | null }).amount_paid;
+      if (amt != null && Number(amt) > 0) sum += Number(amt);
+    }
+    return sum || undefined;
+  };
+
   const toBookingSession = (s: (typeof upcoming)[0]): BookingSession => {
     const a = s.athletes;
     const coach = Array.isArray(a) ? a[0] : a;
@@ -223,6 +233,7 @@ export default async function HomePage() {
       status: s.status,
       total_price: totalPrice,
       price_per_participant: pricePerParticipant ?? undefined,
+      amountPaid: amountPaidForSession(s),
       session_type: s.session_type,
       session_mode: s.session_mode,
       focus_area: s.focus_area ?? null,

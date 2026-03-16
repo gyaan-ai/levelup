@@ -22,6 +22,8 @@ export type BookingSession = {
   total_price: number;
   /** Per-person price when session is pay-per-spot (e.g. small group $30). Shown when total_price is 0. */
   price_per_participant?: number;
+  /** What this family actually paid (from session_participants.amount_paid). Shown when set. */
+  amountPaid?: number;
   session_type?: string;
   session_mode?: string;
   /** Session focus/topic for group/small_group (e.g. "Neutral Re-Attacks"). */
@@ -184,11 +186,13 @@ export function BookingCard({ session, isPast = false }: BookingCardProps) {
           </div>
           <div className="text-left sm:text-right flex flex-col sm:items-end gap-2 shrink-0">
             <p className={isPast ? 'font-bold' : 'text-xl font-bold'}>
-              {session.total_price > 0
-                ? `$${Number(session.total_price).toFixed(2)}`
-                : session.price_per_participant != null && session.price_per_participant > 0
-                  ? `$${Number(session.price_per_participant).toFixed(2)} /person`
-                  : `$${Number(session.total_price).toFixed(2)}`}
+              {session.amountPaid != null && session.amountPaid > 0
+                ? `You paid $${Number(session.amountPaid).toFixed(2)}`
+                : session.total_price > 0
+                  ? `$${Number(session.total_price).toFixed(2)}`
+                  : session.price_per_participant != null && session.price_per_participant > 0
+                    ? `$${Number(session.price_per_participant).toFixed(2)} /person`
+                    : `$${Number(session.total_price).toFixed(2)}`}
             </p>
             <div className="flex flex-col gap-2 sm:items-end">
               {!isPast && (
