@@ -276,11 +276,14 @@ export function AdminDashboardClient({
   const editAthleteId = searchParams.get('edit');
   const [tab, setTab] = useState<TabId>(tabParam && ['sessions', 'users', 'billing', 'payouts', 'credits', 'facility_requests', 'athletes', 'kids'].includes(tabParam) ? tabParam : 'sessions');
   const [markingAthleteId, setMarkingAthleteId] = useState<string | null>(null);
+  const [recordingAthleteId, setRecordingAthleteId] = useState<string | null>(null);
+  const [customPayoutAmount, setCustomPayoutAmount] = useState('');
   const [sessionDateFrom, setSessionDateFrom] = useState('');
   const [sessionDateTo, setSessionDateTo] = useState('');
   const [copiedSessionId, setCopiedSessionId] = useState<string | null>(null);
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
   const [sessionDeleteLoading, setSessionDeleteLoading] = useState(false);
+  const [sessionCompletingId, setSessionCompletingId] = useState<string | null>(null);
   const [userRoleFilter, setUserRoleFilter] = useState<string>('all');
   const [userSearch, setUserSearch] = useState('');
   const [athleteSearch, setAthleteSearch] = useState('');
@@ -690,19 +693,38 @@ export function AdminDashboardClient({
                           )}
                         </td>
                         <td className="py-2 text-right">
-                          <div className="flex items-center justify-end gap-2">
+                          <div className="flex items-center justify-end gap-2 flex-wrap">
                             <Link href={`/admin/sessions/${s.id}/edit`} className="text-accent hover:underline text-sm">
                               Edit
                             </Link>
                             {(s.status === 'scheduled' || s.status === 'pending_payment') && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                                onClick={() => setSessionToDelete(s.id)}
-                              >
-                                Delete
-                              </Button>
+                              <>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-8"
+                                  disabled={sessionCompletingId === s.id}
+                                  onClick={async () => {
+                                    setSessionCompletingId(s.id);
+                                    try {
+                                      const res = await fetch(`/api/sessions/${s.id}/complete`, { method: 'POST' });
+                                      if (res.ok) router.refresh();
+                                    } finally {
+                                      setSessionCompletingId(null);
+                                    }
+                                  }}
+                                >
+                                  {sessionCompletingId === s.id ? 'Marking…' : 'Mark complete'}
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  onClick={() => setSessionToDelete(s.id)}
+                                >
+                                  Delete
+                                </Button>
+                              </>
                             )}
                           </div>
                         </td>
@@ -961,8 +983,21 @@ export function AdminDashboardClient({
           <CardHeader>
             <CardTitle>Coach payouts (manual)</CardTitle>
             <CardDescription>
-              Completed sessions not yet paid. Pay via Venmo or Zelle, then click Mark paid.
+              Completed sessions not yet paid. Pay via Venmo or Zelle, then click Mark paid. To record a custom amount (e.g. $50 when parents didn&apos;t pay), enter the amount below and use &quot;Record $X & mark paid&quot; per coach.
             </CardDescription>
+            <div className="flex flex-wrap items-center gap-3 pt-2">
+              <label className="text-sm text-muted-foreground">Record custom payout amount:</label>
+              <Input
+                type="number"
+                min={0}
+                step={5}
+                placeholder="50"
+                value={customPayoutAmount}
+                onChange={(e) => setCustomPayoutAmount(e.target.value)}
+                className="w-24"
+              />
+              <span className="text-sm text-muted-foreground">per session</span>
+            </div>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -985,7 +1020,10 @@ export function AdminDashboardClient({
                       </td>
                     </tr>
                   ) : (
-                    coachPayouts.map((p) => (
+                    coachPayouts.map((p) => {
+                      const customAmount = parseFloat(customPayoutAmount);
+                      const hasCustom = !Number.isNaN(customAmount) && customAmount >= 0;
+                      return (
                       <tr key={p.athlete_id} className="border-b last:border-0">
                         <td className="py-2">
                           <Link
@@ -1006,34 +1044,63 @@ export function AdminDashboardClient({
                           {p.zelle_email ?? '—'}
                         </td>
                         <td className="py-2 text-right">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={markingAthleteId === p.athlete_id}
-                            onClick={async () => {
-                              setMarkingAthleteId(p.athlete_id);
-                              try {
-                                const r = await fetch('/api/admin/mark-payout-paid', {
-                                  method: 'POST',
-                                  headers: { 'Content-Type': 'application/json' },
-                                  body: JSON.stringify({ athleteId: p.athlete_id }),
-                                });
-                                const data = await r.json().catch(() => ({}));
-                                if (r.ok && data.success) {
-                                  router.refresh();
-                                } else {
-                                  console.error('Mark paid failed:', data.error ?? r.statusText);
+                          <div className="flex items-center justify-end gap-2 flex-wrap">
+                            {hasCustom && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={recordingAthleteId === p.athlete_id}
+                                onClick={async () => {
+                                  setRecordingAthleteId(p.athlete_id);
+                                  try {
+                                    const r = await fetch('/api/admin/record-session-payout', {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ athleteId: p.athlete_id, amount: customAmount }),
+                                    });
+                                    const data = await r.json().catch(() => ({}));
+                                    if (r.ok && data.success) {
+                                      router.refresh();
+                                    } else {
+                                      console.error('Record payout failed:', data.error ?? r.statusText);
+                                    }
+                                  } finally {
+                                    setRecordingAthleteId(null);
+                                  }
+                                }}
+                              >
+                                {recordingAthleteId === p.athlete_id ? 'Recording…' : `Record $${customAmount} & mark paid`}
+                              </Button>
+                            )}
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={markingAthleteId === p.athlete_id}
+                              onClick={async () => {
+                                setMarkingAthleteId(p.athlete_id);
+                                try {
+                                  const r = await fetch('/api/admin/mark-payout-paid', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ athleteId: p.athlete_id }),
+                                  });
+                                  const data = await r.json().catch(() => ({}));
+                                  if (r.ok && data.success) {
+                                    router.refresh();
+                                  } else {
+                                    console.error('Mark paid failed:', data.error ?? r.statusText);
+                                  }
+                                } finally {
+                                  setMarkingAthleteId(null);
                                 }
-                              } finally {
-                                setMarkingAthleteId(null);
-                              }
-                            }}
-                          >
-                            {markingAthleteId === p.athlete_id ? 'Marking…' : 'Mark paid'}
-                          </Button>
+                              }}
+                            >
+                              {markingAthleteId === p.athlete_id ? 'Marking…' : 'Mark paid'}
+                            </Button>
+                          </div>
                         </td>
                       </tr>
-                    ))
+                    );})
                   )}
                 </tbody>
               </table>

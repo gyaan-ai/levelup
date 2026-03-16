@@ -61,6 +61,9 @@ export function EditSessionForm({
   const [focusAreaList, setFocusAreaList] = useState<string[]>([]);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [payoutAmount, setPayoutAmount] = useState('');
+  const [payoutLoading, setPayoutLoading] = useState(false);
+  const [completeLoading, setCompleteLoading] = useState(false);
 
   useEffect(() => {
     fetch('/api/focus-areas')
@@ -246,6 +249,110 @@ export function EditSessionForm({
               </Button>
             )}
           </div>
+        </form>
+      </CardContent>
+    </Card>
+
+    {(sessionStatus === 'scheduled' || sessionStatus === 'pending_payment') && (
+      <Card>
+        <CardHeader>
+          <CardTitle>Mark session complete</CardTitle>
+          <CardDescription>
+            Record that this session happened. This updates the session status to completed and will show in coach stats and payouts.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button
+            variant="default"
+            disabled={completeLoading}
+            onClick={async () => {
+              setCompleteLoading(true);
+              try {
+                const res = await fetch(`/api/sessions/${sessionId}/complete`, { method: 'POST' });
+                const data = await res.json();
+                if (res.ok && data.success) {
+                  router.refresh();
+                } else {
+                  setError(data.error || 'Failed to mark complete');
+                }
+              } catch {
+                setError('Failed to mark complete');
+              } finally {
+                setCompleteLoading(false);
+              }
+            }}
+          >
+            {completeLoading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                Marking…
+              </>
+            ) : (
+              'Mark as completed'
+            )}
+          </Button>
+        </CardContent>
+      </Card>
+    )}
+
+    <Card>
+      <CardHeader>
+        <CardTitle>Record coach payout</CardTitle>
+        <CardDescription>
+          When parents don&apos;t pay but you still pay the coach (e.g. flat $50), record the amount and mark paid for this session.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form
+          className="flex flex-wrap items-end gap-3"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            const val = parseFloat(payoutAmount);
+            if (Number.isNaN(val) || val < 0) return;
+            setPayoutLoading(true);
+            try {
+              const res = await fetch('/api/admin/record-session-payout', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ sessionIds: [sessionId], amount: val }),
+              });
+              const data = await res.json();
+              if (res.ok && data.success) {
+                router.refresh();
+                setPayoutAmount('');
+              } else {
+                setError(data.error || 'Failed to record payout');
+              }
+            } catch {
+              setError('Failed to record payout');
+            } finally {
+              setPayoutLoading(false);
+            }
+          }}
+        >
+          <div className="flex items-center gap-2">
+            <Label htmlFor="payout-amount" className="whitespace-nowrap">Amount ($)</Label>
+            <Input
+              id="payout-amount"
+              type="number"
+              min={0}
+              step={5}
+              value={payoutAmount}
+              onChange={(e) => setPayoutAmount(e.target.value)}
+              className="w-24"
+              placeholder="50"
+            />
+          </div>
+          <Button type="submit" disabled={payoutLoading || payoutAmount.trim() === ''}>
+            {payoutLoading ? (
+              <>
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                Recording…
+              </>
+            ) : (
+              'Record payout'
+            )}
+          </Button>
         </form>
       </CardContent>
     </Card>

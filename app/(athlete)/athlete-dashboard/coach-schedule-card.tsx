@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -65,8 +66,10 @@ export function CoachScheduleCard({
   upcomingSessions: CoachSession[];
   pastSessions: CoachSession[];
 }) {
+  const router = useRouter();
   const [viewMode, setViewMode] = useState<ViewMode>('list');
   const [calendarMonth, setCalendarMonth] = useState(() => new Date());
+  const [completingSessionId, setCompletingSessionId] = useState<string | null>(null);
 
   const allSessions = useMemo(
     () => [...upcomingSessions, ...pastSessions].sort(
@@ -230,20 +233,40 @@ export function CoachScheduleCard({
                             </>
                           )}
                           {' • '}
-                          <Badge variant={session.status === 'completed' ? 'default' : 'secondary'}>
-                            {session.status === 'completed' ? 'Completed' : session.status === 'cancelled' ? 'Cancelled' : 'No-show'}
+                          <Badge variant={session.status === 'completed' ? 'default' : session.status === 'cancelled' ? 'secondary' : 'outline'}>
+                            {session.status === 'completed' ? 'Completed' : session.status === 'cancelled' ? 'Cancelled' : session.status === 'no-show' ? 'No-show' : session.status}
                           </Badge>
                         </div>
                       </div>
                       <div className="text-right flex flex-col items-end gap-1">
                         <p className="font-medium">${Number(session.total_price || 0).toFixed(2)}</p>
                         <p className="text-xs text-muted-foreground">{session.session_type || '—'}</p>
-                        <Link href={`/messages/${session.id}`}>
-                          <Button variant="ghost" size="sm">
-                            <MessageCircle className="h-4 w-4 mr-1" />
-                            Message
-                          </Button>
-                        </Link>
+                        <div className="flex gap-1 flex-wrap justify-end">
+                          {['scheduled', 'pending_payment'].includes(session.status) && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={completingSessionId === session.id}
+                              onClick={async () => {
+                                setCompletingSessionId(session.id);
+                                try {
+                                  const res = await fetch(`/api/sessions/${session.id}/complete`, { method: 'POST' });
+                                  if (res.ok) router.refresh();
+                                } finally {
+                                  setCompletingSessionId(null);
+                                }
+                              }}
+                            >
+                              {completingSessionId === session.id ? 'Marking…' : 'Mark complete'}
+                            </Button>
+                          )}
+                          <Link href={`/messages/${session.id}`}>
+                            <Button variant="ghost" size="sm">
+                              <MessageCircle className="h-4 w-4 mr-1" />
+                              Message
+                            </Button>
+                          </Link>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -299,9 +322,30 @@ export function CoachScheduleCard({
                             totalPrice={Number(session.total_price || 0)}
                           />
                         ) : (
-                          <Link href={`/messages/${session.id}`}>
-                            <Button variant="ghost" size="sm" className="h-8 text-xs">Message</Button>
-                          </Link>
+                          <div className="flex items-center justify-end gap-1 flex-wrap">
+                            {['scheduled', 'pending_payment'].includes(session.status) && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 text-xs"
+                                disabled={completingSessionId === session.id}
+                                onClick={async () => {
+                                  setCompletingSessionId(session.id);
+                                  try {
+                                    const res = await fetch(`/api/sessions/${session.id}/complete`, { method: 'POST' });
+                                    if (res.ok) router.refresh();
+                                  } finally {
+                                    setCompletingSessionId(null);
+                                  }
+                                }}
+                              >
+                                {completingSessionId === session.id ? 'Marking…' : 'Mark complete'}
+                              </Button>
+                            )}
+                            <Link href={`/messages/${session.id}`}>
+                              <Button variant="ghost" size="sm" className="h-8 text-xs">Message</Button>
+                            </Link>
+                          </div>
                         )}
                       </td>
                     </tr>
@@ -372,9 +416,29 @@ export function CoachScheduleCard({
                           />
                         </div>
                       ) : (
-                        <Link href={`/messages/${session.id}`}>
-                          <Button variant="ghost" size="sm">Message</Button>
-                        </Link>
+                        <div className="flex gap-1 flex-wrap">
+                          {['scheduled', 'pending_payment'].includes(session.status) && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              disabled={completingSessionId === session.id}
+                              onClick={async () => {
+                                setCompletingSessionId(session.id);
+                                try {
+                                  const res = await fetch(`/api/sessions/${session.id}/complete`, { method: 'POST' });
+                                  if (res.ok) router.refresh();
+                                } finally {
+                                  setCompletingSessionId(null);
+                                }
+                              }}
+                            >
+                              {completingSessionId === session.id ? 'Marking…' : 'Mark complete'}
+                            </Button>
+                          )}
+                          <Link href={`/messages/${session.id}`}>
+                            <Button variant="ghost" size="sm">Message</Button>
+                          </Link>
+                        </div>
                       )}
                     </li>
                   ))}

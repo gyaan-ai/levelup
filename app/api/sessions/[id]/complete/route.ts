@@ -1,0 +1,74 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { headers } from 'next/headers';
+import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { getTenantByDomain } from '@/config/tenants';
+
+/**
+ * POST - Mark a session as completed.
+ * Allowed for admin or the session's coach (athlete_id).
+ * Only allowed when status is scheduled or pending_payment.
+ */
+export async function POST(
+  _req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id: sessionId } = await params;
+    const headersList = await headers();
+    const host = headersList.get('host') || '';
+    const tenant = getTenantByDomain(host);
+    if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
+
+    const supabase = await createClient(tenant.slug);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
+    const isAdmin = userData?.role === 'admin';
+    const isCoach = userData?.role === 'athlete';
+
+    if (!isAdmin && !isCoach) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const admin = createAdminClient(tenant.slug);
+    const { data: session, error: fetchError } = await admin
+      .from('sessions')
+      .select('id, status, athlete_id')
+      .eq('id', sessionId)
+      .single();
+
+    if (fetchError || !session) {
+      return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+    }
+
+    const isSessionCoach = session.athlete_id === user.id;
+    if (!isAdmin && !isSessionCoach) {
+      return NextResponse.json({ error: 'Not authorized to complete this session' }, { status: 403 });
+    }
+
+    if (!['scheduled', 'pending_payment'].includes(session.status)) {
+      return NextResponse.json(
+        { error: 'Session can only be marked complete when it is scheduled or pending payment' },
+        { status: 400 }
+      );
+    }
+
+    const now = new Date().toISOString();
+    const { error: updateError } = await admin
+      .from('sessions')
+      .update({ status: 'completed', completed_at: now, updated_at: now })
+      .eq('id', sessionId);
+
+    if (updateError) {
+      console.error('Mark session complete error:', updateError);
+      return NextResponse.json({ error: updateError.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (e) {
+    console.error('Mark session complete error:', e);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
