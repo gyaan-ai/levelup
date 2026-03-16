@@ -10,7 +10,7 @@ Use **Stripe test mode** for all development and QA. No real charges; use test c
    - `NEXT_PUBLIC_NC_UNITED_STRIPE_KEY` = your Stripe **publishable** key (`pk_test_...`)
    - `NC_UNITED_STRIPE_SECRET_KEY` = your Stripe **secret** key (`sk_test_...`)
    - `NC_UNITED_STRIPE_WEBHOOK_SECRET` = webhook signing secret (`whsec_...`) — see step 3
-   - `STRIPE_CHECKOUT_ENABLED=true` to turn on payment at checkout
+   - `STRIPE_CHECKOUT_ENABLED=true` to turn on payment at checkout (bookings and session registration, e.g. Liam/Sabino $30 small-group join-by-link)
    - Optional: `NEXT_PUBLIC_APP_URL=https://your-app.vercel.app` so Stripe redirects work in production
 
 2. **Stripe Dashboard (test mode):** Developers → API keys. Copy publishable and secret into env.
@@ -53,7 +53,8 @@ NEXT_PUBLIC_NC_UNITED_STRIPE_KEY=pk_test_xxxxxxxxxxxx
 NC_UNITED_STRIPE_SECRET_KEY=sk_test_xxxxxxxxxxxx
 NC_UNITED_STRIPE_WEBHOOK_SECRET=whsec_xxxxxxxxxxxx
 
-# Set to "true" to enable Stripe Checkout; omit or "false" to skip payment (sessions stay pending_payment)
+# Set to "true" to enable Stripe Checkout for bookings and for join-by-link session registration ($30 small-group).
+# Omit or "false" = no payment collected (sessions stay pending_payment; join-by-link adds for free when session has no price).
 STRIPE_CHECKOUT_ENABLED=true
 ```
 

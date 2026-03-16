@@ -83,8 +83,8 @@ export default async function SessionRegisterPage({
     s.session_type === '2-athlete' ||
     s.session_type === 'small_group' ||
     (max >= 2 && s.session_type !== '1-on-1');
-  // Small group = free for everyone (no Stripe), same as Liam's — show gold free button.
-  const freeSmallGroupJoin = !isOwner && isSmallGroup;
+  // Only show "free" when session has no price (legacy); $30 Liam/Sabino sessions show "Pay $30 & register".
+  const freeSmallGroupJoin = !isOwner && isSmallGroup && pricePer <= 0;
 
   // Youth wrestlers this user can add (primary parent or linked parent)
   const { data: primaryIds } = await supabase

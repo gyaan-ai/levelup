@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
       scheduledTime,
       durationMinutes = 60,
       maxParticipants = 8,
-      pricePerParticipant = 30,
+      pricePerParticipant: bodyPrice,
       focusArea,
     } = body;
 
@@ -53,17 +53,36 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const admin = createAdminClient(tenant.slug);
+
+    // Coach's small-group price from rate card (products + athlete_products), fallback platform default 30
+    let priceFromRateCard: number | null = null;
+    const { data: smallGroupProduct } = await admin
+      .from('products')
+      .select('id, parent_price')
+      .eq('slug', 'small-group')
+      .maybeSingle();
+    if (smallGroupProduct) {
+      const { data: ap } = await admin
+        .from('athlete_products')
+        .select('custom_parent_price')
+        .eq('athlete_id', athleteId)
+        .eq('product_id', smallGroupProduct.id)
+        .maybeSingle();
+      const custom = (ap as { custom_parent_price?: number } | null)?.custom_parent_price;
+      priceFromRateCard = custom != null ? Number(custom) : Number(smallGroupProduct.parent_price);
+    }
+    const defaultPrice = priceFromRateCard ?? 30;
+    const price = bodyPrice != null && bodyPrice !== '' ? Number(bodyPrice) || defaultPrice : defaultPrice;
+
     const [datePart] = scheduledDate.split('T');
     // Interpret date + time as Eastern; store UTC so display (formatEST) shows correct time
     const timePart = scheduledTime.includes(':') ? scheduledTime : `${scheduledTime}:00`;
     const localIso = `${datePart}T${timePart.length === 5 ? `${timePart}:00` : timePart}`;
     const utcDate = fromZonedTime(localIso, APP_TIMEZONE);
     const scheduledDatetime = utcDate.toISOString();
-    const price = Number(pricePerParticipant) || 30;
     const max = Math.min(20, Math.max(2, Number(maxParticipants) || 6));
     const duration = Math.min(120, Math.max(30, Number(durationMinutes) || 60));
-
-    const admin = createAdminClient(tenant.slug);
 
     // Coach must exist
     const { data: athlete, error: athleteErr } = await admin

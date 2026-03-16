@@ -112,13 +112,14 @@ export async function POST(
       return NextResponse.json({ error: 'Session is not open for registration' }, { status: 400 });
     }
 
-    // Small group: always free, no Stripe (same as Liam's session — register and add participant).
+    // Small group with no price (legacy free sessions): add participant without payment.
     const isSmallGroup =
       s.session_type === 'group' ||
       s.session_type === '2-athlete' ||
       s.session_type === 'small_group' ||
       (max >= 2 && s.session_type !== '1-on-1');
-    if (isSmallGroup) {
+    const pricePer = s.price_per_participant ?? 0;
+    if (isSmallGroup && pricePer <= 0) {
       const isSelf = role === 'youth_wrestler' && youthWrestlerId === user.id;
       const { data: yw } = await supabase
         .from('youth_wrestlers')
@@ -158,7 +159,7 @@ export async function POST(
       return NextResponse.json({ added: true });
     }
 
-    const pricePer = s.price_per_participant ?? 0;
+    // Paid sessions (e.g. Liam/Sabino small group at $30): require Stripe.
     const isSelf = role === 'youth_wrestler' && youthWrestlerId === user.id;
     if (pricePer <= 0) {
       return NextResponse.json({ error: 'Session has no price set for participants' }, { status: 400 });

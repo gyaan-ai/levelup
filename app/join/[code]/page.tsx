@@ -62,15 +62,15 @@ export default async function JoinByCodePage({
   const scheduledAt = session.scheduled_datetime ? new Date(session.scheduled_datetime) : null;
   const dateTime = scheduledAt ? `${formatEST(scheduledAt, 'EEEE, MMMM d, yyyy')} at ${formatEST(scheduledAt, 'h:mm a')}` : '';
 
-  const pricePerParticipant = (session as { price_per_participant?: number }).price_per_participant ?? 40;
+  const pricePerParticipant = (session as { price_per_participant?: number }).price_per_participant ?? 30;
   const sessionType = (session as { session_type?: string }).session_type;
   const isSmallGroup =
     sessionType === 'group' ||
     sessionType === '2-athlete' ||
     sessionType === 'small_group' ||
     (maxParticipants >= 2 && sessionType !== '1-on-1');
-  // Small group = free for everyone (no Stripe), same as Liam's — show gold free button.
-  const freeSmallGroupJoin = !isFull && isSmallGroup;
+  // Only free when session has no price; $30 Liam/Sabino sessions use Stripe.
+  const freeSmallGroupJoin = !isFull && isSmallGroup && pricePerParticipant <= 0;
 
   let youthWrestlers: Array<{ id: string; first_name: string; last_name: string; age?: number; weight_class?: string; skill_level?: string }> = [];
   if (user && !isFull) {
