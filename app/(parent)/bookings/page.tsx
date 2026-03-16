@@ -1,8 +1,10 @@
 import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
+import { toZonedTime, fromZonedTime } from 'date-fns-tz';
 import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
 import { getParentYouthWrestlerIds } from '@/lib/parent-wrestlers';
+import { APP_TIMEZONE } from '@/lib/format-date';
 import { BookingCard, type BookingSession } from './booking-card';
 import { BookingsTabsClient } from './bookings-tabs-client';
 
@@ -83,12 +85,28 @@ export default async function MyBookingsPage() {
     }>;
   }>;
 
-  const nowISO = new Date().toISOString();
+  const now = new Date();
+  const nowISO = now.toISOString();
+  const weekEnd = new Date(now);
+  weekEnd.setDate(weekEnd.getDate() + 7);
+  const weekEndISO = weekEnd.toISOString();
+  const nowET = toZonedTime(now, APP_TIMEZONE);
+  const y = nowET.getFullYear();
+  const m = nowET.getMonth();
+  const lastDay = new Date(y, m + 1, 0).getDate();
+  const monthEndETStr = `${y}-${String(m + 1).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}T23:59:59.999`;
+  const monthEndISO = fromZonedTime(monthEndETStr, APP_TIMEZONE).toISOString();
+
   const upcoming = all.filter(
     (s) =>
       (s.status === 'scheduled' || s.status === 'pending_payment') &&
       s.scheduled_datetime >= nowISO
   );
+  const thisWeek = upcoming.filter((s) => s.scheduled_datetime < weekEndISO);
+  const thisMonth = upcoming.filter(
+    (s) => s.scheduled_datetime >= weekEndISO && s.scheduled_datetime <= monthEndISO
+  );
+  const later = upcoming.filter((s) => s.scheduled_datetime > monthEndISO);
   const past = all.filter(
     (s) =>
       s.status === 'completed' ||
@@ -162,19 +180,26 @@ export default async function MyBookingsPage() {
     primaryWrestlerId: primaryWrestlerId(s),
   });
 
-  const upcomingSessions = upcoming.map(transformSession);
+  const thisWeekSessions = thisWeek.map(transformSession);
+  const thisMonthSessions = thisMonth.map(transformSession);
+  const laterSessions = later.map(transformSession);
   const pastSessions = past.map(transformSession);
 
   return (
     <div className="container mx-auto px-4 py-5 pb-8 md:py-8 max-w-full">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-foreground md:text-3xl mb-1">Sessions</h1>
+        <h1 className="text-2xl font-bold text-foreground md:text-3xl mb-1">My bookings</h1>
         <p className="text-muted-foreground text-sm md:text-base">
-          Upcoming and past sessions for your wrestlers
+          This week, this month, and past
         </p>
       </div>
 
-      <BookingsTabsClient upcoming={upcomingSessions} past={pastSessions} />
+      <BookingsTabsClient
+        thisWeek={thisWeekSessions}
+        thisMonth={thisMonthSessions}
+        later={laterSessions}
+        closed={pastSessions}
+      />
     </div>
   );
 }

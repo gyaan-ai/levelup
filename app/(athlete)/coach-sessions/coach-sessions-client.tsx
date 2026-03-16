@@ -5,8 +5,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { MessageCircle, FolderOpen, Check, X } from 'lucide-react';
+import { MessageCircle, FolderOpen, Check, X, DollarSign, Users } from 'lucide-react';
 import { formatEST } from '@/lib/format-date';
+import { COACH_REVENUE_FRACTION } from '@/lib/pricing';
 import { AddToCalendarButton } from '@/components/add-to-calendar-button';
 import { SessionTypeBadge } from '@/components/session-type-badge';
 import type { CoachSession } from '@/app/(athlete)/athlete-dashboard/coach-schedule-card';
@@ -28,6 +29,15 @@ function wrestlerNames(s: CoachSession): string[] {
       return o && (o.first_name || o.last_name) ? [o.first_name, o.last_name].filter(Boolean).join(' ') : null;
     })
     .filter((n): n is string => Boolean(n));
+}
+
+function coachPayout(session: CoachSession): number {
+  if (session.athlete_payment != null && Number(session.athlete_payment) > 0) {
+    return Math.round(Number(session.athlete_payment) * 100) / 100;
+  }
+  const per = Number(session.price_per_participant ?? 0);
+  const n = session.current_participants ?? 0;
+  return Math.round(per * COACH_REVENUE_FRACTION * n * 100) / 100;
 }
 
 type Tab = 'upcoming' | 'requests' | 'completed';
@@ -81,9 +91,9 @@ export function CoachSessionsClient({
   };
 
   const tabs: { id: Tab; label: string }[] = [
-    { id: 'upcoming', label: 'Upcoming' },
+    { id: 'upcoming', label: 'Open' },
     { id: 'requests', label: `Requests${requests.length > 0 ? ` (${requests.length})` : ''}` },
-    { id: 'completed', label: 'Completed' },
+    { id: 'completed', label: 'Past' },
   ];
 
   return (
@@ -109,8 +119,12 @@ export function CoachSessionsClient({
         <div className="space-y-3">
           {upcomingSessions.length === 0 ? (
             <Card>
-              <CardContent className="py-8 text-center text-muted-foreground text-sm">
-                No upcoming sessions.
+              <CardContent className="py-8 text-center text-muted-foreground text-sm space-y-3">
+                <p>No upcoming sessions.</p>
+                <p>
+                  <Link href="/availability" className="text-accent font-medium underline">Set your schedule</Link>
+                  {' '}so parents can book. New group session? Ask your admin to create one.
+                </p>
               </CardContent>
             </Card>
           ) : (
@@ -125,9 +139,17 @@ export function CoachSessionsClient({
                       <p className="font-medium">
                         {formatEST(new Date(session.scheduled_datetime), 'EEE, MMM d')} · {formatEST(new Date(session.scheduled_datetime), 'h:mm a')}
                       </p>
-                      <p className="text-sm text-muted-foreground">
-                        {facilityName(session)}
-                        {wrestlerNames(session).length > 0 && ` · ${wrestlerNames(session).join(', ')}`}
+                      <p className="text-sm text-muted-foreground flex items-center gap-2 mt-0.5">
+                        <span>{facilityName(session)}</span>
+                        <span className="inline-flex items-center gap-1">
+                          <Users className="h-3.5 w-3" />
+                          {session.current_participants ?? 0}/{session.max_participants ?? 1} kids
+                          {wrestlerNames(session).length > 0 && `: ${wrestlerNames(session).join(', ')}`}
+                        </span>
+                      </p>
+                      <p className="text-sm font-medium text-accent mt-1 inline-flex items-center gap-1">
+                        <DollarSign className="h-4 w-4" />
+                        You make ${coachPayout(session).toFixed(2)}
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2">

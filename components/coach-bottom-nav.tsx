@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 const ITEMS = [
   { href: '/athlete-dashboard', label: 'Home', icon: Home },
   { href: '/availability', label: 'Schedule', icon: Calendar },
-  { href: '/coach-sessions', label: 'Sessions', icon: CalendarDays },
+  { href: '/coach-sessions', label: 'My sessions', icon: CalendarDays },
   { href: '/inbox', label: 'Messages', icon: MessageCircle },
   { href: '/profile', label: 'Profile', icon: User },
 ] as const;

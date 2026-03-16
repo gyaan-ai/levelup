@@ -39,6 +39,7 @@ const profileSchema = z.object({
   })).optional(),
   facilityId: z.string().optional(),
   secondaryFacilityId: z.string().optional(),
+  phone: z.string().optional().refine((v) => !v || v.trim() === '' || v.replace(/\D/g, '').length >= 10, 'Enter a valid 10-digit cell number'),
   venmoHandle: z.string().max(30).optional(),
   zelleEmail: z.string().optional().refine((v) => !v || v.trim() === '' || (v.includes('@') ? /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim()) : v.replace(/\D/g, '').length >= 7), 'Use a valid email or phone (7+ digits) for Zelle'),
   photo: z.instanceof(File).optional(),
@@ -71,6 +72,7 @@ export default function ProfilePage() {
       credentials: [],
       facilityId: '',
       secondaryFacilityId: '',
+      phone: '',
       venmoHandle: '',
       zelleEmail: '',
     },
@@ -108,6 +110,7 @@ export default function ProfilePage() {
               : [],
             facilityId: data.athlete.facility_id || '',
             secondaryFacilityId: data.athlete.secondary_facility_id || '',
+            phone: data.athlete.phone || '',
             venmoHandle: data.athlete.venmo_handle || '',
             zelleEmail: data.athlete.zelle_email || '',
           });
@@ -223,6 +226,7 @@ export default function ProfilePage() {
           photoFocusY: photoFocusY,
           facilityId: values.facilityId,
           secondaryFacilityId: values.secondaryFacilityId || undefined,
+          phone: values.phone?.trim() || undefined,
           venmoHandle: values.venmoHandle?.trim() || undefined,
           zelleEmail: values.zelleEmail?.trim() || undefined,
           active: makePublic,
@@ -531,10 +535,24 @@ export default function ProfilePage() {
                 </div>
               )}
 
-              {/* Payout: Venmo / Zelle */}
+              {/* Cell phone + Payout */}
               <div className="space-y-4 rounded-lg border p-4">
-                <p className="text-sm font-medium text-foreground">How you get paid</p>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm font-medium text-foreground">Contact & payout</p>
+                <FormField
+                  control={form.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Cell phone</FormLabel>
+                      <FormControl>
+                        <Input placeholder="5551234567" inputMode="tel" autoComplete="tel" {...field} />
+                      </FormControl>
+                      <FormDescription>We text you when someone signs up for your session.</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <p className="text-sm text-muted-foreground pt-2">
                   We pay coaches via Venmo or Zelle. Add at least one so we can send your earnings.
                 </p>
                 <FormField

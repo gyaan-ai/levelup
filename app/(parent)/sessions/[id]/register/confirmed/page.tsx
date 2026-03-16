@@ -123,7 +123,7 @@ export default async function SessionRegisterConfirmedPage({
           </div>
 
           <p className="text-sm text-muted-foreground text-center">
-            You&apos;ll see this session under Sessions and in Bookings.
+            You&apos;ll see this session in My bookings.
           </p>
 
           <div className="space-y-2 pt-2">
@@ -138,7 +138,7 @@ export default async function SessionRegisterConfirmedPage({
               <Link href="/training">Book another session</Link>
             </Button>
             <Button asChild variant="outline" className="w-full" size="lg">
-              <Link href="/bookings">Done — Back to Sessions</Link>
+              <Link href="/bookings">Done — Back to My bookings</Link>
             </Button>
           </div>
         </CardContent>

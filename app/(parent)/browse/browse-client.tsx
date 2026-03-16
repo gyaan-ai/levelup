@@ -369,12 +369,12 @@ export function BrowseAthletesClient({ initialAthletes, isAdmin, initialYouthWre
                           See availability
                         </Link>
                       </Button>
-                      <Link
+                      <a
                         href={`/training?tab=sessions&coach=${encodeURIComponent(athlete.id)}${initialYouthWrestlerId ? `&wrestler=${encodeURIComponent(initialYouthWrestlerId)}` : ''}`}
                         className="text-xs text-muted-foreground hover:text-foreground underline text-center block"
                       >
                         View their group sessions
-                      </Link>
+                      </a>
                     </div>
                   </CardContent>
                 </Card>

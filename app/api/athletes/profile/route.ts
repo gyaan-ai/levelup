@@ -70,7 +70,7 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { weightClass, bio, credentials, photoUrl, facilityId, secondaryFacilityId, active, venmoHandle, zelleEmail, photoFocusX, photoFocusY } = body;
+    const { weightClass, bio, credentials, photoUrl, facilityId, secondaryFacilityId, active, phone, venmoHandle, zelleEmail, photoFocusX, photoFocusY } = body;
 
     const clamp = (n: number) => Math.min(100, Math.max(0, Math.round(n)));
     const focusX = photoFocusX != null ? clamp(Number(photoFocusX)) : undefined;
@@ -128,6 +128,11 @@ export async function PUT(req: NextRequest) {
     if (venmoHandle !== undefined) updateData.venmo_handle = venmoHandle === '' ? null : String(venmoHandle).trim();
     if (zelleEmail !== undefined) {
       updateData.zelle_email = zelleEmail === '' ? null : normalizeZelleInput(String(zelleEmail).trim()) ?? null;
+    }
+    if (phone !== undefined) {
+      const trimmed = String(phone).trim();
+      if (trimmed === '') updateData.phone = null;
+      else if (trimmed.replace(/\D/g, '').length >= 10) updateData.phone = trimmed;
     }
 
     // ALWAYS try UPDATE first (record should exist from signup)

@@ -4,6 +4,7 @@ import { getStripeInstance, getWebhookSecret } from '@/lib/stripe/webhooks';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import { createNotification } from '@/lib/notifications';
+import { sendCoachNewSignupSms } from '@/lib/twilio';
 import { formatEST } from '@/lib/format-date';
 import { headers } from 'next/headers';
 
@@ -101,9 +102,10 @@ export async function POST(req: NextRequest) {
             user_id: coachId,
             type: 'session_booked',
             title: 'Someone just booked your session',
-            body: `New booking for ${dateStr}. Check your Sessions tab.`,
+            body: `New booking for ${dateStr}. Check My sessions.`,
             data: { session_id: sessionId },
           }).catch((e) => console.warn('Webhook: coach notification failed', e));
+          await sendCoachNewSignupSms(supabase, coachId, dateStr).catch(() => {});
         }
         return NextResponse.json({ received: true });
       }
@@ -145,9 +147,10 @@ export async function POST(req: NextRequest) {
           user_id: coachId,
           type: 'session_booked',
           title: 'New booking',
-          body: `Someone booked ${dateStr}. Check your Sessions tab.`,
+          body: `Someone booked ${dateStr}. Check My sessions.`,
           data: { session_id: sessionId },
         }).catch((e) => console.warn('Webhook: coach notification failed', e));
+        await sendCoachNewSignupSms(supabase, coachId, dateStr).catch(() => {});
       }
 
       if (earlyAdopterEntitlementId) {

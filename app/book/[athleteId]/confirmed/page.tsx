@@ -117,7 +117,7 @@ export default async function BookingConfirmedPage({
               </div>
               <div className="flex gap-3 mb-6">
                 <Button asChild variant="outline" className="flex-1">
-                  <Link href="/bookings">View My Sessions</Link>
+                  <Link href="/bookings">View My bookings</Link>
                 </Button>
                 <Button asChild className="flex-1">
                   <a href={`https://calendar.google.com/calendar/render?action=TEMPLATE&text=Wrestling+Session&dates=${scheduledAt?.toISOString().replace(/[-:]/g, '').slice(0, 15)}/${scheduledAt?.toISOString().replace(/[-:]/g, '').slice(0, 15)}`} target="_blank" rel="noopener noreferrer">
@@ -133,7 +133,7 @@ export default async function BookingConfirmedPage({
                   <Link href="/training">Book another session</Link>
                 </Button>
                 <Button asChild variant="outline" className="w-full">
-                  <Link href="/bookings">Done — Back to Sessions</Link>
+                  <Link href="/bookings">Done — Back to My bookings</Link>
                 </Button>
               </div>
             </>
@@ -156,7 +156,7 @@ export default async function BookingConfirmedPage({
                   <Link href="/training">Book another session</Link>
                 </Button>
                 <Button asChild variant="outline" className="w-full">
-                  <Link href="/bookings">Done — Back to Sessions</Link>
+                  <Link href="/bookings">Done — Back to My bookings</Link>
                 </Button>
               </div>
             </>
@@ -178,7 +178,7 @@ export default async function BookingConfirmedPage({
                   <Link href="/training">Book another session</Link>
                 </Button>
                 <Button asChild variant="outline" className="w-full">
-                  <Link href="/bookings">Done — Back to Sessions</Link>
+                  <Link href="/bookings">Done — Back to My bookings</Link>
                 </Button>
               </div>
             </>

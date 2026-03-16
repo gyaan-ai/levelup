@@ -135,14 +135,23 @@ export default async function TrainingPage({
         end.setDate(end.getDate() + 7);
         return end.toISOString();
       })();
+  // Past/completed sessions: when no date = last 7 days; when date = that day
+  const pastDayStart = dateParam
+    ? dayStart
+    : (() => {
+        const start = new Date(now);
+        start.setDate(start.getDate() - 7);
+        return start.toISOString();
+      })();
+  const pastDayEnd = dateParam ? dayEnd : now.toISOString();
 
   const baseSelect = `
     id, scheduled_datetime, status, session_type, session_mode, join_policy, focus_area,
     current_participants, max_participants, total_price, price_per_participant,
     athlete_id, facility_id, athletes(id, first_name, last_name, school, photo_url), facilities(id, name, address)
   `;
-  const sessions = () =>
-    supabase.from('sessions').select(baseSelect).gte('scheduled_datetime', dayStart).lte('scheduled_datetime', dayEnd);
+  const sessions = (start: string, end: string) =>
+    supabase.from('sessions').select(baseSelect).gte('scheduled_datetime', start).lte('scheduled_datetime', end);
   const withOptFilters = (q: ReturnType<typeof sessions>) => {
     if (sp.location && sp.location !== 'all') q = q.eq('facility_id', sp.location);
     if (sp.coach && sp.coach !== 'all') q = q.eq('athlete_id', sp.coach);
@@ -150,10 +159,10 @@ export default async function TrainingPage({
   };
 
   const [groupUpcoming, partnerUpcoming, groupPast, partnerPast] = await Promise.all([
-    withOptFilters(sessions()).in('status', ['scheduled', 'pending_payment']).in('session_type', ['group', 'small_group']).order('scheduled_datetime', { ascending: true }),
-    withOptFilters(sessions()).in('status', ['scheduled', 'pending_payment']).eq('session_mode', 'partner-open').order('scheduled_datetime', { ascending: true }),
-    withOptFilters(sessions()).in('status', ['completed', 'cancelled', 'no-show']).in('session_type', ['group', 'small_group']).order('scheduled_datetime', { ascending: true }),
-    withOptFilters(sessions()).in('status', ['completed', 'cancelled', 'no-show']).eq('session_mode', 'partner-open').order('scheduled_datetime', { ascending: true }),
+    withOptFilters(sessions(dayStart, dayEnd)).in('status', ['scheduled', 'pending_payment']).in('session_type', ['group', 'small_group']).order('scheduled_datetime', { ascending: true }),
+    withOptFilters(sessions(dayStart, dayEnd)).in('status', ['scheduled', 'pending_payment']).eq('session_mode', 'partner-open').order('scheduled_datetime', { ascending: true }),
+    withOptFilters(sessions(pastDayStart, pastDayEnd)).in('status', ['completed', 'cancelled', 'no-show']).in('session_type', ['group', 'small_group']).order('scheduled_datetime', { ascending: true }),
+    withOptFilters(sessions(pastDayStart, pastDayEnd)).in('status', ['completed', 'cancelled', 'no-show']).eq('session_mode', 'partner-open').order('scheduled_datetime', { ascending: true }),
   ]);
   const seen = new Set<string>();
   let list: SessionRow[] = [];
@@ -184,9 +193,10 @@ export default async function TrainingPage({
     <div className="container mx-auto px-4 py-5 pb-8 md:py-8 max-w-full">
       <h1 className="text-2xl font-bold text-foreground md:text-3xl mb-1">Training</h1>
       <p className="text-muted-foreground text-sm md:text-base mb-6">
-        Find sessions to join or browse coaches to book private
+        Find sessions to book or pick a coach for private
       </p>
       <TrainingClient
+        key={`training-${tab}-${sp.coach ?? 'all'}`}
         initialTab={tab}
         athletesWithNext={athletesWithNext}
         isAdmin={!!isAdmin}

@@ -35,6 +35,7 @@ const onboardingSchema = z.object({
   bio: z.string().max(500, 'Bio must be 500 characters or less').optional(),
   facilityId: z.string().optional(),
   secondaryFacilityId: z.string().optional(),
+  phone: z.string().min(1, 'Cell phone is required').refine((v) => v.replace(/\D/g, '').length >= 10, 'Enter a valid 10-digit cell number'),
   venmoHandle: z.string().max(30).optional(),
   zelleEmail: z.string().optional().refine((v) => !v || v.trim() === '' || (v.includes('@') ? /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim()) : v.replace(/\D/g, '').length >= 7), 'Use a valid email or phone (7+ digits) for Zelle'),
   photo: z.instanceof(File).optional(),
@@ -64,6 +65,7 @@ export default function OnboardingPage() {
       bio: '',
       facilityId: '',
       secondaryFacilityId: '',
+      phone: '',
       venmoHandle: '',
       zelleEmail: '',
     },
@@ -91,6 +93,7 @@ export default function OnboardingPage() {
             bio: data.athlete.bio || '',
             facilityId: data.athlete.facility_id || '',
             secondaryFacilityId: data.athlete.secondary_facility_id || '',
+            phone: data.athlete.phone || '',
             venmoHandle: data.athlete.venmo_handle || '',
             zelleEmail: data.athlete.zelle_email || '',
           });
@@ -149,6 +152,7 @@ export default function OnboardingPage() {
         photoUrl,
         facilityId: values.facilityId,
         secondaryFacilityId: values.secondaryFacilityId || undefined,
+        phone: values.phone?.trim() || undefined,
         venmoHandle: values.venmoHandle?.trim() || undefined,
         zelleEmail: values.zelleEmail?.trim() || undefined,
         active,
@@ -228,6 +232,11 @@ export default function OnboardingPage() {
     }
 
     if (step === 4) {
+      const digits = values.phone?.replace(/\D/g, '') ?? '';
+      if (digits.length < 10) {
+        setError('Enter your cell number (10 digits) so we can text you when someone signs up.');
+        return;
+      }
       const hasVenmo = values.venmoHandle?.trim();
       const hasZelle = values.zelleEmail?.trim();
       if (!hasVenmo && !hasZelle) {
@@ -272,7 +281,7 @@ export default function OnboardingPage() {
     if (step === 0) setStep(1);
     else if (step === 1) setStep(2);
     else if (step === 3 && facilities.length > 0) setStep(4);
-    else if (step === 4) setError('Add Venmo or Zelle to receive payments.');
+    else if (step === 4) setError('Add your cell number and Venmo or Zelle to continue.');
     else if (step === 5) {
       visibilityModalRef.current?.showModal();
     }
@@ -283,7 +292,8 @@ export default function OnboardingPage() {
     if (step === 3 && facilities.length > 0) return !!form.watch('facilityId');
     if (step === 4) {
       const v = form.watch();
-      return !!(v.venmoHandle?.trim() || v.zelleEmail?.trim());
+      const phoneDigits = (v.phone ?? '').replace(/\D/g, '');
+      return phoneDigits.length >= 10 && !!(v.venmoHandle?.trim() || v.zelleEmail?.trim());
     }
     return true;
   })();
@@ -490,13 +500,27 @@ export default function OnboardingPage() {
             </Card>
           )}
 
-          {/* Step 4: Payout */}
+          {/* Step 4: Cell phone + Payout */}
           {step === 4 && (
             <Card className="border-0 shadow-none">
               <CardContent className="p-0 space-y-4">
                 <p className="text-muted-foreground">
-                  How should we pay you? Add Venmo or Zelle.
+                  We need your cell number to text you when someone signs up for a session. Then add how we should pay you.
                 </p>
+                <FormField
+                  control={form.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Cell phone</FormLabel>
+                      <FormControl>
+                        <Input placeholder="5551234567" inputMode="tel" autoComplete="tel" {...field} />
+                      </FormControl>
+                      <FormDescription>We&apos;ll text when someone books your session.</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 <FormField
                   control={form.control}
                   name="venmoHandle"

@@ -116,7 +116,7 @@ export function Header() {
                     href="/coach-sessions"
                     className="text-white hover:text-accent transition-colors font-medium"
                   >
-                    Sessions
+                    My sessions
                   </Link>
                   <Link
                     href="/profile"
@@ -267,7 +267,7 @@ export function Header() {
                   )}
                   <Link href="/dashboard" className="text-white hover:text-accent transition-colors font-medium">Home</Link>
                   <Link href="/training" className="text-white hover:text-accent transition-colors font-medium">Training</Link>
-                  <Link href="/bookings" className="text-white hover:text-accent transition-colors font-medium">Sessions</Link>
+                  <Link href="/bookings" className="text-white hover:text-accent transition-colors font-medium">My bookings</Link>
                   <Link
                     href="/inbox"
                     className="relative flex items-center justify-center min-h-[44px] min-w-[44px] p-1.5 text-white hover:text-accent transition-colors font-medium rounded hover:bg-white/10"
@@ -459,7 +459,7 @@ export function Header() {
                       <Link href="/dashboard" className={navLinkClass} onClick={() => setMobileOpen(false)}>Home</Link>
                       <Link href="/find-training" className={navLinkClass} onClick={() => setMobileOpen(false)}>Find Training</Link>
                       <Link href="/browse" className={navLinkClass} onClick={() => setMobileOpen(false)}>Coaches</Link>
-                      <Link href="/bookings" className={navLinkClass} onClick={() => setMobileOpen(false)}>My Sessions</Link>
+                      <Link href="/bookings" className={navLinkClass} onClick={() => setMobileOpen(false)}>My bookings</Link>
                       <Link href="/inbox" className={navLinkClass} onClick={() => setMobileOpen(false)}>
                         <span className="flex items-center gap-2">
                           <Mail className="h-5 w-5 shrink-0" />

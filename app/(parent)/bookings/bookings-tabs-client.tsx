@@ -5,16 +5,21 @@ import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { BookingCard, type BookingSession } from './booking-card';
 
-type TabId = 'upcoming' | 'past';
+type TabId = 'upcoming' | 'closed';
 
 export function BookingsTabsClient({
-  upcoming,
-  past,
+  thisWeek,
+  thisMonth,
+  later,
+  closed,
 }: {
-  upcoming: BookingSession[];
-  past: BookingSession[];
+  thisWeek: BookingSession[];
+  thisMonth: BookingSession[];
+  later: BookingSession[];
+  closed: BookingSession[];
 }) {
   const [activeTab, setActiveTab] = useState<TabId>('upcoming');
+  const hasUpcoming = thisWeek.length > 0 || thisMonth.length > 0 || later.length > 0;
 
   return (
     <>
@@ -32,42 +37,69 @@ export function BookingsTabsClient({
         </button>
         <button
           type="button"
-          onClick={() => setActiveTab('past')}
+          onClick={() => setActiveTab('closed')}
           className={`min-h-[44px] px-4 py-2 text-sm font-medium border-b-2 shrink-0 touch-manipulation ${
-            activeTab === 'past'
+            activeTab === 'closed'
               ? 'border-accent text-accent'
               : 'border-transparent text-muted-foreground hover:text-foreground'
           }`}
         >
-          Past
+          Past ({closed.length})
         </button>
       </div>
 
       {activeTab === 'upcoming' && (
-        <section>
-          {upcoming.length === 0 ? (
+        <section className="space-y-8">
+          {!hasUpcoming ? (
             <Card>
               <CardContent className="py-8 text-center text-muted-foreground">
                 No upcoming sessions. <Link href="/training" className="text-accent underline">Find training</Link> to book.
               </CardContent>
             </Card>
           ) : (
-            <div className="space-y-4">
-              {upcoming.map((s) => (
-                <BookingCard key={s.id} session={s} />
-              ))}
-            </div>
+            <>
+              {thisWeek.length > 0 && (
+                <div>
+                  <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">This week</h2>
+                  <div className="space-y-4">
+                    {thisWeek.map((s) => (
+                      <BookingCard key={s.id} session={s} />
+                    ))}
+                  </div>
+                </div>
+              )}
+              {thisMonth.length > 0 && (
+                <div>
+                  <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Later this month</h2>
+                  <div className="space-y-4">
+                    {thisMonth.map((s) => (
+                      <BookingCard key={s.id} session={s} />
+                    ))}
+                  </div>
+                </div>
+              )}
+              {later.length > 0 && (
+                <div>
+                  <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Later</h2>
+                  <div className="space-y-4">
+                    {later.map((s) => (
+                      <BookingCard key={s.id} session={s} />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </section>
       )}
 
-      {activeTab === 'past' && (
+      {activeTab === 'closed' && (
         <section>
-          {past.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4">No past sessions yet.</p>
+          {closed.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-4">No past sessions.</p>
           ) : (
             <div className="space-y-4">
-              {past.map((s) => (
+              {closed.map((s) => (
                 <BookingCard key={s.id} session={s} isPast />
               ))}
             </div>

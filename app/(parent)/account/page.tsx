@@ -111,7 +111,7 @@ export default async function AccountPage() {
             <p className="text-sm text-muted-foreground mb-3">Payment is collected at checkout when you book.</p>
             <Link href="/bookings">
               <Button variant="outline" className="w-full min-h-[44px] touch-manipulation">
-                View sessions
+                View my bookings
               </Button>
             </Link>
           </CardContent>
@@ -121,14 +121,14 @@ export default async function AccountPage() {
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
               <Calendar className="h-4 w-4" />
-              Sessions
+              My bookings
             </CardTitle>
-            <CardDescription>Upcoming and past</CardDescription>
+            <CardDescription>Upcoming and past sessions</CardDescription>
           </CardHeader>
           <CardContent>
             <Link href="/bookings">
               <Button variant="outline" className="w-full min-h-[44px] touch-manipulation">
-                View sessions
+                View my bookings
               </Button>
             </Link>
           </CardContent>

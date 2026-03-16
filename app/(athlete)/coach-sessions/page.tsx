@@ -81,9 +81,9 @@ export default async function CoachSessionsPage({
 
   return (
     <div className="container mx-auto px-4 py-5 pb-8 md:py-8 max-w-full">
-      <h1 className="text-2xl font-bold text-foreground md:text-3xl mb-1">Sessions</h1>
+      <h1 className="text-2xl font-bold text-foreground md:text-3xl mb-1">My sessions</h1>
       <p className="text-muted-foreground text-sm md:text-base mb-6">
-        Upcoming, join requests, and past sessions
+        Open sessions, who signed up, your payout · Requests · Past
       </p>
       <CoachSessionsClient
         initialTab={tab}

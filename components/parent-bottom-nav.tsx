@@ -5,11 +5,11 @@ import { usePathname } from 'next/navigation';
 import { Home, Dumbbell, CalendarDays, MessageCircle, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-/** 5 items max; one-word labels for legibility. Coaches live inside Training. */
+/** 5 items max. Training = find/book sessions; My bookings = sessions you've booked. */
 const ITEMS = [
   { href: '/dashboard', label: 'Home', icon: Home },
   { href: '/training', label: 'Training', icon: Dumbbell },
-  { href: '/bookings', label: 'Sessions', icon: CalendarDays },
+  { href: '/bookings', label: 'My bookings', icon: CalendarDays },
   { href: '/inbox', label: 'Messages', icon: MessageCircle },
   { href: '/account', label: 'Account', icon: User },
 ] as const;

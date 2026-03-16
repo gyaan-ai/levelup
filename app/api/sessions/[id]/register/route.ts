@@ -6,6 +6,8 @@ import { getTenantByDomain } from '@/config/tenants';
 import { getStripeInstance } from '@/lib/stripe/webhooks';
 import { formatEST } from '@/lib/format-date';
 import { createRegisterConfirmationToken } from '@/lib/confirmation-token';
+import { createNotification } from '@/lib/notifications';
+import { sendCoachNewSignupSms } from '@/lib/twilio';
 
 /**
  * POST - Pay & register a youth wrestler for a session (public or invite_only).
@@ -103,6 +105,20 @@ export async function POST(
       });
       if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 });
       await supabase.from('sessions').update({ current_participants: current + 1, updated_at: new Date().toISOString() }).eq('id', sessionId);
+      const coachId = (session as { athlete_id?: string }).athlete_id;
+      const dt = s.scheduled_datetime;
+      if (coachId && coachId !== user.id) {
+        const dateStr = dt ? formatEST(new Date(dt), 'EEE MMM d, h:mm a') : 'your session';
+        const admin = createAdminClient(tenant.slug);
+        await createNotification(admin, {
+          user_id: coachId,
+          type: 'session_booked',
+          title: 'Someone signed up for your session',
+          body: `New signup for ${dateStr}. Check My sessions.`,
+          data: { session_id: sessionId },
+        }).catch((e) => console.warn('Register: coach notification failed', e));
+        await sendCoachNewSignupSms(admin, coachId, dateStr).catch(() => {});
+      }
       return NextResponse.json({ added: true });
     }
 
@@ -157,6 +173,19 @@ export async function POST(
         current_participants: current + 1,
         updated_at: new Date().toISOString(),
       }).eq('id', sessionId);
+      const coachId = (session as { athlete_id?: string }).athlete_id;
+      const dt = s.scheduled_datetime;
+      if (coachId) {
+        const dateStr = dt ? formatEST(new Date(dt), 'EEE MMM d, h:mm a') : 'your session';
+        await createNotification(admin, {
+          user_id: coachId,
+          type: 'session_booked',
+          title: 'Someone signed up for your session',
+          body: `New signup for ${dateStr}. Check My sessions.`,
+          data: { session_id: sessionId },
+        }).catch((e) => console.warn('Register: coach notification failed', e));
+        await sendCoachNewSignupSms(admin, coachId, dateStr).catch(() => {});
+      }
       return NextResponse.json({ added: true });
     }
 

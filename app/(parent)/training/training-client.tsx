@@ -12,8 +12,8 @@ interface AthleteWithNext extends Athlete {
 }
 
 const TABS: { id: TabId; label: string }[] = [
-  { id: 'sessions', label: 'Sessions' },
-  { id: 'coaches', label: 'Coaches' },
+  { id: 'sessions', label: 'Find sessions' },
+  { id: 'coaches', label: 'All coaches' },
 ];
 
 type Props = {
