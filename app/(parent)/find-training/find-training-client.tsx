@@ -388,8 +388,15 @@ export function FindTrainingClient({
                         {formatEST(dt, 'EEE, MMM d')} · {formatEST(dt, 'h:mm a')}
                         {coach && (
                           <span className="font-normal text-muted-foreground ml-1">
-                            · {[coach.first_name, coach.last_name].filter(Boolean).join(' ')}
+                            ·{' '}
+                            <Link href={`/athlete/${coach.id}`} className="hover:underline text-foreground">
+                              {[coach.first_name, coach.last_name].filter(Boolean).join(' ')}
+                            </Link>
                             {coach.school && <SchoolLogo school={coach.school} size="sm" className="ml-1 inline" />}
+                            {' · '}
+                            <Link href={`/athlete/${coach.id}`} className="text-xs text-accent hover:underline">
+                              Profile
+                            </Link>
                           </span>
                         )}
                       </p>

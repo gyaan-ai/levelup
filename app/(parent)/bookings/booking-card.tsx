@@ -169,14 +169,25 @@ export function BookingCard({ session, isPast = false }: BookingCardProps) {
               <MapPin className="h-3.5 w-3.5 shrink-0" />
               {session.facility}
             </p>
-            <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+            <p className="text-sm text-muted-foreground flex items-center gap-1.5 flex-wrap">
               <User className="h-3.5 w-3.5 shrink-0" />
-              {session.coach.name}
+              {session.coach.id ? (
+                <Link href={`/athlete/${session.coach.id}`} className="hover:underline text-foreground font-medium">
+                  {session.coach.name}
+                </Link>
+              ) : (
+                session.coach.name
+              )}
               {session.coach.school && (
                 <span className="flex items-center gap-1">
                   <SchoolLogo school={session.coach.school} size="sm" />
                   <span className="text-muted-foreground/80">({session.coach.school})</span>
                 </span>
+              )}
+              {session.coach.id && (
+                <Link href={`/athlete/${session.coach.id}`} className="text-xs text-accent hover:underline">
+                  View profile
+                </Link>
               )}
             </p>
             {session.wrestlers.length > 0 && (

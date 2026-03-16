@@ -131,7 +131,18 @@ export function SmallGroupSessionsClient({
                         {formatEST(dt, 'EEE, MMM d')} at {formatEST(dt, 'h:mm a')}
                       </p>
                       <p className="text-sm text-muted-foreground flex items-center gap-1.5 flex-wrap">
-                        <span>{coachName}</span>
+                        {coach && (coach as { id?: string }).id ? (
+                          <Link href={`/athlete/${(coach as { id: string }).id}`} className="hover:underline font-medium text-foreground">
+                            {coachName}
+                          </Link>
+                        ) : (
+                          <span>{coachName}</span>
+                        )}
+                        {coach && (coach as { id?: string }).id && (
+                          <Link href={`/athlete/${(coach as { id: string }).id}`} className="text-xs text-accent hover:underline">
+                            Profile
+                          </Link>
+                        )}
                         {coachSchool && (
                           <>
                             <SchoolLogo school={coachSchool} size="sm" />

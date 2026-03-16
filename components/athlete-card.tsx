@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { SchoolLogo } from '@/components/school-logo';
@@ -41,7 +42,9 @@ export function AthleteCard({ athlete }: AthleteCardProps) {
               ⭐ {athlete.average_rating.toFixed(1)} ({athlete.total_sessions} sessions)
             </p>
           </div>
-          <Button>View Profile</Button>
+          <Button asChild>
+          <Link href={`/athlete/${athlete.id}`}>View Profile</Link>
+        </Button>
         </div>
       </CardContent>
     </Card>
