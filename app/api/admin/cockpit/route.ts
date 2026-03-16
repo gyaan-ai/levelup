@@ -125,11 +125,14 @@ export async function GET(req: NextRequest) {
       };
     });
 
-    const bookings = (bookingsRes.data ?? []).map((b: {
-      id: string; session_id: string; amount_paid?: number | null; created_at: string;
-      sessions?: { id: string; scheduled_datetime: string; athletes?: { first_name: string; last_name: string } | { first_name: string; last_name: string }[]; facilities?: { name: string } | { name: string }[] } | null;
-    }) => {
-      const sess = b.sessions;
+    const bookings = ((bookingsRes.data ?? []) as Array<{
+      id: string;
+      session_id: string;
+      amount_paid?: number | null;
+      created_at: string;
+      sessions?: unknown;
+    }>).map((b) => {
+      const sess = b.sessions as { scheduled_datetime?: string; athletes?: { first_name?: string; last_name?: string } | Array<{ first_name?: string; last_name?: string }>; facilities?: { name?: string } | Array<{ name?: string }> } | Array<{ scheduled_datetime?: string; athletes?: unknown; facilities?: unknown }> | null | undefined;
       const s = Array.isArray(sess) ? sess[0] : sess;
       const a = s?.athletes;
       const o = Array.isArray(a) ? a[0] : a;
@@ -140,7 +143,7 @@ export async function GET(req: NextRequest) {
         session_id: b.session_id,
         amount_paid: b.amount_paid != null ? Number(b.amount_paid) : null,
         created_at: b.created_at,
-        coach_name: o ? `${o.first_name} ${o.last_name}` : '—',
+        coach_name: o ? `${o.first_name ?? ''} ${o.last_name ?? ''}`.trim() || '—' : '—',
         facility_name: fo?.name ?? '—',
         scheduled_datetime: s?.scheduled_datetime ?? '—',
       };
