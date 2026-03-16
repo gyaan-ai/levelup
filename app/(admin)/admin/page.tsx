@@ -60,7 +60,7 @@ export default async function AdminPage() {
 
   const admin = createAdminClient(tenant.slug);
 
-  const [sessionsRes, usersRes, creditsRes] = await Promise.all([
+  const [sessionsRes, usersRes, creditsRes, athletesRes] = await Promise.all([
     admin
       .from('sessions')
       .select(`
@@ -91,6 +91,10 @@ export default async function AdminPage() {
       .from('credits')
       .select('id, parent_id, amount, remaining, source, description, created_at, expires_at')
       .order('created_at', { ascending: false }),
+    admin
+      .from('athletes')
+      .select('id, first_name, last_name, school')
+      .order('last_name'),
   ]);
 
   if (usersRes.error) {
@@ -118,7 +122,10 @@ export default async function AdminPage() {
   if (creditsRes.error) {
     console.error('Admin credits fetch error:', creditsRes.error);
   }
-  
+  if (athletesRes.error) {
+    console.error('Admin athletes fetch error:', athletesRes.error);
+  }
+
   console.log('[Admin] Sessions fetched:', sessionsRes.data?.length ?? 0, 'rows');
   console.log('[Admin] Users fetched:', usersRes.data?.length ?? 0, 'rows');
   console.log('[Admin] Credits fetched:', creditsRes.data?.length ?? 0, 'rows');
@@ -189,30 +196,32 @@ export default async function AdminPage() {
     pendingPaymentCount: sessions.filter((s) => s.status === 'pending_payment').length,
   };
 
+  // Build coach list from all athletes so coaches with no sessions (e.g. Cam) still appear
+  const athletesRows = (athletesRes.data ?? []) as Array<{ id: string; first_name: string; last_name: string; school: string | null }>;
   const athleteMap = new Map<string, AthleteReport>();
+  for (const o of athletesRows) {
+    athleteMap.set(o.id, {
+      athlete_id: o.id,
+      athlete_name: `${o.first_name} ${o.last_name}`.trim() || '—',
+      school: o.school ?? '',
+      session_count: 0,
+      total_earnings: 0,
+      completed_count: 0,
+    });
+  }
   for (const s of sessionsRows) {
     const a = s.athletes;
     const o = Array.isArray(a) ? a[0] : a;
-    if (!o) continue;
-    const id = o.id;
-    let r = athleteMap.get(id);
-    if (!r) {
-      r = {
-        athlete_id: id,
-        athlete_name: `${o.first_name} ${o.last_name}`,
-        school: o.school ?? '',
-        session_count: 0,
-        total_earnings: 0,
-        completed_count: 0,
-      };
-      athleteMap.set(id, r);
+    if (!o?.id) continue;
+    const r = athleteMap.get(o.id);
+    if (r) {
+      r.session_count += 1;
+      r.total_earnings += Number(s.athlete_payment ?? 0);
+      if (s.status === 'completed') r.completed_count += 1;
     }
-    r.session_count += 1;
-    r.total_earnings += Number(s.athlete_payment ?? 0);
-    if (s.status === 'completed') r.completed_count += 1;
   }
   const athleteReports = Array.from(athleteMap.values()).sort(
-    (a, b) => b.total_earnings - a.total_earnings
+    (a, b) => b.total_earnings - a.total_earnings || a.athlete_name.localeCompare(b.athlete_name)
   );
 
   // Coach payouts: completed sessions not yet paid (athlete_payout_date IS NULL)
