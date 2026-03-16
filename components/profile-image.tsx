@@ -9,7 +9,7 @@ export interface ProfileImageProps {
   alt: string;
   /** 0–100, horizontal focus (face position). Default 50 = center. */
   focusX?: number | null;
-  /** 0–100, vertical focus (face position). Default 38 = slightly above center so heads aren't cut off. */
+  /** 0–100, vertical focus (face position). Default 25 = anchor high so full head fits in circle. */
   focusY?: number | null;
   /** 'full' for avatars, 'lg' for cards. Default 'full'. */
   rounded?: 'full' | 'lg' | 'md' | 'none';
@@ -30,14 +30,14 @@ export function ProfileImage({
   src,
   alt,
   focusX = 50,
-  focusY = 38,
+  focusY = 25,
   rounded = 'full',
   className,
   fallbackIconClassName = 'h-1/3 w-1/3 text-muted-foreground',
 }: ProfileImageProps) {
   const [error, setError] = useState(false);
   const x = focusX != null ? Math.min(100, Math.max(0, focusX)) : 50;
-  const y = focusY != null ? Math.min(100, Math.max(0, focusY)) : 38;
+  const y = focusY != null ? Math.min(100, Math.max(0, focusY)) : 25;
   const roundedCn = roundedClass[rounded];
 
   if (!src || error) {

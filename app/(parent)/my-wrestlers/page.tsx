@@ -111,7 +111,7 @@ export default async function ParentDashboard() {
                       src={wrestler.photo_url}
                       alt={`${wrestler.first_name} ${wrestler.last_name}`}
                       focusX={wrestler.photo_focus_x ?? 50}
-                      focusY={wrestler.photo_focus_y ?? 38}
+                      focusY={wrestler.photo_focus_y ?? 25}
                       className="w-16 h-16 sm:w-20 sm:h-20 shrink-0"
                       fallbackIconClassName="h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground"
                     />
