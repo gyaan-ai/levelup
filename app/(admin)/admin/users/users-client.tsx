@@ -22,7 +22,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Eye, Pencil, Archive, ArchiveRestore, Trash2, Search, Gift } from 'lucide-react';
+import { Eye, Pencil, Archive, ArchiveRestore, Trash2, Search, Gift, CheckCircle, EyeOff } from 'lucide-react';
 import { formatEST } from '@/lib/format-date';
 
 export type AdminUserRow = {
@@ -36,13 +36,15 @@ export type AdminUserRow = {
   school?: string | null;
   /** For coaches: true = visible on Browse Coaches, false = hidden. null = not a coach. */
   athlete_active?: boolean | null;
+  /** For parents: display names of their youth wrestlers (kids). */
+  kids_names?: string[] | null;
 };
 
 type SortOption = 'email_asc' | 'email_desc' | 'role' | 'created_desc' | 'created_asc' | 'login_desc' | 'login_asc';
 
 const ROLE_LABELS: Record<string, string> = {
   parent: 'Parent',
-  athlete: 'Coach',
+  coach: 'Coach',
   admin: 'Admin',
   youth_wrestler: 'Athlete',
 };
@@ -60,6 +62,7 @@ export function AdminUsersClient({ initialUsers }: { initialUsers: AdminUserRow[
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [grantingId, setGrantingId] = useState<string | null>(null);
+  const [activatingId, setActivatingId] = useState<string | null>(null);
 
   const filteredAndSorted = useMemo(() => {
     let list = users.filter((u) => {
@@ -204,6 +207,32 @@ export function AdminUsersClient({ initialUsers }: { initialUsers: AdminUserRow[
     return null;
   };
 
+  const handleSetCoachActive = async (u: AdminUserRow, active: boolean) => {
+    if (u.role !== 'coach') return;
+    setActivatingId(u.id);
+    setError(null);
+    try {
+      const res = await fetch(`/api/admin/athletes/${u.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ active }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        setError(data.error || (active ? 'Failed to activate' : 'Failed to hide'));
+        return;
+      }
+      setUsers((prev) =>
+        prev.map((x) => (x.id === u.id ? { ...x, athlete_active: active } : x))
+      );
+      router.refresh();
+    } catch {
+      setError('Request failed');
+    } finally {
+      setActivatingId(null);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {error && (
@@ -276,6 +305,7 @@ export function AdminUsersClient({ initialUsers }: { initialUsers: AdminUserRow[
                   <th className="text-left py-2 font-medium">Profile / Name</th>
                   <th className="text-left py-2 font-medium">Email</th>
                   <th className="text-left py-2 font-medium">Role</th>
+                  <th className="text-left py-2 font-medium">Kids / Athletes</th>
                   <th className="text-left py-2 font-medium">Created</th>
                   <th className="text-left py-2 font-medium">Last login</th>
                   <th className="text-left py-2 font-medium">Status</th>
@@ -285,7 +315,7 @@ export function AdminUsersClient({ initialUsers }: { initialUsers: AdminUserRow[
               <tbody>
                 {filteredAndSorted.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-8 text-center text-muted-foreground">
+                    <td colSpan={8} className="py-8 text-center text-muted-foreground">
                       No users match filters.
                     </td>
                   </tr>
@@ -309,6 +339,13 @@ export function AdminUsersClient({ initialUsers }: { initialUsers: AdminUserRow[
                       </td>
                       <td className="py-2">
                         <Badge variant="outline">{ROLE_LABELS[u.role] ?? u.role}</Badge>
+                      </td>
+                      <td className="py-2 max-w-[180px]">
+                        {u.kids_names?.length ? (
+                          <span className="text-muted-foreground text-xs">{u.kids_names.join(', ')}</span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
                       </td>
                       <td className="py-2 text-muted-foreground">
                         {formatEST(new Date(u.created_at), 'MMM d, yyyy')}
@@ -345,12 +382,47 @@ export function AdminUsersClient({ initialUsers }: { initialUsers: AdminUserRow[
                                 </Button>
                               </Link>
                               {u.role === 'coach' && (
-                                <Link href={`/admin?tab=athletes&edit=${u.id}`}>
-                                  <Button variant="ghost" size="sm" className="h-8">
-                                    <Pencil className="h-4 w-4 mr-1" />
-                                    Edit profile
-                                  </Button>
-                                </Link>
+                                <>
+                                  <Link href={`/admin?tab=athletes&edit=${u.id}`}>
+                                    <Button variant="ghost" size="sm" className="h-8">
+                                      <Pencil className="h-4 w-4 mr-1" />
+                                      Edit profile
+                                    </Button>
+                                  </Link>
+                                  {u.athlete_active ? (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      className="h-8"
+                                      onClick={() => handleSetCoachActive(u, false)}
+                                      disabled={loading || activatingId === u.id}
+                                      title="Hide from Browse (parents won’t see this coach)"
+                                    >
+                                      {activatingId === u.id ? '…' : (
+                                        <>
+                                          <EyeOff className="h-4 w-4 mr-1" />
+                                          Hide from Browse
+                                        </>
+                                      )}
+                                    </Button>
+                                  ) : (
+                                    <Button
+                                      variant="default"
+                                      size="sm"
+                                      className="h-8"
+                                      onClick={() => handleSetCoachActive(u, true)}
+                                      disabled={loading || activatingId === u.id}
+                                      title="Make coach visible to parents"
+                                    >
+                                      {activatingId === u.id ? '…' : (
+                                        <>
+                                          <CheckCircle className="h-4 w-4 mr-1" />
+                                          Activate
+                                        </>
+                                      )}
+                                    </Button>
+                                  )}
+                                </>
                               )}
                             </>
                           )}

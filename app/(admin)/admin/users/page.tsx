@@ -76,15 +76,59 @@ export default async function AdminUsersPage() {
     }
   }
 
+  const parentIds = userRows.filter((u) => u.role === 'parent').map((u) => u.id);
+  const kidsByParentId = new Map<string, string[]>();
+  if (parentIds.length > 0) {
+    const { data: primaryKids } = await admin
+      .from('youth_wrestlers')
+      .select('parent_id, first_name, last_name')
+      .in('parent_id', parentIds)
+      .eq('active', true);
+    for (const k of primaryKids ?? []) {
+      const row = k as { parent_id: string; first_name?: string | null; last_name?: string | null };
+      const name = [row.first_name, row.last_name].filter(Boolean).join(' ').trim() || '—';
+      const list = kidsByParentId.get(row.parent_id) ?? [];
+      list.push(name);
+      kidsByParentId.set(row.parent_id, list);
+    }
+    const { data: linked } = await admin
+      .from('youth_wrestler_parents')
+      .select('parent_id, youth_wrestler_id')
+      .in('parent_id', parentIds);
+    if (linked && linked.length > 0) {
+      const ywIds = [...new Set((linked as { youth_wrestler_id: string }[]).map((r) => r.youth_wrestler_id))];
+      const { data: ywRows } = await admin
+        .from('youth_wrestlers')
+        .select('id, first_name, last_name')
+        .in('id', ywIds)
+        .eq('active', true);
+      const ywNames = new Map<string, string>();
+      for (const y of ywRows ?? []) {
+        const r = y as { id: string; first_name?: string | null; last_name?: string | null };
+        ywNames.set(r.id, [r.first_name, r.last_name].filter(Boolean).join(' ').trim() || '—');
+      }
+      for (const r of linked as { parent_id: string; youth_wrestler_id: string }[]) {
+        const name = ywNames.get(r.youth_wrestler_id);
+        if (name) {
+          const list = kidsByParentId.get(r.parent_id) ?? [];
+          if (!list.includes(name)) list.push(name);
+          kidsByParentId.set(r.parent_id, list);
+        }
+      }
+    }
+  }
+
   const users: AdminUserRow[] = userRows.map((u) => {
     const profile = u.role === 'coach' ? athleteMap.get(u.id) : null;
     const display_name =
       profile ? [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim() || null : null;
+    const kids = u.role === 'parent' ? (kidsByParentId.get(u.id) ?? []) : null;
     return {
       ...u,
       display_name: display_name ?? null,
       school: profile?.school ?? null,
       athlete_active: u.role === 'coach' ? (profile?.active ?? false) : null,
+      kids_names: kids?.length ? kids : null,
     };
   });
 
