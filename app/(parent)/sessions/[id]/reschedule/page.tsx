@@ -30,7 +30,7 @@ export default async function ReschedulePage({
     .eq('id', user.id)
     .single();
 
-  if (userData?.role !== 'parent' && userData?.role !== 'admin' && userData?.role !== 'athlete') {
+  if (userData?.role !== 'parent' && userData?.role !== 'admin' && userData?.role !== 'coach') {
     redirect('/dashboard');
   }
 

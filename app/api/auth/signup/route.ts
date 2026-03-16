@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Validate role (admin cannot be self-assigned via signup)
-    if (!['parent', 'athlete', 'youth_wrestler'].includes(role)) {
+    if (!['parent', 'coach', 'youth_wrestler'].includes(role)) {
       return NextResponse.json(
         { error: 'Invalid role' },
         { status: 400 }
@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
     const invitePayload = typeof inviteToken === 'string' && inviteToken.trim() ? verifyInviteToken(inviteToken.trim()) : null;
 
     // For athletes (coaches), require additional fields and coach type
-    if (role === 'athlete') {
+    if (role === 'coach') {
       if (!firstName || !lastName || !school?.trim()) {
         return NextResponse.json(
           { error: 'First name, last name, and school/club are required for coaches' },
@@ -173,7 +173,7 @@ export async function POST(req: NextRequest) {
     }
 
     // If athlete, create athlete profile
-    if (role === 'athlete') {
+    if (role === 'coach') {
       const { error: athleteError } = await supabaseAdmin
         .from('athletes')
         .insert({

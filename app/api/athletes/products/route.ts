@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
       .eq('id', user.id)
       .single();
 
-    if (userData?.role !== 'athlete') {
+    if (userData?.role !== 'coach') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -84,7 +84,7 @@ export async function PUT(req: NextRequest) {
       .eq('id', user.id)
       .single();
 
-    if (userData?.role !== 'athlete') {
+    if (userData?.role !== 'coach') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 

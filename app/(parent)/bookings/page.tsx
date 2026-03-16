@@ -23,7 +23,7 @@ export default async function MyBookingsPage() {
     .eq('id', user.id)
     .single();
 
-  if (userData?.role === 'athlete') redirect('/athlete-dashboard');
+  if (userData?.role === 'coach') redirect('/athlete-dashboard');
   // Parent sees only their wrestlers (primary or linked). Explicit filter so parents never see other users' kids.
   const youthWrestlerIds = await getParentYouthWrestlerIds(supabase, user.id);
 

@@ -31,7 +31,7 @@ export default async function SessionRegisterPage({
 
   const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
   const role = userData?.role;
-  if (role !== 'parent' && role !== 'admin' && role !== 'athlete' && role !== 'youth_wrestler') redirect('/dashboard');
+  if (role !== 'parent' && role !== 'admin' && role !== 'coach' && role !== 'youth_wrestler') redirect('/dashboard');
 
   const { data: session, error: sessionErr } = await supabase
     .from('sessions')

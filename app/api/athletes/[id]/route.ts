@@ -27,7 +27,7 @@ export async function DELETE(
     const role = userData?.role ?? null;
     const isAdmin = role === 'admin';
     const isParent = role === 'parent';
-    const isOwnProfile = user.id === id && role === 'athlete';
+    const isOwnProfile = user.id === id && role === 'coach';
 
     if (!isAdmin && !isParent && !isOwnProfile) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });

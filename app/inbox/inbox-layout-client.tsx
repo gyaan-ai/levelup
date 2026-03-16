@@ -10,7 +10,7 @@ export function InboxLayoutClient({
   role,
   children,
 }: {
-  role: 'parent' | 'athlete' | 'youth_wrestler';
+  role: 'parent' | 'coach' | 'youth_wrestler';
   children: React.ReactNode;
 }) {
   const [mobileListOpen, setMobileListOpen] = useState(false);

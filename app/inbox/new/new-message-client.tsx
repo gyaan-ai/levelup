@@ -57,7 +57,7 @@ export function NewMessageClient({
   role,
 }: {
   currentUserId: string;
-  role: 'parent' | 'athlete' | 'admin';
+  role: 'parent' | 'coach' | 'admin';
 }) {
   const router = useRouter();
   const [follows, setFollows] = useState<Follow[]>([]);

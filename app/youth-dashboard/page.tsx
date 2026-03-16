@@ -23,7 +23,7 @@ export default async function YouthDashboardPage() {
   const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
   if (userData?.role !== 'youth_wrestler') {
     if (userData?.role === 'parent') redirect('/dashboard');
-    if (userData?.role === 'athlete') redirect('/athlete-dashboard');
+    if (userData?.role === 'coach') redirect('/athlete-dashboard');
     if (userData?.role === 'admin') redirect('/admin');
     redirect('/');
   }

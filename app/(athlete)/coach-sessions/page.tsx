@@ -27,7 +27,7 @@ export default async function CoachSessionsPage({
   if (!user) redirect('/login');
 
   const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
-  if (userData?.role !== 'athlete' && userData?.role !== 'admin') redirect('/athlete-dashboard');
+  if (userData?.role !== 'coach' && userData?.role !== 'admin') redirect('/athlete-dashboard');
 
   const { data: athlete } = await supabase.from('athletes').select('*').eq('id', user.id).maybeSingle();
   if (!athlete || !isProfileComplete(athlete as Athlete)) redirect('/onboarding');

@@ -49,7 +49,7 @@ export default function HomePage() {
                     asChild
                     className="bg-transparent text-white border-accent text-accent hover:bg-accent hover:text-black"
                   >
-                    <Link href="/signup?role=athlete">Coach? Join The Guild</Link>
+                    <Link href="/signup?role=coach">Coach? Join The Guild</Link>
                   </Button>
                   <Button
                     size="xl"

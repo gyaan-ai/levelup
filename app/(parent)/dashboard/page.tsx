@@ -29,7 +29,7 @@ export default async function HomePage() {
   if (!user) redirect('/login');
 
   const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
-  if (userData?.role === 'athlete') redirect('/athlete-dashboard');
+  if (userData?.role === 'coach') redirect('/athlete-dashboard');
 
   const isAdmin = userData?.role === 'admin';
   const nowISO = new Date().toISOString();

@@ -18,7 +18,7 @@ type Thread = {
 
 type Filter = 'all' | 'unread';
 
-export function InboxClient({ role }: { role: 'parent' | 'athlete' }) {
+export function InboxClient({ role }: { role: 'parent' | 'coach' }) {
   const [threads, setThreads] = useState<Thread[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<Filter>('all');

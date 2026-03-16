@@ -54,7 +54,7 @@ export default async function AdminPage() {
       }
     }
     if (userData?.role === 'parent') redirect('/browse');
-    if (userData?.role === 'athlete') redirect('/athlete-dashboard');
+    if (userData?.role === 'coach') redirect('/athlete-dashboard');
     redirect('/');
   }
 

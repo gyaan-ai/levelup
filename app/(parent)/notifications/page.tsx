@@ -19,7 +19,7 @@ export default async function NotificationsPage() {
   if (!user) redirect('/login?redirect=/notifications');
 
   const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
-  const isAthlete = userData?.role === 'athlete';
+  const isAthlete = userData?.role === 'coach';
 
   const { data: notifications } = await supabase
     .from('notifications')

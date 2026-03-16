@@ -19,7 +19,7 @@ export default async function InboxPage() {
     .single();
 
   const role = userData?.role;
-  if (role !== 'parent' && role !== 'athlete' && role !== 'admin') {
+  if (role !== 'parent' && role !== 'coach' && role !== 'admin') {
     redirect('/dashboard');
   }
 

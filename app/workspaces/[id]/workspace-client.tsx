@@ -277,7 +277,7 @@ export function WorkspaceClient({ workspaceId, isCoach = false }: { workspaceId:
         </CardContent>
       </Card>
 
-      <ActionItemsSection workspaceId={workspaceId} isCoach={userRole === 'athlete'} />
+      <ActionItemsSection workspaceId={workspaceId} isCoach={userRole === 'coach'} />
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>
@@ -438,7 +438,7 @@ export function WorkspaceClient({ workspaceId, isCoach = false }: { workspaceId:
           <SessionsSection
             workspaceId={workspaceId}
             sessions={data.sessions || []}
-            isCoach={userRole === 'athlete'}
+            isCoach={userRole === 'coach'}
             onRefresh={load}
           />
         </CardContent>

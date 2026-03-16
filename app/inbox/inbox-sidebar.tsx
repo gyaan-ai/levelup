@@ -30,7 +30,7 @@ function workspaceLabel(ws: WorkspaceItem): string {
   return kidName ? `${coachName} · ${kidName}` : coachName;
 }
 
-export function InboxSidebar({ role, className }: { role: 'parent' | 'athlete' | 'youth_wrestler'; className?: string }) {
+export function InboxSidebar({ role, className }: { role: 'parent' | 'coach' | 'youth_wrestler'; className?: string }) {
   const pathname = usePathname();
   const [groups, setGroups] = useState<Group[]>([]);
   const [threads, setThreads] = useState<DmThread[]>([]);
@@ -38,7 +38,7 @@ export function InboxSidebar({ role, className }: { role: 'parent' | 'athlete' |
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const workspacesPromise = (role === 'parent' || role === 'athlete' || role === 'youth_wrestler')
+    const workspacesPromise = (role === 'parent' || role === 'coach' || role === 'youth_wrestler')
       ? fetch('/api/workspaces').then((r) => r.json()).then((d) => d.workspaces ?? [])
       : Promise.resolve([]);
     Promise.all([
@@ -66,7 +66,7 @@ export function InboxSidebar({ role, className }: { role: 'parent' | 'athlete' |
         <section>
           <div className="flex items-center justify-between px-2 py-1">
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Direct messages</span>
-            {(role === 'parent' || role === 'athlete') && (
+            {(role === 'parent' || role === 'coach') && (
               <Link href="/inbox/new" title="New message" className="inline-flex items-center justify-center min-h-[44px] min-w-[44px] rounded-md hover:bg-muted/50">
                 <Button variant="ghost" size="icon" className="h-8 w-8 pointer-events-none">
                   <Plus className="h-4 w-4" />
@@ -104,7 +104,7 @@ export function InboxSidebar({ role, className }: { role: 'parent' | 'athlete' |
           )}
         </section>
 
-        {(role === 'parent' || role === 'athlete' || role === 'youth_wrestler') && (
+        {(role === 'parent' || role === 'coach' || role === 'youth_wrestler') && (
           <section>
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide px-2 py-1 block">Hubs</span>
             {loading ? (
@@ -132,7 +132,7 @@ export function InboxSidebar({ role, className }: { role: 'parent' | 'athlete' |
             )}
           </section>
         )}
-        {(role === 'athlete' || role === 'parent') && (
+        {(role === 'coach' || role === 'parent') && (
           <section>
             <div className="flex items-center justify-between px-2 py-1">
               <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Groups</span>

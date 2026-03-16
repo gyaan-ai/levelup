@@ -31,7 +31,7 @@ export default async function WorkspacesPage() {
   if (!user) redirect('/login');
 
   const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
-  if (userData?.role !== 'parent' && userData?.role !== 'athlete' && userData?.role !== 'admin' && userData?.role !== 'youth_wrestler') {
+  if (userData?.role !== 'parent' && userData?.role !== 'coach' && userData?.role !== 'admin' && userData?.role !== 'youth_wrestler') {
     redirect('/');
   }
 
@@ -68,7 +68,7 @@ export default async function WorkspacesPage() {
         }
       }
     }
-  } else if (userData?.role === 'athlete') {
+  } else if (userData?.role === 'coach') {
     const { data: sessions } = await admin.from('sessions').select('id, parent_id, athlete_id').eq('athlete_id', user.id).in('status', ['scheduled', 'completed']);
     if (sessions?.length) {
       const { data: participants } = await admin.from('session_participants').select('session_id, youth_wrestler_id').in('session_id', sessions.map((s) => s.id));
@@ -96,7 +96,7 @@ export default async function WorkspacesPage() {
   `).order('updated_at', { ascending: false });
 
   if (userData?.role === 'parent') query = query.eq('parent_id', user.id);
-  else if (userData?.role === 'athlete') query = query.eq('athlete_id', user.id);
+  else if (userData?.role === 'coach') query = query.eq('athlete_id', user.id);
   else if (userData?.role === 'youth_wrestler') query = query.eq('youth_wrestler_id', user.id);
 
   const { data: workspaces } = await query;
@@ -108,7 +108,7 @@ export default async function WorkspacesPage() {
         <p className="text-muted-foreground mt-1">
           {userData?.role === 'parent'
             ? 'Collaboration spaces with your wrestler\'s coaches — goals, video, session notes, and actions'
-            : userData?.role === 'athlete'
+            : userData?.role === 'coach'
             ? 'Your coaching spaces — track goals, review video, and assign actions to your athletes'
             : userData?.role === 'youth_wrestler'
             ? 'Your spaces with each coach — goals, video, session notes, and actions'

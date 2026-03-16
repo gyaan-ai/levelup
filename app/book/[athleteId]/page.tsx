@@ -50,7 +50,7 @@ export default async function BookPage({
     .eq('id', user.id)
     .single();
 
-  if (userData?.role === 'athlete') redirect('/athlete-dashboard');
+  if (userData?.role === 'coach') redirect('/athlete-dashboard');
   if (userData?.role !== 'parent' && userData?.role !== 'admin') redirect('/browse');
   // parent and admin can both book (admin can test flow)
 

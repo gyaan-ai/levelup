@@ -1,7 +1,12 @@
--- Complete seed script for test coaches (NCAA or club)
--- Run this in Supabase SQL Editor
--- 
--- IMPORTANT: This script requires auth users to exist first!
+-- TEST/DEV SEED ONLY — DO NOT RUN IN PRODUCTION
+-- This script adds DUMMY coaches (Jake Miller, Emma Davis, Marcus Lee) for local/dev.
+-- Run in Supabase SQL Editor only for a local or test project.
+--
+-- To fix real coach roles in production, run the migration:
+--   20240161000000_rename_athlete_role_to_coach.sql
+-- (That migration updates everyone with role 'athlete' to 'coach'.)
+--
+-- This script requires auth users to exist first!
 -- Run seed-athletes-auth-users.sql FIRST, or create auth users via Dashboard
 --
 -- This script will:
@@ -33,8 +38,8 @@ DECLARE
 BEGIN
   -- Insert into public.users (auth user must exist first!)
   INSERT INTO public.users (id, email, role)
-  VALUES (jake_user_id, jake_email, 'athlete')
-  ON CONFLICT (id) DO UPDATE SET email = jake_email, role = 'athlete';
+  VALUES (jake_user_id, jake_email, 'coach')
+  ON CONFLICT (id) DO UPDATE SET email = jake_email, role = 'coach';
   
   -- Insert athlete profile
   INSERT INTO public.athletes (
@@ -113,8 +118,8 @@ DECLARE
 BEGIN
   -- Insert into public.users (auth user must exist first!)
   INSERT INTO public.users (id, email, role)
-  VALUES (emma_user_id, emma_email, 'athlete')
-  ON CONFLICT (id) DO UPDATE SET email = emma_email, role = 'athlete';
+  VALUES (emma_user_id, emma_email, 'coach')
+  ON CONFLICT (id) DO UPDATE SET email = emma_email, role = 'coach';
   
   -- Insert athlete profile
   INSERT INTO public.athletes (
@@ -193,8 +198,8 @@ DECLARE
 BEGIN
   -- Insert into public.users (auth user must exist first!)
   INSERT INTO public.users (id, email, role)
-  VALUES (marcus_user_id, marcus_email, 'athlete')
-  ON CONFLICT (id) DO UPDATE SET email = marcus_email, role = 'athlete';
+  VALUES (marcus_user_id, marcus_email, 'coach')
+  ON CONFLICT (id) DO UPDATE SET email = marcus_email, role = 'coach';
   
   -- Insert athlete profile
   INSERT INTO public.athletes (
@@ -264,9 +269,11 @@ BEGIN
 END $$;
 
 -- ============================================================================
--- VERIFICATION QUERY
+-- VERIFICATION QUERY (local/dev only — only returns the 3 dummy seed coaches)
 -- ============================================================================
--- Verify the seed data was created successfully
+-- In production, to list all coaches run:
+--   SELECT id, email, role FROM public.users WHERE role = 'coach';
+--   (and join to athletes for names/schools)
 SELECT 
   a.id,
   a.first_name || ' ' || a.last_name AS name,

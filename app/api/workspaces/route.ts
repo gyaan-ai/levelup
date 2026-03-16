@@ -60,7 +60,7 @@ export async function GET(req: NextRequest) {
 
     const admin = createAdminClient(tenant.slug);
 
-    if (userData?.role !== 'parent' && userData?.role !== 'athlete' && userData?.role !== 'youth_wrestler' && userData?.role !== 'admin') {
+    if (userData?.role !== 'parent' && userData?.role !== 'coach' && userData?.role !== 'youth_wrestler' && userData?.role !== 'admin') {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -90,7 +90,7 @@ export async function GET(req: NextRequest) {
           }
         }
       }
-    } else if (userData?.role === 'athlete') {
+    } else if (userData?.role === 'coach') {
       const { data: sessions } = await admin
         .from('sessions')
         .select('id, parent_id, athlete_id')
@@ -161,7 +161,7 @@ export async function GET(req: NextRequest) {
 
     if (userData?.role === 'parent') {
       query = query.eq('parent_id', user.id);
-    } else if (userData?.role === 'athlete') {
+    } else if (userData?.role === 'coach') {
       query = query.eq('athlete_id', user.id);
     } else if (userData?.role === 'youth_wrestler') {
       query = query.eq('youth_wrestler_id', user.id);
@@ -200,7 +200,7 @@ export async function POST(req: NextRequest) {
     if (userData?.role === 'parent' && parentId !== user.id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
-    if (userData?.role === 'athlete' && athleteId !== user.id) {
+    if (userData?.role === 'coach' && athleteId !== user.id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 

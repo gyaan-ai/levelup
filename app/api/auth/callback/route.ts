@@ -61,7 +61,7 @@ export async function GET(req: NextRequest) {
 
     const role = userData?.role || 'parent';
     const redirectPath = 
-      role === 'athlete' ? '/athlete-dashboard' :
+      role === 'coach' ? '/athlete-dashboard' :
       role === 'youth_wrestler' ? '/youth-dashboard' :
       '/dashboard';
     // Admins land on product (/dashboard); use Admin nav link to switch to admin.

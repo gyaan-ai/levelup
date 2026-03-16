@@ -42,7 +42,7 @@ export default async function BrowsePage({
     .eq('id', user.id)
     .single();
 
-  if (userData?.role === 'athlete') {
+  if (userData?.role === 'coach') {
     redirect('/athlete-dashboard');
   }
   // parent and admin can both access browse (admin can switch to product view)

@@ -58,7 +58,7 @@ export default async function AdminUsersPage() {
     }));
   }
 
-  const athleteIds = userRows.filter((u) => u.role === 'athlete').map((u) => u.id);
+  const athleteIds = userRows.filter((u) => u.role === 'coach').map((u) => u.id);
   const athleteMap = new Map<string, { first_name: string; last_name: string; school: string; active: boolean }>();
   if (athleteIds.length > 0) {
     const { data: athletes } = await admin
@@ -77,14 +77,14 @@ export default async function AdminUsersPage() {
   }
 
   const users: AdminUserRow[] = userRows.map((u) => {
-    const profile = u.role === 'athlete' ? athleteMap.get(u.id) : null;
+    const profile = u.role === 'coach' ? athleteMap.get(u.id) : null;
     const display_name =
       profile ? [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim() || null : null;
     return {
       ...u,
       display_name: display_name ?? null,
       school: profile?.school ?? null,
-      athlete_active: u.role === 'athlete' ? (profile?.active ?? false) : null,
+      athlete_active: u.role === 'coach' ? (profile?.active ?? false) : null,
     };
   });
 

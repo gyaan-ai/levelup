@@ -31,7 +31,7 @@ export async function PUT(req: NextRequest) {
       .eq('id', user.id)
       .single();
 
-    if (!userData || userData.role !== 'athlete') {
+    if (!userData || userData.role !== 'coach') {
       return NextResponse.json({ error: 'User is not an athlete' }, { status: 400 });
     }
 

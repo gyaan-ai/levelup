@@ -16,14 +16,14 @@ export default async function InboxNewPage() {
 
   const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
   const role = userData?.role;
-  if (role !== 'parent' && role !== 'athlete' && role !== 'admin') redirect('/inbox');
+  if (role !== 'parent' && role !== 'coach' && role !== 'admin') redirect('/inbox');
 
   return (
     <div className="flex flex-col h-full">
       <div className="p-4 border-b border-border">
         <h1 className="text-xl font-bold">New message</h1>
         <p className="text-sm text-muted-foreground">
-          {role === 'athlete'
+          {role === 'coach'
             ? 'Start a direct message with a parent or create a group.'
             : 'Start a direct message with any coach.'}
         </p>

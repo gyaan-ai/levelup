@@ -120,7 +120,7 @@ export default async function AthleteProfilePage({
     : { data: null };
   const isParent = userData?.role === 'parent';
   const isAdmin = userData?.role === 'admin';
-  const isOwnProfile = !!user && user.id === id && userData?.role === 'athlete';
+  const isOwnProfile = !!user && user.id === id && userData?.role === 'coach';
   const canDelete = isAdmin || isParent || isOwnProfile;
   const canEdit = isOwnProfile || isAdmin;
   const athleteName = `${athlete.first_name} ${athlete.last_name}`.trim() || 'This coach';

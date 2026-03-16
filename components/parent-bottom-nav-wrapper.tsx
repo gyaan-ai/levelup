@@ -54,7 +54,7 @@ export function ParentBottomNavWrapper({ children }: { children: React.ReactNode
   const pathname = usePathname();
   const { effectiveRole } = useAuth();
   const showParentNav = effectiveRole === 'parent' && isParentRoute(pathname);
-  const showCoachNav = effectiveRole === 'athlete' && isCoachRoute(pathname);
+  const showCoachNav = effectiveRole === 'coach' && isCoachRoute(pathname);
   const showNav = showParentNav || showCoachNav;
 
   return (

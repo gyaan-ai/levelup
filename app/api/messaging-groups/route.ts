@@ -50,7 +50,7 @@ export async function POST(req: Request) {
 
     const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
     const role = userData?.role;
-    if (role !== 'athlete' && role !== 'parent' && role !== 'admin') {
+    if (role !== 'coach' && role !== 'parent' && role !== 'admin') {
       return NextResponse.json({ error: 'Only coaches or parents can create groups' }, { status: 403 });
     }
 
@@ -58,7 +58,7 @@ export async function POST(req: Request) {
     const name = typeof body.name === 'string' ? body.name.trim() : '';
     if (!name) return NextResponse.json({ error: 'Group name is required' }, { status: 400 });
 
-    if (role === 'athlete' || role === 'admin') {
+    if (role === 'coach' || role === 'admin') {
       const { data: athlete } = await supabase
         .from('athletes')
         .select('id')

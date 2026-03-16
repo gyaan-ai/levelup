@@ -26,13 +26,13 @@ export function Header() {
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [notificationCount, refreshNotifications] = useNotificationCount(!!user);
-  const showInboxIcon = effectiveRole === 'parent' || effectiveRole === 'athlete' || effectiveRole === 'youth_wrestler';
+  const showInboxIcon = effectiveRole === 'parent' || effectiveRole === 'coach' || effectiveRole === 'youth_wrestler';
   const [inboxUnreadCount, refreshInboxUnread] = useInboxUnreadCount(!!user && showInboxIcon);
 
   const handleViewAsChange = (value: string) => {
-    setViewAsRole(value === 'admin' ? null : (value as 'athlete' | 'parent' | 'youth_wrestler'));
+    setViewAsRole(value === 'admin' ? null : (value as 'coach' | 'parent' | 'youth_wrestler'));
     if (value === 'admin') router.push('/admin');
-    else if (value === 'athlete') router.push('/athlete-dashboard');
+    else if (value === 'coach') router.push('/athlete-dashboard');
     else if (value === 'parent') router.push('/dashboard');
     else if (value === 'youth_wrestler') router.push('/youth-dashboard');
   };
@@ -73,7 +73,7 @@ export function Header() {
             <>
             {/* Post-login: nav aligned to profile (athlete = coach, parent, youth_wrestler, admin) */}
             <nav className="hidden md:flex items-center gap-6">
-              {effectiveRole === 'athlete' && (
+              {effectiveRole === 'coach' && (
                 <>
                   {isAdmin && (
                     <>
@@ -93,7 +93,7 @@ export function Header() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="admin">Admin</SelectItem>
-                          <SelectItem value="athlete">Coach</SelectItem>
+                          <SelectItem value="coach">Coach</SelectItem>
                           <SelectItem value="parent">Parent</SelectItem>
                           <SelectItem value="youth_wrestler">Athlete</SelectItem>
                         </SelectContent>
@@ -166,7 +166,7 @@ export function Header() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="admin">Admin</SelectItem>
-                          <SelectItem value="athlete">Coach</SelectItem>
+                          <SelectItem value="coach">Coach</SelectItem>
                           <SelectItem value="parent">Parent</SelectItem>
                           <SelectItem value="youth_wrestler">Athlete</SelectItem>
                         </SelectContent>
@@ -231,7 +231,7 @@ export function Header() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="admin">Admin</SelectItem>
-                      <SelectItem value="athlete">Coach</SelectItem>
+                      <SelectItem value="coach">Coach</SelectItem>
                       <SelectItem value="parent">Parent</SelectItem>
                       <SelectItem value="youth_wrestler">Athlete</SelectItem>
                     </SelectContent>
@@ -258,7 +258,7 @@ export function Header() {
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="admin">Admin</SelectItem>
-                          <SelectItem value="athlete">Coach</SelectItem>
+                          <SelectItem value="coach">Coach</SelectItem>
                           <SelectItem value="parent">Parent</SelectItem>
                           <SelectItem value="youth_wrestler">Athlete</SelectItem>
                         </SelectContent>
@@ -318,7 +318,7 @@ export function Header() {
                 aria-label="Mobile navigation"
               >
                 <div className="container mx-auto px-0 py-2">
-                  {effectiveRole === 'athlete' && (
+                  {effectiveRole === 'coach' && (
                     <>
                       {isAdmin && (
                     <>
@@ -331,7 +331,7 @@ export function Header() {
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="admin">Admin</SelectItem>
-                            <SelectItem value="athlete">Coach</SelectItem>
+                            <SelectItem value="coach">Coach</SelectItem>
                             <SelectItem value="parent">Parent</SelectItem>
                             <SelectItem value="youth_wrestler">Athlete</SelectItem>
                           </SelectContent>
@@ -380,7 +380,7 @@ export function Header() {
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="admin">Admin</SelectItem>
-                            <SelectItem value="athlete">Coach</SelectItem>
+                            <SelectItem value="coach">Coach</SelectItem>
                             <SelectItem value="parent">Parent</SelectItem>
                             <SelectItem value="youth_wrestler">Athlete</SelectItem>
                           </SelectContent>
@@ -427,7 +427,7 @@ export function Header() {
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="admin">Admin</SelectItem>
-                            <SelectItem value="athlete">Coach</SelectItem>
+                            <SelectItem value="coach">Coach</SelectItem>
                             <SelectItem value="parent">Parent</SelectItem>
                             <SelectItem value="youth_wrestler">Athlete</SelectItem>
                           </SelectContent>
@@ -448,7 +448,7 @@ export function Header() {
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="admin">Admin</SelectItem>
-                            <SelectItem value="athlete">Coach</SelectItem>
+                            <SelectItem value="coach">Coach</SelectItem>
                             <SelectItem value="parent">Parent</SelectItem>
                             <SelectItem value="youth_wrestler">Athlete</SelectItem>
                           </SelectContent>
@@ -510,7 +510,7 @@ export function Header() {
                 Browse Coaches
               </Link>
               <Link
-                href="/signup?role=athlete"
+                href="/signup?role=coach"
                 className="text-white hover:text-accent transition-colors font-medium"
               >
                 For Coaches
@@ -554,7 +554,7 @@ export function Header() {
               <nav className="absolute left-0 right-0 top-full bg-primary border-b border-accent/20 shadow-lg md:hidden" aria-label="Mobile navigation">
                 <div className="container mx-auto px-0 py-2">
                   <Link href="/browse" className={navLinkClass} onClick={() => setMobileOpen(false)}>Browse Coaches</Link>
-                  <Link href="/signup?role=athlete" className={navLinkClass} onClick={() => setMobileOpen(false)}>For Coaches</Link>
+                  <Link href="/signup?role=coach" className={navLinkClass} onClick={() => setMobileOpen(false)}>For Coaches</Link>
                   <Link href="/how-it-works" className={navLinkClass} onClick={() => setMobileOpen(false)}>How It Works</Link>
                   <Link href="/login" className={navLinkClass} onClick={() => setMobileOpen(false)}>Login</Link>
                   <Link href="/signup" className={navLinkClass} onClick={() => setMobileOpen(false)}>

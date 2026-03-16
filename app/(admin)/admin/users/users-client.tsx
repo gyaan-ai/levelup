@@ -199,7 +199,7 @@ export function AdminUsersClient({ initialUsers }: { initialUsers: AdminUserRow[
   };
 
   const viewProfileUrl = (u: AdminUserRow) => {
-    if (u.role === 'athlete') return `/athlete/${u.id}`;
+    if (u.role === 'coach') return `/athlete/${u.id}`;
     if (u.role === 'parent') return '/bookings';
     return null;
   };
@@ -225,7 +225,7 @@ export function AdminUsersClient({ initialUsers }: { initialUsers: AdminUserRow[
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All roles</SelectItem>
-                <SelectItem value="athlete">Coaches</SelectItem>
+                <SelectItem value="coach">Coaches</SelectItem>
                 <SelectItem value="parent">Parents</SelectItem>
                 <SelectItem value="admin">Admin</SelectItem>
                 <SelectItem value="youth_wrestler">Athlete</SelectItem>
@@ -324,7 +324,7 @@ export function AdminUsersClient({ initialUsers }: { initialUsers: AdminUserRow[
                         ) : (
                           <span className="text-muted-foreground">Active</span>
                         )}
-                        {u.role === 'athlete' && u.athlete_active !== undefined && (
+                        {u.role === 'coach' && u.athlete_active !== undefined && (
                           <div className="mt-1">
                             {u.athlete_active ? (
                               <Badge variant="outline" className="text-xs font-normal">Visible on Browse</Badge>
@@ -344,7 +344,7 @@ export function AdminUsersClient({ initialUsers }: { initialUsers: AdminUserRow[
                                   View profile
                                 </Button>
                               </Link>
-                              {u.role === 'athlete' && (
+                              {u.role === 'coach' && (
                                 <Link href={`/admin?tab=athletes&edit=${u.id}`}>
                                   <Button variant="ghost" size="sm" className="h-8">
                                     <Pencil className="h-4 w-4 mr-1" />
@@ -452,7 +452,7 @@ export function AdminUsersClient({ initialUsers }: { initialUsers: AdminUserRow[
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="parent">Parent</SelectItem>
-                  <SelectItem value="athlete">Coach</SelectItem>
+                  <SelectItem value="coach">Coach</SelectItem>
                   <SelectItem value="admin">Admin</SelectItem>
                   <SelectItem value="youth_wrestler">Athlete</SelectItem>
                 </SelectContent>

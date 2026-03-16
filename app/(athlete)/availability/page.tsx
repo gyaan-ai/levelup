@@ -24,7 +24,7 @@ export default async function AvailabilityPage() {
     .eq('id', user.id)
     .single();
 
-  if (userData?.role !== 'athlete' && userData?.role !== 'admin') {
+  if (userData?.role !== 'coach' && userData?.role !== 'admin') {
     if (userData?.role === 'parent') redirect('/browse');
     redirect('/login');
   }

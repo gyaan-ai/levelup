@@ -16,7 +16,7 @@ export default async function MyCoachesPage() {
   if (!user) redirect('/login');
 
   const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
-  if (userData?.role === 'athlete') redirect('/athlete-dashboard');
+  if (userData?.role === 'coach') redirect('/athlete-dashboard');
   if (userData?.role !== 'parent' && userData?.role !== 'admin') redirect('/');
   // parent and admin can both access (admin can switch to product view)
 

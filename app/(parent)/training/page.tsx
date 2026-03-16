@@ -47,7 +47,7 @@ export default async function TrainingPage({
   if (!user) redirect('/login');
 
   const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
-  if (userData?.role === 'athlete') redirect('/athlete-dashboard');
+  if (userData?.role === 'coach') redirect('/athlete-dashboard');
   if (userData?.role !== 'parent' && userData?.role !== 'admin' && userData?.role !== 'youth_wrestler') redirect('/dashboard');
 
   const { data: facilities } = await supabase

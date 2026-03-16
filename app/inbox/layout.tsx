@@ -25,12 +25,12 @@ export default async function InboxLayout({
     .single();
 
   const role = userData?.role;
-  if (role !== 'parent' && role !== 'athlete' && role !== 'youth_wrestler' && role !== 'admin') {
+  if (role !== 'parent' && role !== 'coach' && role !== 'youth_wrestler' && role !== 'admin') {
     redirect('/dashboard');
   }
 
   // Admins see Community like a parent (Spaces, DMs). Envelope goes here; Admin nav link goes to /admin.
-  const sidebarRole = role === 'admin' ? 'parent' : (role as 'parent' | 'athlete' | 'youth_wrestler');
+  const sidebarRole = role === 'admin' ? 'parent' : (role as 'parent' | 'coach' | 'youth_wrestler');
 
   return (
     <InboxLayoutClient role={sidebarRole}>

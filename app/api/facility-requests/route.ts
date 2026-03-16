@@ -16,7 +16,7 @@ export async function POST(req: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
-    if (userData?.role !== 'athlete') return NextResponse.json({ error: 'Only coaches can request facilities' }, { status: 403 });
+    if (userData?.role !== 'coach') return NextResponse.json({ error: 'Only coaches can request facilities' }, { status: 403 });
 
     const body = await req.json().catch(() => ({})) as { name?: string; school?: string; address?: string };
     const name = typeof body.name === 'string' ? body.name.trim() : '';

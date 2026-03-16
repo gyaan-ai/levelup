@@ -24,7 +24,7 @@ export async function PATCH(
 
     const body = await req.json().catch(() => ({})) as { role?: string; archived_at?: string | null };
     const updates: { role?: string; archived_at?: string | null; updated_at?: string } = {};
-    if (typeof body.role === 'string' && ['parent', 'athlete', 'admin', 'youth_wrestler'].includes(body.role)) {
+    if (typeof body.role === 'string' && ['parent', 'coach', 'admin', 'youth_wrestler'].includes(body.role)) {
       updates.role = body.role;
     }
     if (body.archived_at !== undefined) {

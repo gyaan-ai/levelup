@@ -7,15 +7,15 @@ import { User } from '@supabase/supabase-js';
 
 const VIEW_AS_STORAGE_KEY = 'levelup_view_as_role';
 
-export type ViewAsRole = 'admin' | 'athlete' | 'parent' | 'youth_wrestler';
+export type ViewAsRole = 'admin' | 'coach' | 'parent' | 'youth_wrestler';
 
 interface AuthContextType {
   user: User | null;
-  userRole: 'parent' | 'athlete' | 'admin' | 'youth_wrestler' | null;
+  userRole: 'parent' | 'coach' | 'admin' | 'youth_wrestler' | null;
   /** When admin uses "View as" dropdown, this is the selected role; otherwise null. */
   viewAsRole: ViewAsRole | null;
   /** Role to use for UI (nav, etc.). For admins with viewAsRole set, this is viewAsRole; else userRole. */
-  effectiveRole: 'parent' | 'athlete' | 'admin' | 'youth_wrestler' | null;
+  effectiveRole: 'parent' | 'coach' | 'admin' | 'youth_wrestler' | null;
   setViewAsRole: (role: ViewAsRole | null) => void;
   loading: boolean;
   signOut: () => Promise<void>;
@@ -32,7 +32,7 @@ export function AuthProvider({
   tenantSlug: string;
 }) {
   const [user, setUser] = useState<User | null>(null);
-  const [userRole, setUserRole] = useState<'parent' | 'athlete' | 'admin' | 'youth_wrestler' | null>(null);
+  const [userRole, setUserRole] = useState<'parent' | 'coach' | 'admin' | 'youth_wrestler' | null>(null);
   const [viewAsRole, setViewAsRoleState] = useState<ViewAsRole | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
@@ -46,7 +46,7 @@ export function AuthProvider({
     }
   }, []);
 
-  const effectiveRole: 'parent' | 'athlete' | 'admin' | 'youth_wrestler' | null =
+  const effectiveRole: 'parent' | 'coach' | 'admin' | 'youth_wrestler' | null =
     userRole === 'admin' && viewAsRole ? viewAsRole : userRole;
 
   const fetchUserRole = useCallback(async (userId: string) => {
@@ -65,7 +65,7 @@ export function AuthProvider({
       }
 
       if (data && data.role) {
-        setUserRole(data.role as 'parent' | 'athlete' | 'admin' | 'youth_wrestler');
+        setUserRole(data.role as 'parent' | 'coach' | 'admin' | 'youth_wrestler');
       } else {
         // User record doesn't exist yet - this can happen during signup
         setUserRole(null);
@@ -96,7 +96,7 @@ export function AuthProvider({
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const stored = window.localStorage.getItem(VIEW_AS_STORAGE_KEY) as ViewAsRole | null;
-      if (stored && ['admin', 'athlete', 'parent', 'youth_wrestler'].includes(stored)) {
+      if (stored && ['admin', 'coach', 'parent', 'youth_wrestler'].includes(stored)) {
         setViewAsRoleState(stored);
       }
     }

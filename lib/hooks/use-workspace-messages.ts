@@ -33,7 +33,7 @@ async function resolveAuthorName(
     .maybeSingle();
   if (a) {
     const name = `${(a as { first_name?: string; last_name?: string }).first_name || ''} ${(a as { first_name?: string; last_name?: string }).last_name || ''}`.trim();
-    if (name) return { id: authorId, name, role: 'athlete' };
+    if (name) return { id: authorId, name, role: 'coach' };
   }
   const { data: y } = await supabase
     .from('youth_wrestlers')

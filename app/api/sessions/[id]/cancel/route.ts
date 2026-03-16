@@ -39,7 +39,7 @@ export async function POST(
 
     const isParent = userData?.role === 'parent';
     const isAdmin = userData?.role === 'admin';
-    const isAthlete = userData?.role === 'athlete';
+    const isAthlete = userData?.role === 'coach';
 
     if (!isParent && !isAdmin && !isAthlete) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });

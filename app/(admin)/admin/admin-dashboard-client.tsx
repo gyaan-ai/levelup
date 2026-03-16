@@ -800,7 +800,7 @@ export function AdminDashboardClient({
                 <SelectContent>
                   <SelectItem value="all">All roles</SelectItem>
                   <SelectItem value="parent">Parent</SelectItem>
-                  <SelectItem value="athlete">Athlete</SelectItem>
+                  <SelectItem value="coach">Coach</SelectItem>
                   <SelectItem value="admin">Admin</SelectItem>
                   <SelectItem value="youth_wrestler">Athlete</SelectItem>
                 </SelectContent>

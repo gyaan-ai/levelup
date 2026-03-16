@@ -14,7 +14,7 @@ export function FollowCoachButton({ coachId, className }: Props) {
   const [toggleLoading, setToggleLoading] = useState(false);
 
   const canFollow = userRole === 'parent' || userRole === 'admin';
-  const hideButton = userRole === 'athlete' || !user;
+  const hideButton = userRole === 'coach' || !user;
 
   useEffect(() => {
     if (!user || !canFollow) {

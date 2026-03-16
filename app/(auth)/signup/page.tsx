@@ -32,7 +32,7 @@ const signupSchema = z.object({
   email: z.string().email('Invalid email address'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
   confirmPassword: z.string(),
-  role: z.enum(['parent', 'athlete', 'youth_wrestler']),
+  role: z.enum(['parent', 'coach', 'youth_wrestler']),
   coachType: z.enum(['ncaa_athlete', 'club_hs_coach']).optional(),
   firstName: z.string().optional(),
   lastName: z.string().optional(),
@@ -42,7 +42,7 @@ const signupSchema = z.object({
   message: "Passwords don&apos;t match",
   path: ['confirmPassword'],
 }).refine((data) => {
-  if (data.role === 'athlete') {
+  if (data.role === 'coach') {
     return data.firstName && data.lastName && data.coachType && data.school?.trim();
   }
   return true;
@@ -66,7 +66,7 @@ export default function SignupPage() {
     !redirectTo.includes(':')
       ? redirectTo
       : null;
-  const defaultRole = inviteToken ? 'parent' : (roleParam === 'athlete' ? 'athlete' : 'parent');
+  const defaultRole = inviteToken ? 'parent' : (roleParam === 'coach' ? 'coach' : 'parent');
   const tenant = useTenant();
   const supabase = createClient(tenant.slug);
   const [loading, setLoading] = useState(false);
@@ -89,7 +89,7 @@ export default function SignupPage() {
 
   useEffect(() => {
     if (inviteToken) form.setValue('role', 'parent');
-    else if (roleParam === 'athlete') form.setValue('role', 'athlete');
+    else if (roleParam === 'coach') form.setValue('role', 'coach');
   }, [inviteToken, roleParam, form]);
 
   const selectedRole = form.watch('role');
@@ -154,7 +154,7 @@ export default function SignupPage() {
       }
 
       // Redirect based on role (coaches go to onboarding first to complete profile)
-      if (role === 'athlete') {
+      if (role === 'coach') {
         router.push('/onboarding');
       } else if (role === 'youth_wrestler') {
         router.push('/youth-dashboard');
@@ -203,7 +203,7 @@ export default function SignupPage() {
                       </FormControl>
                       <SelectContent>
                         <SelectItem value="parent">Parent</SelectItem>
-                        <SelectItem value="athlete">Coach</SelectItem>
+                        <SelectItem value="coach">Coach</SelectItem>
                         <SelectItem value="youth_wrestler">Athlete</SelectItem>
                       </SelectContent>
                     </Select>
@@ -234,7 +234,7 @@ export default function SignupPage() {
                 />
               )}
 
-              {(selectedRole === 'athlete' || selectedRole === 'youth_wrestler') && (
+              {(selectedRole === 'coach' || selectedRole === 'youth_wrestler') && (
                 <>
                   <FormField
                     control={form.control}
@@ -264,7 +264,7 @@ export default function SignupPage() {
                     )}
                   />
 
-                  {selectedRole === 'athlete' && (
+                  {selectedRole === 'coach' && (
                     <>
                       <FormField
                         control={form.control}
