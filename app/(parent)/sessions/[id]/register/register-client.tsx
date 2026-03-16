@@ -170,7 +170,7 @@ export function SessionRegisterClient({ sessionId, isOwner, isSmallGroup = false
             <Input
               id="promo"
               type="text"
-              placeholder="e.g. GUILDLAUNCH"
+              placeholder=""
               value={promoCode}
               onChange={(e) => { setPromoCode(e.target.value.toUpperCase()); setError(null); setCodeApplied(false); }}
               className="uppercase flex-1"

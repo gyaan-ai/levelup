@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import { getStripeInstance } from '@/lib/stripe/webhooks';
 import { formatEST } from '@/lib/format-date';
+import { createRegisterConfirmationToken } from '@/lib/confirmation-token';
 
 /**
  * POST - Pay & register a youth wrestler for a session (public or invite_only).
@@ -201,7 +202,8 @@ export async function POST(
 
     const stripe = getStripeInstance(tenant.slug);
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (host.startsWith('localhost') ? `http://${host}` : `https://${host}`);
-    const successUrl = `${baseUrl}/sessions/${sessionId}/register/confirmed`;
+    const confirmToken = createRegisterConfirmationToken(sessionId);
+    const successUrl = `${baseUrl}/sessions/${sessionId}/register/confirmed?t=${encodeURIComponent(confirmToken)}`;
     const cancelUrl = req.headers.get('referer') || `${baseUrl}/training`;
 
     const dt = s.scheduled_datetime ? new Date(s.scheduled_datetime) : null;
