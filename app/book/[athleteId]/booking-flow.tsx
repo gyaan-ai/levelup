@@ -371,8 +371,25 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
             </CardContent>
           </Card>
 
-          {/* Step 1: Select Wrestler(s) */}
-          {currentStep === 1 && (
+          {/* Step 1: Select Wrestler(s) — or prompt to add one */}
+          {currentStep === 1 && youthWrestlers.length === 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Add your wrestler to book</CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  You need at least one wrestler on your account to book a session with {athlete.first_name} {athlete.last_name}. Add one below and you’ll return here to continue.
+                </p>
+              </CardHeader>
+              <CardContent>
+                <Button asChild className="w-full">
+                  <Link href={`/wrestlers/add?redirect=${encodeURIComponent('/book/' + athlete.id)}`}>
+                    Add wrestler
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+          )}
+          {currentStep === 1 && youthWrestlers.length > 0 && (
             <Card>
               <CardHeader>
                 <CardTitle>Select Wrestler(s)</CardTitle>

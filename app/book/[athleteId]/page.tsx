@@ -74,9 +74,9 @@ export default async function BookPage({
     .eq('active', true)
     .order('created_at', { ascending: false });
 
-  if (!youthWrestlers || youthWrestlers.length === 0) {
-    redirect('/wrestlers/add?redirect=' + encodeURIComponent('/book/' + athleteId));
-  }
+  // When parent has no wrestlers, still render the book page so "See availability" lands here;
+  // BookingFlow will show an "Add your wrestler to book" CTA instead of redirecting away.
+  const youthWrestlersList = youthWrestlers ?? [];
 
   // Get facility info if available
   let facility = null;
@@ -133,7 +133,7 @@ export default async function BookPage({
     <BookingFlow
       athlete={athlete}
       facility={facility}
-      youthWrestlers={youthWrestlers || []}
+      youthWrestlers={youthWrestlersList}
       tenantPricing={tenant.pricing}
       products={products}
       preselectedYouthWrestlerId={preselectedYouthWrestlerId}
