@@ -338,24 +338,23 @@ export function BrowseAthletesClient({ initialAthletes, isAdmin, initialYouthWre
                       {athlete.weight_class && `${athlete.weight_class} lbs`}
                     </div>
 
-                    {rating > 0 && (
-                      <div className="flex items-center gap-2 text-sm flex-wrap">
-                        <div className="flex gap-0.5" aria-label={`${displayRating} out of 5 stars`}>
-                          {[1, 2, 3, 4, 5].map((i) => (
-                            <Star
-                              key={i}
-                              className={`h-4 w-4 ${i <= Math.round(rating) ? 'fill-accent text-accent' : 'text-muted-foreground/30'}`}
-                            />
-                          ))}
-                        </div>
-                        <span className="font-medium">{displayRating}</span>
-                        {athlete.total_sessions > 0 && (
-                          <span className="text-muted-foreground">
-                            ({athlete.total_sessions} {athlete.total_sessions === 1 ? 'session' : 'sessions'})
-                          </span>
-                        )}
+                    {/* Star value (average) + number of reviews in parentheses */}
+                    <div className="flex items-center gap-2 text-sm flex-wrap">
+                      <div className="flex gap-0.5" aria-label={rating > 0 ? `${displayRating} out of 5 stars` : 'No reviews yet'}>
+                        {[1, 2, 3, 4, 5].map((i) => (
+                          <Star
+                            key={i}
+                            className={`h-4 w-4 ${i <= Math.round(rating) ? 'fill-accent text-accent' : 'text-muted-foreground/30'}`}
+                          />
+                        ))}
                       </div>
-                    )}
+                      <span className="font-medium">{displayRating}</span>
+                      {(athlete.review_count ?? 0) > 0 && (
+                        <span className="text-muted-foreground">
+                          ({(athlete.review_count ?? 0)} {(athlete.review_count ?? 0) === 1 ? 'review' : 'reviews'})
+                        </span>
+                      )}
+                    </div>
 
                     {athlete.nextAvailable && (
                       <div className="flex items-center gap-1.5 text-sm text-muted-foreground">

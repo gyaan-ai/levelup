@@ -148,7 +148,7 @@ export default async function TrainingPage({
   const baseSelect = `
     id, scheduled_datetime, status, session_type, session_mode, join_policy, focus_area,
     current_participants, max_participants, total_price, price_per_participant,
-    athlete_id, facility_id, athletes(id, first_name, last_name, school, photo_url), facilities(id, name, address)
+    athlete_id, facility_id, athletes(id, first_name, last_name, school, photo_url, average_rating, review_count), facilities(id, name, address)
   `;
   const sessions = (start: string, end: string) =>
     supabase.from('sessions').select(baseSelect).gte('scheduled_datetime', start).lte('scheduled_datetime', end);

@@ -35,7 +35,7 @@ type Props = {
     price_per_participant: number | null;
     athlete_id: string;
     facility_id: string;
-    athletes?: { id: string; first_name?: string; last_name?: string; school?: string } | null;
+    athletes?: { id: string; first_name?: string; last_name?: string; school?: string; photo_url?: string; average_rating?: number | null; review_count?: number | null } | null;
     facilities?: { id: string; name?: string; address?: string } | null;
   }>;
   availabilityDate: string;

@@ -75,7 +75,7 @@ export default async function FindTrainingPage({
             price_per_participant,
             athlete_id,
             facility_id,
-            athletes(id, first_name, last_name, school, photo_url),
+            athletes(id, first_name, last_name, school, photo_url, average_rating, review_count),
             facilities(id, name, address)
           `)
           .in('status', ['scheduled', 'pending_payment'])
@@ -127,7 +127,7 @@ export default async function FindTrainingPage({
     twoWeeks.setDate(twoWeeks.getDate() + 14);
     const dayEnd = twoWeeks.toISOString();
     const baseQ = () => {
-      let q = supabase.from('sessions').select('id, scheduled_datetime, session_type, session_mode, join_policy, focus_area, current_participants, max_participants, total_price, price_per_participant, athlete_id, facility_id, athletes(id, first_name, last_name, school, photo_url), facilities(id, name, address)').in('status', ['scheduled', 'pending_payment']).eq('facility_id', sp.location).gte('scheduled_datetime', dayStart).lte('scheduled_datetime', dayEnd);
+      let q = supabase.from('sessions').select('id, scheduled_datetime, session_type, session_mode, join_policy, focus_area, current_participants, max_participants, total_price, price_per_participant, athlete_id, facility_id, athletes(id, first_name, last_name, school, photo_url, average_rating, review_count), facilities(id, name, address)').in('status', ['scheduled', 'pending_payment']).eq('facility_id', sp.location).gte('scheduled_datetime', dayStart).lte('scheduled_datetime', dayEnd);
       if (sp.coach && sp.coach !== 'all') q = q.eq('athlete_id', sp.coach);
       return q;
     };

@@ -19,7 +19,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
-import { MapPin, Calendar, Users, ChevronDown, Clock } from 'lucide-react';
+import { MapPin, Calendar, Users, ChevronDown, Clock, Star } from 'lucide-react';
 import { formatEST } from '@/lib/format-date';
 import { startOfDay } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -43,7 +43,7 @@ type SessionRow = {
   price_per_participant: number | null;
   athlete_id: string;
   facility_id: string;
-  athletes?: { id: string; first_name?: string; last_name?: string; school?: string; photo_url?: string } | null;
+  athletes?: { id: string; first_name?: string; last_name?: string; school?: string; photo_url?: string; average_rating?: number | null; review_count?: number | null } | null;
   facilities?: { id: string; name?: string; address?: string } | null;
 };
 
@@ -400,6 +400,34 @@ export function FindTrainingClient({
                           </span>
                         )}
                       </p>
+                      {coach && (
+                        <div className="flex items-center gap-1.5 text-sm flex-wrap">
+                          {(() => {
+                            const c = coach as { average_rating?: number | null; review_count?: number | null };
+                            const avg = c.average_rating ?? 0;
+                            const displayRating = avg > 0 ? avg.toFixed(1) : 'New';
+                            const reviewCount = c.review_count ?? 0;
+                            return (
+                              <>
+                                <div className="flex gap-0.5" aria-label={avg > 0 ? `${displayRating} out of 5 stars` : 'No reviews yet'}>
+                                  {[1, 2, 3, 4, 5].map((i) => (
+                                    <Star
+                                      key={i}
+                                      className={`h-3.5 w-3.5 ${i <= Math.round(avg) ? 'fill-accent text-accent' : 'text-muted-foreground/30'}`}
+                                    />
+                                  ))}
+                                </div>
+                                <span className="font-medium text-foreground">{displayRating}</span>
+                                {reviewCount > 0 && (
+                                  <span className="text-muted-foreground">
+                                    ({reviewCount} {reviewCount === 1 ? 'review' : 'reviews'})
+                                  </span>
+                                )}
+                              </>
+                            );
+                          })()}
+                        </div>
+                      )}
                       {fac && (
                         <p className="text-sm text-muted-foreground flex items-center gap-1.5">
                           <MapPin className="h-3.5 w-3.5 shrink-0" />

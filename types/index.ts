@@ -23,6 +23,7 @@ export interface Athlete {
   photo_focus_y?: number;
   credentials?: Record<string, any>;
   average_rating: number;
+  review_count?: number;
   total_sessions: number;
   ytd_earnings: number;
   commitment_sessions: number;
