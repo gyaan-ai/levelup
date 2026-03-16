@@ -1,9 +1,10 @@
 import Link from 'next/link';
 import { headers } from 'next/headers';
 import { getTenantByDomain } from '@/config/tenants';
+import { createClient } from '@/lib/supabase/server';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, Users, Award, Shield, Search } from 'lucide-react';
+import { CheckCircle, Users, Award, Shield, Search, Star } from 'lucide-react';
 import { EarlyAccessForm } from '@/app/early-access-form';
 import { HomeHeroLogo } from '@/app/home-hero-logo';
 
@@ -18,6 +19,33 @@ export default async function HomePage() {
   const host = headersList.get('host') || '';
   const tenant = getTenantByDomain(host);
   const logoSrc = tenant?.logo ?? '/logos/guild-g.png';
+
+  let featuredReviews: { id: string; rating: number; comment: string | null; coach_name: string }[] = [];
+  if (tenant) {
+    const supabase = await createClient(tenant.slug);
+    const { data: reviews } = await supabase
+      .from('reviews_anonymous')
+      .select('id, athlete_id, rating, comment')
+      .gte('rating', 4)
+      .not('comment', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(6);
+    if (reviews && reviews.length > 0) {
+      const athleteIds = [...new Set(reviews.map((r) => r.athlete_id))];
+      const { data: athletes } = await supabase
+        .from('athletes')
+        .select('id, first_name, last_name')
+        .in('id', athleteIds);
+      const coachById = new Map((athletes ?? []).map((a) => [a.id, `${a.first_name} ${a.last_name}`]));
+      featuredReviews = reviews.map((r) => ({
+        id: r.id,
+        rating: r.rating,
+        comment: r.comment,
+        coach_name: coachById.get(r.athlete_id) ?? 'Coach',
+      }));
+    }
+  }
+
   return (
     <main>
       {/* Hero */}
@@ -74,6 +102,44 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* What parents say — gold stars */}
+      {featuredReviews.length > 0 && (
+        <section className="py-12 sm:py-16 bg-muted/40">
+          <div className="container mx-auto px-4">
+            <div className="text-center mb-10">
+              <h2 className="text-3xl sm:text-4xl font-serif font-bold text-foreground mb-2 flex items-center justify-center gap-2">
+                <Star className="h-8 w-8 fill-accent text-accent" />
+                What parents say
+              </h2>
+              <p className="text-muted-foreground">Real feedback from parents after sessions</p>
+            </div>
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto">
+              {featuredReviews.slice(0, 3).map((r) => (
+                <Card key={r.id} className="p-6 border-2 border-accent/20">
+                  <div className="flex gap-1 mb-3">
+                    {[1, 2, 3, 4, 5].map((i) => (
+                      <Star
+                        key={i}
+                        className={`h-4 w-4 ${i <= r.rating ? 'fill-accent text-accent' : 'text-muted-foreground/30'}`}
+                      />
+                    ))}
+                  </div>
+                  {r.comment && (
+                    <p className="text-foreground font-medium mb-2">&ldquo;{r.comment}&rdquo;</p>
+                  )}
+                  <p className="text-sm text-muted-foreground">— Parent, session with {r.coach_name}</p>
+                </Card>
+              ))}
+            </div>
+            <div className="text-center mt-8">
+              <Button variant="outline" size="lg" asChild>
+                <Link href="/browse">Browse coaches & reviews</Link>
+              </Button>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* How The Guild Works */}
       <section id="how-it-works" className="py-12 sm:py-16 md:py-20 bg-background">

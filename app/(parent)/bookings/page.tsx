@@ -118,6 +118,16 @@ export default async function MyBookingsPage() {
       s.scheduled_datetime < nowISO
   );
 
+  const pastSessionIds = past.map((s) => s.id);
+  const { data: myReviews } = pastSessionIds.length > 0
+    ? await supabase
+        .from('reviews')
+        .select('session_id')
+        .eq('parent_id', user.id)
+        .in('session_id', pastSessionIds)
+    : { data: [] };
+  const reviewedSessionIds = new Set((myReviews ?? []).map((r: { session_id: string }) => r.session_id));
+
   const coach = (s: (typeof all)[0]) => {
     const a = s.athletes;
     if (!a) return { name: '—', school: '', id: '', photo_url: undefined };
@@ -194,6 +204,7 @@ export default async function MyBookingsPage() {
     facility_id: facilityId(s),
     wrestlers: wrestlers(s),
     primaryWrestlerId: primaryWrestlerId(s),
+    hasReviewed: s.status === 'completed' ? reviewedSessionIds.has(s.id) : undefined,
   });
 
   const thisWeekSessions = thisWeek.map(transformSession);

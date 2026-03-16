@@ -114,6 +114,14 @@ export default async function AthleteProfilePage({
   const schoolColor = SCHOOL_COLORS[athlete.school] || { bg: 'bg-gray-500', text: 'text-white' };
   const rating = (athlete.average_rating ?? 0) > 0 ? (athlete.average_rating ?? 0).toFixed(1) : 'New';
 
+  const { data: reviewsRows } = await supabase
+    .from('reviews_anonymous')
+    .select('id, rating, comment, tags, created_at')
+    .eq('athlete_id', id)
+    .order('created_at', { ascending: false });
+  const reviews = reviewsRows ?? [];
+  const reviewCount = reviews.length;
+
   const { data: { user } } = await supabase.auth.getUser();
   const { data: userData } = user
     ? await supabase.from('users').select('role').eq('id', user.id).single()
@@ -219,11 +227,16 @@ export default async function AthleteProfilePage({
                 )}
               </div>
 
-              {/* Star Rating */}
+              {/* Star Rating + review count */}
               <div className="flex items-center gap-2 mb-4">
                 <Star className="h-5 w-5 fill-accent text-accent" />
                 <span className="text-lg font-semibold">{rating}</span>
-                {completedSessions > 0 && (
+                {reviewCount > 0 && (
+                  <span className="text-muted-foreground">
+                    ({reviewCount} {reviewCount === 1 ? 'review' : 'reviews'})
+                  </span>
+                )}
+                {completedSessions > 0 && reviewCount === 0 && (
                   <span className="text-muted-foreground">
                     ({completedSessions} {completedSessions === 1 ? 'session' : 'sessions'})
                   </span>
@@ -345,6 +358,54 @@ export default async function AthleteProfilePage({
             <p className="text-muted-foreground whitespace-pre-wrap leading-relaxed">
               {athlete.bio}
             </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* What parents say — reviews */}
+      {reviews.length > 0 && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Star className="h-5 w-5 fill-accent text-accent" />
+              What parents say
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Feedback from parents after sessions
+            </p>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-5">
+              {reviews.map((r) => (
+                <li key={r.id} className="border-b border-border last:border-0 pb-5 last:pb-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="flex gap-0.5">
+                      {[1, 2, 3, 4, 5].map((i) => (
+                        <Star
+                          key={i}
+                          className={`h-4 w-4 ${i <= (r.rating ?? 0) ? 'fill-accent text-accent' : 'text-muted-foreground/30'}`}
+                        />
+                      ))}
+                    </div>
+                    <span className="text-sm text-muted-foreground">
+                      Parent · {new Date(r.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                    </span>
+                  </div>
+                  {r.comment && (
+                    <p className="text-muted-foreground text-sm leading-relaxed mt-1">&ldquo;{r.comment}&rdquo;</p>
+                  )}
+                  {r.tags && Array.isArray(r.tags) && r.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {(r.tags as string[]).map((tag) => (
+                        <Badge key={tag} variant="secondary" className="text-xs font-normal">
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </li>
+              ))}
+            </ul>
           </CardContent>
         </Card>
       )}

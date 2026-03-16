@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { Calendar, User, MapPin, X, Share2, Check, ExternalLink, RotateCcw } from 'lucide-react';
+import { Calendar, User, MapPin, X, Share2, Check, ExternalLink, RotateCcw, Star } from 'lucide-react';
 import { SchoolLogo } from '@/components/school-logo';
 import { differenceInHours } from 'date-fns';
 import { formatEST } from '@/lib/format-date';
@@ -38,6 +38,8 @@ export type BookingSession = {
   facility_id?: string | null;
   wrestlers: string[];
   primaryWrestlerId?: string | null;
+  /** True if current user already left a review for this (completed) session */
+  hasReviewed?: boolean;
 };
 
 interface BookingCardProps {
@@ -231,6 +233,14 @@ export function BookingCard({ session, isPast = false }: BookingCardProps) {
                     </Button>
                   )}
                 </div>
+              )}
+              {isPast && session.status === 'completed' && !session.hasReviewed && (
+                <Link href={`/sessions/${session.id}/review`} className="inline-flex">
+                  <Button size="sm" className="min-h-[40px] px-3 bg-accent hover:bg-accent/90 text-primary">
+                    <Star className="h-4 w-4 mr-1 shrink-0 fill-current" />
+                    Leave feedback
+                  </Button>
+                </Link>
               )}
               {isPast && session.coach.id && (
                 <Link
