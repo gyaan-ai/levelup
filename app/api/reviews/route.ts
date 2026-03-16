@@ -86,7 +86,7 @@ export async function POST(req: NextRequest) {
     const rating = body.rating != null ? Number(body.rating) : NaN;
     const comment = typeof body.comment === 'string' ? body.comment.trim() || null : null;
     const tags = Array.isArray(body.tags)
-      ? body.tags.filter((t): t is string => typeof t === 'string').slice(0, 5)
+      ? body.tags.filter((t: unknown): t is string => typeof t === 'string').slice(0, 5)
       : [];
 
     if (!sessionId || typeof sessionId !== 'string') {
