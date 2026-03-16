@@ -334,15 +334,17 @@ export function BrowseAthletesClient({ initialAthletes, isAdmin, initialYouthWre
                       {athlete.weight_class && `${athlete.weight_class} lbs`}
                     </div>
 
-                    <div className="flex items-center gap-1 text-sm">
-                      <Star className="h-4 w-4 fill-accent text-accent" />
-                      <span className="font-medium">{displayRating}</span>
-                      {rating > 0 && athlete.total_sessions > 0 && (
-                        <span className="text-muted-foreground ml-1">
-                          ({athlete.total_sessions} {athlete.total_sessions === 1 ? 'session' : 'sessions'})
-                        </span>
-                      )}
-                    </div>
+                    {rating > 0 && (
+                      <div className="flex items-center gap-1 text-sm">
+                        <Star className="h-4 w-4 fill-accent text-accent" />
+                        <span className="font-medium">{displayRating}</span>
+                        {athlete.total_sessions > 0 && (
+                          <span className="text-muted-foreground ml-1">
+                            ({athlete.total_sessions} {athlete.total_sessions === 1 ? 'session' : 'sessions'})
+                          </span>
+                        )}
+                      </div>
+                    )}
 
                     {athlete.nextAvailable && (
                       <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
@@ -351,9 +353,26 @@ export function BrowseAthletesClient({ initialAthletes, isAdmin, initialYouthWre
                       </div>
                     )}
 
-                    <Button className="w-full" variant="outline">
-                      View Profile
-                    </Button>
+                    <div className="flex flex-col gap-2">
+                      <Button className="w-full" variant="outline" asChild>
+                        <span>View Profile</span>
+                      </Button>
+                      <Link
+                        href={`/book/${athlete.id}${initialYouthWrestlerId ? `?wrestler=${encodeURIComponent(initialYouthWrestlerId)}` : ''}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="inline-flex items-center justify-center gap-2 rounded-md text-sm font-medium bg-secondary text-secondary-foreground hover:bg-secondary/80 h-9 px-4 w-full"
+                      >
+                        <Calendar className="h-4 w-4 shrink-0" />
+                        See availability
+                      </Link>
+                      <Link
+                        href={`/training?tab=sessions&coach=${encodeURIComponent(athlete.id)}${initialYouthWrestlerId ? `&wrestler=${encodeURIComponent(initialYouthWrestlerId)}` : ''}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-xs text-muted-foreground hover:text-foreground underline text-center"
+                      >
+                        View their group sessions
+                      </Link>
+                    </div>
                   </CardContent>
                 </Card>
                 </Link>
