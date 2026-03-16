@@ -82,6 +82,29 @@ export default async function TrainingPage({
     if (!nextByAthlete.has(r.athlete_id)) nextByAthlete.set(r.athlete_id, { slot_date: r.slot_date, start_time: r.start_time });
   }
 
+  // Fallback: coaches with no availability slots — use their earliest upcoming session (e.g. small group)
+  const nowIso = new Date().toISOString();
+  const { data: upcomingSessions } = athleteIds.length
+    ? await supabase
+        .from('sessions')
+        .select('athlete_id, scheduled_datetime')
+        .in('athlete_id', athleteIds)
+        .in('status', ['scheduled', 'pending_payment'])
+        .gte('scheduled_datetime', nowIso)
+        .order('scheduled_datetime', { ascending: true })
+    : { data: [] };
+  for (const row of upcomingSessions ?? []) {
+    const r = row as { athlete_id: string; scheduled_datetime: string };
+    if (nextByAthlete.has(r.athlete_id)) continue;
+    const zoned = toZonedTime(new Date(r.scheduled_datetime), APP_TIMEZONE);
+    const y = zoned.getFullYear();
+    const m = zoned.getMonth() + 1;
+    const day = zoned.getDate();
+    const slotDate = `${y}-${String(m).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+    const startTime = `${String(zoned.getHours()).padStart(2, '0')}:${String(zoned.getMinutes()).padStart(2, '0')}`;
+    nextByAthlete.set(r.athlete_id, { slot_date: slotDate, start_time: startTime });
+  }
+
   const athletesWithNext = athletesList.map((a) => ({
     ...a,
     nextAvailable: nextByAthlete.get(a.id) ?? null,

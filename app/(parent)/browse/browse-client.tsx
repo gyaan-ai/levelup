@@ -45,6 +45,17 @@ function formatNextAvailable(slot_date: string, start_time: string): string {
   return `${dateStr} · ${timeStr}`;
 }
 
+/** Avoid duplicating last name when first_name already ends with it (e.g. "Liam Hickey" + "Hickey"). */
+function athleteDisplayName(first: string | undefined | null, last: string | undefined | null): string {
+  const f = (first ?? '').trim();
+  const l = (last ?? '').trim();
+  if (!f && !l) return '';
+  if (!l) return f;
+  if (!f) return l;
+  if (f.endsWith(l)) return f;
+  return `${f} ${l}`.trim();
+}
+
 const WEIGHT_RANGES: { id: string; label: string; classes: readonly string[] }[] = [
   { id: 'all', label: 'All weights', classes: [] },
   { id: 'light', label: 'Light', classes: ['125', '133', '141', '149', '157'] },
@@ -296,7 +307,7 @@ export function BrowseAthletesClient({ initialAthletes, isAdmin, initialYouthWre
                       <div className="flex items-center gap-4">
                         <ProfileImage
                           src={athlete.photo_url}
-                          alt={`${athlete.first_name} ${athlete.last_name}`}
+                          alt={athleteDisplayName(athlete.first_name, athlete.last_name) || 'Coach'}
                           focusX={athlete.photo_focus_x}
                           focusY={athlete.photo_focus_y}
                           className="w-24 h-24 border-2 border-accent/30"
@@ -304,7 +315,7 @@ export function BrowseAthletesClient({ initialAthletes, isAdmin, initialYouthWre
                         />
                       <div className="flex-1 min-w-0">
                         <h3 className="text-lg font-semibold truncate">
-                          {athlete.first_name} {athlete.last_name}
+                          {athleteDisplayName(athlete.first_name, athlete.last_name) || 'Coach'}
                         </h3>
                         <div className="flex items-center gap-2 mt-1 flex-wrap">
                           <CoachSessionBadge totalSessions={athlete.total_sessions ?? 0} size="sm" />
