@@ -69,7 +69,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-/** POST /api/reviews — create or update a review (parent, after completed session) */
+/** POST /api/reviews — create or update a review. One review per session per parent; only the parent (or a parent whose kid participated) can leave it. */
 export async function POST(req: NextRequest) {
   try {
     const headersList = await headers();
@@ -134,7 +134,7 @@ export async function POST(req: NextRequest) {
       tags: tags.length > 0 ? tags : null,
     };
 
-    // Upsert: one review per (session_id, parent_id)
+    // One review per session per family (upsert on session_id + parent_id)
     const { data: review, error: upsertError } = await supabase
       .from('reviews')
       .upsert(row, {

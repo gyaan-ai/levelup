@@ -227,7 +227,7 @@ export default async function AthleteProfilePage({
                 )}
               </div>
 
-              {/* Star Rating + review count */}
+              {/* Rating summary only; full stars + comments are below in "What parents say" */}
               <div className="flex items-center gap-2 mb-4">
                 <Star className="h-5 w-5 fill-accent text-accent" />
                 <span className="text-lg font-semibold">{rating}</span>
@@ -362,7 +362,7 @@ export default async function AthleteProfilePage({
         </Card>
       )}
 
-      {/* What parents say — reviews */}
+      {/* What parents say — ratings and comments (anonymous; no names shown) */}
       {reviews.length > 0 && (
         <Card className="mb-6">
           <CardHeader>
@@ -388,7 +388,7 @@ export default async function AthleteProfilePage({
                       ))}
                     </div>
                     <span className="text-sm text-muted-foreground">
-                      Parent · {new Date(r.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                      {new Date(r.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                     </span>
                   </div>
                   {r.comment && (
