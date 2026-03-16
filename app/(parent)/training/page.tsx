@@ -15,6 +15,7 @@ export const metadata = {
 type SessionRow = {
   id: string;
   scheduled_datetime: string;
+  status?: string | null;
   session_type: string | null;
   session_mode: string | null;
   join_policy?: string | null;
@@ -135,29 +136,35 @@ export default async function TrainingPage({
         return end.toISOString();
       })();
 
-  const baseQuery = () => {
-    let q = supabase
-      .from('sessions')
-      .select(`
-        id, scheduled_datetime, session_type, session_mode, join_policy, focus_area,
-        current_participants, max_participants, total_price, price_per_participant,
-        athlete_id, facility_id, athletes(id, first_name, last_name, school, photo_url), facilities(id, name, address)
-      `)
-      .in('status', ['scheduled', 'pending_payment'])
-      .gte('scheduled_datetime', dayStart)
-      .lte('scheduled_datetime', dayEnd);
-    if (sp.location && sp.location !== 'all') q = q.eq('facility_id', sp.location);
-    if (sp.coach && sp.coach !== 'all') q = q.eq('athlete_id', sp.coach);
-    return q;
+  const baseSelect = `
+    id, scheduled_datetime, status, session_type, session_mode, join_policy, focus_area,
+    current_participants, max_participants, total_price, price_per_participant,
+    athlete_id, facility_id, athletes(id, first_name, last_name, school, photo_url), facilities(id, name, address)
+  `;
+  const baseFilter = (q: ReturnType<typeof supabase.from>) => {
+    let q2 = q.gte('scheduled_datetime', dayStart).lte('scheduled_datetime', dayEnd);
+    if (sp.location && sp.location !== 'all') q2 = q2.eq('facility_id', sp.location);
+    if (sp.coach && sp.coach !== 'all') q2 = q2.eq('athlete_id', sp.coach);
+    return q2;
   };
 
-  const [groupRes, partnerRes] = await Promise.all([
-    baseQuery().in('session_type', ['group', 'small_group']).order('scheduled_datetime', { ascending: true }),
-    baseQuery().eq('session_mode', 'partner-open').order('scheduled_datetime', { ascending: true }),
+  const [groupUpcoming, partnerUpcoming, groupPast, partnerPast] = await Promise.all([
+    baseFilter(
+      supabase.from('sessions').select(baseSelect).in('status', ['scheduled', 'pending_payment'])
+    ).in('session_type', ['group', 'small_group']).order('scheduled_datetime', { ascending: true }),
+    baseFilter(
+      supabase.from('sessions').select(baseSelect).in('status', ['scheduled', 'pending_payment'])
+    ).eq('session_mode', 'partner-open').order('scheduled_datetime', { ascending: true }),
+    baseFilter(
+      supabase.from('sessions').select(baseSelect).in('status', ['completed', 'cancelled', 'no-show'])
+    ).in('session_type', ['group', 'small_group']).order('scheduled_datetime', { ascending: true }),
+    baseFilter(
+      supabase.from('sessions').select(baseSelect).in('status', ['completed', 'cancelled', 'no-show'])
+    ).eq('session_mode', 'partner-open').order('scheduled_datetime', { ascending: true }),
   ]);
   const seen = new Set<string>();
   let list: SessionRow[] = [];
-  for (const row of [...(groupRes.data ?? []), ...(partnerRes.data ?? [])]) {
+  for (const row of [...(groupUpcoming.data ?? []), ...(partnerUpcoming.data ?? []), ...(groupPast.data ?? []), ...(partnerPast.data ?? [])]) {
     const r = row as unknown as SessionRow;
     if (seen.has(r.id)) continue;
     seen.add(r.id);
@@ -175,9 +182,7 @@ export default async function TrainingPage({
     });
   }
   availabilitySessions = list.filter(
-    (s) =>
-      (s.current_participants ?? 0) < (s.max_participants ?? 1) &&
-      ((s as { join_policy?: string }).join_policy === 'public' || (s as { join_policy?: string }).join_policy === 'invite_only')
+    (s) => (s as { join_policy?: string }).join_policy === 'public' || (s as { join_policy?: string }).join_policy === 'invite_only'
   );
 
   const isAdmin = userData?.role === 'admin';

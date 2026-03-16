@@ -32,6 +32,7 @@ type Facility = { id: string; name?: string; school?: string; address?: string |
 type SessionRow = {
   id: string;
   scheduled_datetime: string;
+  status?: string | null;
   session_type: string | null;
   session_mode: string | null;
   join_policy?: string | null;
@@ -104,8 +105,15 @@ export function FindTrainingClient({
   const showResults = initialSessions.length > 0 && (hasSearchCriteria || !!defaultRangeLabel);
   const showNoResults = (hasSearchCriteria || !!defaultRangeLabel) && initialSessions.length === 0;
 
-  const openSessions = initialSessions.filter((s) => (s.current_participants ?? 0) < (s.max_participants ?? 1));
-  const closedSessions = initialSessions.filter((s) => (s.current_participants ?? 0) >= (s.max_participants ?? 1));
+  const closedStatuses = ['completed', 'cancelled', 'no-show'];
+  const openSessions = initialSessions.filter((s) => {
+    if (closedStatuses.includes((s.status ?? '') as string)) return false;
+    return (s.current_participants ?? 0) < (s.max_participants ?? 1);
+  });
+  const closedSessions = initialSessions.filter((s) => {
+    const atCapacity = (s.current_participants ?? 0) >= (s.max_participants ?? 1);
+    return closedStatuses.includes((s.status ?? '') as string) || atCapacity;
+  });
   const displayedSessions = sessionsTab === 'open' ? openSessions : closedSessions;
 
   return (

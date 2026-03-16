@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { BrowseAthletesClient } from '@/app/(parent)/browse/browse-client';
 import { FindTrainingClient } from '@/app/(parent)/find-training/find-training-client';
 import type { Athlete } from '@/types';
@@ -24,6 +24,7 @@ type Props = {
   availabilitySessions: Array<{
     id: string;
     scheduled_datetime: string;
+    status?: string | null;
     session_type: string | null;
     session_mode: string | null;
     join_policy?: string | null;
@@ -60,6 +61,11 @@ export function TrainingClient({
 }: Props) {
   const tab = (initialTab === 'coaches' ? 'coaches' : 'sessions') as TabId;
   const [activeTab, setActiveTab] = useState<TabId>(tab);
+
+  // Sync tab state when URL changes (e.g. "View their group sessions" → ?tab=sessions&coach=xxx)
+  useEffect(() => {
+    setActiveTab(tab);
+  }, [tab]);
 
   return (
     <>

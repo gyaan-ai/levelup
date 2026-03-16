@@ -126,7 +126,7 @@ export async function POST(req: NextRequest) {
         facility_id: facilityId,
         session_type: 'group',
         session_mode: 'partner-invite',
-        join_policy: 'invite_only',
+        join_policy: 'public',
         partner_invite_code: code,
         max_participants: max,
         current_participants: 0,
