@@ -2,17 +2,22 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Star, Loader2 } from 'lucide-react';
+import { Star, Loader2, CheckCircle } from 'lucide-react';
 
 const TAG_OPTIONS = ['Technique', 'Great with kids', 'Punctual', 'Communication', 'My kid loved it'];
 
 export function SessionReviewForm({
   sessionId,
+  coachId,
+  coachName,
   existingReview,
 }: {
   sessionId: string;
+  coachId: string;
+  coachName: string;
   existingReview: { rating: number; comment: string; tags: string[] } | null;
 }) {
   const router = useRouter();
@@ -21,6 +26,7 @@ export function SessionReviewForm({
   const [comment, setComment] = useState(existingReview?.comment ?? '');
   const [tags, setTags] = useState<string[]>(existingReview?.tags ?? []);
   const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const toggleTag = (tag: string) => {
@@ -53,7 +59,7 @@ export function SessionReviewForm({
         setError(data.error || 'Something went wrong');
         return;
       }
-      router.push('/bookings');
+      setSubmitted(true);
       router.refresh();
     } catch {
       setError('Something went wrong');
@@ -64,12 +70,45 @@ export function SessionReviewForm({
 
   const displayRating = hoverRating || rating;
 
+  if (submitted) {
+    return (
+      <Card className="border-green-600/30 bg-green-500/5">
+        <CardContent className="pt-6 pb-6">
+          <div className="flex flex-col items-center text-center gap-4">
+            <div className="rounded-full bg-green-600/20 p-3">
+              <CheckCircle className="h-10 w-10 text-green-600" />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold text-foreground mb-1">Thanks! Your feedback was saved.</h2>
+              <p className="text-muted-foreground text-sm">
+                Your stars and review are now on the coach&apos;s profile for other parents to see.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3 justify-center">
+              {coachId ? (
+                <Button asChild variant="default" size="lg" className="gap-2">
+                  <Link href={`/athlete/${coachId}`}>
+                    <Star className="h-4 w-4 fill-current" />
+                    View on {coachName}&apos;s profile
+                  </Link>
+                </Button>
+              ) : null}
+              <Button asChild variant="outline" size="lg">
+                <Link href="/bookings">Back to My bookings</Link>
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Your feedback</CardTitle>
         <CardDescription>
-          Your review will be shown on the coach&apos;s profile. Stars are required; your own words are optional but help other parents.
+          Your review will be shown on the coach&apos;s profile (star rating at the top and in the &quot;What parents say&quot; section below). Stars are required; your own words are optional but help other parents.
         </CardDescription>
       </CardHeader>
       <CardContent>

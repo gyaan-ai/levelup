@@ -82,6 +82,8 @@ export default async function SessionReviewPage({
       </div>
       <SessionReviewForm
         sessionId={sessionId}
+        coachId={coach?.id ?? ''}
+        coachName={coachName}
         existingReview={existing ? { rating: existing.rating, comment: existing.comment ?? '', tags: (existing.tags as string[]) ?? [] } : null}
       />
     </div>
