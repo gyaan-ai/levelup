@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 
 const REVIEW_TAGS = ['Technique', 'Great with kids', 'Punctual', 'Communication', 'My kid loved it'] as const;
@@ -96,8 +97,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'rating must be 1–5' }, { status: 400 });
     }
 
-    // Load session and verify completed + parent is owner or participant
-    const { data: session, error: sessionError } = await supabase
+    // Load session and verify completed + parent is owner or participant (same logic as review page: admin-based so multi-kid + RLS don't block)
+    const admin = createAdminClient(tenant.slug);
+    const { data: session, error: sessionError } = await admin
       .from('sessions')
       .select('id, parent_id, athlete_id, status')
       .eq('id', sessionId)
@@ -113,13 +115,35 @@ export async function POST(req: NextRequest) {
     const isOwner = session.parent_id === user.id;
     let isParticipant = false;
     if (!isOwner) {
-      const { data: part } = await supabase
+      const { data: participants } = await admin
         .from('session_participants')
-        .select('id')
-        .eq('session_id', sessionId)
-        .eq('parent_id', user.id)
-        .maybeSingle();
-      isParticipant = !!part;
+        .select('youth_wrestler_id, parent_id')
+        .eq('session_id', sessionId);
+      const rows = participants ?? [];
+      const hasRowAsParent = rows.some((r: { parent_id?: string | null }) => r.parent_id === user.id);
+      if (hasRowAsParent) {
+        isParticipant = true;
+      } else {
+        const youthIds = rows.map((r: { youth_wrestler_id: string | null }) => r.youth_wrestler_id).filter(Boolean) as string[];
+        if (youthIds.length > 0) {
+          const { data: youthRows } = await admin
+            .from('youth_wrestlers')
+            .select('id')
+            .in('id', youthIds)
+            .eq('parent_id', user.id)
+            .limit(1);
+          if (youthRows && youthRows.length > 0) isParticipant = true;
+          if (!isParticipant) {
+            const { data: linked } = await admin
+              .from('youth_wrestler_parents')
+              .select('youth_wrestler_id')
+              .in('youth_wrestler_id', youthIds)
+              .eq('parent_id', user.id)
+              .limit(1);
+            if (linked && linked.length > 0) isParticipant = true;
+          }
+        }
+      }
     }
     if (!isOwner && !isParticipant) {
       return NextResponse.json({ error: 'You did not participate in this session' }, { status: 403 });

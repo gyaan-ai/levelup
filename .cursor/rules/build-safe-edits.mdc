@@ -1,0 +1,21 @@
+---
+description: Avoid build-breaking edits; verify before finishing
+globs: "**/*.tsx,**/*.ts,**/*.jsx,**/*.js"
+alwaysApply: true
+---
+
+# Build-safe edits
+
+Code changes must not introduce build or runtime errors. Follow these every time you edit.
+
+## JSX / TSX
+
+- **Never use escaped double quotes inside a double-quoted JSX attribute.** The parser can treat `\"` as an invalid escape and fail the build.
+  - **Bad:** `message="Try \"Leave feedback\" again."`
+  - **Good:** `message={\`Try "Leave feedback" again.\`}` or `message='Try "Leave feedback" again.'`
+- Prefer template literals in `{}` when the string contains quotes or apostrophes.
+
+## Before finishing
+
+- After editing `.tsx`/`.ts`/`.jsx`/`.js`, run `npm run build` (or suggest the user run it) so broken syntax or type errors are caught before push. Do not rely only on the linter.
+- If the project uses Next.js, the build uses SWC; avoid ambiguous escapes and non-standard JS in JSX.
