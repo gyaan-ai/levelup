@@ -5,7 +5,11 @@ import { usePathname } from 'next/navigation';
 import { Home, Dumbbell, CalendarDays, MessageCircle, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-/** 5 items max. Training = find/book sessions; My bookings = sessions you've booked. */
+/**
+ * Parent mobile bottom nav. 5 items max.
+ * Training = find/book sessions. My bookings = the FULL bookings page: upcoming + past + leave reviews.
+ * This link MUST go to /bookings only (never /training or any other page).
+ */
 const ITEMS = [
   { href: '/dashboard', label: 'Home', icon: Home },
   { href: '/training', label: 'Training', icon: Dumbbell },
@@ -30,6 +34,7 @@ export function ParentBottomNav() {
           <Link
             key={href}
             href={href}
+            data-nav={href === '/bookings' ? 'my-bookings' : undefined}
             className={cn(
               'flex flex-col items-center justify-center min-h-[44px] min-w-0 flex-1 py-2 px-2 touch-manipulation text-[11px] font-medium transition-colors whitespace-nowrap overflow-visible',
               isActive ? 'text-accent' : 'text-muted-foreground'

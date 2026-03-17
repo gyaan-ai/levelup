@@ -43,6 +43,7 @@ export function BookingsTabsClient({
               ? 'border-accent text-accent'
               : 'border-transparent text-muted-foreground hover:text-foreground'
           }`}
+          aria-label={`Past sessions and leave feedback (${closed.length})`}
         >
           Past ({closed.length})
         </button>

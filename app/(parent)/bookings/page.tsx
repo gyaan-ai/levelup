@@ -213,11 +213,11 @@ export default async function MyBookingsPage() {
   const pastSessions = past.map(transformSession);
 
   return (
-    <div className="container mx-auto px-4 py-5 pb-8 md:py-8 max-w-full">
+    <div className="container mx-auto px-4 py-5 pb-8 md:py-8 max-w-full" data-page="my-bookings-full">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-foreground md:text-3xl mb-1">My bookings</h1>
         <p className="text-muted-foreground text-sm md:text-base">
-          This week, this month, and past
+          Upcoming and past. Use the <strong>Past</strong> tab to see completed sessions and leave feedback.
         </p>
       </div>
 
