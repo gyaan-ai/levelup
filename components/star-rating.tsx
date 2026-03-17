@@ -10,6 +10,7 @@ export function StarRating({
 }: {
   averageRating: number | null | undefined;
   reviewCount?: number | null;
+  size?: 'sm' | 'md' | 'lg';
 }) {
   const rating = Number(averageRating) || 0;
   const count = Number(reviewCount) || 0;
