@@ -66,7 +66,7 @@ export default async function SessionDetailPage({
   `;
 
   let session: Record<string, unknown> | null = null;
-  let error: { message?: string; code?: string } | null = null;
+  let adminError: { message?: string; code?: string } | null = null;
 
   try {
     const admin = createAdminClient(tenant.slug);
@@ -76,13 +76,13 @@ export default async function SessionDetailPage({
       .eq('id', sessionId)
       .single();
     session = result.data;
-    error = result.error;
+    adminError = result.error;
   } catch (adminErr) {
-    error = adminErr instanceof Error ? adminErr : { message: String(adminErr) };
+    adminError = adminErr instanceof Error ? adminErr : { message: String(adminErr) };
   }
 
-  // Fallback: user can see session on bookings via RLS; fetch with user client so View never 404s when they have access
-  if (error || !session) {
+  let userError: { message?: string; code?: string } | null = null;
+  if (adminError || !session) {
     const userResult = await supabase
       .from('sessions')
       .select(sessionSelect)
@@ -90,11 +90,20 @@ export default async function SessionDetailPage({
       .single();
     if (!userResult.error && userResult.data) {
       session = userResult.data;
-      error = null;
+      adminError = null;
+    } else {
+      userError = userResult.error;
     }
   }
 
-  if (error || !session) notFound();
+  if (!session) {
+    console.error('[sessions/[id]] 404', {
+      sessionId,
+      adminError: adminError?.message ?? adminError?.code ?? null,
+      userError: userError?.message ?? userError?.code ?? null,
+    });
+    notFound();
+  }
 
   const s = session as {
     parent_id?: string;
