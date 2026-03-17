@@ -29,6 +29,8 @@ interface JoinSessionClientProps {
   isSmallGroup?: boolean;
   freeSmallGroupJoin?: boolean;
   pricePerParticipant: number;
+  priceAfterDiscount?: number;
+  percentOff?: number;
   youthWrestlers: YouthWrestlerOption[];
 }
 
@@ -38,6 +40,8 @@ export function JoinSessionClient({
   isSmallGroup = false,
   freeSmallGroupJoin = false,
   pricePerParticipant,
+  priceAfterDiscount,
+  percentOff,
   youthWrestlers,
 }: JoinSessionClientProps) {
   const router = useRouter();
@@ -50,6 +54,7 @@ export function JoinSessionClient({
   const [error, setError] = useState<string | null>(null);
 
   const freeWithCode = freeSmallGroupJoin;
+  const displayPrice = priceAfterDiscount ?? pricePerParticipant;
 
   const handleApplyCode = async () => {
     const codeTrimmed = promoCode.trim();
@@ -196,6 +201,11 @@ export function JoinSessionClient({
         {freeWithCode && (
           <p className="text-sm text-green-600 dark:text-green-400 font-medium">Promo applied — this session is free.</p>
         )}
+        {!freeWithCode && percentOff != null && isSmallGroup && (
+          <p className="text-sm text-green-600 dark:text-green-400 font-medium">
+            {codeApplied ? `Code applied. You get ${percentOff}% off — pay & register below.` : `Your ${percentOff}% discount applies — pay & register below.`}
+          </p>
+        )}
       </div>
       <Button
         onClick={handlePayAndRegister}
@@ -206,7 +216,7 @@ export function JoinSessionClient({
           ? (freeWithCode ? 'Adding…' : 'Redirecting to payment…')
           : freeWithCode
             ? 'Register free (early adopter)'
-            : `Pay $${pricePerParticipant.toFixed(2)} & register`}
+            : `Pay $${displayPrice.toFixed(2)} & register`}
       </Button>
     </div>
   );

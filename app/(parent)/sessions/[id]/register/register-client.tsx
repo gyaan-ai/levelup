@@ -28,12 +28,14 @@ interface SessionRegisterClientProps {
   isOwner: boolean;
   isSmallGroup?: boolean;
   pricePerParticipant: number;
+  priceAfterDiscount?: number;
+  percentOff?: number;
   youthWrestlers: YouthWrestlerItem[];
   initialWrestlerId?: string;
   freeSmallGroupJoin?: boolean;
 }
 
-export function SessionRegisterClient({ sessionId, isOwner, isSmallGroup = false, pricePerParticipant, youthWrestlers, initialWrestlerId = '', freeSmallGroupJoin = false }: SessionRegisterClientProps) {
+export function SessionRegisterClient({ sessionId, isOwner, isSmallGroup = false, pricePerParticipant, priceAfterDiscount, percentOff, youthWrestlers, initialWrestlerId = '', freeSmallGroupJoin = false }: SessionRegisterClientProps) {
   const router = useRouter();
   const [selectedWrestlerId, setSelectedWrestlerId] = useState(initialWrestlerId);
   const [promoCode, setPromoCode] = useState('');
@@ -44,6 +46,7 @@ export function SessionRegisterClient({ sessionId, isOwner, isSmallGroup = false
 
   // Free when server says parent has early adopter entitlement for small group (freeSmallGroupJoin).
   const freeWithCode = freeSmallGroupJoin;
+  const displayPrice = priceAfterDiscount ?? pricePerParticipant;
 
   const handleApplyCode = async () => {
     const codeTrimmed = promoCode.trim();
@@ -189,7 +192,12 @@ export function SessionRegisterClient({ sessionId, isOwner, isSmallGroup = false
           {freeWithCode && (
             <p className="text-sm text-green-600 dark:text-green-400 font-medium">Promo applied — this session is free.</p>
           )}
-          {codeApplied && !freeWithCode && isSmallGroup && (
+          {!freeWithCode && isSmallGroup && percentOff != null && (
+            <p className="text-sm text-green-600 dark:text-green-400 font-medium">
+              {codeApplied ? `Code applied. You get ${percentOff}% off — pay & register below.` : `Your ${percentOff}% discount applies — pay & register below.`}
+            </p>
+          )}
+          {codeApplied && !freeWithCode && isSmallGroup && percentOff == null && (
             <p className="text-sm text-muted-foreground">Code applied. You have no free spots left — use the button below to pay & register.</p>
           )}
         </div>
@@ -205,7 +213,7 @@ export function SessionRegisterClient({ sessionId, isOwner, isSmallGroup = false
             ? 'Add wrestler'
             : freeWithCode
               ? 'Register free (early adopter)'
-              : `Pay $${pricePerParticipant.toFixed(2)} & register`}
+              : `Pay $${displayPrice.toFixed(2)} & register`}
       </Button>
     </form>
   );

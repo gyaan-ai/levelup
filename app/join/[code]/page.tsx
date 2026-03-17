@@ -72,6 +72,21 @@ export default async function JoinByCodePage({
   // Only free when session has no price; $30 Liam/Sabino sessions use Stripe.
   const freeSmallGroupJoin = !isFull && isSmallGroup && pricePerParticipant <= 0;
 
+  // Parent percentage discount (e.g. FAMILY10) for logged-in user
+  let percentOff: number | null = null;
+  let priceAfterDiscount: number | null = null;
+  if (user && !isFull && pricePerParticipant > 0) {
+    const { data: pctRow } = await admin
+      .from('parent_percentage_discounts')
+      .select('percent_off')
+      .eq('parent_id', user.id)
+      .maybeSingle();
+    percentOff = pctRow?.percent_off != null ? Number(pctRow.percent_off) : null;
+    if (percentOff != null && percentOff >= 1 && percentOff <= 100) {
+      priceAfterDiscount = pricePerParticipant * (1 - percentOff / 100);
+    }
+  }
+
   let youthWrestlers: Array<{ id: string; first_name: string; last_name: string; age?: number; weight_class?: string; skill_level?: string }> = [];
   if (user && !isFull) {
     const { data: primaryRows } = await supabase
@@ -152,7 +167,11 @@ export default async function JoinByCodePage({
                   </ul>
                 </div>
               )}
-              <p className="text-lg font-bold">${Number(pricePerParticipant).toFixed(2)} to join</p>
+              <p className="text-lg font-bold">
+                {priceAfterDiscount != null
+                  ? `$${priceAfterDiscount.toFixed(2)} to join (${percentOff}% off)`
+                  : `$${Number(pricePerParticipant).toFixed(2)} to join`}
+              </p>
 
               {user ? (
                 <JoinSessionClient
@@ -161,6 +180,8 @@ export default async function JoinByCodePage({
                   isSmallGroup={isSmallGroup}
                   freeSmallGroupJoin={freeSmallGroupJoin}
                   pricePerParticipant={pricePerParticipant}
+                  priceAfterDiscount={priceAfterDiscount ?? undefined}
+                  percentOff={percentOff ?? undefined}
                   youthWrestlers={youthWrestlers}
                 />
               ) : (

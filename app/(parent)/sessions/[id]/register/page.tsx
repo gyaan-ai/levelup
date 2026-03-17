@@ -113,6 +113,20 @@ export default async function SessionRegisterPage({
   const dt = s.scheduled_datetime ? new Date(s.scheduled_datetime) : null;
 
   const admin = createAdminClient(tenant.slug);
+  // Parent percentage discount (e.g. FAMILY10) — used to show discounted price and message
+  const { data: pctDiscount } = !isOwner
+    ? await admin
+        .from('parent_percentage_discounts')
+        .select('percent_off')
+        .eq('parent_id', user.id)
+        .maybeSingle()
+    : { data: null };
+  const percentOff = pctDiscount?.percent_off != null ? Number(pctDiscount.percent_off) : null;
+  const priceAfterDiscount =
+    percentOff != null && percentOff >= 1 && percentOff <= 100 && pricePer > 0
+      ? pricePer * (1 - percentOff / 100)
+      : null;
+
   const { data: participants } = await admin
     .from('session_participants')
     .select('youth_wrestlers(id, first_name, last_name, age, weight_class, skill_level)')
@@ -174,7 +188,21 @@ export default async function SessionRegisterPage({
             )}
             <p className="text-sm text-muted-foreground">
               {current} / {max} participants
-              {!isOwner && pricePer > 0 && <> · <strong>${Number(pricePer).toFixed(2)}</strong> per spot</>}
+              {!isOwner && pricePer > 0 && (
+                <>
+                  {' · '}
+                  {priceAfterDiscount != null ? (
+                    <>
+                      <strong>${priceAfterDiscount.toFixed(2)}</strong> per spot
+                      <span className="text-muted-foreground/80"> ({(percentOff ?? 0)}% off)</span>
+                    </>
+                  ) : (
+                    <>
+                      <strong>${Number(pricePer).toFixed(2)}</strong> per spot
+                    </>
+                  )}
+                </>
+              )}
             </p>
             {participantsList.length > 0 && (
               <div className="text-sm pt-1">
@@ -192,6 +220,8 @@ export default async function SessionRegisterPage({
             isOwner={!!isOwner}
             isSmallGroup={isSmallGroup}
             pricePerParticipant={pricePer}
+            priceAfterDiscount={priceAfterDiscount ?? undefined}
+            percentOff={percentOff ?? undefined}
             youthWrestlers={youthWrestlers as Array<{ id: string; first_name?: string; last_name?: string; age?: number; weight_class?: string; skill_level?: string }>}
             initialWrestlerId={preselectedWrestlerId && youthWrestlers.some((yw) => yw.id === preselectedWrestlerId) ? preselectedWrestlerId : ''}
             freeSmallGroupJoin={freeSmallGroupJoin}
