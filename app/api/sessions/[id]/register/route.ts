@@ -12,9 +12,9 @@ import { sendCoachNewSignupSms } from '@/lib/twilio';
 /**
  * POST - Pay & register a youth wrestler for a session (public or invite_only).
  * - Session owner: add for free.
- * - Non-owner + session has no price (price_per_participant <= 0): add for free (legacy free sessions).
- *   (We do NOT check early_adopter_entitlements here; paid sessions always go to Stripe.)
- * - Non-owner + paid session: Creates Stripe Checkout (with FAMILY10 % off if parent has it); webhook adds participant.
+ * - Non-owner + small group + parent has early_adopter_entitlements (2-athlete, remaining > 0): add for free and decrement entitlement.
+ * - Non-owner otherwise: Stripe Checkout (with FAMILY10 % off if parent has it); webhook adds participant.
+ * Never default to free: free only when entitlement is explicitly found.
  */
 export async function POST(
   req: NextRequest,
@@ -130,7 +130,6 @@ export async function POST(
       return NextResponse.json({ error: 'Session is not open for registration' }, { status: 400 });
     }
 
-    // We charge for small group now — no more free path. Always use Stripe for non-owner.
     const isSmallGroup =
       s.session_type === 'group' ||
       s.session_type === '2-athlete' ||
@@ -163,6 +162,47 @@ export async function POST(
       .maybeSingle();
     if (existing) {
       return NextResponse.json({ error: 'This wrestler is already registered for this session' }, { status: 409 });
+    }
+
+    // Free path only when parent has verified early-adopter entitlement (never default to free)
+    const admin = createAdminClient(tenant.slug);
+    if (isSmallGroup) {
+      const { data: entitlement } = await admin
+        .from('early_adopter_entitlements')
+        .select('id, remaining')
+        .eq('parent_id', user.id)
+        .eq('session_type', '2-athlete')
+        .gt('remaining', 0)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (entitlement && (entitlement as { remaining?: number }).remaining != null) {
+        const { error: insertErr } = await supabase.from('session_participants').insert({
+          session_id: sessionId,
+          youth_wrestler_id: youthWrestlerId,
+          parent_id: user.id,
+          paid: true,
+          amount_paid: 0,
+        });
+        if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 });
+        await supabase.from('sessions').update({ current_participants: current + 1, updated_at: new Date().toISOString() }).eq('id', sessionId);
+        const newRemaining = Math.max(0, ((entitlement as { remaining?: number }).remaining ?? 1) - 1);
+        await admin.from('early_adopter_entitlements').update({ remaining: newRemaining, updated_at: new Date().toISOString() }).eq('id', entitlement.id);
+        const coachId = (session as { athlete_id?: string }).athlete_id;
+        const dt = s.scheduled_datetime;
+        if (coachId && coachId !== user.id) {
+          const dateStr = dt ? formatEST(new Date(dt), 'EEE MMM d, h:mm a') : 'your session';
+          await createNotification(admin, {
+            user_id: coachId,
+            type: 'session_booked',
+            title: 'Someone signed up for your session',
+            body: `New signup for ${dateStr}. Check My sessions.`,
+            data: { session_id: sessionId },
+          }).catch((e) => console.warn('Register: coach notification failed', e));
+          await sendCoachNewSignupSms(admin, coachId, dateStr).catch(() => {});
+        }
+        return NextResponse.json({ added: true });
+      }
     }
 
     const stripeEnabled = process.env.STRIPE_CHECKOUT_ENABLED === 'true';

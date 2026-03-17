@@ -77,15 +77,28 @@ export default async function SessionRegisterPage({
 
   const rawPrice = s.price_per_participant;
   const pricePer = rawPrice != null && rawPrice > 0 ? rawPrice : 30;
-  if (!isOwner && pricePer <= 0) notFound();
 
   const isSmallGroup =
     s.session_type === 'group' ||
     s.session_type === '2-athlete' ||
     s.session_type === 'small_group' ||
     (max >= 2 && s.session_type !== '1-on-1');
-  // We charge for small group now — never show "free early adopter" so promo field stays usable.
-  const freeSmallGroupJoin = false;
+
+  // Free only when parent has verified early-adopter entitlement (never default to free)
+  let freeSmallGroupJoin = false;
+  if (!isOwner && isSmallGroup) {
+    const admin = createAdminClient(tenant.slug);
+    const { data: entitlement } = await admin
+      .from('early_adopter_entitlements')
+      .select('id')
+      .eq('parent_id', user.id)
+      .eq('session_type', '2-athlete')
+      .gt('remaining', 0)
+      .limit(1)
+      .maybeSingle();
+    freeSmallGroupJoin = !!entitlement;
+  }
+  if (!isOwner && pricePer <= 0 && !freeSmallGroupJoin) notFound();
 
   // Youth wrestlers this user can add (primary parent or linked parent)
   const { data: primaryIds } = await supabase

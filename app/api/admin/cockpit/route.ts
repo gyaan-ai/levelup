@@ -3,11 +3,15 @@ import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
+import { fromZonedTime } from 'date-fns-tz';
+import { APP_TIMEZONE } from '@/lib/format-date';
 
 /**
  * GET /api/admin/cockpit?date=YYYY-MM-DD
- * Returns command-center metrics for the given day and trends (last 7 days).
- * All date filters use UTC date (created_at::date = date).
+ * Returns command-center metrics for the given day.
+ * - New parents/coaches/athletes/early access: created_at on that UTC day.
+ * - Sessions, bookings, revenue: by SESSION SCHEDULED DATE (scheduled_datetime in app timezone).
+ *   So picking March 22 shows all sessions scheduled for March 22 and all their participants/revenue.
  */
 export async function GET(req: NextRequest) {
   try {
@@ -35,9 +39,17 @@ export async function GET(req: NextRequest) {
     const nextDay = nextDayDate.toISOString().slice(0, 10);
     const admin = createAdminClient(tenant.slug);
 
-    // Single-day bounds (UTC): [date 00:00, date+1 00:00)
+    // UTC bounds for "created_at" (new parents, coaches, etc.)
     const dayStart = `${date}T00:00:00.000Z`;
     const dayEnd = `${nextDay}T00:00:00.000Z`;
+
+    // Session scheduled date: selected day in app timezone → UTC range
+    const dayStartET = `${date}T00:00:00`;
+    const dayEndET = `${nextDay}T00:00:00`;
+    const sessionDayStartUTC = fromZonedTime(dayStartET, APP_TIMEZONE).toISOString();
+    const sessionDayEndUTC = fromZonedTime(dayEndET, APP_TIMEZONE).toISOString();
+
+    const sessionIds = await sessionIdsForDate(admin, sessionDayStartUTC, sessionDayEndUTC);
 
     const [
       newParentsRes,
@@ -57,8 +69,10 @@ export async function GET(req: NextRequest) {
       admin.from('users').select('id, email, created_at').eq('role', 'parent').gte('created_at', dayStart).lt('created_at', dayEnd).order('created_at', { ascending: false }),
       admin.from('athletes').select('id, first_name, last_name, school, created_at').gte('created_at', dayStart).lt('created_at', dayEnd).order('created_at', { ascending: false }),
       admin.from('youth_wrestlers').select('id, first_name, last_name, parent_id, created_at').gte('created_at', dayStart).lt('created_at', dayEnd).order('created_at', { ascending: false }),
-      admin.from('sessions').select('id, scheduled_datetime, status, session_type, session_mode, current_participants, max_participants, athletes(first_name, last_name, school), facilities(name)').gte('created_at', dayStart).lt('created_at', dayEnd).order('created_at', { ascending: false }),
-      admin.from('session_participants').select('id, session_id, parent_id, youth_wrestler_id, amount_paid, created_at, sessions(id, scheduled_datetime, athletes(first_name, last_name), facilities(name))').gte('created_at', dayStart).lt('created_at', dayEnd).order('created_at', { ascending: false }),
+      admin.from('sessions').select('id, scheduled_datetime, status, session_type, session_mode, current_participants, max_participants, athletes(first_name, last_name, school), facilities(name)').gte('scheduled_datetime', sessionDayStartUTC).lt('scheduled_datetime', sessionDayEndUTC).order('scheduled_datetime', { ascending: false }),
+      sessionIds.length > 0
+        ? admin.from('session_participants').select('id, session_id, parent_id, youth_wrestler_id, amount_paid, created_at, sessions(id, scheduled_datetime, athletes(first_name, last_name), facilities(name))').in('session_id', sessionIds).order('created_at', { ascending: false })
+        : Promise.resolve({ data: [] }),
       admin.from('early_access').select('id, email, name, parent_name, wrestler_name, created_at').gte('created_at', dayStart).lt('created_at', dayEnd).order('created_at', { ascending: false }),
       admin.from('sessions').select('id, athlete_payment, athlete_payout_date, athletes(first_name, last_name)').eq('status', 'completed').eq('athlete_payout_date', date),
       trendCount(admin, 'users', 'parent', date, 7),
@@ -69,7 +83,7 @@ export async function GET(req: NextRequest) {
       trendCount(admin, 'early_access', null, date, 7),
     ]);
 
-    // Revenue that day: sum of session_participants.amount_paid for participants created that day
+    // Revenue that day: sum of amount_paid for participants in sessions SCHEDULED that day
     let revenueThatDay = 0;
     if (bookingsRes.data) {
       for (const b of bookingsRes.data as { amount_paid?: number | null }[]) {
@@ -174,6 +188,19 @@ export async function GET(req: NextRequest) {
     console.error('Cockpit API error:', e);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
+}
+
+async function sessionIdsForDate(
+  admin: ReturnType<typeof createAdminClient>,
+  dayStartUTC: string,
+  dayEndUTC: string
+): Promise<string[]> {
+  const { data } = await admin
+    .from('sessions')
+    .select('id')
+    .gte('scheduled_datetime', dayStartUTC)
+    .lt('scheduled_datetime', dayEndUTC);
+  return (data ?? []).map((r: { id: string }) => r.id);
 }
 
 function lastNDays(untilDate: string, n: number): string[] {

@@ -70,8 +70,20 @@ export default async function JoinByCodePage({
     sessionType === '2-athlete' ||
     sessionType === 'small_group' ||
     (maxParticipants >= 2 && sessionType !== '1-on-1');
-  // We charge for small group now — never show "free early adopter" so promo field stays usable.
-  const freeSmallGroupJoin = false;
+
+  // Free only when parent has verified early-adopter entitlement (never default to free)
+  let freeSmallGroupJoin = false;
+  if (user && !isFull && isSmallGroup) {
+    const { data: entitlement } = await admin
+      .from('early_adopter_entitlements')
+      .select('id')
+      .eq('parent_id', user.id)
+      .eq('session_type', '2-athlete')
+      .gt('remaining', 0)
+      .limit(1)
+      .maybeSingle();
+    freeSmallGroupJoin = !!entitlement;
+  }
 
   // Parent percentage discount (e.g. FAMILY10) for logged-in user
   let percentOff: number | null = null;
