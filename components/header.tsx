@@ -55,16 +55,16 @@ export function Header() {
 
   return (
     <header className="bg-primary text-white border-b border-accent/20 sticky top-0 z-50 pt-[env(safe-area-inset-top,0px)]">
-      {/* Mobile: fixed Log in pill so it's always visible when not logged in */}
-      {!user && (
+      {/* Mobile: always show Log in bar so paying users are never locked out (no auth check) */}
+      <div className="md:hidden bg-accent text-black">
         <Link
           href="/login"
-          className="fixed top-[max(0.5rem,env(safe-area-inset-top))] right-4 z-[100] md:hidden py-2.5 px-4 rounded-full bg-accent text-black font-semibold text-sm shadow-lg hover:bg-accent/90"
+          className="block text-center font-bold text-base py-3 px-4 min-h-[48px] flex items-center justify-center"
           onClick={() => setMobileOpen(false)}
         >
           Log in
         </Link>
-      )}
+      </div>
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-14 sm:h-16">
           <div className="flex items-center gap-2 min-w-0">

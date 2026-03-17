@@ -71,8 +71,14 @@ export type CockpitData = {
   trendDays: string[];
 };
 
+const COCKPIT_TIMEZONE = 'America/New_York';
+
+function todayInTz(tz: string): string {
+  return new Date().toLocaleDateString('en-CA', { timeZone: tz });
+}
+
 export function AdminCockpitView() {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayInTz(COCKPIT_TIMEZONE);
   const [date, setDate] = useState(today);
   const [range, setRange] = useState<'today' | 'week' | 'month'>('today');
   const [data, setData] = useState<CockpitData | null>(null);
@@ -82,7 +88,7 @@ export function AdminCockpitView() {
   useEffect(() => {
     setLoading(true);
     setError(null);
-    fetch(`/api/admin/cockpit?date=${date}&range=${range}`)
+    fetch(`/api/admin/cockpit?date=${date}&range=${range}&timezone=${encodeURIComponent(COCKPIT_TIMEZONE)}`)
       .then((r) => r.json())
       .then((json) => {
         if (json.error) {
@@ -192,7 +198,7 @@ export function AdminCockpitView() {
                 <button
                   key={r}
                   type="button"
-                  onClick={() => { setRange(r); if (r === 'today') setDate(today); }}
+                  onClick={() => { setRange(r); if (r === 'today') setDate(todayInTz(COCKPIT_TIMEZONE)); }}
                   className={`px-3 py-2 text-sm font-medium transition-colors ${range === r ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
                 >
                   {r === 'today' ? 'Today' : r === 'week' ? 'This week' : 'This month'}
@@ -213,9 +219,9 @@ export function AdminCockpitView() {
           )}
           {data && (
             <span className="text-sm text-muted-foreground">
-              {range === 'today' && <><strong>{formatEST(new Date(date + 'T12:00:00'), 'MMM d, yyyy')}</strong> (UTC)</>}
-              {range === 'week' && data.rangeStart && data.rangeEnd && <><strong>{formatRange(data.rangeStart, data.rangeEnd, 'week')}</strong> (UTC)</>}
-              {range === 'month' && data.rangeStart && data.rangeEnd && <><strong>{formatRange(data.rangeStart, data.rangeEnd, 'month')}</strong> (UTC)</>}
+              {range === 'today' && <><strong>{date}</strong> (Eastern — today&apos;s calendar day)</>}
+              {range === 'week' && data.rangeStart && data.rangeEnd && <><strong>{formatRange(data.rangeStart, data.rangeEnd, 'week')}</strong> (Eastern)</>}
+              {range === 'month' && data.rangeStart && data.rangeEnd && <><strong>{formatRange(data.rangeStart, data.rangeEnd, 'month')}</strong> (Eastern)</>}
             </span>
           )}
         </div>
@@ -414,7 +420,7 @@ export function AdminCockpitView() {
                 <CreditCard className="h-4 w-4" />
                 Bookings
               </CardTitle>
-              <CardDescription>Signups created on this date (UTC). Count = registrations that day, not total in a session.</CardDescription>
+              <CardDescription>Signups created on this date (Eastern). Count = registrations that day.</CardDescription>
             </CardHeader>
             <CardContent>
               <ul className="space-y-2 text-sm">

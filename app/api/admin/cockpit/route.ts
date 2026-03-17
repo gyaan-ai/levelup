@@ -3,12 +3,27 @@ import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
+import { startOfDay, endOfDay } from 'date-fns';
+import { utcToZonedTime, zonedTimeToUtc } from 'date-fns-tz';
+import { APP_TIMEZONE } from '@/lib/format-date';
+
+/** Given a date YYYY-MM-DD in the given timezone, return UTC ISO range for that calendar day. */
+function dayRangeInTz(dateStr: string, tz: string): { start: string; end: string } {
+  const ref = new Date(dateStr + 'T12:00:00.000Z');
+  const zoned = utcToZonedTime(ref, tz);
+  const startZoned = startOfDay(zoned);
+  const endZoned = endOfDay(zoned);
+  const startUTC = zonedTimeToUtc(startZoned, tz);
+  const endUTC = zonedTimeToUtc(endZoned, tz);
+  return {
+    start: startUTC.toISOString(),
+    end: endUTC.toISOString(),
+  };
+}
 
 /**
- * GET /api/admin/cockpit?date=YYYY-MM-DD
- * Returns command-center metrics for the given day (UTC date).
- * - All main metrics: created_at on that UTC day (sessions created, bookings = signups created, revenue from those).
- * - Extra: sessionsOnThisDate / revenueOnSessionDate = sessions SCHEDULED for that date (Eastern) and their revenue.
+ * GET /api/admin/cockpit?date=YYYY-MM-DD&range=today|week|month&timezone=America/New_York
+ * Uses Eastern (America/New_York) by default so "Today" = your calendar day, not UTC.
  */
 export async function GET(req: NextRequest) {
   try {
@@ -31,7 +46,10 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const dateParam = searchParams.get('date');
     const rangeParam = searchParams.get('range');
-    const date = dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : new Date().toISOString().slice(0, 10);
+    const tz = searchParams.get('timezone') || APP_TIMEZONE;
+    // Default "today" to current date in Eastern so admins see their real day
+    const todayEastern = new Date().toLocaleDateString('en-CA', { timeZone: tz });
+    const date = dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : todayEastern;
     const range = rangeParam === 'week' || rangeParam === 'month' ? rangeParam : 'today';
 
     let rangeStart = date;
@@ -46,10 +64,11 @@ export async function GET(req: NextRequest) {
       rangeStart = d.toISOString().slice(0, 10);
     }
 
-    const nextRangeEnd = new Date(rangeEnd + 'T12:00:00.000Z');
-    nextRangeEnd.setUTCDate(nextRangeEnd.getUTCDate() + 1);
-    const dayStart = `${rangeStart}T00:00:00.000Z`;
-    const dayEnd = `${nextRangeEnd.toISOString().slice(0, 10)}T00:00:00.000Z`;
+    // Use Eastern (or requested tz) day boundaries so "Today" matches real signups/sessions
+    const rangeStartBounds = dayRangeInTz(rangeStart, tz);
+    const rangeEndBounds = dayRangeInTz(rangeEnd, tz);
+    const dayStart = rangeStartBounds.start;
+    const dayEnd = rangeEndBounds.end;
     const startMs = new Date(dayStart).getTime();
     const endMs = new Date(dayEnd).getTime();
 
@@ -70,19 +89,19 @@ export async function GET(req: NextRequest) {
       trendBookingsRes,
       trendEarlyRes,
     ] = await Promise.all([
-      admin.from('users').select('id, email, created_at').eq('role', 'parent').gte('created_at', dayStart).lt('created_at', dayEnd).order('created_at', { ascending: false }),
-      admin.from('athletes').select('id, first_name, last_name, school, created_at').gte('created_at', dayStart).lt('created_at', dayEnd).order('created_at', { ascending: false }),
-      admin.from('youth_wrestlers').select('id, first_name, last_name, parent_id, created_at').gte('created_at', dayStart).lt('created_at', dayEnd).order('created_at', { ascending: false }),
-      admin.from('sessions').select('id, scheduled_datetime, status, session_type, session_mode, current_participants, max_participants, athletes(first_name, last_name, school), facilities(name)').gte('created_at', dayStart).lt('created_at', dayEnd).order('created_at', { ascending: false }),
-      admin.from('session_participants').select('id, session_id, parent_id, youth_wrestler_id, amount_paid, created_at, sessions(id, scheduled_datetime, athletes(first_name, last_name), facilities(name))').gte('created_at', dayStart).lt('created_at', dayEnd).order('created_at', { ascending: false }),
-      admin.from('early_access').select('id, email, name, parent_name, wrestler_name, created_at').gte('created_at', dayStart).lt('created_at', dayEnd).order('created_at', { ascending: false }),
+      admin.from('users').select('id, email, created_at').eq('role', 'parent').gte('created_at', dayStart).lte('created_at', dayEnd).order('created_at', { ascending: false }),
+      admin.from('athletes').select('id, first_name, last_name, school, created_at').gte('created_at', dayStart).lte('created_at', dayEnd).order('created_at', { ascending: false }),
+      admin.from('youth_wrestlers').select('id, first_name, last_name, parent_id, created_at').gte('created_at', dayStart).lte('created_at', dayEnd).order('created_at', { ascending: false }),
+      admin.from('sessions').select('id, scheduled_datetime, status, session_type, session_mode, current_participants, max_participants, athletes(first_name, last_name, school), facilities(name)').gte('created_at', dayStart).lte('created_at', dayEnd).order('created_at', { ascending: false }),
+      admin.from('session_participants').select('id, session_id, parent_id, youth_wrestler_id, amount_paid, created_at, sessions(id, scheduled_datetime, athletes(first_name, last_name), facilities(name))').gte('created_at', dayStart).lte('created_at', dayEnd).order('created_at', { ascending: false }),
+      admin.from('early_access').select('id, email, name, parent_name, wrestler_name, created_at').gte('created_at', dayStart).lte('created_at', dayEnd).order('created_at', { ascending: false }),
       admin.from('sessions').select('id, athlete_payment, athlete_payout_date, athletes(first_name, last_name)').eq('status', 'completed').gte('athlete_payout_date', rangeStart).lte('athlete_payout_date', rangeEnd),
-      trendCount(admin, 'users', 'parent', date, 7),
-      trendCount(admin, 'athletes', null, date, 7),
-      trendCount(admin, 'youth_wrestlers', null, date, 7),
-      trendCount(admin, 'sessions', null, date, 7),
-      trendCount(admin, 'session_participants', null, date, 7),
-      trendCount(admin, 'early_access', null, date, 7),
+      trendCount(admin, 'users', 'parent', date, 7, tz),
+      trendCount(admin, 'athletes', null, date, 7, tz),
+      trendCount(admin, 'youth_wrestlers', null, date, 7, tz),
+      trendCount(admin, 'sessions', null, date, 7, tz),
+      trendCount(admin, 'session_participants', null, date, 7, tz),
+      trendCount(admin, 'early_access', null, date, 7, tz),
     ]);
 
     // Vercel Analytics (drain): page views and unique visitors in range (origin matches tenant domain)
@@ -94,7 +113,7 @@ export async function GET(req: NextRequest) {
         .from('vercel_analytics_events')
         .select('event_type, device_id')
         .gte('timestamp_ms', startMs)
-        .lt('timestamp_ms', endMs)
+        .lte('timestamp_ms', endMs)
         .ilike('origin', originPattern)
         .limit(100000);
       if (analyticsRows && analyticsRows.length > 0) {
@@ -235,16 +254,14 @@ async function trendCount(
   table: 'users' | 'athletes' | 'youth_wrestlers' | 'sessions' | 'session_participants' | 'early_access',
   role: string | null,
   endDate: string,
-  numDays: number
+  numDays: number,
+  tz: string
 ): Promise<{ date: string; count: number }[]> {
   const days = lastNDays(endDate, numDays);
   const results: { date: string; count: number }[] = [];
   for (const ds of days) {
-    const start = `${ds}T00:00:00.000Z`;
-    const nextD = new Date(ds + 'T12:00:00.000Z');
-    nextD.setUTCDate(nextD.getUTCDate() + 1);
-    const end = nextD.toISOString().slice(0, 10) + 'T00:00:00.000Z';
-    const base = (admin as any).from(table).select('*', { count: 'exact', head: true }).gte('created_at', start).lt('created_at', end);
+    const { start, end } = dayRangeInTz(ds, tz);
+    const base = (admin as any).from(table).select('*', { count: 'exact', head: true }).gte('created_at', start).lte('created_at', end);
     const q = table === 'users' && role ? base.eq('role', role) : base;
     const { count, error } = await q;
     results.push({ date: ds, count: error ? 0 : (count ?? 0) });
