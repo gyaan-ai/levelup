@@ -61,8 +61,8 @@ export interface TenantConfig {
 }
 
 export const tenants: Record<string, TenantConfig> = {
-  "nc-united": {
-    slug: "nc-united",
+  guild: {
+    slug: "guild",
     orgName: "The Guild",
     orgType: "501c3",
     productName: "The Guild",
@@ -78,7 +78,7 @@ export const tenants: Record<string, TenantConfig> = {
     },
 
     logo: "/logos/guild-g.png",
-    stateOrgLogo: "/logos/nc-united.png",
+    stateOrgLogo: "/logos/guild-g.png",
     favicon: "/favicons/guild.ico",
     tagline: "Mastery. Technique. Access the Elite.",
     secondaryTagline: "Elite wrestling technique instruction",
@@ -87,10 +87,10 @@ export const tenants: Record<string, TenantConfig> = {
     supportEmail: "info@WrestlingGuild.com",
     phone: "631.662.5409",
 
-    supabaseUrl: process.env.NEXT_PUBLIC_NC_UNITED_SUPABASE_URL!,
-    supabaseAnonKey: process.env.NEXT_PUBLIC_NC_UNITED_SUPABASE_ANON_KEY!,
+    supabaseUrl: process.env.NEXT_PUBLIC_GUILD_SUPABASE_URL || process.env.NEXT_PUBLIC_NC_UNITED_SUPABASE_URL!,
+    supabaseAnonKey: process.env.NEXT_PUBLIC_GUILD_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_NC_UNITED_SUPABASE_ANON_KEY!,
 
-    stripePublishableKey: process.env.NEXT_PUBLIC_NC_UNITED_STRIPE_KEY!,
+    stripePublishableKey: process.env.NEXT_PUBLIC_GUILD_STRIPE_KEY || process.env.NEXT_PUBLIC_NC_UNITED_STRIPE_KEY!,
 
     facilities: [
       { name: "UNC Wrestling Room", school: "UNC" },
@@ -127,15 +127,15 @@ export function getTenantByDomain(hostname: string): TenantConfig | null {
   const host = hostname.split(':')[0].toLowerCase();
   // Primary domain and localhost for dev
   if (host === 'www.wrestlingguild.com' || host === 'wrestlingguild.com' || host === 'localhost') {
-    return tenants["nc-united"];
+    return tenants.guild;
   }
   // Legacy / alternate domain (redirect to www.wrestlingguild.com in Vercel if desired)
   if (host === 'guildwrestling.com' || host === 'www.guildwrestling.com' || host === 'guild.ncunitedwrestling.com') {
-    return tenants["nc-united"];
+    return tenants.guild;
   }
   // Vercel preview and other known hosts
   if (host.endsWith('.vercel.app')) {
-    return tenants["nc-united"];
+    return tenants.guild;
   }
   return null;
 }

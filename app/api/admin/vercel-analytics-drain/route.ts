@@ -53,7 +53,7 @@ export async function POST(req: NextRequest) {
         host = '';
       }
       const tenant = host ? getTenantByDomain(host) : getTenantByDomain('localhost') ?? getTenantByDomain('www.wrestlingguild.com');
-      const slug = tenant?.slug ?? 'nc-united';
+      const slug = tenant?.slug ?? 'guild';
       if (!byTenant.has(slug)) byTenant.set(slug, []);
       byTenant.get(slug)!.push(e);
     }

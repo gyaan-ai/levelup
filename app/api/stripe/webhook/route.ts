@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
 
     const headersList = await headers();
     const host = headersList.get('host') || '';
-    const tenant = getTenantByDomain(host) ?? { slug: 'nc-united' };
+    const tenant = getTenantByDomain(host) ?? { slug: 'guild' };
     const webhookSecret = getWebhookSecret(tenant.slug);
     const stripe = getStripeInstance(tenant.slug);
 

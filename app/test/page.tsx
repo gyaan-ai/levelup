@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 export default async function TestPage() {
   // Get tenant slug from headers (set by middleware)
   const headersList = await headers();
-  const tenantSlug = headersList.get('x-tenant-slug') || 'nc-united';
+  const tenantSlug = headersList.get('x-tenant-slug') || 'guild';
   
   // Create Supabase client
   const supabase = await createClient(tenantSlug);
