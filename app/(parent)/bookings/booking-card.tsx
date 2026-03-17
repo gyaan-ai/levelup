@@ -245,7 +245,7 @@ export function BookingCard({ session, isPast = false }: BookingCardProps) {
                   )}
                 </div>
               )}
-              {isPast && (
+              {isPast && session.status === 'completed' && (
                 <Link href={`/sessions/${session.id}/review`} className="inline-flex w-full sm:w-auto">
                   <Button size="sm" className="w-full sm:w-auto min-h-[44px] px-4 bg-accent hover:bg-accent/90 text-primary">
                     <Star className="h-4 w-4 mr-1 shrink-0 fill-current" />
