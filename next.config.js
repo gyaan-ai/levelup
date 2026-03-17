@@ -15,6 +15,11 @@ const nextConfig = {
           },
         ],
       },
+      // Prevent CDN/browser from caching My Bookings HTML so mobile gets updates after deploy
+      {
+        source: '/bookings',
+        headers: [{ key: 'Cache-Control', value: 'private, no-store, max-age=0' }],
+      },
     ];
   },
 };
