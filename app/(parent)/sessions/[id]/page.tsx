@@ -2,7 +2,6 @@ import { redirect, notFound } from 'next/navigation';
 import { headers } from 'next/headers';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
-import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import { getParentYouthWrestlerIds } from '@/lib/parent-wrestlers';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -65,43 +64,15 @@ export default async function SessionDetailPage({
     session_participants(youth_wrestler_id, amount_paid, youth_wrestlers(id, first_name, last_name))
   `;
 
-  let session: Record<string, unknown> | null = null;
-  let adminError: { message?: string; code?: string } | null = null;
+  // Use same client as /bookings so View works wherever bookings works (no dependency on admin service key)
+  const { data: session, error: sessionError } = await supabase
+    .from('sessions')
+    .select(sessionSelect)
+    .eq('id', sessionId)
+    .single();
 
-  try {
-    const admin = createAdminClient(tenant.slug);
-    const result = await admin
-      .from('sessions')
-      .select(sessionSelect)
-      .eq('id', sessionId)
-      .single();
-    session = result.data;
-    adminError = result.error;
-  } catch (adminErr) {
-    adminError = adminErr instanceof Error ? adminErr : { message: String(adminErr) };
-  }
-
-  let userError: { message?: string; code?: string } | null = null;
-  if (adminError || !session) {
-    const userResult = await supabase
-      .from('sessions')
-      .select(sessionSelect)
-      .eq('id', sessionId)
-      .single();
-    if (!userResult.error && userResult.data) {
-      session = userResult.data;
-      adminError = null;
-    } else {
-      userError = userResult.error;
-    }
-  }
-
-  if (!session) {
-    console.error('[sessions/[id]] 404', {
-      sessionId,
-      adminError: adminError?.message ?? adminError?.code ?? null,
-      userError: userError?.message ?? userError?.code ?? null,
-    });
+  if (sessionError || !session) {
+    console.error('[sessions/[id]] 404', { sessionId, error: sessionError?.message ?? sessionError?.code ?? null });
     notFound();
   }
 
