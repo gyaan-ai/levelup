@@ -50,6 +50,7 @@ export type CockpitData = {
     session_id: string;
     amount_paid: number | null;
     created_at: string;
+    kid_name: string;
     coach_name: string;
     facility_name: string;
     scheduled_datetime: string;
@@ -69,6 +70,8 @@ export type CockpitData = {
     earlyAccess: number[];
   };
   trendDays: string[];
+  trendLabels?: string[];
+  trendPeriod?: '7d' | '3w' | '12m';
 };
 
 const COCKPIT_TIMEZONE = 'America/New_York';
@@ -89,6 +92,7 @@ export function AdminCockpitView() {
   const today = todayInTz(COCKPIT_TIMEZONE);
   const [date, setDate] = useState(today);
   const [range, setRange] = useState<'today' | 'yesterday' | 'week' | 'month'>('today');
+  const [trendPeriod, setTrendPeriod] = useState<'7d' | '3w' | '12m'>('7d');
   const [data, setData] = useState<CockpitData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -96,7 +100,7 @@ export function AdminCockpitView() {
   useEffect(() => {
     setLoading(true);
     setError(null);
-    fetch(`/api/admin/cockpit?date=${range === 'yesterday' ? yesterdayInTz(COCKPIT_TIMEZONE) : date}&range=${range === 'yesterday' ? 'today' : range}&timezone=${encodeURIComponent(COCKPIT_TIMEZONE)}`)
+    fetch(`/api/admin/cockpit?date=${range === 'yesterday' ? yesterdayInTz(COCKPIT_TIMEZONE) : date}&range=${range === 'yesterday' ? 'today' : range}&trendPeriod=${trendPeriod}&timezone=${encodeURIComponent(COCKPIT_TIMEZONE)}`)
       .then((r) => r.json())
       .then((json) => {
         if (json.error) {
@@ -111,7 +115,7 @@ export function AdminCockpitView() {
         setData(null);
       })
       .finally(() => setLoading(false));
-  }, [date, range]);
+  }, [date, range, trendPeriod]);
 
   if (loading && !data) {
     return (
@@ -135,7 +139,8 @@ export function AdminCockpitView() {
   const trends = d.trends ?? {
     parents: [], coaches: [], athletes: [], sessions: [], bookings: [], earlyAccess: [],
   };
-  const trendDays = (d.trendDays ?? []).slice(0, 7);
+  const trendDays = d.trendDays ?? [];
+  const trendLabels = d.trendLabels ?? trendDays.map((ds) => formatEST(new Date(ds + 'T12:00:00'), 'M/d'));
   const maxTrend = Math.max(
     1,
     ...(trends.parents ?? []),
@@ -147,26 +152,26 @@ export function AdminCockpitView() {
   );
 
   const TrendBar = ({ values, label }: { values: number[]; label: string }) => {
-    const vals = values.slice(0, trendDays.length);
+    const vals = values.slice(0, trendLabels.length);
     return (
       <div className="space-y-3">
         <p className="text-sm font-semibold text-foreground">{label}</p>
-        <div className="flex gap-1.5 items-end h-14 min-h-[56px]">
+        <div className="flex gap-1.5 items-end h-16 min-h-[64px]">
           {vals.map((v, i) => {
             const pct = maxTrend > 0 ? Math.max(8, (v / maxTrend) * 100) : 8;
-            const dayStr = trendDays[i] ? formatEST(new Date(trendDays[i] + 'T12:00:00'), 'M/d') : '—';
+            const labelStr = trendLabels[i] ?? '—';
             return (
               <div key={i} className="flex-1 min-w-0 flex flex-col items-center gap-1">
-                <span className="text-xs font-semibold tabular-nums text-foreground" title={`${dayStr}: ${v}`}>
+                <span className="text-xs font-semibold tabular-nums text-foreground" title={`${labelStr}: ${v}`}>
                   {v}
                 </span>
                 <div
-                  className="w-full min-w-[8px] max-w-[24px] rounded-t bg-accent/40 hover:bg-accent/70 transition-colors flex-shrink-0"
+                  className="w-full min-w-[8px] max-w-[32px] rounded-t bg-accent/50 hover:bg-accent/80 transition-colors flex-shrink-0"
                   style={{ height: `${pct}%`, minHeight: 6 }}
-                  title={`${dayStr}: ${v}`}
+                  title={`${labelStr}: ${v}`}
                 />
-                <span className="text-[10px] font-medium text-muted-foreground tabular-nums truncate w-full text-center">
-                  {dayStr}
+                <span className="text-[10px] font-medium text-muted-foreground tabular-nums truncate w-full text-center leading-tight">
+                  {labelStr}
                 </span>
               </div>
             );
@@ -296,16 +301,35 @@ export function AdminCockpitView() {
         </Card>
       </div>
 
-      {/* Trends */}
+      {/* Trends: bar chart with period filter */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="h-4 w-4" />
-            Last 7 days
-          </CardTitle>
-          <CardDescription>
-            Counts by day (oldest → newest). Date and value shown on each bar.
-          </CardDescription>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="h-4 w-4" />
+                {trendPeriod === '7d' ? 'Last 7 days' : trendPeriod === '3w' ? 'Last 3 weeks' : 'Last 12 months'}
+              </CardTitle>
+              <CardDescription className="mt-1">
+                {trendPeriod === '7d' && 'Counts by day (oldest → newest).'}
+                {trendPeriod === '3w' && 'Counts by week.'}
+                {trendPeriod === '12m' && 'Counts by month.'}
+                {' Value and label on each bar.'}
+              </CardDescription>
+            </div>
+            <div className="flex rounded-md border border-input bg-background overflow-hidden">
+              {(['7d', '3w', '12m'] as const).map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => setTrendPeriod(p)}
+                  className={`px-3 py-2 text-sm font-medium transition-colors ${trendPeriod === p ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
+                >
+                  {p === '7d' ? 'Week' : p === '3w' ? '3 weeks' : 'Year'}
+                </button>
+              ))}
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <TrendBar values={trends.parents} label="Parents" />
@@ -435,7 +459,7 @@ export function AdminCockpitView() {
                 {d.bookings.map((b) => (
                   <li key={b.id} className="flex flex-wrap items-center justify-between gap-2">
                     <span>
-                      {b.coach_name} · {b.facility_name}
+                      {b.kid_name ?? '—'} · {b.coach_name} · {b.facility_name}
                     </span>
                     <span className="text-muted-foreground">
                       {b.amount_paid != null ? `$${b.amount_paid.toFixed(2)}` : '—'}

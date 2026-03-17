@@ -3,7 +3,7 @@ import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
-import { startOfDay, endOfDay } from 'date-fns';
+import { startOfDay, endOfDay, subDays, subMonths } from 'date-fns';
 import { toZonedTime, fromZonedTime } from 'date-fns-tz';
 import { APP_TIMEZONE } from '@/lib/format-date';
 
@@ -46,6 +46,7 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const dateParam = searchParams.get('date');
     const rangeParam = searchParams.get('range');
+    const trendPeriod = (searchParams.get('trendPeriod') || '7d') as '7d' | '3w' | '12m';
     const tz = searchParams.get('timezone') || APP_TIMEZONE;
     // Default "today" to current date in Eastern so admins see their real day
     const todayEastern = new Date().toLocaleDateString('en-CA', { timeZone: tz });
@@ -74,6 +75,51 @@ export async function GET(req: NextRequest) {
 
     const admin = createAdminClient(tenant.slug);
 
+    // Trend buckets: 7d = 7 days, 3w = 3 weeks, 12m = 12 months
+    const trendEndDate = date;
+    let trendRanges: { start: string; end: string; label: string }[] = [];
+    if (trendPeriod === '7d') {
+      const days = lastNDays(trendEndDate, 7);
+      trendRanges = days.map((ds) => {
+        const { start, end } = dayRangeInTz(ds, tz);
+        const label = new Date(ds + 'T12:00:00').toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', timeZone: tz });
+        return { start, end, label };
+      });
+    } else if (trendPeriod === '3w') {
+      const endRef = new Date(trendEndDate + 'T12:00:00.000Z');
+      for (let i = 2; i >= 0; i--) {
+        const weekEnd = subDays(endRef, i * 7);
+        const weekStart = subDays(weekEnd, 6);
+        const startStr = weekStart.toISOString().slice(0, 10);
+        const endStr = weekEnd.toISOString().slice(0, 10);
+        const { start, end } = dayRangeInTz(startStr, tz);
+        const endRange = dayRangeInTz(endStr, tz);
+        trendRanges.push({
+          start,
+          end: endRange.end,
+          label: new Date(weekStart).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', timeZone: tz }) + '–' + new Date(weekEnd).toLocaleDateString('en-US', { month: 'numeric', day: 'numeric', timeZone: tz }),
+        });
+      }
+    } else {
+      // 12m: one bucket per month
+      const endRef = new Date(trendEndDate + 'T12:00:00.000Z');
+      for (let i = 11; i >= 0; i--) {
+        const m = subMonths(endRef, i);
+        const y = m.getUTCFullYear();
+        const mon = m.getUTCMonth();
+        const firstDay = `${y}-${String(mon + 1).padStart(2, '0')}-01`;
+        const lastDate = new Date(Date.UTC(y, mon + 1, 0));
+        const lastDay = `${y}-${String(mon + 1).padStart(2, '0')}-${String(lastDate.getUTCDate()).padStart(2, '0')}`;
+        const startRange = dayRangeInTz(firstDay, tz);
+        const endRange = dayRangeInTz(lastDay, tz);
+        trendRanges.push({
+          start: startRange.start,
+          end: endRange.end,
+          label: m.toLocaleDateString('en-US', { month: 'short', year: '2-digit', timeZone: tz }),
+        });
+      }
+    }
+
     const [
       newParentsRes,
       newCoachesRes,
@@ -93,15 +139,15 @@ export async function GET(req: NextRequest) {
       admin.from('athletes').select('id, first_name, last_name, school, created_at').gte('created_at', dayStart).lte('created_at', dayEnd).order('created_at', { ascending: false }),
       admin.from('youth_wrestlers').select('id, first_name, last_name, parent_id, created_at').gte('created_at', dayStart).lte('created_at', dayEnd).order('created_at', { ascending: false }),
       admin.from('sessions').select('id, scheduled_datetime, status, session_type, session_mode, current_participants, max_participants, athletes(first_name, last_name, school), facilities(name)').gte('created_at', dayStart).lte('created_at', dayEnd).order('created_at', { ascending: false }),
-      admin.from('session_participants').select('id, session_id, parent_id, youth_wrestler_id, amount_paid, created_at, sessions(id, scheduled_datetime, athletes(first_name, last_name), facilities(name))').gte('created_at', dayStart).lte('created_at', dayEnd).order('created_at', { ascending: false }),
+      admin.from('session_participants').select('id, session_id, parent_id, youth_wrestler_id, amount_paid, created_at, youth_wrestlers(first_name, last_name), sessions(id, scheduled_datetime, athletes(first_name, last_name), facilities(name))').gte('created_at', dayStart).lte('created_at', dayEnd).order('created_at', { ascending: false }),
       admin.from('early_access').select('id, email, name, parent_name, wrestler_name, created_at').gte('created_at', dayStart).lte('created_at', dayEnd).order('created_at', { ascending: false }),
       admin.from('sessions').select('id, athlete_payment, athlete_payout_date, athletes(first_name, last_name)').eq('status', 'completed').gte('athlete_payout_date', rangeStart).lte('athlete_payout_date', rangeEnd),
-      trendCount(admin, 'users', 'parent', date, 7, tz),
-      trendCount(admin, 'athletes', null, date, 7, tz),
-      trendCount(admin, 'youth_wrestlers', null, date, 7, tz),
-      trendCount(admin, 'sessions', null, date, 7, tz),
-      trendCount(admin, 'session_participants', null, date, 7, tz),
-      trendCount(admin, 'early_access', null, date, 7, tz),
+      trendCountByRanges(admin, 'users', 'parent', trendRanges),
+      trendCountByRanges(admin, 'athletes', null, trendRanges),
+      trendCountByRanges(admin, 'youth_wrestlers', null, trendRanges),
+      trendCountByRanges(admin, 'sessions', null, trendRanges),
+      trendCountByRanges(admin, 'session_participants', null, trendRanges),
+      trendCountByRanges(admin, 'early_access', null, trendRanges),
     ]);
 
     // Vercel Analytics (drain): page views and unique visitors in range (origin matches tenant domain)
@@ -145,13 +191,16 @@ export async function GET(req: NextRequest) {
     // Build trend arrays (last 7 days, oldest first)
     const trendDays = lastNDays(date, 7);
     const trends = {
-      parents: fillTrend(trendDays, trendParentsRes),
-      coaches: fillTrend(trendDays, trendCoachesRes),
-      athletes: fillTrend(trendDays, trendAthletesRes),
-      sessions: fillTrend(trendDays, trendSessionsRes),
-      bookings: fillTrend(trendDays, trendBookingsRes),
-      earlyAccess: fillTrend(trendDays, trendEarlyRes),
+      parents: trendParentsRes,
+      coaches: trendCoachesRes,
+      athletes: trendAthletesRes,
+      sessions: trendSessionsRes,
+      bookings: trendBookingsRes,
+      earlyAccess: trendEarlyRes,
     };
+
+    const trendLabels = trendRanges.map((r) => r.label);
+    const trendDaysForResponse = trendRanges.map((r) => r.start.slice(0, 10));
 
     const newParents = (newParentsRes.data ?? []).map((p: { id: string; email: string; created_at: string }) => ({ id: p.id, email: p.email, created_at: p.created_at }));
     const newCoaches = (newCoachesRes.data ?? []).map((a: { id: string; first_name: string; last_name: string; school: string; created_at: string }) => ({
@@ -185,10 +234,15 @@ export async function GET(req: NextRequest) {
     const bookings = ((bookingsRes.data ?? []) as Array<{
       id: string;
       session_id: string;
+      youth_wrestler_id?: string | null;
       amount_paid?: number | null;
       created_at: string;
+      youth_wrestlers?: { first_name?: string; last_name?: string } | Array<{ first_name?: string; last_name?: string }> | null;
       sessions?: unknown;
     }>).map((b) => {
+      const yw = b.youth_wrestlers;
+      const ywOne = Array.isArray(yw) ? yw[0] : yw;
+      const kid_name = ywOne ? `${ywOne.first_name ?? ''} ${ywOne.last_name ?? ''}`.trim() || '—' : '—';
       const sess = b.sessions as { scheduled_datetime?: string; athletes?: { first_name?: string; last_name?: string } | Array<{ first_name?: string; last_name?: string }>; facilities?: { name?: string } | Array<{ name?: string }> } | Array<{ scheduled_datetime?: string; athletes?: unknown; facilities?: unknown }> | null | undefined;
       const s = Array.isArray(sess) ? sess[0] : sess;
       const a = s?.athletes;
@@ -200,6 +254,7 @@ export async function GET(req: NextRequest) {
         session_id: b.session_id,
         amount_paid: b.amount_paid != null ? Number(b.amount_paid) : null,
         created_at: b.created_at,
+        kid_name,
         coach_name: o ? `${o.first_name ?? ''} ${o.last_name ?? ''}`.trim() || '—' : '—',
         facility_name: fo?.name ?? '—',
         scheduled_datetime: s?.scheduled_datetime ?? '—',
@@ -230,7 +285,9 @@ export async function GET(req: NextRequest) {
       payoutsPaidList,
       revenueThatDay,
       trends,
-      trendDays,
+      trendDays: trendDaysForResponse,
+      trendLabels,
+      trendPeriod,
     });
   } catch (e) {
     console.error('Cockpit API error:', e);
@@ -249,27 +306,18 @@ function lastNDays(untilDate: string, n: number): string[] {
   return out;
 }
 
-async function trendCount(
+async function trendCountByRanges(
   admin: ReturnType<typeof createAdminClient>,
   table: 'users' | 'athletes' | 'youth_wrestlers' | 'sessions' | 'session_participants' | 'early_access',
   role: string | null,
-  endDate: string,
-  numDays: number,
-  tz: string
-): Promise<{ date: string; count: number }[]> {
-  const days = lastNDays(endDate, numDays);
-  const results: { date: string; count: number }[] = [];
-  for (const ds of days) {
-    const { start, end } = dayRangeInTz(ds, tz);
+  ranges: { start: string; end: string }[]
+): Promise<number[]> {
+  const counts: number[] = [];
+  for (const { start, end } of ranges) {
     const base = (admin as any).from(table).select('*', { count: 'exact', head: true }).gte('created_at', start).lte('created_at', end);
     const q = table === 'users' && role ? base.eq('role', role) : base;
     const { count, error } = await q;
-    results.push({ date: ds, count: error ? 0 : (count ?? 0) });
+    counts.push(error ? 0 : (count ?? 0));
   }
-  return results;
-}
-
-function fillTrend(days: string[], trendRes: { date: string; count: number }[]): number[] {
-  const byDate = new Map(trendRes.map((t) => [t.date, t.count]));
-  return days.map((d) => byDate.get(d) ?? 0);
+  return counts;
 }
