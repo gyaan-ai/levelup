@@ -51,47 +51,58 @@ export default async function HomePage() {
       {/* Hero */}
       <section className="relative bg-black min-h-[90vh] flex items-center overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-black via-black to-gray-900" />
-        <div className="container mx-auto px-4 py-20 relative z-10">
+        {/* Mobile: Log in top-right on the same screen as THE GUILD / Browse — tell users "tap Log in top right" */}
+        <Link
+          href="/login"
+          className="absolute top-4 right-4 z-20 md:hidden py-2.5 px-4 rounded-full bg-accent text-black font-semibold text-sm shadow-lg hover:bg-accent/90"
+        >
+          Log in
+        </Link>
+        <div className="container mx-auto px-4 py-12 sm:py-20 relative z-10">
           <div className="max-w-6xl mx-auto">
             <div className="grid lg:grid-cols-2 gap-12 items-center">
               <div className="text-center lg:text-left">
-                <div className="mb-8">
-                  <h1 className="text-6xl md:text-7xl lg:text-8xl font-serif font-bold text-accent mb-4 tracking-wide">
+                <div className="mb-4 sm:mb-8">
+                  <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-serif font-bold text-accent mb-4 tracking-wide">
                     THE GUILD
                   </h1>
                   <div className="h-1 w-32 bg-accent mx-auto lg:mx-0" />
                 </div>
-                <p className="text-xl md:text-2xl text-white font-light tracking-wide mb-10 uppercase">
+                <p className="text-lg sm:text-xl md:text-2xl text-white font-light tracking-wide mb-4 sm:mb-10 uppercase">
                   Mastery. Technique. Access the Elite.
                 </p>
-                <p className="text-base sm:text-lg text-white/80 mb-8 sm:mb-12 max-w-xl mx-auto lg:mx-0">
+                <p className="text-base sm:text-lg text-white/80 mb-4 sm:mb-12 max-w-xl mx-auto lg:mx-0">
                   Train with NCAA wrestlers and elite coaches in your community for private technique
                   instruction. Master the details that separate good from elite.
                 </p>
+                <p className="text-sm text-white/70 mb-3 sm:mb-4 text-center lg:text-left">
+                  Already have an account?{' '}
+                  <Link href="/login" className="text-accent font-semibold underline underline-offset-2 hover:text-accent/90">
+                    Log in
+                  </Link>
+                </p>
                 <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4 justify-center lg:justify-start">
-                  <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4 justify-center lg:justify-start w-full sm:w-auto">
-                    <Button
-                      size="xl"
-                      variant="premium"
-                      asChild
-                      className="gold-glow-hover w-full sm:w-auto min-w-0 sm:min-w-[140px]"
-                    >
-                      <Link href="/browse">Browse Elite Coaches</Link>
-                    </Button>
-                    <Button
-                      size="xl"
-                      variant="outline"
-                      asChild
-                      className="w-full sm:w-auto min-w-0 sm:min-w-[140px] bg-transparent text-white border-2 border-accent text-accent hover:bg-accent hover:text-black font-semibold"
-                    >
-                      <Link href="/login">Login</Link>
-                    </Button>
-                  </div>
+                  <Button
+                    size="xl"
+                    variant="premium"
+                    asChild
+                    className="gold-glow-hover w-full sm:w-auto min-w-0 sm:min-w-[140px]"
+                  >
+                    <Link href="/login">Log in</Link>
+                  </Button>
+                  <Button
+                    size="xl"
+                    variant="premium"
+                    asChild
+                    className="gold-glow-hover w-full sm:w-auto min-w-0 sm:min-w-[140px] bg-white/10 text-white border-2 border-accent hover:bg-accent hover:text-black"
+                  >
+                    <Link href="/browse">Browse Elite Coaches</Link>
+                  </Button>
                   <Button
                     size="xl"
                     variant="outline"
                     asChild
-                    className="bg-transparent text-white border-accent text-accent hover:bg-accent hover:text-black"
+                    className="w-full sm:w-auto bg-transparent text-white border-accent text-accent hover:bg-accent hover:text-black"
                   >
                     <Link href="/signup?role=coach">Coach? Join The Guild</Link>
                   </Button>
@@ -99,7 +110,7 @@ export default async function HomePage() {
                     size="xl"
                     variant="outline"
                     asChild
-                    className="bg-transparent text-white border-white hover:bg-white hover:text-black"
+                    className="w-full sm:w-auto bg-transparent text-white border-white hover:bg-white hover:text-black"
                   >
                     <Link href="/#how-it-works">How It Works</Link>
                   </Button>

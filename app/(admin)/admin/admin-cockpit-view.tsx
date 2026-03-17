@@ -166,13 +166,13 @@ export function AdminCockpitView() {
   };
 
   const summaryCards = [
+    { label: 'Revenue booked', value: `$${d.revenueThatDay.toFixed(0)}`, icon: DollarSign },
+    { label: 'Bookings (signups)', value: d.bookings.length, icon: CreditCard },
     { label: 'New parents', value: d.newParents.length, icon: UserPlus },
     { label: 'New coaches', value: d.newCoaches.length, icon: Users },
     { label: 'New athletes', value: d.newAthletes.length, icon: Users },
     { label: 'Sessions created', value: d.sessionsScheduled.length, icon: Calendar },
-    { label: 'Bookings', value: d.bookings.length, icon: CreditCard },
     { label: 'Early access', value: d.earlyAccess.length, icon: ClipboardList },
-    { label: 'Revenue (day)', value: `$${d.revenueThatDay.toFixed(0)}`, icon: DollarSign },
     { label: 'Payouts paid', value: `$${d.payoutsPaid.toFixed(0)}`, icon: Wallet },
   ];
 
@@ -220,6 +220,34 @@ export function AdminCockpitView() {
           )}
         </div>
       </div>
+
+      {/* At a glance: $ booked, bookings, new users, new sessions */}
+      <Card className="border-primary/30 bg-primary/5">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base font-medium text-muted-foreground">
+            {range === 'today' ? 'Today' : range === 'week' ? 'This week' : 'This month'} — at a glance
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-wrap items-baseline gap-x-6 gap-y-2 text-lg">
+          <span className="font-bold text-2xl tabular-nums">
+            ${d.revenueThatDay.toFixed(0)} booked
+          </span>
+          <span className="text-muted-foreground">
+            <span className="font-semibold text-foreground tabular-nums">{d.bookings.length}</span> bookings
+            {d.bookings.length > 0 && d.revenueThatDay > 0 && (
+              <span className="text-muted-foreground"> (~${(d.revenueThatDay / d.bookings.length).toFixed(0)} each)</span>
+            )}
+          </span>
+          <span className="text-muted-foreground">
+            <span className="font-semibold text-foreground tabular-nums">{d.newParents.length}</span> parents,{' '}
+            <span className="font-semibold text-foreground tabular-nums">{d.newCoaches.length}</span> coaches,{' '}
+            <span className="font-semibold text-foreground tabular-nums">{d.newAthletes.length}</span> athletes
+          </span>
+          <span className="text-muted-foreground">
+            <span className="font-semibold text-foreground tabular-nums">{d.sessionsScheduled.length}</span> new sessions created
+          </span>
+        </CardContent>
+      </Card>
 
       {/* Summary cards: consistent grid and styling */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">

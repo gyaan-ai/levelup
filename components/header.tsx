@@ -55,6 +55,16 @@ export function Header() {
 
   return (
     <header className="bg-primary text-white border-b border-accent/20 sticky top-0 z-50 pt-[env(safe-area-inset-top,0px)]">
+      {/* Mobile: fixed Log in pill so it's always visible when not logged in */}
+      {!user && (
+        <Link
+          href="/login"
+          className="fixed top-[max(0.5rem,env(safe-area-inset-top))] right-4 z-[100] md:hidden py-2.5 px-4 rounded-full bg-accent text-black font-semibold text-sm shadow-lg hover:bg-accent/90"
+          onClick={() => setMobileOpen(false)}
+        >
+          Log in
+        </Link>
+      )}
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-14 sm:h-16">
           <div className="flex items-center gap-2 min-w-0">
@@ -71,9 +81,7 @@ export function Header() {
             <AddToHomeScreen variant="toolbar" />
           </div>
 
-          {loading ? (
-            <div className="text-sm text-white/70">Loading...</div>
-          ) : user ? (
+          {user ? (
             <>
             {/* Post-login: nav aligned to profile (athlete = coach, parent, youth_wrestler, admin) */}
             <nav className="hidden md:flex items-center gap-6">

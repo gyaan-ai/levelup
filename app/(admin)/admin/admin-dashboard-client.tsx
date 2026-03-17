@@ -804,48 +804,53 @@ export function AdminDashboardClient({
       )}
 
       {tab === 'billing' && (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Total revenue</CardDescription>
-              <CardTitle className="text-2xl">
-                ${billing.totalRevenue.toFixed(2)}
-              </CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Org fees</CardDescription>
-              <CardTitle className="text-2xl">
-                ${billing.totalOrgFees.toFixed(2)}
-              </CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Stripe fees</CardDescription>
-              <CardTitle className="text-2xl">
-                ${billing.totalStripeFees.toFixed(2)}
-              </CardTitle>
-            </CardHeader>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardDescription>Coach payouts</CardDescription>
-              <CardTitle className="text-2xl">
-                ${billing.totalAthletePayments.toFixed(2)}
-              </CardTitle>
-            </CardHeader>
-          </Card>
-          <Card className="md:col-span-2">
-            <CardHeader className="pb-2">
-              <CardDescription>Sessions</CardDescription>
-              <CardTitle className="text-2xl">{billing.sessionCount} total</CardTitle>
-              <p className="text-sm text-muted-foreground pt-1">
-                {billing.completedCount} completed · {billing.pendingPaymentCount} pending payment
-              </p>
-            </CardHeader>
-          </Card>
+        <div className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            All-time totals. For today / this week / this month (revenue booked, new users, bookings), use <strong>Cockpit</strong>.
+          </p>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardDescription>Total revenue (all time)</CardDescription>
+                <CardTitle className="text-2xl">
+                  ${billing.totalRevenue.toFixed(2)}
+                </CardTitle>
+              </CardHeader>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardDescription>Org fees (all time)</CardDescription>
+                <CardTitle className="text-2xl">
+                  ${billing.totalOrgFees.toFixed(2)}
+                </CardTitle>
+              </CardHeader>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardDescription>Stripe fees (all time)</CardDescription>
+                <CardTitle className="text-2xl">
+                  ${billing.totalStripeFees.toFixed(2)}
+                </CardTitle>
+              </CardHeader>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardDescription>Coach payouts (all time)</CardDescription>
+                <CardTitle className="text-2xl">
+                  ${billing.totalAthletePayments.toFixed(2)}
+                </CardTitle>
+              </CardHeader>
+            </Card>
+            <Card className="md:col-span-2">
+              <CardHeader className="pb-2">
+                <CardDescription>Sessions (all time)</CardDescription>
+                <CardTitle className="text-2xl">{billing.sessionCount} total</CardTitle>
+                <p className="text-sm text-muted-foreground pt-1">
+                  {billing.completedCount} completed · {billing.pendingPaymentCount} pending payment
+                </p>
+              </CardHeader>
+            </Card>
+          </div>
         </div>
       )}
 
