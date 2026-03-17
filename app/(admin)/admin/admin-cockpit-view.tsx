@@ -120,15 +120,17 @@ function StandardBarChart({ values, labels, metricLabel }: { values: number[]; l
           <div className="flex gap-1 items-end" style={{ height: chartHeight }}>
             {vals.map((v, i) => {
               const heightPct = yMax > 0 ? (v / yMax) * 100 : 0;
+              const barHeightPx = yMax > 0 ? Math.max(2, (v / yMax) * chartHeight) : 0;
               return (
                 <div
                   key={i}
                   className="flex-1 min-w-[20px] max-w-[48px] flex flex-col items-center justify-end gap-0.5"
+                  style={{ height: chartHeight }}
                   title={`${labels[i] ?? '—'}: ${v}`}
                 >
                   <div
-                    className="w-full rounded-t bg-primary/80 hover:bg-primary transition-colors min-h-[2px]"
-                    style={{ height: `${Math.max(0, heightPct)}%` }}
+                    className="w-full rounded-t bg-primary/80 hover:bg-primary transition-colors min-h-[2px] flex-shrink-0"
+                    style={{ height: barHeightPx }}
                   />
                 </div>
               );

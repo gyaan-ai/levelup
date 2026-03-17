@@ -150,17 +150,18 @@ export async function GET(req: NextRequest) {
       trendCountByRanges(admin, 'early_access', null, trendRanges),
     ]);
 
-    // Vercel Analytics (drain): page views and unique visitors in range (origin matches tenant domain)
+    // Vercel Analytics (drain): page views and unique visitors in range (origin matches tenant domain or request host for previews)
     let pageViews = 0;
     let visitors = 0;
     try {
-      const originPattern = `%${tenant.domain}%`;
+      const requestHost = host.replace(/^https?:\/\//, '').split(':')[0];
+      const orFilter = `origin.ilike.%${tenant.domain}%,origin.ilike.%${requestHost}%`;
       const { data: analyticsRows } = await admin
         .from('vercel_analytics_events')
         .select('event_type, device_id')
         .gte('timestamp_ms', startMs)
         .lte('timestamp_ms', endMs)
-        .ilike('origin', originPattern)
+        .or(orFilter)
         .limit(100000);
       if (analyticsRows && analyticsRows.length > 0) {
         const rows = analyticsRows as { event_type?: string; device_id?: number | null }[];
