@@ -60,7 +60,7 @@ export default async function SessionDetailPage({
     current_participants,
     max_participants,
     partner_invite_code,
-    athletes(id, first_name, last_name, school, photo_url, average_rating, review_count, phone),
+    athletes(id, first_name, last_name, school, photo_url, average_rating, review_count),
     facilities(id, name, address),
     session_participants(youth_wrestler_id, amount_paid, youth_wrestlers(id, first_name, last_name))
   `;
