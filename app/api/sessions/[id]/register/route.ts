@@ -211,7 +211,6 @@ export async function POST(
     }
 
     // Family / percentage discount (e.g. 10% off)
-    const admin = createAdminClient(tenant.slug);
     const { data: pctDiscount } = await admin
       .from('parent_percentage_discounts')
       .select('percent_off')
