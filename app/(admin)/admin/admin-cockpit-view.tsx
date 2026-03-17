@@ -72,6 +72,30 @@ export type CockpitData = {
   trendDays: string[];
   trendLabels?: string[];
   trendPeriod?: '7d' | '3w' | '12m';
+  trendDetailParents?: { id: string; email: string; created_at: string }[];
+  trendDetailCoaches?: { id: string; name: string; school: string; created_at: string }[];
+  trendDetailAthletes?: { id: string; name: string; parent_id: string; created_at: string }[];
+  trendDetailSessions?: {
+    id: string;
+    scheduled_datetime: string;
+    status: string;
+    session_type: string;
+    session_mode: string;
+    coach_name: string;
+    facility_name: string;
+    participants: string;
+  }[];
+  trendDetailBookings?: {
+    id: string;
+    session_id: string;
+    amount_paid: number | null;
+    created_at: string;
+    kid_name: string;
+    coach_name: string;
+    facility_name: string;
+    scheduled_datetime: string;
+  }[];
+  trendDetailEarlyAccess?: { id: string; email: string; name: string; created_at: string }[];
 };
 
 const COCKPIT_TIMEZONE = 'America/New_York';
@@ -380,162 +404,105 @@ export function AdminCockpitView() {
         </CardContent>
       </Card>
 
-      {/* Detail lists */}
+      {/* Table below chart: rows for the selected trend metric and period */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            {trendMetric === 'parents' && <UserPlus className="h-4 w-4" />}
+            {trendMetric === 'coaches' && <Users className="h-4 w-4" />}
+            {trendMetric === 'athletes' && <Users className="h-4 w-4" />}
+            {trendMetric === 'sessions' && <Calendar className="h-4 w-4" />}
+            {trendMetric === 'bookings' && <CreditCard className="h-4 w-4" />}
+            {trendMetric === 'earlyAccess' && <ClipboardList className="h-4 w-4" />}
+            {trendMetrics.find((m) => m.id === trendMetric)?.label ?? ''} · {trendPeriod === '7d' ? 'Last 7 days' : trendPeriod === '3w' ? 'Last 3 weeks' : 'Last 12 months'}
+          </CardTitle>
+          <CardDescription>
+            {trendMetric === 'parents' && 'Parents who signed up in this period'}
+            {trendMetric === 'coaches' && 'Coaches onboarded in this period'}
+            {trendMetric === 'athletes' && 'Youth wrestlers added in this period'}
+            {trendMetric === 'sessions' && 'Sessions created in this period'}
+            {trendMetric === 'bookings' && 'Bookings (signups) in this period'}
+            {trendMetric === 'earlyAccess' && 'Early access signups in this period'}
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {trendMetric === 'parents' && (d.trendDetailParents ?? []).length > 0 && (
+            <ul className="space-y-2 text-sm">
+              {(d.trendDetailParents ?? []).map((p) => (
+                <li key={p.id} className="flex items-center justify-between gap-2">
+                  <a href={`mailto:${p.email}`} className="text-accent hover:underline truncate">{p.email}</a>
+                  <span className="text-muted-foreground shrink-0">{formatEST(new Date(p.created_at), 'MMM d h:mm a')}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {trendMetric === 'coaches' && (d.trendDetailCoaches ?? []).length > 0 && (
+            <ul className="space-y-2 text-sm">
+              {(d.trendDetailCoaches ?? []).map((c) => (
+                <li key={c.id} className="flex items-center justify-between gap-2">
+                  <Link href={`/athlete/${c.id}`} className="text-accent hover:underline">{c.name}</Link>
+                  <span className="text-muted-foreground shrink-0">{c.school} · {formatEST(new Date(c.created_at), 'MMM d')}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {trendMetric === 'athletes' && (d.trendDetailAthletes ?? []).length > 0 && (
+            <ul className="space-y-2 text-sm">
+              {(d.trendDetailAthletes ?? []).map((y) => (
+                <li key={y.id} className="flex items-center justify-between gap-2">
+                  <Link href={`/wrestlers/${y.id}`} className="text-accent hover:underline">{y.name}</Link>
+                  <span className="text-muted-foreground shrink-0">{formatEST(new Date(y.created_at), 'MMM d h:mm a')}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {trendMetric === 'sessions' && (d.trendDetailSessions ?? []).length > 0 && (
+            <ul className="space-y-2 text-sm">
+              {(d.trendDetailSessions ?? []).map((s) => (
+                <li key={s.id} className="flex flex-wrap items-center justify-between gap-2">
+                  <Link href={`/admin/sessions/${s.id}/edit`} className="text-accent hover:underline">{s.coach_name} · {s.facility_name}</Link>
+                  <span className="text-muted-foreground">{formatEST(new Date(s.scheduled_datetime), 'MMM d h:mm a')} · {s.participants}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {trendMetric === 'bookings' && (d.trendDetailBookings ?? []).length > 0 && (
+            <ul className="space-y-2 text-sm">
+              {(d.trendDetailBookings ?? []).map((b) => (
+                <li key={b.id} className="flex flex-wrap items-center justify-between gap-2">
+                  <span>{b.kid_name ?? '—'} · {b.coach_name} · {b.facility_name}</span>
+                  <span className="text-muted-foreground">
+                    {b.amount_paid != null ? `$${b.amount_paid.toFixed(2)}` : '—'}
+                    {b.created_at ? ` · ${formatEST(new Date(b.created_at), 'MMM d')}` : ''}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {trendMetric === 'earlyAccess' && (d.trendDetailEarlyAccess ?? []).length > 0 && (
+            <ul className="space-y-2 text-sm">
+              {(d.trendDetailEarlyAccess ?? []).map((e) => (
+                <li key={e.id} className="flex items-center justify-between gap-2">
+                  <a href={`mailto:${e.email}`} className="text-accent hover:underline truncate">{e.email}</a>
+                  {e.name !== '—' && <span className="text-muted-foreground truncate">{e.name}</span>}
+                </li>
+              ))}
+            </ul>
+          )}
+          {(
+            (trendMetric === 'parents' && (d.trendDetailParents ?? []).length === 0) ||
+            (trendMetric === 'coaches' && (d.trendDetailCoaches ?? []).length === 0) ||
+            (trendMetric === 'athletes' && (d.trendDetailAthletes ?? []).length === 0) ||
+            (trendMetric === 'sessions' && (d.trendDetailSessions ?? []).length === 0) ||
+            (trendMetric === 'bookings' && (d.trendDetailBookings ?? []).length === 0) ||
+            (trendMetric === 'earlyAccess' && (d.trendDetailEarlyAccess ?? []).length === 0)
+          ) && (
+            <p className="text-sm text-muted-foreground">No records in this period.</p>
+          )}
+        </CardContent>
+      </Card>
+
       <div className="grid gap-6 lg:grid-cols-2">
-        {d.newParents.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <UserPlus className="h-4 w-4" />
-                New parents
-              </CardTitle>
-              <CardDescription>Accounts created on this day</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-2 text-sm">
-                {d.newParents.map((p) => (
-                  <li key={p.id} className="flex items-center justify-between gap-2">
-                    <a href={`mailto:${p.email}`} className="text-accent hover:underline truncate">
-                      {p.email}
-                    </a>
-                    <span className="text-muted-foreground shrink-0">
-                      {formatEST(new Date(p.created_at), 'h:mm a')}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
-        )}
-
-        {d.newCoaches.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-4 w-4" />
-                New coaches
-              </CardTitle>
-              <CardDescription>Coaches onboarded this day</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-2 text-sm">
-                {d.newCoaches.map((c) => (
-                  <li key={c.id} className="flex items-center justify-between gap-2">
-                    <Link href={`/athlete/${c.id}`} className="text-accent hover:underline">
-                      {c.name}
-                    </Link>
-                    <span className="text-muted-foreground shrink-0">{c.school}</span>
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
-        )}
-
-        {d.newAthletes.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-4 w-4" />
-                New youth athletes
-              </CardTitle>
-              <CardDescription>Youth wrestlers added this day</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-2 text-sm">
-                {d.newAthletes.map((y) => (
-                  <li key={y.id} className="flex items-center justify-between gap-2">
-                    <Link href={`/wrestlers/${y.id}`} className="text-accent hover:underline">
-                      {y.name}
-                    </Link>
-                    <span className="text-muted-foreground shrink-0">
-                      {formatEST(new Date(y.created_at), 'h:mm a')}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
-        )}
-
-        {d.sessionsScheduled.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
-                Sessions created
-              </CardTitle>
-              <CardDescription>Sessions created this day</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-2 text-sm">
-                {d.sessionsScheduled.map((s) => (
-                  <li key={s.id} className="flex flex-wrap items-center justify-between gap-2">
-                    <Link href={`/admin/sessions/${s.id}/edit`} className="text-accent hover:underline">
-                      {s.coach_name} · {s.facility_name}
-                    </Link>
-                    <span className="text-muted-foreground">
-                      {formatEST(new Date(s.scheduled_datetime), 'MMM d h:mm a')} · {s.participants}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
-        )}
-
-        {d.bookings.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CreditCard className="h-4 w-4" />
-                Bookings
-              </CardTitle>
-              <CardDescription>Signups created on this date. Count = registrations that day.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-2 text-sm">
-                {d.bookings.map((b) => (
-                  <li key={b.id} className="flex flex-wrap items-center justify-between gap-2">
-                    <span>
-                      {b.kid_name ?? '—'} · {b.coach_name} · {b.facility_name}
-                    </span>
-                    <span className="text-muted-foreground">
-                      {b.amount_paid != null ? `$${b.amount_paid.toFixed(2)}` : '—'}
-                      {b.created_at ? ` · Signed up ${formatEST(new Date(b.created_at), 'MMM d')}` : ''}
-                      {b.scheduled_datetime && b.scheduled_datetime !== '—' ? ` · Session ${formatEST(new Date(b.scheduled_datetime), 'MMM d')}` : ''}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
-        )}
-
-        {d.earlyAccess.length > 0 && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <ClipboardList className="h-4 w-4" />
-                Early access signups
-              </CardTitle>
-              <CardDescription>Leads from website this day</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-2 text-sm">
-                {d.earlyAccess.map((e) => (
-                  <li key={e.id} className="flex items-center justify-between gap-2">
-                    <a href={`mailto:${e.email}`} className="text-accent hover:underline truncate">
-                      {e.email}
-                    </a>
-                    {e.name !== '—' && <span className="text-muted-foreground truncate">{e.name}</span>}
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
-        )}
-
         {(d.payoutsPaidList.length > 0 || d.payoutsPaid > 0) && (
           <Card>
             <CardHeader>
