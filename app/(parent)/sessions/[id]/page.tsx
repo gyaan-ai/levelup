@@ -2,6 +2,7 @@ import { redirect, notFound } from 'next/navigation';
 import { headers } from 'next/headers';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import { getParentYouthWrestlerIds } from '@/lib/parent-wrestlers';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -64,23 +65,32 @@ export default async function SessionDetailPage({
     session_participants(youth_wrestler_id, amount_paid, youth_wrestlers(id, first_name, last_name))
   `;
 
-  // Same data path as My Bookings: no service key, no extra env. If you see the session on Bookings, this uses the same Supabase client and RLS.
   const youthWrestlerIds = await getParentYouthWrestlerIds(supabase, user.id);
-  let familySessionIds: string[] = [];
-  if (youthWrestlerIds.length > 0) {
-    const { data: partRows } = await supabase
-      .from('session_participants')
-      .select('session_id')
-      .in('youth_wrestler_id', youthWrestlerIds);
-    familySessionIds = [...new Set((partRows ?? []).map((r: { session_id: string }) => r.session_id))];
-  }
-  const idsToFetch = [...new Set([...familySessionIds, sessionId])];
-  const { data: sessionsList } = await supabase
-    .from('sessions')
-    .select(sessionSelect)
-    .in('id', idsToFetch);
-  const session = sessionsList?.find((row) => (row as { id: string }).id === sessionId) ?? null;
 
+  let session: Record<string, unknown> | null = null;
+  try {
+    const admin = createAdminClient(tenant.slug);
+    const res = await admin.from('sessions').select(sessionSelect).eq('id', sessionId).single();
+    if (!res.error && res.data) session = res.data;
+  } catch {
+    // no service key
+  }
+  if (!session) {
+    let familySessionIds: string[] = [];
+    if (youthWrestlerIds.length > 0) {
+      const { data: partRows } = await supabase
+        .from('session_participants')
+        .select('session_id')
+        .in('youth_wrestler_id', youthWrestlerIds);
+      familySessionIds = [...new Set((partRows ?? []).map((r: { session_id: string }) => r.session_id))];
+    }
+    const idsToFetch = [...new Set([...familySessionIds, sessionId])];
+    const { data: sessionsList } = await supabase
+      .from('sessions')
+      .select(sessionSelect)
+      .in('id', idsToFetch);
+    session = sessionsList?.find((row) => (row as { id: string }).id === sessionId) ?? null;
+  }
   if (!session) {
     notFound();
   }
