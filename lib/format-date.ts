@@ -1,6 +1,6 @@
 /**
- * App-wide date/time display in Eastern Time (America/New_York).
- * Use these helpers for all user-facing dates so the system is consistently EST.
+ * Entire product uses Eastern (EST/EDT — America/New_York) only.
+ * All dates and times are displayed and interpreted in Eastern. Do not show or reference other timezones.
  */
 
 import { formatInTimeZone } from 'date-fns-tz';

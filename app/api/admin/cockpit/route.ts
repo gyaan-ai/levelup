@@ -4,17 +4,17 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import { startOfDay, endOfDay } from 'date-fns';
-import { utcToZonedTime, zonedTimeToUtc } from 'date-fns-tz';
+import { toZonedTime, fromZonedTime } from 'date-fns-tz';
 import { APP_TIMEZONE } from '@/lib/format-date';
 
-/** Given a date YYYY-MM-DD in the given timezone, return UTC ISO range for that calendar day. */
+/** Given a date YYYY-MM-DD in Eastern, return ISO range for that calendar day (for DB queries). */
 function dayRangeInTz(dateStr: string, tz: string): { start: string; end: string } {
   const ref = new Date(dateStr + 'T12:00:00.000Z');
-  const zoned = utcToZonedTime(ref, tz);
+  const zoned = toZonedTime(ref, tz);
   const startZoned = startOfDay(zoned);
   const endZoned = endOfDay(zoned);
-  const startUTC = zonedTimeToUtc(startZoned, tz);
-  const endUTC = zonedTimeToUtc(endZoned, tz);
+  const startUTC = fromZonedTime(startZoned, tz);
+  const endUTC = fromZonedTime(endZoned, tz);
   return {
     start: startUTC.toISOString(),
     end: endUTC.toISOString(),
@@ -23,7 +23,7 @@ function dayRangeInTz(dateStr: string, tz: string): { start: string; end: string
 
 /**
  * GET /api/admin/cockpit?date=YYYY-MM-DD&range=today|week|month&timezone=America/New_York
- * Uses Eastern (America/New_York) by default so "Today" = your calendar day, not UTC.
+ * All dates/times are Eastern (EST/EDT). "Today" = current Eastern calendar day.
  */
 export async function GET(req: NextRequest) {
   try {

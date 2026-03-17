@@ -77,10 +77,18 @@ function todayInTz(tz: string): string {
   return new Date().toLocaleDateString('en-CA', { timeZone: tz });
 }
 
+function yesterdayInTz(tz: string): string {
+  const todayStr = new Date().toLocaleDateString('en-CA', { timeZone: tz });
+  const [y, m, d] = todayStr.split('-').map(Number);
+  const todayNoon = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+  const yesterdayNoon = new Date(todayNoon.getTime() - 24 * 60 * 60 * 1000);
+  return yesterdayNoon.toLocaleDateString('en-CA', { timeZone: tz });
+}
+
 export function AdminCockpitView() {
   const today = todayInTz(COCKPIT_TIMEZONE);
   const [date, setDate] = useState(today);
-  const [range, setRange] = useState<'today' | 'week' | 'month'>('today');
+  const [range, setRange] = useState<'today' | 'yesterday' | 'week' | 'month'>('today');
   const [data, setData] = useState<CockpitData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -88,7 +96,7 @@ export function AdminCockpitView() {
   useEffect(() => {
     setLoading(true);
     setError(null);
-    fetch(`/api/admin/cockpit?date=${date}&range=${range}&timezone=${encodeURIComponent(COCKPIT_TIMEZONE)}`)
+    fetch(`/api/admin/cockpit?date=${range === 'yesterday' ? yesterdayInTz(COCKPIT_TIMEZONE) : date}&range=${range === 'yesterday' ? 'today' : range}&timezone=${encodeURIComponent(COCKPIT_TIMEZONE)}`)
       .then((r) => r.json())
       .then((json) => {
         if (json.error) {
@@ -146,10 +154,7 @@ export function AdminCockpitView() {
         <div className="flex gap-1.5 items-end h-14 min-h-[56px]">
           {vals.map((v, i) => {
             const pct = maxTrend > 0 ? Math.max(8, (v / maxTrend) * 100) : 8;
-            const dayStr = trendDays[i] ? (() => {
-              const d = new Date(trendDays[i] + 'T12:00:00.000Z');
-              return `${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
-            })() : '—';
+            const dayStr = trendDays[i] ? formatEST(new Date(trendDays[i] + 'T12:00:00'), 'M/d') : '—';
             return (
               <div key={i} className="flex-1 min-w-0 flex flex-col items-center gap-1">
                 <span className="text-xs font-semibold tabular-nums text-foreground" title={`${dayStr}: ${v}`}>
@@ -194,14 +199,18 @@ export function AdminCockpitView() {
           <div className="flex items-center gap-2 shrink-0">
             <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">Period</span>
             <div className="flex rounded-md border border-input bg-background overflow-hidden">
-              {(['today', 'week', 'month'] as const).map((r) => (
+              {(['today', 'yesterday', 'week', 'month'] as const).map((r) => (
                 <button
                   key={r}
                   type="button"
-                  onClick={() => { setRange(r); if (r === 'today') setDate(todayInTz(COCKPIT_TIMEZONE)); }}
+                  onClick={() => {
+                    setRange(r);
+                    if (r === 'today') setDate(todayInTz(COCKPIT_TIMEZONE));
+                    if (r === 'yesterday') setDate(yesterdayInTz(COCKPIT_TIMEZONE));
+                  }}
                   className={`px-3 py-2 text-sm font-medium transition-colors ${range === r ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
                 >
-                  {r === 'today' ? 'Today' : r === 'week' ? 'This week' : 'This month'}
+                  {r === 'today' ? 'Today' : r === 'yesterday' ? 'Yesterday' : r === 'week' ? 'This week' : 'This month'}
                 </button>
               ))}
             </div>
@@ -219,9 +228,10 @@ export function AdminCockpitView() {
           )}
           {data && (
             <span className="text-sm text-muted-foreground">
-              {range === 'today' && <><strong>{date}</strong> (Eastern — today&apos;s calendar day)</>}
-              {range === 'week' && data.rangeStart && data.rangeEnd && <><strong>{formatRange(data.rangeStart, data.rangeEnd, 'week')}</strong> (Eastern)</>}
-              {range === 'month' && data.rangeStart && data.rangeEnd && <><strong>{formatRange(data.rangeStart, data.rangeEnd, 'month')}</strong> (Eastern)</>}
+              {range === 'today' && <><strong>{date}</strong></>}
+              {range === 'yesterday' && <><strong>{date}</strong></>}
+              {range === 'week' && data.rangeStart && data.rangeEnd && <><strong>{formatRange(data.rangeStart, data.rangeEnd, 'week')}</strong></>}
+              {range === 'month' && data.rangeStart && data.rangeEnd && <><strong>{formatRange(data.rangeStart, data.rangeEnd, 'month')}</strong></>}
             </span>
           )}
         </div>
@@ -231,19 +241,17 @@ export function AdminCockpitView() {
       <Card className="border-primary/30 bg-primary/5">
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-medium text-muted-foreground">
-            {range === 'today' ? 'Today' : range === 'week' ? 'This week' : 'This month'} — at a glance
+            {range === 'today' ? 'Today' : range === 'yesterday' ? 'Yesterday' : range === 'week' ? 'This week' : 'This month'} — at a glance
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-wrap items-baseline gap-x-6 gap-y-2 text-lg">
+          <span className="font-semibold text-foreground tabular-nums">{d.bookings.length} bookings</span>
           <span className="font-bold text-2xl tabular-nums">
-            ${d.revenueThatDay.toFixed(0)} booked
+            ${d.revenueThatDay.toFixed(0)} total
           </span>
-          <span className="text-muted-foreground">
-            <span className="font-semibold text-foreground tabular-nums">{d.bookings.length}</span> bookings
-            {d.bookings.length > 0 && d.revenueThatDay > 0 && (
-              <span className="text-muted-foreground"> (~${(d.revenueThatDay / d.bookings.length).toFixed(0)} each)</span>
-            )}
-          </span>
+          {d.bookings.length > 0 && d.revenueThatDay > 0 && (
+            <span className="text-muted-foreground">(~${(d.revenueThatDay / d.bookings.length).toFixed(0)} each)</span>
+          )}
           <span className="text-muted-foreground">
             <span className="font-semibold text-foreground tabular-nums">{d.newParents.length}</span> parents,{' '}
             <span className="font-semibold text-foreground tabular-nums">{d.newCoaches.length}</span> coaches,{' '}
@@ -420,7 +428,7 @@ export function AdminCockpitView() {
                 <CreditCard className="h-4 w-4" />
                 Bookings
               </CardTitle>
-              <CardDescription>Signups created on this date (Eastern). Count = registrations that day.</CardDescription>
+              <CardDescription>Signups created on this date. Count = registrations that day.</CardDescription>
             </CardHeader>
             <CardContent>
               <ul className="space-y-2 text-sm">
