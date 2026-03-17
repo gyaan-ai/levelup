@@ -8,8 +8,8 @@ export function StarRating({
   reviewCount,
   size = 'md',
 }: {
-  averageRating: number | null | undefined;
-  reviewCount?: number | null;
+  averageRating: number | string | null | undefined;
+  reviewCount?: number | string | null;
   size?: 'sm' | 'md' | 'lg';
 }) {
   const rating = Number(averageRating) || 0;
