@@ -56,7 +56,7 @@ export default async function SessionReviewPage({
     return (
       <ReviewError
         title="Session not found"
-        message="We couldn't find that session. Go back to My bookings and try \"Leave feedback\" again from the session card."
+        message={`We couldn't find that session. Go back to My bookings and try "Leave feedback" again from the session card.`}
       />
     );
   }
