@@ -2,6 +2,7 @@ import { redirect, notFound } from 'next/navigation';
 import { headers } from 'next/headers';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import { getParentYouthWrestlerIds } from '@/lib/parent-wrestlers';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -64,14 +65,30 @@ export default async function SessionDetailPage({
     session_participants(youth_wrestler_id, amount_paid, youth_wrestlers(id, first_name, last_name))
   `;
 
-  // Use same client as /bookings so View works wherever bookings works (no dependency on admin service key)
-  const { data: session, error: sessionError } = await supabase
-    .from('sessions')
-    .select(sessionSelect)
-    .eq('id', sessionId)
-    .single();
+  // Prefer admin (bypasses RLS) so single-session read always works when session exists. Fallback to user client if admin unavailable (e.g. no service key on preview).
+  let session: Record<string, unknown> | null = null;
+  let sessionError: { message?: string; code?: string } | null = null;
 
-  if (sessionError || !session) {
+  try {
+    const admin = createAdminClient(tenant.slug);
+    const res = await admin.from('sessions').select(sessionSelect).eq('id', sessionId).single();
+    if (!res.error && res.data) session = res.data;
+    else sessionError = res.error;
+  } catch {
+    sessionError = { message: 'admin unavailable' };
+  }
+
+  if (!session) {
+    const userRes = await supabase.from('sessions').select(sessionSelect).eq('id', sessionId).single();
+    if (!userRes.error && userRes.data) {
+      session = userRes.data;
+      sessionError = null;
+    } else {
+      sessionError = userRes.error ?? sessionError;
+    }
+  }
+
+  if (!session) {
     console.error('[sessions/[id]] 404', { sessionId, error: sessionError?.message ?? sessionError?.code ?? null });
     notFound();
   }
