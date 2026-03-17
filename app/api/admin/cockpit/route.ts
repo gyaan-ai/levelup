@@ -134,6 +134,7 @@ export async function GET(req: NextRequest) {
       trendSessionsRes,
       trendBookingsRes,
       trendEarlyRes,
+      trendReviewsRes,
     ] = await Promise.all([
       admin.from('users').select('id, email, created_at').eq('role', 'parent').gte('created_at', dayStart).lte('created_at', dayEnd).order('created_at', { ascending: false }),
       admin.from('athletes').select('id, first_name, last_name, school, created_at').gte('created_at', dayStart).lte('created_at', dayEnd).order('created_at', { ascending: false }),
@@ -148,6 +149,7 @@ export async function GET(req: NextRequest) {
       trendCountByRanges(admin, 'sessions', null, trendRanges),
       trendCountByRanges(admin, 'session_participants', null, trendRanges),
       trendCountByRanges(admin, 'early_access', null, trendRanges),
+      trendCountByRanges(admin, 'reviews', null, trendRanges),
     ]);
 
     // Vercel Analytics (drain): page views and unique visitors in range (origin matches tenant domain or request host for previews)
@@ -198,6 +200,7 @@ export async function GET(req: NextRequest) {
       sessions: trendSessionsRes,
       bookings: trendBookingsRes,
       earlyAccess: trendEarlyRes,
+      reviews: trendReviewsRes,
     };
 
     const trendLabels = trendRanges.map((r) => r.label);
@@ -213,6 +216,7 @@ export async function GET(req: NextRequest) {
       trendDetailSessionsRes,
       trendDetailBookingsRes,
       trendDetailEarlyRes,
+      trendDetailReviewsRes,
     ] = await Promise.all([
       admin.from('users').select('id, email, created_at').eq('role', 'parent').gte('created_at', trendStart).lte('created_at', trendEnd).order('created_at', { ascending: false }),
       admin.from('athletes').select('id, first_name, last_name, school, created_at').gte('created_at', trendStart).lte('created_at', trendEnd).order('created_at', { ascending: false }),
@@ -220,6 +224,7 @@ export async function GET(req: NextRequest) {
       admin.from('sessions').select('id, scheduled_datetime, status, session_type, session_mode, current_participants, max_participants, athletes(first_name, last_name, school), facilities(name)').gte('created_at', trendStart).lte('created_at', trendEnd).order('created_at', { ascending: false }),
       admin.from('session_participants').select('id, session_id, parent_id, youth_wrestler_id, amount_paid, created_at, youth_wrestlers(first_name, last_name), sessions(id, scheduled_datetime, athletes(first_name, last_name), facilities(name))').gte('created_at', trendStart).lte('created_at', trendEnd).order('created_at', { ascending: false }),
       admin.from('early_access').select('id, email, name, parent_name, wrestler_name, created_at').gte('created_at', trendStart).lte('created_at', trendEnd).order('created_at', { ascending: false }),
+      admin.from('reviews').select('id, rating, comment, created_at, parent_id, athlete_id, athletes(first_name, last_name)').gte('created_at', trendStart).lte('created_at', trendEnd).order('created_at', { ascending: false }),
     ]);
 
     const trendDetailParents = (trendDetailParentsRes.data ?? []).map((p: { id: string; email: string; created_at: string }) => ({ id: p.id, email: p.email, created_at: p.created_at }));
@@ -280,6 +285,28 @@ export async function GET(req: NextRequest) {
       name: e.name ?? e.parent_name ?? e.wrestler_name ?? '—',
       created_at: e.created_at,
     }));
+
+    const reviewsRaw = (trendDetailReviewsRes.data ?? []) as Array<{
+      id: string; rating: number; comment: string | null; created_at: string; parent_id: string; athlete_id: string;
+      athletes?: { first_name: string; last_name: string } | { first_name: string; last_name: string }[];
+    }>;
+    const reviewParentIds = [...new Set(reviewsRaw.map((r) => r.parent_id))];
+    const { data: reviewParents } = reviewParentIds.length > 0
+      ? await admin.from('users').select('id, email').in('id', reviewParentIds)
+      : { data: [] };
+    const parentEmailById = new Map((reviewParents ?? []).map((u: { id: string; email: string }) => [u.id, u.email]));
+    const trendDetailReviews = reviewsRaw.map((r) => {
+      const a = r.athletes;
+      const o = Array.isArray(a) ? a[0] : a;
+      return {
+        id: r.id,
+        coach_name: o ? `${o.first_name} ${o.last_name}`.trim() : '—',
+        reviewed_by: parentEmailById.get(r.parent_id) ?? '—',
+        rating: r.rating,
+        comment: r.comment ?? '',
+        created_at: r.created_at,
+      };
+    });
 
     const newParents = (newParentsRes.data ?? []).map((p: { id: string; email: string; created_at: string }) => ({ id: p.id, email: p.email, created_at: p.created_at }));
     const newCoaches = (newCoachesRes.data ?? []).map((a: { id: string; first_name: string; last_name: string; school: string; created_at: string }) => ({
@@ -373,6 +400,7 @@ export async function GET(req: NextRequest) {
       trendDetailSessions,
       trendDetailBookings,
       trendDetailEarlyAccess,
+      trendDetailReviews,
     });
   } catch (e) {
     console.error('Cockpit API error:', e);
@@ -393,14 +421,14 @@ function lastNDays(untilDate: string, n: number): string[] {
 
 async function trendCountByRanges(
   admin: ReturnType<typeof createAdminClient>,
-  table: 'users' | 'athletes' | 'youth_wrestlers' | 'sessions' | 'session_participants' | 'early_access',
+  table: 'users' | 'athletes' | 'youth_wrestlers' | 'sessions' | 'session_participants' | 'early_access' | 'reviews',
   role: string | null,
   ranges: { start: string; end: string }[]
 ): Promise<number[]> {
   const counts: number[] = [];
   for (const { start, end } of ranges) {
     const base = (admin as any).from(table).select('*', { count: 'exact', head: true }).gte('created_at', start).lte('created_at', end);
-    const q = table === 'users' && role ? base.eq('role', role) : base;
+    const q = table === 'users' && role != null ? base.eq('role', role) : base;
     const { count, error } = await q;
     counts.push(error ? 0 : (count ?? 0));
   }

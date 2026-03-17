@@ -16,6 +16,7 @@ import {
   Gauge,
   ClipboardList,
   Eye,
+  Star,
 } from 'lucide-react';
 import { formatEST } from '@/lib/format-date';
 import Link from 'next/link';
@@ -68,6 +69,7 @@ export type CockpitData = {
     sessions: number[];
     bookings: number[];
     earlyAccess: number[];
+    reviews: number[];
   };
   trendDays: string[];
   trendLabels?: string[];
@@ -75,6 +77,7 @@ export type CockpitData = {
   trendDetailParents?: { id: string; email: string; created_at: string }[];
   trendDetailCoaches?: { id: string; name: string; school: string; created_at: string }[];
   trendDetailAthletes?: { id: string; name: string; parent_id: string; created_at: string }[];
+  trendDetailReviews?: { id: string; coach_name: string; reviewed_by: string; rating: number; comment: string; created_at: string }[];
   trendDetailSessions?: {
     id: string;
     scheduled_datetime: string;
@@ -178,7 +181,7 @@ export function AdminCockpitView() {
   const [date, setDate] = useState(today);
   const [range, setRange] = useState<'today' | 'yesterday' | 'week' | 'month'>('today');
   const [trendPeriod, setTrendPeriod] = useState<'7d' | '3w' | '12m'>('7d');
-  const [trendMetric, setTrendMetric] = useState<'parents' | 'coaches' | 'athletes' | 'sessions' | 'bookings' | 'earlyAccess'>('bookings');
+  const [trendMetric, setTrendMetric] = useState<'parents' | 'coaches' | 'athletes' | 'sessions' | 'bookings' | 'earlyAccess' | 'reviews'>('bookings');
   const [data, setData] = useState<CockpitData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -223,7 +226,7 @@ export function AdminCockpitView() {
 
   const d = data!;
   const trends = d.trends ?? {
-    parents: [], coaches: [], athletes: [], sessions: [], bookings: [], earlyAccess: [],
+    parents: [], coaches: [], athletes: [], sessions: [], bookings: [], earlyAccess: [], reviews: [],
   };
   const trendDays = d.trendDays ?? [];
   const trendLabels = d.trendLabels ?? trendDays.map((ds) => formatEST(new Date(ds + 'T12:00:00'), 'M/d'));
@@ -235,6 +238,7 @@ export function AdminCockpitView() {
     { id: 'sessions' as const, label: 'Sessions', values: trends.sessions ?? [] },
     { id: 'bookings' as const, label: 'Bookings', values: trends.bookings ?? [] },
     { id: 'earlyAccess' as const, label: 'Early access', values: trends.earlyAccess ?? [] },
+    { id: 'reviews' as const, label: 'Reviews', values: trends.reviews ?? [] },
   ];
 
   const summaryCards = [
@@ -414,6 +418,7 @@ export function AdminCockpitView() {
             {trendMetric === 'sessions' && <Calendar className="h-4 w-4" />}
             {trendMetric === 'bookings' && <CreditCard className="h-4 w-4" />}
             {trendMetric === 'earlyAccess' && <ClipboardList className="h-4 w-4" />}
+            {trendMetric === 'reviews' && <Star className="h-4 w-4" />}
             {trendMetrics.find((m) => m.id === trendMetric)?.label ?? ''} · {trendPeriod === '7d' ? 'Last 7 days' : trendPeriod === '3w' ? 'Last 3 weeks' : 'Last 12 months'}
           </CardTitle>
           <CardDescription>
@@ -423,6 +428,7 @@ export function AdminCockpitView() {
             {trendMetric === 'sessions' && 'Sessions created in this period'}
             {trendMetric === 'bookings' && 'Bookings (signups) in this period'}
             {trendMetric === 'earlyAccess' && 'Early access signups in this period'}
+            {trendMetric === 'reviews' && 'Reviews left in this period — coach, reviewer, stars, comment'}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -489,13 +495,44 @@ export function AdminCockpitView() {
               ))}
             </ul>
           )}
+          {trendMetric === 'reviews' && (d.trendDetailReviews ?? []).length > 0 && (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm border-collapse">
+                <thead>
+                  <tr className="border-b border-border">
+                    <th className="text-left py-2 pr-3 font-medium text-muted-foreground">Coach</th>
+                    <th className="text-left py-2 pr-3 font-medium text-muted-foreground">Reviewed by</th>
+                    <th className="text-left py-2 pr-3 font-medium text-muted-foreground">Stars</th>
+                    <th className="text-left py-2 font-medium text-muted-foreground">Comment</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(d.trendDetailReviews ?? []).map((r) => (
+                    <tr key={r.id} className="border-b border-border/50">
+                      <td className="py-2 pr-3 font-medium">{r.coach_name}</td>
+                      <td className="py-2 pr-3 text-muted-foreground">{r.reviewed_by}</td>
+                      <td className="py-2 pr-3">
+                        <span className="inline-flex gap-0.5" aria-label={`${r.rating} stars`}>
+                          {[1, 2, 3, 4, 5].map((i) => (
+                            <Star key={i} className={`h-4 w-4 ${i <= r.rating ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/40'}`} />
+                          ))}
+                        </span>
+                      </td>
+                      <td className="py-2 text-muted-foreground max-w-[280px] truncate" title={r.comment || undefined}>{r.comment || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
           {(
             (trendMetric === 'parents' && (d.trendDetailParents ?? []).length === 0) ||
             (trendMetric === 'coaches' && (d.trendDetailCoaches ?? []).length === 0) ||
             (trendMetric === 'athletes' && (d.trendDetailAthletes ?? []).length === 0) ||
             (trendMetric === 'sessions' && (d.trendDetailSessions ?? []).length === 0) ||
             (trendMetric === 'bookings' && (d.trendDetailBookings ?? []).length === 0) ||
-            (trendMetric === 'earlyAccess' && (d.trendDetailEarlyAccess ?? []).length === 0)
+            (trendMetric === 'earlyAccess' && (d.trendDetailEarlyAccess ?? []).length === 0) ||
+            (trendMetric === 'reviews' && (d.trendDetailReviews ?? []).length === 0)
           ) && (
             <p className="text-sm text-muted-foreground">No records in this period.</p>
           )}
