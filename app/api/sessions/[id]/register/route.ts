@@ -12,8 +12,9 @@ import { sendCoachNewSignupSms } from '@/lib/twilio';
 /**
  * POST - Pay & register a youth wrestler for a session (public or invite_only).
  * - Session owner: add for free.
- * - Non-owner + early adopter entitlement (1 free small group): add for free and consume entitlement.
- * - Non-owner otherwise: Creates Stripe Checkout; on success webhook adds participant and marks paid.
+ * - Non-owner + session has no price (price_per_participant <= 0): add for free (legacy free sessions).
+ *   (We do NOT check early_adopter_entitlements here; paid sessions always go to Stripe.)
+ * - Non-owner + paid session: Creates Stripe Checkout (with FAMILY10 % off if parent has it); webhook adds participant.
  */
 export async function POST(
   req: NextRequest,

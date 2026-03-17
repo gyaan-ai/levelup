@@ -223,7 +223,7 @@ export default function SignupPage() {
                     <FormItem>
                       <FormLabel>Discount code (optional)</FormLabel>
                       <FormControl>
-                        <Input placeholder="e.g. GUILDLAUNCH" {...field} />
+                        <Input placeholder="e.g. FAMILY10" {...field} />
                       </FormControl>
                       <FormDescription>
                         Early adopters: enter your code for 1 free private + 1 free small group session

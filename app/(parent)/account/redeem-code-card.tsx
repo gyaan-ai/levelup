@@ -70,7 +70,7 @@ export function RedeemCodeCard({ hasEntitlements }: Props) {
           Redeem discount code
         </CardTitle>
         <CardDescription>
-          Have a code like GUILDLAUNCH? Enter it here for 1 free private + 1 free small group session.
+          Have a discount code? Enter it here (e.g. FAMILY10 for 10% off).
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -78,7 +78,7 @@ export function RedeemCodeCard({ hasEntitlements }: Props) {
           <Input
             value={code}
             onChange={(e) => setCode(e.target.value)}
-            placeholder="e.g. GUILDLAUNCH"
+            placeholder="e.g. FAMILY10"
             className="font-mono max-w-xs"
             disabled={loading}
           />
