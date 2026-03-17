@@ -65,31 +65,41 @@ export default async function SessionDetailPage({
     session_participants(youth_wrestler_id, amount_paid, youth_wrestlers(id, first_name, last_name))
   `;
 
-  // Prefer admin (bypasses RLS) so single-session read always works when session exists. Fallback to user client if admin unavailable (e.g. no service key on preview).
   let session: Record<string, unknown> | null = null;
-  let sessionError: { message?: string; code?: string } | null = null;
 
   try {
     const admin = createAdminClient(tenant.slug);
     const res = await admin.from('sessions').select(sessionSelect).eq('id', sessionId).single();
     if (!res.error && res.data) session = res.data;
-    else sessionError = res.error;
   } catch {
-    sessionError = { message: 'admin unavailable' };
+    // no service key
   }
 
   if (!session) {
-    const userRes = await supabase.from('sessions').select(sessionSelect).eq('id', sessionId).single();
-    if (!userRes.error && userRes.data) {
-      session = userRes.data;
-      sessionError = null;
-    } else {
-      sessionError = userRes.error ?? sessionError;
+    const youthWrestlerIds = await getParentYouthWrestlerIds(supabase, user.id);
+    let familySessionIds: string[] = [];
+    if (youthWrestlerIds.length > 0) {
+      const { data: partRows } = await supabase
+        .from('session_participants')
+        .select('session_id')
+        .in('youth_wrestler_id', youthWrestlerIds);
+      familySessionIds = [...new Set((partRows ?? []).map((r: { session_id: string }) => r.session_id))];
+    }
+    const idsToFetch = [...new Set([...familySessionIds, sessionId])];
+    const { data: sessionsList, error: fetchError } = await supabase
+      .from('sessions')
+      .select(sessionSelect)
+      .in('id', idsToFetch);
+    session = sessionsList?.find((row) => (row as { id: string }).id === sessionId) ?? null;
+
+    if (!session) {
+      const single = await supabase.from('sessions').select(sessionSelect).eq('id', sessionId).single();
+      if (!single.error && single.data) session = single.data;
     }
   }
 
   if (!session) {
-    console.error('[sessions/[id]] 404', { sessionId, error: sessionError?.message ?? sessionError?.code ?? null });
+    console.error('[sessions/[id]] 404', { sessionId });
     notFound();
   }
 

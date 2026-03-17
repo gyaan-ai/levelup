@@ -226,7 +226,7 @@ export function BookingCard({ session, isPast = false }: BookingCardProps) {
             </p>
             <div className="flex flex-col gap-2 sm:items-end">
               {!isPast && (
-                <Link href={`/sessions/${session.id}`} className="inline-flex">
+                <Link href={`/sessions/${session.id}`} className="inline-flex" prefetch={false}>
                   <Button size="sm" className="min-h-[44px] px-4">
                     <ExternalLink className="h-4 w-4 mr-1 shrink-0" />
                     View
