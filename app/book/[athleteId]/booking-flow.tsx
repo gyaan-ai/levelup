@@ -98,6 +98,7 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
   const [availability, setAvailability] = useState<AvailabilityByDay | null>(null);
   const [availabilityDates, setAvailabilityDates] = useState<Set<string>>(new Set());
   const [slots, setSlots] = useState<string[]>([]);
+  const [percentOff, setPercentOff] = useState<number | null>(null);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [freeEntitlements, setFreeEntitlements] = useState({ free1on1: 0, free2Athlete: 0 });
@@ -134,6 +135,10 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
   const priceInfo = getProductPrice();
   const totalPrice = priceInfo?.total ?? 0;
   const pricePerParticipant = priceInfo?.pricePerParticipant;
+  const displayPrice = percentOff != null && percentOff >= 1 && percentOff <= 100
+    ? totalPrice * (1 - percentOff / 100)
+    : totalPrice;
+  const hasPercentDiscount = percentOff != null && percentOff >= 1 && percentOff <= 100;
 
   const firstPrivateProduct = products.find(p => p.slug === 'private' || (p.min_participants === 1 && p.max_participants === 1));
   const firstPartnerProduct = products.find(p => p.slug === 'partner' || (p.min_participants <= 2 && p.max_participants >= 2));
@@ -180,10 +185,18 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
   useEffect(() => {
     (async () => {
       try {
-        const r = await fetch('/api/early-adopter-entitlements');
-        if (r.ok) {
-          const d = await r.json();
+        const [entRes, pctRes] = await Promise.all([
+          fetch('/api/early-adopter-entitlements'),
+          fetch('/api/account/percentage-discount'),
+        ]);
+        if (entRes.ok) {
+          const d = await entRes.json();
           setFreeEntitlements({ free1on1: d.free1on1 ?? 0, free2Athlete: d.free2Athlete ?? 0 });
+        }
+        if (pctRes.ok) {
+          const p = await pctRes.json();
+          const n = p.percent_off != null ? Number(p.percent_off) : null;
+          setPercentOff(n >= 1 && n <= 100 ? n : null);
         }
       } catch {
         /* ignore */
@@ -692,12 +705,21 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
                 <div className="pt-4 border-t flex justify-between items-center">
                   <span className="font-semibold">Price</span>
                   <span className="text-2xl font-bold">
-                    {willUseFreeSession ? <span className="text-accent">Free (early adopter)</span> : `$${totalPrice.toFixed(2)}`}
+                    {willUseFreeSession ? <span className="text-accent">Free (early adopter)</span> : hasPercentDiscount ? (
+                      <span>{percentOff}% off: ${displayPrice.toFixed(2)}</span>
+                    ) : (
+                      `$${totalPrice.toFixed(2)}`
+                    )}
                   </span>
                 </div>
                 {willUseFreeSession && (
                   <p className="text-sm text-muted-foreground">
                     Your free session from the early adopter offer will be applied. No payment required.
+                  </p>
+                )}
+                {hasPercentDiscount && !willUseFreeSession && (
+                  <p className="text-sm text-muted-foreground">
+                    Your {percentOff}% family discount is applied. You&apos;ll pay ${displayPrice.toFixed(2)}.
                   </p>
                 )}
                 {(sessionMode === 'partner-invite' || sessionMode === 'partner-open') && !willUseFreeSession && (
@@ -708,7 +730,7 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
                 <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mt-4">
                   <Button variant="outline" onClick={handleBack} className="flex-1 w-full sm:w-auto">Back</Button>
                   <Button onClick={handlePay} disabled={loading} className="flex-1 w-full sm:w-auto">
-                    {loading ? 'Booking…' : willUseFreeSession ? 'Confirm booking (free)' : `Book Session ($${totalPrice.toFixed(2)})`}
+                    {loading ? 'Booking…' : willUseFreeSession ? 'Confirm booking (free)' : hasPercentDiscount ? `Book Session ($${displayPrice.toFixed(2)})` : `Book Session ($${totalPrice.toFixed(2)})`}
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground text-center">
@@ -791,7 +813,7 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
               <div className="pt-4 border-t flex justify-between">
                 <span className="font-semibold">Total</span>
                 <span className="text-xl font-bold">
-                  {sessionMode ? `$${totalPrice.toFixed(2)}` : '—'}
+                  {sessionMode ? (hasPercentDiscount ? `$${displayPrice.toFixed(2)} (${percentOff}% off)` : `$${totalPrice.toFixed(2)}`) : '—'}
                 </span>
               </div>
             </CardContent>
