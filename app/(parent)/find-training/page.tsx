@@ -49,6 +49,7 @@ export default async function FindTrainingPage({
     facility_id: string;
     athletes?: { id: string; first_name?: string; last_name?: string; school?: string } | null;
     facilities?: { id: string; name?: string; address?: string } | null;
+    session_participants?: Array<{ youth_wrestlers?: { id: string; first_name?: string; last_name?: string; photo_url?: string } | null } | null>;
   }> = [];
 
   const dateParam = sp.date;
@@ -76,7 +77,8 @@ export default async function FindTrainingPage({
             athlete_id,
             facility_id,
             athletes(id, first_name, last_name, school, photo_url, average_rating, review_count),
-            facilities(id, name, address)
+            facilities(id, name, address),
+            session_participants(youth_wrestlers(id, first_name, last_name, photo_url))
           `)
           .in('status', ['scheduled', 'pending_payment'])
           .gte('scheduled_datetime', dayStart)
@@ -127,7 +129,7 @@ export default async function FindTrainingPage({
     twoWeeks.setDate(twoWeeks.getDate() + 14);
     const dayEnd = twoWeeks.toISOString();
     const baseQ = () => {
-      let q = supabase.from('sessions').select('id, scheduled_datetime, session_type, session_mode, join_policy, focus_area, current_participants, max_participants, total_price, price_per_participant, athlete_id, facility_id, athletes(id, first_name, last_name, school, photo_url, average_rating, review_count), facilities(id, name, address)').in('status', ['scheduled', 'pending_payment']).eq('facility_id', sp.location).gte('scheduled_datetime', dayStart).lte('scheduled_datetime', dayEnd);
+      let q = supabase.from('sessions').select('id, scheduled_datetime, session_type, session_mode, join_policy, focus_area, current_participants, max_participants, total_price, price_per_participant, athlete_id, facility_id, athletes(id, first_name, last_name, school, photo_url, average_rating, review_count), facilities(id, name, address), session_participants(youth_wrestlers(id, first_name, last_name, photo_url))').in('status', ['scheduled', 'pending_payment']).eq('facility_id', sp.location).gte('scheduled_datetime', dayStart).lte('scheduled_datetime', dayEnd);
       if (sp.coach && sp.coach !== 'all') q = q.eq('athlete_id', sp.coach);
       return q;
     };

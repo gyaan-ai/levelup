@@ -24,7 +24,7 @@ import { formatEST } from '@/lib/format-date';
 import { startOfDay } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { SchoolLogo } from '@/components/school-logo';
-import { SessionStatusPill } from '@/components/session-tile-utils';
+import { SessionStatusPill, ParticipantAvatars } from '@/components/session-tile-utils';
 import { SessionTypeBadge } from '@/components/session-type-badge';
 import { ProfileImage } from '@/components/profile-image';
 
@@ -45,9 +45,18 @@ type SessionRow = {
   facility_id: string;
   athletes?: { id: string; first_name?: string; last_name?: string; school?: string; photo_url?: string; average_rating?: number | null; review_count?: number | null } | null;
   facilities?: { id: string; name?: string; address?: string } | null;
+  session_participants?: Array<{ youth_wrestlers?: { id: string; first_name?: string; last_name?: string; photo_url?: string } | { id: string; first_name?: string; last_name?: string; photo_url?: string }[] | null } | null>;
 };
 
 type CoachOption = { id: string; first_name?: string; last_name?: string; school?: string };
+
+function participantsFromSession(s: SessionRow): { id: string; first_name?: string | null; last_name?: string | null; photo_url?: string | null }[] {
+  const parts = s.session_participants ?? [];
+  return parts.map((p) => {
+    const yw = Array.isArray(p?.youth_wrestlers) ? (p?.youth_wrestlers as { id: string; first_name?: string; last_name?: string; photo_url?: string }[])[0] : (p?.youth_wrestlers as { id: string; first_name?: string; last_name?: string; photo_url?: string } | undefined);
+    return yw ? { id: yw.id, first_name: yw.first_name ?? null, last_name: yw.last_name ?? null, photo_url: yw.photo_url ?? null } : { id: '', first_name: null, last_name: null, photo_url: null };
+  }).filter((x) => x.id);
+}
 
 export function FindTrainingClient({
   facilities,
@@ -403,10 +412,10 @@ export function FindTrainingClient({
                       {coach && (
                         <div className="flex items-center gap-1.5 text-sm flex-wrap">
                           {(() => {
-                            const c = coach as { average_rating?: number | null; review_count?: number | null };
-                            const avg = c.average_rating ?? 0;
+                            const c = coach as { average_rating?: number | string | null; review_count?: number | null };
+                            const avg = Number(c.average_rating) || 0;
                             const displayRating = avg > 0 ? avg.toFixed(1) : 'New';
-                            const reviewCount = c.review_count ?? 0;
+                            const reviewCount = Number(c.review_count) || 0;
                             return (
                               <>
                                 <div className="flex gap-0.5" aria-label={avg > 0 ? `${displayRating} out of 5 stars` : 'No reviews yet'}>
@@ -428,6 +437,19 @@ export function FindTrainingClient({
                           })()}
                         </div>
                       )}
+                      {(() => {
+                        const participantList = participantsFromSession(s);
+                        if (participantList.length === 0) return null;
+                        return (
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs text-muted-foreground">Signed up:</span>
+                            <ParticipantAvatars participants={participantList} maxShow={5} size="sm" />
+                            <span className="text-xs text-muted-foreground">
+                              {participantList.map((p) => [p.first_name, p.last_name].filter(Boolean).join(' ')).filter(Boolean).join(', ')}
+                            </span>
+                          </div>
+                        );
+                      })()}
                       {fac && (
                         <p className="text-sm text-muted-foreground flex items-center gap-1.5">
                           <MapPin className="h-3.5 w-3.5 shrink-0" />

@@ -25,7 +25,7 @@ export async function GET() {
     const admin = createAdminClient(tenant.slug);
     const { data: rows, error } = await admin
       .from('discount_codes')
-      .select('id, code, name, max_redemptions, redemptions, created_at')
+      .select('id, code, name, max_redemptions, redemptions, active, percent_off, created_at')
       .order('created_at', { ascending: false });
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -63,6 +63,10 @@ export async function POST(req: NextRequest) {
           ? parseInt(body.max_redemptions, 10)
           : null;
     const max = Number.isNaN(maxRedemptions) || maxRedemptions === null ? null : Math.max(0, maxRedemptions);
+    const percentOff = body?.percent_off != null
+      ? (typeof body.percent_off === 'number' ? body.percent_off : parseInt(String(body.percent_off), 10))
+      : null;
+    const percentOffValid = percentOff != null && !Number.isNaN(percentOff) && percentOff >= 1 && percentOff <= 100 ? percentOff : null;
 
     const admin = createAdminClient(tenant.slug);
     const { data: row, error } = await admin
@@ -72,8 +76,9 @@ export async function POST(req: NextRequest) {
         name: name ?? undefined,
         max_redemptions: max ?? undefined,
         redemptions: 0,
+        percent_off: percentOffValid ?? undefined,
       })
-      .select('id, code, name, max_redemptions, redemptions, created_at')
+      .select('id, code, name, max_redemptions, redemptions, percent_off, created_at')
       .single();
 
     if (error) {
@@ -83,6 +88,42 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ code: row });
   } catch (e) {
     console.error('Admin discount-codes POST error:', e);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+/** PATCH - Pause or unpause a discount code. Body: { id: string, active: boolean } */
+export async function PATCH(req: NextRequest) {
+  try {
+    const headersList = await headers();
+    const host = headersList.get('host') || '';
+    const tenant = getTenantByDomain(host);
+    if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
+
+    const supabase = await createClient(tenant.slug);
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const { data: userData } = await requireAdmin(supabase, user.id);
+    if (userData?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
+    const body = await req.json().catch(() => ({}));
+    const id = typeof body?.id === 'string' ? body.id.trim() : '';
+    const active = body?.active;
+    if (!id) return NextResponse.json({ error: 'id is required' }, { status: 400 });
+    if (typeof active !== 'boolean') return NextResponse.json({ error: 'active must be true or false' }, { status: 400 });
+
+    const admin = createAdminClient(tenant.slug);
+    const { data: row, error } = await admin
+      .from('discount_codes')
+      .update({ active, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .select('id, code, active')
+      .single();
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ code: row });
+  } catch (e) {
+    console.error('Admin discount-codes PATCH error:', e);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

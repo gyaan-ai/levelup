@@ -89,12 +89,23 @@ export async function POST(req: NextRequest) {
 
     const useEarlyAdopter = !!entitlement?.id && (entitlement.remaining ?? 0) > 0;
 
+    // Family / percentage discount (e.g. 10% off) — apply before early adopter
+    const { data: pctDiscount } = await admin
+      .from('parent_percentage_discounts')
+      .select('percent_off')
+      .eq('parent_id', user.id)
+      .maybeSingle();
+    const percentOff = pctDiscount?.percent_off != null ? Number(pctDiscount.percent_off) : 0;
+    const priceAfterPct = percentOff >= 1 && percentOff <= 100
+      ? totalPrice * (1 - percentOff / 100)
+      : totalPrice;
+
     const [datePart] = scheduledDate.split('T');
     const scheduledDatetime = `${datePart}T${scheduledTime}`;
     
     const testModePenny = process.env.TEST_MODE_PENNY_PRICING === 'true';
     const athletePayment = testModePenny ? 0.50 : totalPrice; // what we pay the coach (you pay manually)
-    const basePrice = useEarlyAdopter ? 0 : (testModePenny ? 0.50 : totalPrice);
+    const basePrice = useEarlyAdopter ? 0 : (testModePenny ? 0.50 : priceAfterPct);
     const stripeChargeAmount = basePrice;
     const orgFee = 0;
     const stripeFee = 0;

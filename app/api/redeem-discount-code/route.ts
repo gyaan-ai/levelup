@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
 
     const { data: codeRow, error: codeErr } = await admin
       .from('discount_codes')
-      .select('id, code, max_redemptions, redemptions')
+      .select('id, code, max_redemptions, redemptions, active, percent_off')
       .eq('code', codeNormalized)
       .maybeSingle();
 
@@ -49,6 +49,9 @@ export async function POST(req: NextRequest) {
         error: 'Code not found. Check the spelling or ask an admin to add it in Admin → Discount codes.',
       }, { status: 400 });
     }
+    if (codeRow.active === false) {
+      return NextResponse.json({ error: 'This discount code is no longer active' }, { status: 400 });
+    }
 
     const max = codeRow.max_redemptions;
     const current = codeRow.redemptions ?? 0;
@@ -56,6 +59,29 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'This discount code has reached its limit' }, { status: 400 });
     }
 
+    const percentOff = codeRow.percent_off != null ? Number(codeRow.percent_off) : null;
+
+    if (percentOff != null && percentOff >= 1 && percentOff <= 100) {
+      // Percentage-off code (e.g. family 10% off): grant this parent the discount
+      const { data: existingPct } = await admin
+        .from('parent_percentage_discounts')
+        .select('id')
+        .eq('parent_id', user.id)
+        .maybeSingle();
+      if (existingPct) {
+        return NextResponse.json({ success: true, alreadyUsed: true, message: 'You already have a discount.' }, { status: 200 });
+      }
+      const { error: insErr } = await admin.from('parent_percentage_discounts').insert({
+        parent_id: user.id,
+        discount_code_id: codeRow.id,
+        percent_off: percentOff,
+      });
+      if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 });
+      await admin.from('discount_codes').update({ redemptions: current + 1, updated_at: new Date().toISOString() }).eq('id', codeRow.id);
+      return NextResponse.json({ success: true, message: `Code applied. You get ${percentOff}% off all sessions.` });
+    }
+
+    // Early adopter code: 1 free 1-on-1 + 2 free small group spots
     const { data: existing } = await admin
       .from('early_adopter_entitlements')
       .select('id')

@@ -13,6 +13,7 @@ type CodeRow = {
   name?: string | null;
   max_redemptions?: number | null;
   redemptions: number;
+  percent_off?: number | null;
   created_at: string;
 };
 
@@ -21,6 +22,7 @@ export function DiscountCodesClient({ initialCodes }: { initialCodes: CodeRow[] 
   const [code, setCode] = useState('');
   const [name, setName] = useState('');
   const [maxRedemptions, setMaxRedemptions] = useState('');
+  const [percentOff, setPercentOff] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -41,6 +43,7 @@ export function DiscountCodesClient({ initialCodes }: { initialCodes: CodeRow[] 
           code: trimmed,
           name: name.trim() || undefined,
           max_redemptions: maxRedemptions.trim() === '' ? undefined : parseInt(maxRedemptions, 10),
+          percent_off: percentOff.trim() === '' ? undefined : parseInt(percentOff, 10),
         }),
       });
       const data = await res.json();
@@ -64,7 +67,7 @@ export function DiscountCodesClient({ initialCodes }: { initialCodes: CodeRow[] 
       <CardHeader>
         <CardTitle>Create a new code</CardTitle>
         <CardDescription>
-          Parents enter this code on signup (optional field when role is Parent) to get 1 free private + 1 free small group session.
+          Early adopter: 1 free private + 1 free small group. Or set &quot;Percent off&quot; (e.g. 10) for a family discount — parent gets that % off all sessions.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -104,6 +107,21 @@ export function DiscountCodesClient({ initialCodes }: { initialCodes: CodeRow[] 
               className="mt-1"
               disabled={loading}
             />
+          </div>
+          <div>
+            <Label htmlFor="new-percent">Percent off (optional)</Label>
+            <Input
+              id="new-percent"
+              type="number"
+              min={1}
+              max={100}
+              value={percentOff}
+              onChange={(e) => setPercentOff(e.target.value)}
+              placeholder="e.g. 10 for 10% off (family discount)"
+              className="mt-1"
+              disabled={loading}
+            />
+            <p className="text-xs text-muted-foreground mt-1">Leave blank for early adopter (free sessions). Set 10 for family 10% off.</p>
           </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
           <Button type="submit" disabled={loading}>

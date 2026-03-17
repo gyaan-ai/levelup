@@ -37,6 +37,7 @@ type Props = {
     facility_id: string;
     athletes?: { id: string; first_name?: string; last_name?: string; school?: string; photo_url?: string; average_rating?: number | null; review_count?: number | null } | null;
     facilities?: { id: string; name?: string; address?: string } | null;
+    session_participants?: Array<{ youth_wrestlers?: { id: string; first_name?: string; last_name?: string; photo_url?: string } | { id: string; first_name?: string; last_name?: string; photo_url?: string }[] | null } | null>;
   }>;
   availabilityDate: string;
   availabilityTime: string;

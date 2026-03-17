@@ -224,7 +224,19 @@ export async function POST(
       return NextResponse.json({ error: 'Online payment is not enabled' }, { status: 503 });
     }
 
-    const amountCents = Math.round(pricePer * 100);
+    // Family / percentage discount (e.g. 10% off)
+    const admin = createAdminClient(tenant.slug);
+    const { data: pctDiscount } = await admin
+      .from('parent_percentage_discounts')
+      .select('percent_off')
+      .eq('parent_id', user.id)
+      .maybeSingle();
+    const percentOff = pctDiscount?.percent_off != null ? Number(pctDiscount.percent_off) : 0;
+    const priceAfterDiscount = percentOff >= 1 && percentOff <= 100
+      ? pricePer * (1 - percentOff / 100)
+      : pricePer;
+
+    const amountCents = Math.round(priceAfterDiscount * 100);
     if (amountCents < 50) {
       return NextResponse.json({ error: 'Minimum charge is $0.50' }, { status: 400 });
     }

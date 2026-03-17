@@ -284,7 +284,7 @@ export function BrowseAthletesClient({ initialAthletes, isAdmin, initialYouthWre
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredAthletes.map((athlete) => {
             const schoolColors = getSchoolBadgeColor(athlete.school);
-            const rating = athlete.average_rating || 0;
+            const rating = Number(athlete.average_rating) || 0;
             const displayRating = rating > 0 ? rating.toFixed(1) : 'New';
 
             return (
@@ -351,7 +351,7 @@ export function BrowseAthletesClient({ initialAthletes, isAdmin, initialYouthWre
                       <span className="font-medium">{displayRating}</span>
                       {(athlete.review_count ?? 0) > 0 && (
                         <span className="text-muted-foreground">
-                          ({(athlete.review_count ?? 0)} {(athlete.review_count ?? 0) === 1 ? 'review' : 'reviews'})
+                          ({(Number(athlete.review_count) || 0)} {(Number(athlete.review_count) || 0) === 1 ? 'review' : 'reviews'})
                         </span>
                       )}
                     </div>

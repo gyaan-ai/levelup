@@ -6,6 +6,7 @@ import { getTenantByDomain } from '@/config/tenants';
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { DiscountCodesClient } from './discount-codes-client';
+import { DiscountCodePauseButton } from './discount-code-pause-button';
 import { formatEST } from '@/lib/format-date';
 
 type DiscountCodeRow = {
@@ -14,6 +15,8 @@ type DiscountCodeRow = {
   name?: string | null;
   max_redemptions?: number | null;
   redemptions: number;
+  active?: boolean;
+  percent_off?: number | null;
   created_at: string;
 };
 
@@ -33,7 +36,7 @@ export default async function AdminDiscountCodesPage() {
   const admin = createAdminClient(tenant.slug);
   const { data: rows, error } = await admin
     .from('discount_codes')
-    .select('id, code, name, max_redemptions, redemptions, created_at')
+    .select('id, code, name, max_redemptions, redemptions, active, percent_off, created_at')
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -73,9 +76,12 @@ export default async function AdminDiscountCodesPage() {
                   <tr className="border-b text-left">
                     <th className="p-2 font-medium">Code</th>
                     <th className="p-2 font-medium">Name</th>
+                    <th className="p-2 font-medium">Type</th>
+                    <th className="p-2 font-medium">Status</th>
                     <th className="p-2 font-medium">Redemptions</th>
                     <th className="p-2 font-medium">Max</th>
                     <th className="p-2 font-medium">Created</th>
+                    <th className="p-2 font-medium">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -83,9 +89,20 @@ export default async function AdminDiscountCodesPage() {
                     <tr key={c.id} className="border-b">
                       <td className="p-2 font-mono font-medium">{c.code}</td>
                       <td className="p-2 text-muted-foreground">{c.name ?? '—'}</td>
+                      <td className="p-2 text-muted-foreground">{c.percent_off != null ? `${c.percent_off}% off` : 'Early adopter'}</td>
+                      <td className="p-2">
+                        {c.active !== false ? (
+                          <span className="text-green-600 dark:text-green-400 font-medium">Active</span>
+                        ) : (
+                          <span className="text-amber-600 dark:text-amber-400 font-medium">Paused</span>
+                        )}
+                      </td>
                       <td className="p-2">{c.redemptions}</td>
                       <td className="p-2">{c.max_redemptions ?? 'Unlimited'}</td>
                       <td className="p-2 text-muted-foreground">{formatEST(new Date(c.created_at), 'MMM d, yyyy')}</td>
+                      <td className="p-2">
+                        <DiscountCodePauseButton id={c.id} code={c.code} active={c.active !== false} />
+                      </td>
                     </tr>
                   ))}
                 </tbody>
