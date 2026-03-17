@@ -19,11 +19,12 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
-import { MapPin, Calendar, Users, ChevronDown, Clock, Star } from 'lucide-react';
+import { MapPin, Calendar, Users, ChevronDown, Clock } from 'lucide-react';
 import { formatEST } from '@/lib/format-date';
 import { startOfDay } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { SchoolLogo } from '@/components/school-logo';
+import { StarRating } from '@/components/star-rating';
 import { SessionStatusPill, ParticipantAvatars } from '@/components/session-tile-utils';
 import { SessionTypeBadge } from '@/components/session-type-badge';
 import { ProfileImage } from '@/components/profile-image';
@@ -410,31 +411,12 @@ export function FindTrainingClient({
                         )}
                       </p>
                       {coach && (
-                        <div className="flex items-center gap-1.5 text-sm flex-wrap">
-                          {(() => {
-                            const c = coach as { average_rating?: number | string | null; review_count?: number | null };
-                            const avg = Number(c.average_rating) || 0;
-                            const displayRating = avg > 0 ? avg.toFixed(1) : 'New';
-                            const reviewCount = Number(c.review_count) || 0;
-                            return (
-                              <>
-                                <div className="flex gap-0.5" aria-label={avg > 0 ? `${displayRating} out of 5 stars` : 'No reviews yet'}>
-                                  {[1, 2, 3, 4, 5].map((i) => (
-                                    <Star
-                                      key={i}
-                                      className={`h-3.5 w-3.5 ${i <= Math.round(avg) ? 'fill-accent text-accent' : 'text-muted-foreground/30'}`}
-                                    />
-                                  ))}
-                                </div>
-                                <span className="font-medium text-foreground">{displayRating}</span>
-                                {reviewCount > 0 && (
-                                  <span className="text-muted-foreground">
-                                    ({reviewCount} {reviewCount === 1 ? 'review' : 'reviews'})
-                                  </span>
-                                )}
-                              </>
-                            );
-                          })()}
+                        <div className="text-sm">
+                          <StarRating
+                            averageRating={(coach as { average_rating?: number | string | null }).average_rating}
+                            reviewCount={(coach as { review_count?: number | null }).review_count}
+                            size="sm"
+                          />
                         </div>
                       )}
                       {(() => {

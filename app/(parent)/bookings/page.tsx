@@ -56,7 +56,7 @@ export default async function MyBookingsPage() {
           max_participants,
           partner_invite_code,
           parent_id,
-          athletes(id, first_name, last_name, school, photo_url),
+          athletes(id, first_name, last_name, school, photo_url, average_rating, review_count),
           facilities(id, name, address),
           session_participants(youth_wrestler_id, amount_paid, youth_wrestlers(id, first_name, last_name))
         `)
@@ -132,13 +132,15 @@ export default async function MyBookingsPage() {
 
   const coach = (s: (typeof all)[0]) => {
     const a = s.athletes;
-    if (!a) return { name: '—', school: '', id: '', photo_url: undefined };
+    if (!a) return { name: '—', school: '', id: '', photo_url: undefined, average_rating: null, review_count: null };
     const o = Array.isArray(a) ? a[0] : a;
     return {
       name: o ? `${o.first_name} ${o.last_name}` : '—',
       school: o?.school ?? '',
       id: o?.id ?? '',
       photo_url: (o as { photo_url?: string })?.photo_url,
+      average_rating: (o as { average_rating?: number | null })?.average_rating ?? null,
+      review_count: (o as { review_count?: number | null })?.review_count ?? null,
     };
   };
 

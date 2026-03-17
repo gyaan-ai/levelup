@@ -66,7 +66,7 @@ export default async function HomePage() {
         session_mode,
         focus_area,
         partner_invite_code,
-        athletes(id, first_name, last_name, school, photo_url),
+        athletes(id, first_name, last_name, school, photo_url, average_rating, review_count),
         facilities(id, name, address),
         session_participants(youth_wrestler_id, youth_wrestlers(first_name, last_name))
       `)
@@ -143,7 +143,7 @@ export default async function HomePage() {
           current_participants,
           max_participants,
           partner_invite_code,
-          athletes(id, first_name, last_name, school, photo_url),
+          athletes(id, first_name, last_name, school, photo_url, average_rating, review_count),
           facilities(id, name, address),
           session_participants(youth_wrestler_id, amount_paid, youth_wrestlers(id, first_name, last_name))
         `)
@@ -245,6 +245,8 @@ export default async function HomePage() {
         school: coach?.school ?? '',
         id: coach?.id ?? '',
         photo_url: (coach as { photo_url?: string })?.photo_url,
+        average_rating: (coach as { average_rating?: number | null })?.average_rating ?? null,
+        review_count: (coach as { review_count?: number | null })?.review_count ?? null,
       },
       facility: fac?.name ?? '—',
       facility_id: (fac as { id?: string })?.id ?? null,
@@ -285,6 +287,8 @@ export default async function HomePage() {
         school: coach?.school ?? '',
         id: coach?.id ?? '',
         photo_url: coach?.photo_url ?? null,
+        average_rating: (coach as { average_rating?: number | null })?.average_rating ?? null,
+        review_count: (coach as { review_count?: number | null })?.review_count ?? null,
       },
       facility: fac?.name ?? '—',
       facility_id: fac?.id ?? null,

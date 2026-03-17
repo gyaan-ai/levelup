@@ -12,6 +12,7 @@ import { differenceInHours } from 'date-fns';
 import { formatEST } from '@/lib/format-date';
 import { SessionTypeBadge } from '@/components/session-type-badge';
 import { ProfileImage } from '@/components/profile-image';
+import { StarRating } from '@/components/star-rating';
 
 const CANCELLATION_WINDOW_HOURS = 24;
 
@@ -33,7 +34,7 @@ export type BookingSession = {
   isTentative?: boolean;
   /** True if current user created this session (can cancel whole session). False = participant (can leave session). */
   isOwner?: boolean;
-  coach: { name: string; school: string; id: string; photo_url?: string | null };
+  coach: { name: string; school: string; id: string; photo_url?: string | null; average_rating?: number | null; review_count?: number | null };
   facility: string;
   facility_id?: string | null;
   wrestlers: string[];
@@ -190,6 +191,7 @@ export function BookingCard({ session, isPast = false }: BookingCardProps) {
                 </Link>
               )}
             </p>
+            <StarRating averageRating={session.coach.average_rating} reviewCount={session.coach.review_count} size="sm" />
             {session.wrestlers.length > 0 && (
               <p className="text-sm text-muted-foreground">
                 {session.wrestlers.join(', ')}

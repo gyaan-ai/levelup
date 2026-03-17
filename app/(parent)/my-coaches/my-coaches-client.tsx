@@ -6,6 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { User, Heart, ExternalLink } from 'lucide-react';
 import { SchoolLogo } from '@/components/school-logo';
+import { StarRating } from '@/components/star-rating';
 
 type Coach = {
   id: string;
@@ -13,6 +14,8 @@ type Coach = {
   lastName: string;
   school: string;
   photoUrl?: string;
+  averageRating?: number | null;
+  reviewCount?: number | null;
 };
 
 type Follow = {
@@ -100,6 +103,7 @@ export function MyCoachesClient() {
                   <span>{f.coach.school}</span>
                 </div>
               )}
+              <StarRating averageRating={f.coach?.averageRating} reviewCount={f.coach?.reviewCount} size="sm" />
             </div>
             <div className="flex flex-col gap-2">
               <Button variant="outline" size="sm" asChild>

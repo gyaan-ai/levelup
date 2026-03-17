@@ -4,6 +4,7 @@ import { Button } from './ui/button';
 import { SchoolLogo } from '@/components/school-logo';
 import { CoachSessionBadge } from '@/components/coach-session-badge';
 import { ProfileImage } from '@/components/profile-image';
+import { StarRating } from '@/components/star-rating';
 import { Athlete } from '@/types';
 
 interface AthleteCardProps {
@@ -36,11 +37,10 @@ export function AthleteCard({ athlete }: AthleteCardProps) {
             {athlete.bio}
           </p>
         )}
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-medium">
-              ⭐ {athlete.average_rating.toFixed(1)} ({athlete.total_sessions} sessions)
-            </p>
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <StarRating averageRating={athlete.average_rating} reviewCount={athlete.review_count} />
+            <span className="text-sm text-muted-foreground">({athlete.total_sessions ?? 0} sessions)</span>
           </div>
           <Button asChild>
           <Link href={`/athlete/${athlete.id}`}>View Profile</Link>

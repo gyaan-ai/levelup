@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
 
     const { data, error } = await supabase
       .from('coach_follows')
-      .select('coach_id, created_at, athletes(id, first_name, last_name, school, photo_url)')
+      .select('coach_id, created_at, athletes(id, first_name, last_name, school, photo_url, average_rating, review_count)')
       .eq('parent_id', user.id)
       .order('created_at', { ascending: false });
 
@@ -27,14 +27,14 @@ export async function GET(req: NextRequest) {
     const rows = (data ?? []) as Array<{
       coach_id: string;
       created_at: string;
-      athletes?: { id: string; first_name: string; last_name: string; school: string; photo_url?: string } | { id: string; first_name: string; last_name: string; school: string; photo_url?: string }[];
+      athletes?: { id: string; first_name: string; last_name: string; school: string; photo_url?: string; average_rating?: number | null; review_count?: number | null } | { id: string; first_name: string; last_name: string; school: string; photo_url?: string; average_rating?: number | null; review_count?: number | null }[];
     }>;
     const follows = rows.map((f) => {
       const a = Array.isArray(f.athletes) ? f.athletes[0] : f.athletes;
       return {
         coachId: f.coach_id,
         followedAt: f.created_at,
-        coach: a ? { id: a.id, firstName: a.first_name, lastName: a.last_name, school: a.school, photoUrl: a.photo_url } : null,
+        coach: a ? { id: a.id, firstName: a.first_name, lastName: a.last_name, school: a.school, photoUrl: a.photo_url, averageRating: a.average_rating ?? null, reviewCount: a.review_count ?? null } : null,
       };
     });
     return NextResponse.json({ follows });

@@ -15,10 +15,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ArrowLeft, Star, User, Calendar, Trash2, Loader2 } from 'lucide-react';
+import { ArrowLeft, User, Calendar, Trash2, Loader2 } from 'lucide-react';
 import { SchoolLogo } from '@/components/school-logo';
 import { CoachSessionBadge } from '@/components/coach-session-badge';
 import { ProfileImage } from '@/components/profile-image';
+import { StarRating } from '@/components/star-rating';
 import { formatEST } from '@/lib/format-date';
 import { Athlete } from '@/types';
 
@@ -284,9 +285,6 @@ export function BrowseAthletesClient({ initialAthletes, isAdmin, initialYouthWre
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredAthletes.map((athlete) => {
             const schoolColors = getSchoolBadgeColor(athlete.school);
-            const rating = Number(athlete.average_rating) || 0;
-            const displayRating = rating > 0 ? rating.toFixed(1) : 'New';
-
             return (
               <div key={athlete.id} className="relative">
                 {isAdmin && (
@@ -338,23 +336,7 @@ export function BrowseAthletesClient({ initialAthletes, isAdmin, initialYouthWre
                       {athlete.weight_class && `${athlete.weight_class} lbs`}
                     </div>
 
-                    {/* Star value (average) + number of reviews in parentheses */}
-                    <div className="flex items-center gap-2 text-sm flex-wrap">
-                      <div className="flex gap-0.5" aria-label={rating > 0 ? `${displayRating} out of 5 stars` : 'No reviews yet'}>
-                        {[1, 2, 3, 4, 5].map((i) => (
-                          <Star
-                            key={i}
-                            className={`h-4 w-4 ${i <= Math.round(rating) ? 'fill-accent text-accent' : 'text-muted-foreground/30'}`}
-                          />
-                        ))}
-                      </div>
-                      <span className="font-medium">{displayRating}</span>
-                      {(athlete.review_count ?? 0) > 0 && (
-                        <span className="text-muted-foreground">
-                          ({(Number(athlete.review_count) || 0)} {(Number(athlete.review_count) || 0) === 1 ? 'review' : 'reviews'})
-                        </span>
-                      )}
-                    </div>
+                    <StarRating averageRating={athlete.average_rating} reviewCount={athlete.review_count} />
 
                     {athlete.nextAvailable && (
                       <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
