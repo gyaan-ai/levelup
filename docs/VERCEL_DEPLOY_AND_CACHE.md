@@ -26,3 +26,14 @@ Then open the production URL (and on mobile, use a **new incognito/private** tab
 - **Mobile:** Use a new private/incognito window so the browser doesn’t use old cached HTML/JS.
 
 If you still see old content after a “Clear cache and redeploy” and a fresh incognito load, the next place to check is Vercel’s **Build & Development Settings** (e.g. build command, output directory) and that the production domain is assigned to the deployment you redeployed.
+
+---
+
+## How to know if the NEW build is live
+
+On **wrestlingguild.com** the indicator is: bottom nav and page say **“My bookings”** (not “Sessions”). Page title “My bookings”, subtitle about Past tab and leave feedback, and on past completed sessions a **Leave feedback** / **View feedback** button.
+
+If you see “Sessions” or “Upcoming and past sessions for your wrestlers” or no “Leave feedback” on past sessions, **the site is not running the build from this repo.** Then:
+
+- **Vercel → Settings → Domains:** which project has **wrestlingguild.com**? Is it the same project that is connected to **this** Git repo (e.g. gyaan-ai/levelup)?
+- If the domain is on a different project (or an old/staging project), point **wrestlingguild.com** to the project that builds from this repo, then redeploy with “Clear build cache and redeploy”.
