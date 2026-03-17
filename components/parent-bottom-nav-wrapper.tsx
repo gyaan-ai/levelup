@@ -4,6 +4,8 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth/use-auth';
 import { ParentBottomNav } from './parent-bottom-nav';
 import { CoachBottomNav } from './coach-bottom-nav';
+import { YouthWrestlerBottomNav } from './youth-wrestler-bottom-nav';
+import { AdminBottomNav } from './admin-bottom-nav';
 
 const PARENT_ROUTES = [
   '/dashboard',
@@ -34,6 +36,16 @@ const COACH_ROUTES = [
   '/workspaces',
 ];
 
+const YOUTH_WRESTLER_ROUTES = [
+  '/youth-dashboard',
+  '/workspaces',
+  '/small-group-sessions',
+  '/inbox',
+  '/notifications',
+];
+
+const ADMIN_ROUTES = ['/dashboard', '/admin'];
+
 function isParentRoute(pathname: string | null): boolean {
   if (!pathname) return false;
   return PARENT_ROUTES.some(
@@ -50,12 +62,31 @@ function isCoachRoute(pathname: string | null): boolean {
   );
 }
 
+function isYouthWrestlerRoute(pathname: string | null): boolean {
+  if (!pathname) return false;
+  return YOUTH_WRESTLER_ROUTES.some(
+    (route) =>
+      pathname === route ||
+      (route !== '/youth-dashboard' && pathname.startsWith(route + '/'))
+  );
+}
+
+function isAdminRoute(pathname: string | null): boolean {
+  if (!pathname) return false;
+  return ADMIN_ROUTES.some(
+    (route) => pathname === route || pathname.startsWith(route + '/')
+  );
+}
+
+/** One menu system on mobile: bottom nav for everyone (parent, coach, youth_wrestler, admin). */
 export function ParentBottomNavWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { effectiveRole } = useAuth();
   const showParentNav = effectiveRole === 'parent' && isParentRoute(pathname);
   const showCoachNav = effectiveRole === 'coach' && isCoachRoute(pathname);
-  const showNav = showParentNav || showCoachNav;
+  const showYouthNav = effectiveRole === 'youth_wrestler' && isYouthWrestlerRoute(pathname);
+  const showAdminNav = effectiveRole === 'admin' && isAdminRoute(pathname);
+  const showNav = showParentNav || showCoachNav || showYouthNav || showAdminNav;
 
   return (
     <>
@@ -68,6 +99,8 @@ export function ParentBottomNavWrapper({ children }: { children: React.ReactNode
       )}
       {showParentNav && <ParentBottomNav />}
       {showCoachNav && <CoachBottomNav />}
+      {showYouthNav && <YouthWrestlerBottomNav />}
+      {showAdminNav && <AdminBottomNav />}
     </>
   );
 }

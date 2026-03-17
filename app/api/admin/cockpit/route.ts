@@ -30,14 +30,30 @@ export async function GET(req: NextRequest) {
 
     const { searchParams } = new URL(req.url);
     const dateParam = searchParams.get('date');
+    const rangeParam = searchParams.get('range');
     const date = dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : new Date().toISOString().slice(0, 10);
-    const nextDayDate = new Date(date + 'T12:00:00.000Z');
-    nextDayDate.setUTCDate(nextDayDate.getUTCDate() + 1);
-    const nextDay = nextDayDate.toISOString().slice(0, 10);
-    const admin = createAdminClient(tenant.slug);
+    const range = rangeParam === 'week' || rangeParam === 'month' ? rangeParam : 'today';
 
-    const dayStart = `${date}T00:00:00.000Z`;
-    const dayEnd = `${nextDay}T00:00:00.000Z`;
+    let rangeStart = date;
+    let rangeEnd = date;
+    if (range === 'week') {
+      const d = new Date(date + 'T12:00:00.000Z');
+      d.setUTCDate(d.getUTCDate() - 6);
+      rangeStart = d.toISOString().slice(0, 10);
+    } else if (range === 'month') {
+      const d = new Date(date + 'T12:00:00.000Z');
+      d.setUTCDate(1);
+      rangeStart = d.toISOString().slice(0, 10);
+    }
+
+    const nextRangeEnd = new Date(rangeEnd + 'T12:00:00.000Z');
+    nextRangeEnd.setUTCDate(nextRangeEnd.getUTCDate() + 1);
+    const dayStart = `${rangeStart}T00:00:00.000Z`;
+    const dayEnd = `${nextRangeEnd.toISOString().slice(0, 10)}T00:00:00.000Z`;
+    const startMs = new Date(dayStart).getTime();
+    const endMs = new Date(dayEnd).getTime();
+
+    const admin = createAdminClient(tenant.slug);
 
     const [
       newParentsRes,
@@ -60,7 +76,7 @@ export async function GET(req: NextRequest) {
       admin.from('sessions').select('id, scheduled_datetime, status, session_type, session_mode, current_participants, max_participants, athletes(first_name, last_name, school), facilities(name)').gte('created_at', dayStart).lt('created_at', dayEnd).order('created_at', { ascending: false }),
       admin.from('session_participants').select('id, session_id, parent_id, youth_wrestler_id, amount_paid, created_at, sessions(id, scheduled_datetime, athletes(first_name, last_name), facilities(name))').gte('created_at', dayStart).lt('created_at', dayEnd).order('created_at', { ascending: false }),
       admin.from('early_access').select('id, email, name, parent_name, wrestler_name, created_at').gte('created_at', dayStart).lt('created_at', dayEnd).order('created_at', { ascending: false }),
-      admin.from('sessions').select('id, athlete_payment, athlete_payout_date, athletes(first_name, last_name)').eq('status', 'completed').eq('athlete_payout_date', date),
+      admin.from('sessions').select('id, athlete_payment, athlete_payout_date, athletes(first_name, last_name)').eq('status', 'completed').gte('athlete_payout_date', rangeStart).lte('athlete_payout_date', rangeEnd),
       trendCount(admin, 'users', 'parent', date, 7),
       trendCount(admin, 'athletes', null, date, 7),
       trendCount(admin, 'youth_wrestlers', null, date, 7),
@@ -68,6 +84,28 @@ export async function GET(req: NextRequest) {
       trendCount(admin, 'session_participants', null, date, 7),
       trendCount(admin, 'early_access', null, date, 7),
     ]);
+
+    // Vercel Analytics (drain): page views and unique visitors in range (origin matches tenant domain)
+    let pageViews = 0;
+    let visitors = 0;
+    try {
+      const originPattern = `%${tenant.domain}%`;
+      const { data: analyticsRows } = await admin
+        .from('vercel_analytics_events')
+        .select('event_type, device_id')
+        .gte('timestamp_ms', startMs)
+        .lt('timestamp_ms', endMs)
+        .ilike('origin', originPattern)
+        .limit(100000);
+      if (analyticsRows && analyticsRows.length > 0) {
+        const rows = analyticsRows as { event_type?: string; device_id?: number | null }[];
+        pageViews = rows.filter((r) => r.event_type === 'pageview').length;
+        const deviceIds = new Set(rows.map((r) => r.device_id).filter((id): id is number => id != null));
+        visitors = deviceIds.size;
+      }
+    } catch {
+      // Table may not exist yet or drain not configured
+    }
 
     // Revenue that day: sum of amount_paid for participants CREATED that day (signups that day)
     let revenueThatDay = 0;
@@ -158,6 +196,11 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       date,
+      range,
+      rangeStart,
+      rangeEnd,
+      pageViews,
+      visitors,
       newParents,
       newCoaches,
       newAthletes,

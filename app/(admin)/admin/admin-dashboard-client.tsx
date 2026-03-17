@@ -953,7 +953,7 @@ export function AdminDashboardClient({
                                   const r = await fetch('/api/admin/mark-payout-paid', {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ athleteId: p.athlete_id }),
+                                    body: JSON.stringify({ athleteId: p.athlete_id, amount: p.amount }),
                                   });
                                   const data = await r.json().catch(() => ({}));
                                   if (r.ok && data.success) {

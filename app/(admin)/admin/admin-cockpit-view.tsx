@@ -20,8 +20,18 @@ import {
 import { formatEST } from '@/lib/format-date';
 import Link from 'next/link';
 
+function formatRange(start: string, end: string, type: 'week' | 'month'): string {
+  const s = new Date(start + 'T12:00:00.000Z');
+  const e = new Date(end + 'T12:00:00.000Z');
+  if (type === 'month') return formatEST(s, 'MMMM yyyy');
+  return `${formatEST(s, 'MMM d')} – ${formatEST(e, 'MMM d, yyyy')}`;
+}
+
 export type CockpitData = {
   date: string;
+  range?: 'today' | 'week' | 'month';
+  rangeStart?: string;
+  rangeEnd?: string;
   newParents: { id: string; email: string; created_at: string }[];
   newCoaches: { id: string; name: string; school: string; created_at: string }[];
   newAthletes: { id: string; name: string; parent_id: string; created_at: string }[];
@@ -48,6 +58,8 @@ export type CockpitData = {
   payoutsPaid: number;
   payoutsPaidList: { session_id: string; amount: number; coach_name: string }[];
   revenueThatDay: number;
+  pageViews?: number;
+  visitors?: number;
   trends: {
     parents: number[];
     coaches: number[];
@@ -60,7 +72,9 @@ export type CockpitData = {
 };
 
 export function AdminCockpitView() {
-  const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const today = new Date().toISOString().slice(0, 10);
+  const [date, setDate] = useState(today);
+  const [range, setRange] = useState<'today' | 'week' | 'month'>('today');
   const [data, setData] = useState<CockpitData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -68,7 +82,7 @@ export function AdminCockpitView() {
   useEffect(() => {
     setLoading(true);
     setError(null);
-    fetch(`/api/admin/cockpit?date=${date}`)
+    fetch(`/api/admin/cockpit?date=${date}&range=${range}`)
       .then((r) => r.json())
       .then((json) => {
         if (json.error) {
@@ -83,7 +97,7 @@ export function AdminCockpitView() {
         setData(null);
       })
       .finally(() => setLoading(false));
-  }, [date]);
+  }, [date, range]);
 
   if (loading && !data) {
     return (
@@ -121,19 +135,32 @@ export function AdminCockpitView() {
   const TrendBar = ({ values, label }: { values: number[]; label: string }) => {
     const vals = values.slice(0, trendDays.length);
     return (
-      <div className="space-y-2">
-        <p className="text-xs font-medium text-muted-foreground">{label}</p>
-        <div className="flex gap-1 items-end h-8">
-          {vals.map((v, i) => (
-            <div
-              key={i}
-              className="flex-1 min-w-[6px] rounded-t bg-accent/30 hover:bg-accent/50 transition-colors"
-              style={{ height: `${Math.max(6, (v / maxTrend) * 100)}%` }}
-              title={`${trendDays[i] ?? ''}: ${v}`}
-            />
-          ))}
+      <div className="space-y-3">
+        <p className="text-sm font-semibold text-foreground">{label}</p>
+        <div className="flex gap-1.5 items-end h-14 min-h-[56px]">
+          {vals.map((v, i) => {
+            const pct = maxTrend > 0 ? Math.max(8, (v / maxTrend) * 100) : 8;
+            const dayStr = trendDays[i] ? (() => {
+              const d = new Date(trendDays[i] + 'T12:00:00.000Z');
+              return `${d.getUTCMonth() + 1}/${d.getUTCDate()}`;
+            })() : '—';
+            return (
+              <div key={i} className="flex-1 min-w-0 flex flex-col items-center gap-1">
+                <span className="text-xs font-semibold tabular-nums text-foreground" title={`${dayStr}: ${v}`}>
+                  {v}
+                </span>
+                <div
+                  className="w-full min-w-[8px] max-w-[24px] rounded-t bg-accent/40 hover:bg-accent/70 transition-colors flex-shrink-0"
+                  style={{ height: `${pct}%`, minHeight: 6 }}
+                  title={`${dayStr}: ${v}`}
+                />
+                <span className="text-[10px] font-medium text-muted-foreground tabular-nums truncate w-full text-center">
+                  {dayStr}
+                </span>
+              </div>
+            );
+          })}
         </div>
-        <p className="text-[10px] text-muted-foreground tabular-nums truncate">{vals.join(' · ')}</p>
       </div>
     );
   };
@@ -159,17 +186,38 @@ export function AdminCockpitView() {
         </div>
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <div className="flex items-center gap-2 shrink-0">
-            <label className="text-sm font-medium text-muted-foreground whitespace-nowrap">Date</label>
-            <Input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="w-40 bg-background"
-            />
+            <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">Period</span>
+            <div className="flex rounded-md border border-input bg-background overflow-hidden">
+              {(['today', 'week', 'month'] as const).map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => { setRange(r); if (r === 'today') setDate(today); }}
+                  className={`px-3 py-2 text-sm font-medium transition-colors ${range === r ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
+                >
+                  {r === 'today' ? 'Today' : r === 'week' ? 'This week' : 'This month'}
+                </button>
+              ))}
+            </div>
           </div>
-          <Button variant="outline" size="sm" onClick={() => setDate(new Date().toISOString().slice(0, 10))}>
-            Today
-          </Button>
+          {(range === 'week' || range === 'month') && (
+            <div className="flex items-center gap-2 shrink-0">
+              <label className="text-sm font-medium text-muted-foreground whitespace-nowrap">End date</label>
+              <Input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="w-40 bg-background"
+              />
+            </div>
+          )}
+          {data && (
+            <span className="text-sm text-muted-foreground">
+              {range === 'today' && <><strong>{formatEST(new Date(date + 'T12:00:00'), 'MMM d, yyyy')}</strong> (UTC)</>}
+              {range === 'week' && data.rangeStart && data.rangeEnd && <><strong>{formatRange(data.rangeStart, data.rangeEnd, 'week')}</strong> (UTC)</>}
+              {range === 'month' && data.rangeStart && data.rangeEnd && <><strong>{formatRange(data.rangeStart, data.rangeEnd, 'month')}</strong> (UTC)</>}
+            </span>
+          )}
         </div>
       </div>
 
@@ -196,8 +244,12 @@ export function AdminCockpitView() {
                 <Eye className="h-3.5 w-3.5 text-muted-foreground" />
               </span>
             </div>
-            <CardTitle className="text-xl font-semibold text-muted-foreground mt-1">—</CardTitle>
-            <p className="text-[10px] text-muted-foreground mt-0.5">Vercel Analytics</p>
+            <CardTitle className="text-2xl font-bold tabular-nums mt-1">
+              {typeof d.visitors === 'number' ? d.visitors : '—'}
+            </CardTitle>
+            <p className="text-[10px] text-muted-foreground mt-0.5">
+              {typeof d.pageViews === 'number' && d.pageViews > 0 ? `${d.pageViews.toLocaleString()} page views` : 'Add a Web Analytics Drain in Vercel → Project → Drains to stream data here.'}
+            </p>
           </CardHeader>
         </Card>
       </div>
@@ -210,7 +262,7 @@ export function AdminCockpitView() {
             Last 7 days
           </CardTitle>
           <CardDescription>
-            Counts by day (oldest → newest). Hover bars for values.
+            Counts by day (oldest → newest). Date and value shown on each bar.
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -334,7 +386,7 @@ export function AdminCockpitView() {
                 <CreditCard className="h-4 w-4" />
                 Bookings
               </CardTitle>
-              <CardDescription>Signups this day</CardDescription>
+              <CardDescription>Signups created on this date (UTC). Count = registrations that day, not total in a session.</CardDescription>
             </CardHeader>
             <CardContent>
               <ul className="space-y-2 text-sm">
@@ -345,7 +397,8 @@ export function AdminCockpitView() {
                     </span>
                     <span className="text-muted-foreground">
                       {b.amount_paid != null ? `$${b.amount_paid.toFixed(2)}` : '—'}
-                      {b.scheduled_datetime && b.scheduled_datetime !== '—' ? ` · ${formatEST(new Date(b.scheduled_datetime), 'MMM d')}` : ''}
+                      {b.created_at ? ` · Signed up ${formatEST(new Date(b.created_at), 'MMM d')}` : ''}
+                      {b.scheduled_datetime && b.scheduled_datetime !== '—' ? ` · Session ${formatEST(new Date(b.scheduled_datetime), 'MMM d')}` : ''}
                     </span>
                   </li>
                 ))}
@@ -417,7 +470,7 @@ export function AdminCockpitView() {
         d.payoutsPaidList.length === 0 && (
           <Card>
             <CardContent className="py-12 text-center text-muted-foreground">
-              No activity on {formatEST(new Date(d.date + 'T12:00:00'), 'MMMM d, yyyy')}. Change the date or check back later.
+              No activity {range === 'today' ? `on ${formatEST(new Date(d.date + 'T12:00:00'), 'MMMM d, yyyy')}` : d.rangeStart && d.rangeEnd ? `for ${range === 'month' ? formatRange(d.rangeStart, d.rangeEnd, 'month') : formatRange(d.rangeStart, d.rangeEnd, 'week')}` : 'for this period'}. Change the period or check back later.
             </CardContent>
           </Card>
         )}

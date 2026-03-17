@@ -27,25 +27,46 @@ export async function POST(req: NextRequest) {
     if (!athleteId || typeof athleteId !== 'string') {
       return NextResponse.json({ error: 'Missing athleteId' }, { status: 400 });
     }
+    const totalAmount = body?.amount != null ? Number(body.amount) : null;
 
     const today = new Date().toISOString().slice(0, 10);
     const admin = createAdminClient(tenant.slug);
 
-    const { data: updated, error: updateError } = await admin
+    const { data: sessionsToUpdate, error: fetchErr } = await admin
       .from('sessions')
-      .update({ athlete_payout_date: today })
+      .select('id, athlete_payment')
       .eq('athlete_id', athleteId)
       .eq('status', 'completed')
-      .is('athlete_payout_date', null)
-      .select('id');
+      .is('athlete_payout_date', null);
 
-    if (updateError) {
-      console.error('Mark payout paid error:', updateError);
-      return NextResponse.json({ error: updateError.message }, { status: 500 });
+    if (fetchErr || !sessionsToUpdate?.length) {
+      return NextResponse.json({ success: true, updatedCount: 0 });
     }
 
-    const updatedCount = updated?.length ?? 0;
-    return NextResponse.json({ success: true, updatedCount });
+    const count = sessionsToUpdate.length;
+    const amountPerSession =
+      totalAmount != null && !Number.isNaN(totalAmount) && totalAmount >= 0 && count > 0
+        ? Math.round((totalAmount / count) * 100) / 100
+        : null;
+
+    for (const s of sessionsToUpdate) {
+      const updates: { athlete_payout_date: string; athlete_payment?: number } = {
+        athlete_payout_date: today,
+      };
+      if (amountPerSession != null) {
+        updates.athlete_payment = amountPerSession;
+      }
+      const { error: updateError } = await admin
+        .from('sessions')
+        .update(updates)
+        .eq('id', s.id);
+      if (updateError) {
+        console.error('Mark payout paid error', s.id, updateError);
+        return NextResponse.json({ error: updateError.message }, { status: 500 });
+      }
+    }
+
+    return NextResponse.json({ success: true, updatedCount: count });
   } catch (e) {
     console.error('Mark payout paid error:', e);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
