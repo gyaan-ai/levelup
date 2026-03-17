@@ -68,12 +68,15 @@ export default async function SessionDetailPage({
   const youthWrestlerIds = await getParentYouthWrestlerIds(supabase, user.id);
 
   let session: Record<string, unknown> | null = null;
+  let adminErr: string | null = null;
+  let fallbackCount = 0;
   try {
     const admin = createAdminClient(tenant.slug);
     const res = await admin.from('sessions').select(sessionSelect).eq('id', sessionId).single();
     if (!res.error && res.data) session = res.data;
-  } catch {
-    // no service key
+    else if (res.error) adminErr = res.error.message || res.error.code || String(res.error);
+  } catch (e) {
+    adminErr = e instanceof Error ? e.message : String(e);
   }
   if (!session) {
     let familySessionIds: string[] = [];
@@ -89,9 +92,11 @@ export default async function SessionDetailPage({
       .from('sessions')
       .select(sessionSelect)
       .in('id', idsToFetch);
+    fallbackCount = sessionsList?.length ?? 0;
     session = sessionsList?.find((row) => (row as { id: string }).id === sessionId) ?? null;
   }
   if (!session) {
+    console.error('[sessions/[id]] 404', { sessionId, userId: user.id, adminErr, youthCount: youthWrestlerIds.length, fallbackRows: fallbackCount });
     notFound();
   }
 
