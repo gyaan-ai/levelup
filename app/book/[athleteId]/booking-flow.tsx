@@ -196,7 +196,7 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
         if (pctRes.ok) {
           const p = await pctRes.json();
           const n = p.percent_off != null ? Number(p.percent_off) : null;
-          setPercentOff(n >= 1 && n <= 100 ? n : null);
+          setPercentOff(n != null && n >= 1 && n <= 100 ? n : null);
         }
       } catch {
         /* ignore */
