@@ -69,14 +69,24 @@ export default async function HomePage() {
                   instruction. Master the details that separate good from elite.
                 </p>
                 <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4 justify-center lg:justify-start">
-                  <Button
-                    size="xl"
-                    variant="premium"
-                    asChild
-                    className="gold-glow-hover"
-                  >
-                    <Link href="/browse">Browse Elite Coaches</Link>
-                  </Button>
+                  <div className="flex flex-row flex-wrap gap-3 sm:gap-4 justify-center lg:justify-start w-full sm:w-auto">
+                    <Button
+                      size="xl"
+                      variant="premium"
+                      asChild
+                      className="gold-glow-hover flex-1 sm:flex-initial min-w-[140px]"
+                    >
+                      <Link href="/browse">Browse Elite Coaches</Link>
+                    </Button>
+                    <Button
+                      size="xl"
+                      variant="outline"
+                      asChild
+                      className="bg-transparent text-white border-white hover:bg-white hover:text-black flex-1 sm:flex-initial min-w-[140px]"
+                    >
+                      <Link href="/login">Login</Link>
+                    </Button>
+                  </div>
                   <Button
                     size="xl"
                     variant="outline"

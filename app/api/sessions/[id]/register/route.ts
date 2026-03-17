@@ -130,71 +130,16 @@ export async function POST(
       return NextResponse.json({ error: 'Session is not open for registration' }, { status: 400 });
     }
 
-    // Small group with no price (legacy free sessions): add participant without payment.
+    // We charge for small group now — no more free path. Always use Stripe for non-owner.
     const isSmallGroup =
       s.session_type === 'group' ||
       s.session_type === '2-athlete' ||
       s.session_type === 'small_group' ||
       (max >= 2 && s.session_type !== '1-on-1');
-    const pricePer = s.price_per_participant ?? 0;
-    if (isSmallGroup && pricePer <= 0) {
-      const isSelf = role === 'youth_wrestler' && youthWrestlerId === user.id;
-      const { data: yw } = await supabase
-        .from('youth_wrestlers')
-        .select('id, parent_id')
-        .eq('id', youthWrestlerId)
-        .single();
-      const ywParentId = (yw as { parent_id?: string } | null)?.parent_id;
-      const isPrimaryParent = yw && ywParentId === user.id;
-      const { data: link } = !isPrimaryParent && !isSelf && yw
-        ? await supabase.from('youth_wrestler_parents').select('id').eq('youth_wrestler_id', youthWrestlerId).eq('parent_id', user.id).maybeSingle()
-        : { data: null };
-      if (!yw || (!isPrimaryParent && !link && !isSelf)) {
-        return NextResponse.json({ error: 'Youth wrestler not found or not yours' }, { status: 400 });
-      }
-      const { data: existing } = await supabase
-        .from('session_participants')
-        .select('id')
-        .eq('session_id', sessionId)
-        .eq('youth_wrestler_id', youthWrestlerId)
-        .maybeSingle();
-      if (existing) {
-        return NextResponse.json({ error: 'This wrestler is already registered for this session' }, { status: 409 });
-      }
-      const admin = createAdminClient(tenant.slug);
-      const { error: insertErr } = await admin.from('session_participants').insert({
-        session_id: sessionId,
-        youth_wrestler_id: youthWrestlerId,
-        parent_id: user.id,
-        paid: true,
-        amount_paid: 0,
-      });
-      if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 });
-      await admin.from('sessions').update({
-        current_participants: current + 1,
-        updated_at: new Date().toISOString(),
-      }).eq('id', sessionId);
-      const coachId = (session as { athlete_id?: string }).athlete_id;
-      const dt = s.scheduled_datetime;
-      if (coachId) {
-        const dateStr = dt ? formatEST(new Date(dt), 'EEE MMM d, h:mm a') : 'your session';
-        await createNotification(admin, {
-          user_id: coachId,
-          type: 'session_booked',
-          title: 'Someone signed up for your session',
-          body: `New signup for ${dateStr}. Check My sessions.`,
-          data: { session_id: sessionId },
-        }).catch((e) => console.warn('Register: coach notification failed', e));
-        await sendCoachNewSignupSms(admin, coachId, dateStr).catch(() => {});
-      }
-      return NextResponse.json({ added: true });
-    }
+    const rawPrice = s.price_per_participant;
+    const pricePer = rawPrice != null && rawPrice > 0 ? rawPrice : 30;
 
-    // Paid sessions (e.g. Liam/Sabino small group at $30): require Stripe.
     const isSelf = role === 'youth_wrestler' && youthWrestlerId === user.id;
-    if (pricePer <= 0) {
-      return NextResponse.json({ error: 'Session has no price set for participants' }, { status: 400 });
-    }
 
     const { data: yw } = await supabase
       .from('youth_wrestlers')

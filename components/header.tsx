@@ -536,13 +536,13 @@ export function Header() {
               </Button>
             </nav>
 
-            <div className="md:hidden flex items-center gap-1">
+            <div className="md:hidden flex items-center gap-2">
               <Link
                 href="/login"
-                className="py-2 px-3 min-h-[44px] flex items-center text-white hover:text-accent hover:bg-white/10 rounded font-medium text-sm"
+                className="py-2 px-4 min-h-[44px] flex items-center rounded font-medium text-sm bg-accent text-black hover:bg-accent/90 shrink-0"
                 onClick={() => setMobileOpen(false)}
               >
-                Sign in
+                Login
               </Link>
               <button
                 type="button"

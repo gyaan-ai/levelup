@@ -75,7 +75,8 @@ export default async function SessionRegisterPage({
   const max = s.max_participants ?? 2;
   if (current >= max) notFound();
 
-  const pricePer = s.price_per_participant ?? 0;
+  const rawPrice = s.price_per_participant;
+  const pricePer = rawPrice != null && rawPrice > 0 ? rawPrice : 30;
   if (!isOwner && pricePer <= 0) notFound();
 
   const isSmallGroup =
@@ -83,8 +84,8 @@ export default async function SessionRegisterPage({
     s.session_type === '2-athlete' ||
     s.session_type === 'small_group' ||
     (max >= 2 && s.session_type !== '1-on-1');
-  // Only show "free" when session has no price (legacy); $30 Liam/Sabino sessions show "Pay $30 & register".
-  const freeSmallGroupJoin = !isOwner && isSmallGroup && pricePer <= 0;
+  // We charge for small group now — never show "free early adopter" so promo field stays usable.
+  const freeSmallGroupJoin = false;
 
   // Youth wrestlers this user can add (primary parent or linked parent)
   const { data: primaryIds } = await supabase

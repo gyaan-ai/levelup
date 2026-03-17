@@ -62,15 +62,16 @@ export default async function JoinByCodePage({
   const scheduledAt = session.scheduled_datetime ? new Date(session.scheduled_datetime) : null;
   const dateTime = scheduledAt ? `${formatEST(scheduledAt, 'EEEE, MMMM d, yyyy')} at ${formatEST(scheduledAt, 'h:mm a')}` : '';
 
-  const pricePerParticipant = (session as { price_per_participant?: number }).price_per_participant ?? 30;
+  const rawPrice = (session as { price_per_participant?: number }).price_per_participant;
+  const pricePerParticipant = rawPrice != null && rawPrice > 0 ? rawPrice : 30;
   const sessionType = (session as { session_type?: string }).session_type;
   const isSmallGroup =
     sessionType === 'group' ||
     sessionType === '2-athlete' ||
     sessionType === 'small_group' ||
     (maxParticipants >= 2 && sessionType !== '1-on-1');
-  // Only free when session has no price; $30 Liam/Sabino sessions use Stripe.
-  const freeSmallGroupJoin = !isFull && isSmallGroup && pricePerParticipant <= 0;
+  // We charge for small group now — never show "free early adopter" so promo field stays usable.
+  const freeSmallGroupJoin = false;
 
   // Parent percentage discount (e.g. FAMILY10) for logged-in user
   let percentOff: number | null = null;
