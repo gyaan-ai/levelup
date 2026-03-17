@@ -23,6 +23,33 @@ const SCHOOL_COLORS: Record<string, { bg: string; text: string }> = {
   'North Carolina State': { bg: 'bg-red-600', text: 'text-white' },
 };
 
+function CoachProfileUnavailable() {
+  return (
+    <div className="container mx-auto px-4 py-8 max-w-lg">
+      <Card>
+        <CardHeader>
+          <CardTitle>Coach profile unavailable</CardTitle>
+          <p className="text-muted-foreground">
+            This coach&apos;s profile is no longer available. They may have deactivated their account or the link may be outdated.
+          </p>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
+          <Link href="/bookings">
+            <Button variant="default" className="w-full sm:w-auto">
+              My bookings
+            </Button>
+          </Link>
+          <Link href="/browse">
+            <Button variant="outline" className="w-full sm:w-auto">
+              Browse coaches
+            </Button>
+          </Link>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
 export default async function AthleteProfilePage({
   params,
   searchParams,
@@ -43,7 +70,12 @@ export default async function AthleteProfilePage({
 
   const tenantSlug = tenant.slug;
   const supabase = await createClient(tenantSlug);
-  
+
+  // Invalid id (e.g. /athlete/undefined or empty) -> friendly fallback instead of 404
+  if (!id || typeof id !== 'string' || id.trim() === '') {
+    return <CoachProfileUnavailable />;
+  }
+
   // Fetch athlete first without join to avoid RLS/join issues
   const { data: athleteRow, error: athleteError } = await supabase
     .from('athletes')
@@ -55,8 +87,9 @@ export default async function AthleteProfilePage({
     console.error('[Athlete profile] fetch error:', athleteError);
     notFound();
   }
+  // Coach missing or deactivated: show friendly message instead of 404
   if (!athleteRow || !athleteRow.active) {
-    notFound();
+    return <CoachProfileUnavailable />;
   }
 
   // Fetch facility separately so public profile doesn't depend on join RLS

@@ -13,6 +13,7 @@ import { formatEST } from '@/lib/format-date';
 import { SessionTypeBadge } from '@/components/session-type-badge';
 import { ProfileImage } from '@/components/profile-image';
 import { StarRating } from '@/components/star-rating';
+import { CapacityBadge } from '@/components/capacity-badge';
 
 const CANCELLATION_WINDOW_HOURS = 24;
 
@@ -29,6 +30,11 @@ export type BookingSession = {
   session_mode?: string;
   /** Session focus/topic for group/small_group (e.g. "Neutral Re-Attacks"). */
   focus_area?: string | null;
+  /** Second optional focus for small group. */
+  focus_area_2?: string | null;
+  /** For capacity badge when max_participants > 1. */
+  current_participants?: number;
+  max_participants?: number;
   partner_invite_code?: string | null;
   /** Small group or partner-open session not yet filled (open slots). */
   isTentative?: boolean;
@@ -147,10 +153,17 @@ export function BookingCard({ session, isPast = false }: BookingCardProps) {
             <div className="space-y-2 min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
               <SessionTypeBadge sessionType={session.session_type} sessionMode={session.session_mode} />
-              {session.focus_area && (
+              {(session.focus_area || session.focus_area_2) && (
                 <Badge variant="secondary" className="font-normal text-xs">
-                  {session.focus_area}
+                  {[session.focus_area, session.focus_area_2].filter(Boolean).join(', ')}
                 </Badge>
+              )}
+              {(session.max_participants ?? 1) > 1 && (
+                <CapacityBadge
+                  current={session.current_participants ?? 0}
+                  max={session.max_participants ?? 1}
+                  label=""
+                />
               )}
               {statusBadge(session.status)}
               {session.isTentative && (
@@ -172,8 +185,8 @@ export function BookingCard({ session, isPast = false }: BookingCardProps) {
             </p>
             <p className="text-sm text-muted-foreground flex items-center gap-1.5 flex-wrap">
               <User className="h-3.5 w-3.5 shrink-0" />
-              {session.coach.id ? (
-                <Link href={`/athlete/${session.coach.id}`} className="hover:underline text-foreground font-medium">
+              {session.coach.id && String(session.coach.id).trim() ? (
+                <Link href={`/athlete/${String(session.coach.id).trim()}`} className="hover:underline text-foreground font-medium">
                   {session.coach.name}
                 </Link>
               ) : (
@@ -185,13 +198,22 @@ export function BookingCard({ session, isPast = false }: BookingCardProps) {
                   <span className="text-muted-foreground/80">({session.coach.school})</span>
                 </span>
               )}
-              {session.coach.id && (
-                <Link href={`/athlete/${session.coach.id}`} className="text-xs text-accent hover:underline">
+              {session.coach.id && String(session.coach.id).trim() && (
+                <Link href={`/athlete/${String(session.coach.id).trim()}`} className="text-xs text-accent hover:underline">
                   View profile
                 </Link>
               )}
             </p>
             <StarRating averageRating={session.coach.average_rating} reviewCount={session.coach.review_count} size="sm" />
+            {(session.max_participants ?? 1) > 1 && (
+              <p className="text-sm text-muted-foreground flex items-center gap-2">
+                <CapacityBadge
+                  current={session.current_participants ?? 0}
+                  max={session.max_participants ?? 1}
+                  label="spots"
+                />
+              </p>
+            )}
             {session.wrestlers.length > 0 && (
               <p className="text-sm text-muted-foreground">
                 {session.wrestlers.join(', ')}

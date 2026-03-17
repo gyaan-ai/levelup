@@ -37,6 +37,7 @@ export default async function HomePage() {
   // Admin: fetch ALL scheduled/pending sessions (no date filter) so admin always sees every session
   type AdminUpcomingRow = {
     id: string;
+    athlete_id?: string | null;
     scheduled_datetime: string;
     status: string;
     total_price?: number;
@@ -45,6 +46,9 @@ export default async function HomePage() {
     session_type?: string;
     session_mode?: string;
     focus_area?: string | null;
+    focus_area_2?: string | null;
+    current_participants?: number;
+    max_participants?: number;
     partner_invite_code?: string | null;
     athletes?: { id: string; first_name?: string; last_name?: string; school?: string; photo_url?: string } | { id: string; first_name?: string; last_name?: string; school?: string; photo_url?: string }[] | null;
     facilities?: { id?: string; name?: string; address?: string } | { id?: string; name?: string; address?: string }[] | null;
@@ -57,6 +61,7 @@ export default async function HomePage() {
       .from('sessions')
       .select(`
         id,
+        athlete_id,
         scheduled_datetime,
         status,
         total_price,
@@ -65,6 +70,9 @@ export default async function HomePage() {
         session_type,
         session_mode,
         focus_area,
+        focus_area_2,
+        current_participants,
+        max_participants,
         partner_invite_code,
         athletes(id, first_name, last_name, school, photo_url, average_rating, review_count),
         facilities(id, name, address),
@@ -132,6 +140,7 @@ export default async function HomePage() {
         .from('sessions')
         .select(`
           id,
+          athlete_id,
           scheduled_datetime,
           status,
           total_price,
@@ -140,6 +149,7 @@ export default async function HomePage() {
           session_type,
           session_mode,
           focus_area,
+          focus_area_2,
           current_participants,
           max_participants,
           partner_invite_code,
@@ -156,6 +166,7 @@ export default async function HomePage() {
 
   const upcoming = (upcomingSessions ?? []) as Array<{
     id: string;
+    athlete_id?: string | null;
     scheduled_datetime: string;
     status: string;
     total_price?: number;
@@ -164,6 +175,7 @@ export default async function HomePage() {
     session_type?: string;
     session_mode?: string;
     focus_area?: string | null;
+    focus_area_2?: string | null;
     current_participants?: number;
     max_participants?: number;
     partner_invite_code?: string | null;
@@ -227,6 +239,7 @@ export default async function HomePage() {
       }).filter(Boolean) as string[];
     const totalPrice = s.total_price ?? 0;
     const pricePerParticipant = s.price_per_participant != null ? Number(s.price_per_participant) : null;
+    const coachId = (coach?.id && String(coach.id).trim()) || (s.athlete_id && String(s.athlete_id).trim()) || '';
     return {
       id: s.id,
       scheduled_datetime: s.scheduled_datetime,
@@ -237,13 +250,16 @@ export default async function HomePage() {
       session_type: s.session_type,
       session_mode: s.session_mode,
       focus_area: s.focus_area ?? null,
+      focus_area_2: s.focus_area_2 ?? null,
+      current_participants: s.current_participants ?? 0,
+      max_participants: s.max_participants ?? 1,
       partner_invite_code: s.partner_invite_code ?? null,
       isTentative: false,
       isOwner: s.parent_id === user.id,
       coach: {
-        name: coach ? `${coach.first_name ?? ''} ${coach.last_name ?? ''}`.trim() : '—',
+        name: coach ? `${coach.first_name ?? ''} ${coach.last_name ?? ''}`.trim() || 'Coach' : 'Coach',
         school: coach?.school ?? '',
-        id: coach?.id ?? '',
+        id: coachId,
         photo_url: (coach as { photo_url?: string })?.photo_url,
         average_rating: (coach as { average_rating?: number | null })?.average_rating ?? null,
         review_count: (coach as { review_count?: number | null })?.review_count ?? null,
@@ -270,6 +286,7 @@ export default async function HomePage() {
       .filter(Boolean) as string[];
     const totalPrice = s.total_price ?? 0;
     const pricePerParticipant = s.price_per_participant != null ? Number(s.price_per_participant) : null;
+    const coachId = (coach?.id && String(coach.id).trim()) || (s.athlete_id && String(s.athlete_id).trim()) || '';
     return {
       id: s.id,
       scheduled_datetime: s.scheduled_datetime,
@@ -279,13 +296,16 @@ export default async function HomePage() {
       session_type: s.session_type,
       session_mode: s.session_mode,
       focus_area: s.focus_area ?? null,
+      focus_area_2: s.focus_area_2 ?? null,
+      current_participants: (s as { current_participants?: number }).current_participants ?? 0,
+      max_participants: (s as { max_participants?: number }).max_participants ?? 1,
       partner_invite_code: s.partner_invite_code ?? null,
       isTentative: false,
       isOwner: s.parent_id === user.id,
       coach: {
-        name: coach ? `${coach.first_name ?? ''} ${coach.last_name ?? ''}`.trim() : '—',
+        name: coach ? `${coach.first_name ?? ''} ${coach.last_name ?? ''}`.trim() || 'Coach' : 'Coach',
         school: coach?.school ?? '',
-        id: coach?.id ?? '',
+        id: coachId,
         photo_url: coach?.photo_url ?? null,
         average_rating: (coach as { average_rating?: number | null })?.average_rating ?? null,
         review_count: (coach as { review_count?: number | null })?.review_count ?? null,

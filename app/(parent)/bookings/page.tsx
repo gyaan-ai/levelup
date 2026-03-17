@@ -45,6 +45,7 @@ export default async function MyBookingsPage() {
         .from('sessions')
         .select(`
           id,
+          athlete_id,
           scheduled_datetime,
           status,
           total_price,
@@ -52,6 +53,7 @@ export default async function MyBookingsPage() {
           session_type,
           session_mode,
           focus_area,
+          focus_area_2,
           current_participants,
           max_participants,
           partner_invite_code,
@@ -70,6 +72,7 @@ export default async function MyBookingsPage() {
 
   const all = (sessions || []) as Array<{
     id: string;
+    athlete_id?: string | null;
     scheduled_datetime: string;
     status: string;
     total_price: number;
@@ -78,6 +81,7 @@ export default async function MyBookingsPage() {
     session_type?: string;
     session_mode?: string;
     focus_area?: string | null;
+    focus_area_2?: string | null;
     current_participants?: number;
     max_participants?: number;
     partner_invite_code?: string | null;
@@ -132,12 +136,12 @@ export default async function MyBookingsPage() {
 
   const coach = (s: (typeof all)[0]) => {
     const a = s.athletes;
-    if (!a) return { name: '—', school: '', id: '', photo_url: undefined, average_rating: null, review_count: null };
-    const o = Array.isArray(a) ? a[0] : a;
+    const o = a ? (Array.isArray(a) ? a[0] : a) : null;
+    const fallbackId = s.athlete_id && String(s.athlete_id).trim() ? s.athlete_id : '';
     return {
-      name: o ? `${o.first_name} ${o.last_name}` : '—',
+      name: o ? `${o.first_name ?? ''} ${o.last_name ?? ''}`.trim() || 'Coach' : 'Coach',
       school: o?.school ?? '',
-      id: o?.id ?? '',
+      id: (o?.id && String(o.id).trim()) || fallbackId,
       photo_url: (o as { photo_url?: string })?.photo_url,
       average_rating: (o as { average_rating?: number | null })?.average_rating ?? null,
       review_count: (o as { review_count?: number | null })?.review_count ?? null,
@@ -200,6 +204,9 @@ export default async function MyBookingsPage() {
     session_type: s.session_type,
     session_mode: s.session_mode,
     focus_area: s.focus_area ?? null,
+    focus_area_2: (s as { focus_area_2?: string | null }).focus_area_2 ?? null,
+    current_participants: s.current_participants ?? 0,
+    max_participants: s.max_participants ?? 1,
     partner_invite_code: s.partner_invite_code,
     isTentative: isTentative(s),
     isOwner: s.parent_id === user.id,

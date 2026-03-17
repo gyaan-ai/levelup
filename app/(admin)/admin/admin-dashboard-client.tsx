@@ -49,6 +49,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { ProfileImage } from '@/components/profile-image';
+import { CapacityBadge } from '@/components/capacity-badge';
 import { formatEST } from '@/lib/format-date';
 import { AdminCockpitView } from './admin-cockpit-view';
 
@@ -495,8 +496,7 @@ export function AdminDashboardClient({
                     <th className="text-left py-2 font-medium">Parent</th>
                     <th className="text-left py-2 font-medium">Facility</th>
                     <th className="text-left py-2 font-medium">Status</th>
-                    <th className="text-right py-2 font-medium"># registered</th>
-                    <th className="text-right py-2 font-medium"># openings</th>
+                    <th className="text-right py-2 font-medium">Spots</th>
                     <th className="text-right py-2 font-medium">Total</th>
                     <th className="text-right py-2 font-medium">Coach $</th>
                     <th className="text-right py-2 font-medium">Share link</th>
@@ -506,7 +506,7 @@ export function AdminDashboardClient({
                 <tbody>
                   {filteredSessions.length === 0 ? (
                     <tr>
-                      <td colSpan={11} className="py-8 text-center text-muted-foreground">
+                      <td colSpan={10} className="py-8 text-center text-muted-foreground">
                         No sessions match filters. Clear date filters to see all.
                       </td>
                     </tr>
@@ -544,8 +544,13 @@ export function AdminDashboardClient({
                         </td>
                         <td className="py-2">{s.facility_name}</td>
                         <td className="py-2">{statusBadge(s.status)}</td>
-                        <td className="py-2 text-right">{s.current_participants}</td>
-                        <td className="py-2 text-right">{Math.max(0, (s.max_participants ?? 1) - s.current_participants)}</td>
+                        <td className="py-2 text-right">
+                          <CapacityBadge
+                            current={s.current_participants}
+                            max={s.max_participants ?? 1}
+                            label=""
+                          />
+                        </td>
                         <td className="py-2 text-right">${Number(s.total_price).toFixed(2)}</td>
                         <td className="py-2 text-right">${Number(s.athlete_payment).toFixed(2)}</td>
                         <td className="py-2 text-right">

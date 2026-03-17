@@ -29,6 +29,7 @@ type Props = {
   sessionStatus?: string;
   sessionType?: string;
   focusArea: string;
+  focusArea2?: string;
   joinPolicy: 'public' | 'private' | 'invite_only';
   maxParticipants: number;
   pricePerParticipant: number;
@@ -42,6 +43,7 @@ export function EditSessionForm({
   sessionStatus,
   sessionType,
   focusArea,
+  focusArea2 = '',
   joinPolicy,
   maxParticipants,
   pricePerParticipant,
@@ -51,6 +53,7 @@ export function EditSessionForm({
 }: Props) {
   const router = useRouter();
   const [focus, setFocus] = useState(focusArea);
+  const [focus2, setFocus2] = useState(focusArea2);
   const [join, setJoin] = useState(joinPolicy);
   const [max, setMax] = useState(String(maxParticipants));
   const [price, setPrice] = useState(String(pricePerParticipant));
@@ -87,6 +90,7 @@ export function EditSessionForm({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           focus_area: focus.trim() || null,
+          focus_area_2: focus2.trim() || null,
           join_policy: join,
           max_participants: Math.min(20, Math.max(1, parseInt(max, 10) || 2)),
           price_per_participant: Math.max(0, parseFloat(price) || 0),
@@ -147,7 +151,7 @@ export function EditSessionForm({
           {isGroup && (
             <>
               <div>
-                <Label htmlFor="focus">Topic / focus</Label>
+                <Label htmlFor="focus">Topic / focus (1)</Label>
                 <Select value={focus || 'none'} onValueChange={(v) => setFocus(v === 'none' ? '' : v)}>
                   <SelectTrigger id="focus">
                     <SelectValue placeholder="e.g. Takedowns, Escapes" />
@@ -159,6 +163,27 @@ export function EditSessionForm({
                         {area}
                       </SelectItem>
                     ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="focus2">Topic / focus (2) — optional</Label>
+                <Select value={focus2 || 'none'} onValueChange={(v) => setFocus2(v === 'none' ? '' : v)}>
+                  <SelectTrigger id="focus2">
+                    <SelectValue placeholder="Second topic" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">None</SelectItem>
+                    {(focus2 && !focusOptions.includes(focus2)
+                      ? [focus2, ...focusOptions]
+                      : focusOptions
+                    )
+                      .filter((a) => a !== focus)
+                      .map((area) => (
+                        <SelectItem key={area} value={area}>
+                          {area}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
                 <p className="text-xs text-muted-foreground mt-1">

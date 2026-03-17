@@ -36,6 +36,7 @@ export default async function AdminEditSessionPage({
       session_type,
       session_mode,
       focus_area,
+      focus_area_2,
       join_policy,
       current_participants,
       max_participants,
@@ -73,6 +74,7 @@ export default async function AdminEditSessionPage({
         sessionStatus={(session as { status?: string }).status}
         sessionType={(session as { session_type?: string }).session_type}
         focusArea={(session as { focus_area?: string | null }).focus_area ?? ''}
+        focusArea2={(session as { focus_area_2?: string | null }).focus_area_2 ?? ''}
         joinPolicy={((session as { join_policy?: string }).join_policy as 'public' | 'private' | 'invite_only') ?? 'private'}
         maxParticipants={(session as { max_participants?: number }).max_participants ?? 6}
         pricePerParticipant={(session as { price_per_participant?: number }).price_per_participant ?? 0}

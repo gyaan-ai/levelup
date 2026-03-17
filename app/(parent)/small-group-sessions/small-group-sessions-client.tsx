@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { formatEST } from '@/lib/format-date';
 import { SchoolLogo } from '@/components/school-logo';
 import { ProfileImage } from '@/components/profile-image';
-import { SessionStatusPill } from '@/components/session-tile-utils';
+import { CapacityBadge } from '@/components/capacity-badge';
 
 export type SmallGroupSession = {
   id: string;
@@ -16,6 +16,7 @@ export type SmallGroupSession = {
   session_mode?: string;
   join_policy?: 'public' | 'private' | 'invite_only';
   focus_area?: string | null;
+  focus_area_2?: string | null;
   current_participants?: number;
   max_participants?: number;
   total_price?: number;
@@ -151,14 +152,13 @@ export function SmallGroupSessionsClient({
                         )}
                         {(fac as { name?: string })?.name && <span> · {(fac as { name?: string }).name}</span>}
                       </p>
-                      {(s as SmallGroupSession).focus_area && (
+                      {((s as SmallGroupSession).focus_area || (s as SmallGroupSession).focus_area_2) && (
                         <p className="text-xs text-muted-foreground">
-                          Covering: {(s as SmallGroupSession).focus_area}
+                          Covering: {[(s as SmallGroupSession).focus_area, (s as SmallGroupSession).focus_area_2].filter(Boolean).join(', ')}
                         </p>
                       )}
                       <p className="text-xs text-muted-foreground flex items-center gap-2 flex-wrap">
-                        {hasRoom && <SessionStatusPill current={current} max={max} />}
-                        <span>{current}/{max} spots</span>
+                        <CapacityBadge current={current} max={max} label="spots" />
                         {s.price_per_participant != null && s.price_per_participant > 0 && (
                           <> · ${Number(s.price_per_participant).toFixed(0)}</>
                         )}

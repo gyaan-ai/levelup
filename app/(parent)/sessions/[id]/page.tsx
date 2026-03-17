@@ -13,6 +13,7 @@ import { StarRating } from '@/components/star-rating';
 import { SchoolLogo } from '@/components/school-logo';
 import { formatEST } from '@/lib/format-date';
 import { SessionDetailActions } from './session-detail-actions';
+import { CapacityBadge } from '@/components/capacity-badge';
 import { Calendar, User, MapPin, Users } from 'lucide-react';
 
 export default async function SessionDetailPage({
@@ -59,6 +60,7 @@ export default async function SessionDetailPage({
       session_type,
       session_mode,
       focus_area,
+      focus_area_2,
       current_participants,
       max_participants,
       partner_invite_code,
@@ -81,6 +83,7 @@ export default async function SessionDetailPage({
     session_type?: string;
     session_mode?: string;
     focus_area?: string | null;
+    focus_area_2?: string | null;
     current_participants?: number;
     max_participants?: number;
     athletes?: { id: string; first_name?: string; last_name?: string; school?: string; photo_url?: string | null; average_rating?: number | null; review_count?: number | null; phone?: string | null } | { id: string; first_name?: string; last_name?: string; school?: string; photo_url?: string | null; average_rating?: number | null; review_count?: number | null; phone?: string | null }[];
@@ -94,13 +97,14 @@ export default async function SessionDetailPage({
 
   const isAdmin = role === 'admin';
   const isOwner = s.parent_id === user.id;
+  const isCoach = s.athlete_id === user.id;
   const youthWrestlerIds = await getParentYouthWrestlerIds(supabase, user.id);
   const participantYouthIds = (s.session_participants ?? [])
     .map((p) => p.youth_wrestler_id)
     .filter(Boolean) as string[];
   const isParticipant = youthWrestlerIds.some((id) => participantYouthIds.includes(id));
 
-  if (!isOwner && !isParticipant && !isAdmin) {
+  if (!isOwner && !isParticipant && !isAdmin && !isCoach) {
     notFound();
   }
 
@@ -125,6 +129,7 @@ export default async function SessionDetailPage({
     ? `${coach.first_name ?? ''} ${coach.last_name ?? ''}`.trim() || 'Coach'
     : 'Coach';
   const coachPhone = coach && 'phone' in coach ? (coach.phone as string | null) : null;
+  const coachIdForLink = (coach?.id && String(coach.id).trim()) || (s.athlete_id && String(s.athlete_id).trim()) || null;
   const fac = Array.isArray(s.facilities) ? s.facilities[0] : s.facilities;
   const facilityName = fac?.name ?? '—';
   const facilityAddress = fac?.address ?? null;
@@ -142,7 +147,9 @@ export default async function SessionDetailPage({
   const openings = Math.max(0, max - current);
 
   let amountPaid = 0;
+  const myParticipantIds = new Set(youthWrestlerIds);
   for (const p of s.session_participants ?? []) {
+    if (!p.youth_wrestler_id || !myParticipantIds.has(p.youth_wrestler_id)) continue;
     const amt = p.amount_paid;
     if (amt != null && Number(amt) > 0) amountPaid += Number(amt);
   }
@@ -187,10 +194,13 @@ export default async function SessionDetailPage({
             <div className="min-w-0 flex-1 space-y-1">
               <CardTitle className="text-lg flex flex-wrap items-center gap-2">
                 <SessionTypeBadge sessionType={s.session_type} sessionMode={s.session_mode} />
-                {s.focus_area && (
+                {(s.focus_area || s.focus_area_2) && (
                   <Badge variant="secondary" className="font-normal text-xs">
-                    {s.focus_area}
+                    {[s.focus_area, s.focus_area_2].filter(Boolean).join(', ')}
                   </Badge>
+                )}
+                {max > 1 && (
+                  <CapacityBadge current={current} max={max} label="" />
                 )}
                 {s.status && statusBadge(s.status)}
               </CardTitle>
@@ -216,9 +226,9 @@ export default async function SessionDetailPage({
 
           <div className="flex items-center gap-2 flex-wrap">
             <User className="h-4 w-4 shrink-0 text-muted-foreground" />
-            {coach?.id ? (
+            {coachIdForLink ? (
               <Link
-                href={`/athlete/${coach.id}`}
+                href={`/athlete/${coachIdForLink}`}
                 className="font-medium text-foreground hover:underline"
               >
                 {coachName}
@@ -232,8 +242,8 @@ export default async function SessionDetailPage({
                 <span className="text-muted-foreground/80">({coach.school})</span>
               </span>
             )}
-            {coach?.id && (
-              <Link href={`/athlete/${coach.id}`} className="text-xs text-accent hover:underline">
+            {coachIdForLink && (
+              <Link href={`/athlete/${coachIdForLink}`} className="text-xs text-accent hover:underline">
                 View profile
               </Link>
             )}
@@ -249,17 +259,18 @@ export default async function SessionDetailPage({
             </p>
           )}
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Users className="h-4 w-4 shrink-0 text-muted-foreground" />
-            <span className="text-sm">
-              <span className="font-medium text-foreground">{current} registered</span>
-              {max > 1 && (
-                <span className="text-muted-foreground">
-                  {' '}
-                  · {openings} opening{openings !== 1 ? 's' : ''}
-                </span>
-              )}
-            </span>
+            {max > 1 ? (
+              <CapacityBadge current={current} max={max} label="registered" />
+            ) : (
+              <span className="text-sm font-medium text-foreground">{current} registered</span>
+            )}
+            {max > 1 && (
+              <span className="text-sm text-muted-foreground">
+                {openings} opening{openings !== 1 ? 's' : ''}
+              </span>
+            )}
           </div>
           {participantsList.length > 0 && (
             <p className="text-sm text-muted-foreground pl-6">

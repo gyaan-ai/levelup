@@ -10,6 +10,7 @@ import { formatEST } from '@/lib/format-date';
 import { COACH_REVENUE_FRACTION } from '@/lib/pricing';
 import { AddToCalendarButton } from '@/components/add-to-calendar-button';
 import { SessionTypeBadge } from '@/components/session-type-badge';
+import { CapacityBadge } from '@/components/capacity-badge';
 import type { CoachSession } from '@/app/(athlete)/athlete-dashboard/coach-schedule-card';
 
 function facilityName(s: CoachSession): string {
@@ -139,12 +140,15 @@ export function CoachSessionsClient({
                       <p className="font-medium">
                         {formatEST(new Date(session.scheduled_datetime), 'EEE, MMM d')} · {formatEST(new Date(session.scheduled_datetime), 'h:mm a')}
                       </p>
-                      <p className="text-sm text-muted-foreground flex items-center gap-2 mt-0.5">
+                      <p className="text-sm text-muted-foreground flex items-center gap-2 mt-0.5 flex-wrap">
                         <span>{facilityName(session)}</span>
-                        <span className="inline-flex items-center gap-1">
-                          <Users className="h-3.5 w-3" />
-                          {session.current_participants ?? 0}/{session.max_participants ?? 1} kids
-                          {wrestlerNames(session).length > 0 && `: ${wrestlerNames(session).join(', ')}`}
+                        <span className="inline-flex items-center gap-1.5">
+                          <CapacityBadge
+                            current={session.current_participants ?? 0}
+                            max={session.max_participants ?? 1}
+                            label=""
+                          />
+                          {wrestlerNames(session).length > 0 && ` ${wrestlerNames(session).join(', ')}`}
                         </span>
                       </p>
                       <p className="text-sm font-medium text-accent mt-1 inline-flex items-center gap-1">

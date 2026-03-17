@@ -46,7 +46,7 @@ export default async function AdminFocusAreasPage() {
       </Link>
       <h1 className="text-2xl font-bold mb-1">Session topics</h1>
       <p className="text-muted-foreground text-sm mb-6">
-        These appear in the dropdown when creating or editing a group session. Add, rename, or remove topics.
+        Add or edit topics here. They appear when creating or editing a small group session (you can choose up to 2 focus areas per session). Use <strong>Admin → Create session</strong> or <strong>Edit</strong> on a session to set focus areas.
       </p>
       <FocusAreasClient initialList={focusAreas} />
     </div>

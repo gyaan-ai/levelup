@@ -30,6 +30,7 @@ export async function PATCH(
 
     const body = (await req.json()) as {
       focus_area?: string | null;
+      focus_area_2?: string | null;
       join_policy?: 'public' | 'private' | 'invite_only';
       max_participants?: number;
       price_per_participant?: number;
@@ -60,6 +61,11 @@ export async function PATCH(
       updates.focus_area = body.focus_area === '' || body.focus_area == null
         ? null
         : String(body.focus_area).trim() || null;
+    }
+    if (body.focus_area_2 !== undefined) {
+      updates.focus_area_2 = body.focus_area_2 === '' || body.focus_area_2 == null
+        ? null
+        : String(body.focus_area_2).trim() || null;
     }
     if (body.join_policy !== undefined) {
       if (['public', 'private', 'invite_only'].includes(body.join_policy)) {

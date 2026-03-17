@@ -34,6 +34,7 @@ export function CreateSessionForm({
   const [maxParticipants, setMaxParticipants] = useState(6);
   const [pricePerParticipant, setPricePerParticipant] = useState(30);
   const [focusArea, setFocusArea] = useState('');
+  const [focusArea2, setFocusArea2] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{
@@ -77,6 +78,7 @@ export function CreateSessionForm({
           maxParticipants,
           pricePerParticipant,
           focusArea: focusArea || undefined,
+          focusArea2: focusArea2 || undefined,
         }),
       });
       const data = await res.json();
@@ -167,7 +169,7 @@ export function CreateSessionForm({
               </Select>
             </div>
 <div>
-                <Label htmlFor="focus">Focus area</Label>
+                <Label htmlFor="focus">Focus area (1)</Label>
                 <Select
                   value={focusArea || '__none__'}
                   onValueChange={(v) => setFocusArea(v === '__none__' ? '' : v)}
@@ -178,6 +180,25 @@ export function CreateSessionForm({
                   <SelectContent>
                     <SelectItem value="__none__">None</SelectItem>
                     {focusOptions.map((area) => (
+                      <SelectItem key={area} value={area}>
+                        {area}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="focus2">Focus area (2) — optional</Label>
+                <Select
+                  value={focusArea2 || '__none__'}
+                  onValueChange={(v) => setFocusArea2(v === '__none__' ? '' : v)}
+                >
+                  <SelectTrigger id="focus2">
+                    <SelectValue placeholder="Second topic" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">None</SelectItem>
+                    {focusOptions.filter((a) => a !== focusArea).map((area) => (
                       <SelectItem key={area} value={area}>
                         {area}
                       </SelectItem>
