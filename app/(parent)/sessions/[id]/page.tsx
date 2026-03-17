@@ -110,7 +110,6 @@ export default async function SessionDetailPage({
   const isAdmin = role === 'admin';
   const isOwner = s.parent_id === user.id;
   const isCoach = s.athlete_id === user.id;
-  const youthWrestlerIds = await getParentYouthWrestlerIds(supabase, user.id);
   const participantYouthIds = (s.session_participants ?? [])
     .map((p) => p.youth_wrestler_id)
     .filter(Boolean) as string[];
