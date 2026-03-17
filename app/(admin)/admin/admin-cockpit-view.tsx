@@ -88,11 +88,71 @@ function yesterdayInTz(tz: string): string {
   return yesterdayNoon.toLocaleDateString('en-CA', { timeZone: tz });
 }
 
+function niceYMax(max: number): number {
+  if (max <= 0) return 5;
+  const step = Math.pow(10, Math.floor(Math.log10(max)));
+  const n = Math.ceil(max / step);
+  if (n <= 1) return Math.max(5, step);
+  return n * step;
+}
+
+function StandardBarChart({ values, labels, metricLabel }: { values: number[]; labels: string[]; metricLabel: string }) {
+  const vals = values.slice(0, labels.length);
+  const maxVal = Math.max(0, ...vals);
+  const yMax = niceYMax(maxVal);
+  const chartHeight = 240;
+  const yTicks = yMax <= 0 ? [0] : [0, ...(yMax <= 5 ? [yMax] : [Math.floor(yMax / 2), yMax])];
+
+  return (
+    <div className="space-y-2">
+      <p className="text-sm text-muted-foreground">{metricLabel} · count per period</p>
+      <div className="flex gap-4 overflow-x-auto pb-2">
+        {/* Y-axis */}
+        <div className="flex flex-col justify-between shrink-0 text-right pr-2 border-r border-border" style={{ height: chartHeight }}>
+          {[...yTicks].reverse().map((t) => (
+            <span key={t} className="text-xs font-medium tabular-nums text-muted-foreground">
+              {t}
+            </span>
+          ))}
+        </div>
+        {/* Chart + X-axis */}
+        <div className="flex-1 min-w-0">
+          <div className="flex gap-1 items-end" style={{ height: chartHeight }}>
+            {vals.map((v, i) => {
+              const heightPct = yMax > 0 ? (v / yMax) * 100 : 0;
+              return (
+                <div
+                  key={i}
+                  className="flex-1 min-w-[20px] max-w-[48px] flex flex-col items-center justify-end gap-0.5"
+                  title={`${labels[i] ?? '—'}: ${v}`}
+                >
+                  <div
+                    className="w-full rounded-t bg-primary/80 hover:bg-primary transition-colors min-h-[2px]"
+                    style={{ height: `${Math.max(0, heightPct)}%` }}
+                  />
+                </div>
+              );
+            })}
+          </div>
+          <div className="flex gap-1 mt-1">
+            {labels.map((l, i) => (
+              <div key={i} className="flex-1 min-w-[20px] max-w-[48px] text-center">
+                <span className="text-[10px] font-medium text-muted-foreground truncate block">{l}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function AdminCockpitView() {
   const today = todayInTz(COCKPIT_TIMEZONE);
   const [date, setDate] = useState(today);
   const [range, setRange] = useState<'today' | 'yesterday' | 'week' | 'month'>('today');
   const [trendPeriod, setTrendPeriod] = useState<'7d' | '3w' | '12m'>('7d');
+  const [trendMetric, setTrendMetric] = useState<'parents' | 'coaches' | 'athletes' | 'sessions' | 'bookings' | 'earlyAccess'>('bookings');
   const [data, setData] = useState<CockpitData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -141,45 +201,15 @@ export function AdminCockpitView() {
   };
   const trendDays = d.trendDays ?? [];
   const trendLabels = d.trendLabels ?? trendDays.map((ds) => formatEST(new Date(ds + 'T12:00:00'), 'M/d'));
-  const maxTrend = Math.max(
-    1,
-    ...(trends.parents ?? []),
-    ...(trends.coaches ?? []),
-    ...(trends.athletes ?? []),
-    ...(trends.sessions ?? []),
-    ...(trends.bookings ?? []),
-    ...(trends.earlyAccess ?? [])
-  );
 
-  const TrendBar = ({ values, label }: { values: number[]; label: string }) => {
-    const vals = values.slice(0, trendLabels.length);
-    return (
-      <div className="space-y-3">
-        <p className="text-sm font-semibold text-foreground">{label}</p>
-        <div className="flex gap-1.5 items-end h-16 min-h-[64px]">
-          {vals.map((v, i) => {
-            const pct = maxTrend > 0 ? Math.max(8, (v / maxTrend) * 100) : 8;
-            const labelStr = trendLabels[i] ?? '—';
-            return (
-              <div key={i} className="flex-1 min-w-0 flex flex-col items-center gap-1">
-                <span className="text-xs font-semibold tabular-nums text-foreground" title={`${labelStr}: ${v}`}>
-                  {v}
-                </span>
-                <div
-                  className="w-full min-w-[8px] max-w-[32px] rounded-t bg-accent/50 hover:bg-accent/80 transition-colors flex-shrink-0"
-                  style={{ height: `${pct}%`, minHeight: 6 }}
-                  title={`${labelStr}: ${v}`}
-                />
-                <span className="text-[10px] font-medium text-muted-foreground tabular-nums truncate w-full text-center leading-tight">
-                  {labelStr}
-                </span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
-  };
+  const trendMetrics = [
+    { id: 'parents' as const, label: 'Parents', values: trends.parents ?? [] },
+    { id: 'coaches' as const, label: 'Coaches', values: trends.coaches ?? [] },
+    { id: 'athletes' as const, label: 'Athletes', values: trends.athletes ?? [] },
+    { id: 'sessions' as const, label: 'Sessions', values: trends.sessions ?? [] },
+    { id: 'bookings' as const, label: 'Bookings', values: trends.bookings ?? [] },
+    { id: 'earlyAccess' as const, label: 'Early access', values: trends.earlyAccess ?? [] },
+  ];
 
   const summaryCards = [
     { label: 'Revenue booked', value: `$${d.revenueThatDay.toFixed(0)}`, icon: DollarSign },
@@ -301,43 +331,50 @@ export function AdminCockpitView() {
         </Card>
       </div>
 
-      {/* Trends: bar chart with period filter */}
+      {/* Trends: standard bar chart with x/y axes and filters */}
       <Card>
         <CardHeader>
           <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="h-4 w-4" />
-                {trendPeriod === '7d' ? 'Last 7 days' : trendPeriod === '3w' ? 'Last 3 weeks' : 'Last 12 months'}
-              </CardTitle>
-              <CardDescription className="mt-1">
-                {trendPeriod === '7d' && 'Counts by day (oldest → newest).'}
-                {trendPeriod === '3w' && 'Counts by week.'}
-                {trendPeriod === '12m' && 'Counts by month.'}
-                {' Value and label on each bar.'}
-              </CardDescription>
-            </div>
-            <div className="flex rounded-md border border-input bg-background overflow-hidden">
-              {(['7d', '3w', '12m'] as const).map((p) => (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => setTrendPeriod(p)}
-                  className={`px-3 py-2 text-sm font-medium transition-colors ${trendPeriod === p ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
-                >
-                  {p === '7d' ? 'Week' : p === '3w' ? '3 weeks' : 'Year'}
-                </button>
-              ))}
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="h-4 w-4" />
+              Trends
+            </CardTitle>
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-sm font-medium text-muted-foreground">Metric</span>
+              <div className="flex rounded-md border border-input bg-background overflow-hidden">
+                {trendMetrics.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => setTrendMetric(m.id)}
+                    className={`px-2.5 py-1.5 text-xs font-medium transition-colors ${trendMetric === m.id ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+              <span className="text-sm font-medium text-muted-foreground">Period</span>
+              <div className="flex rounded-md border border-input bg-background overflow-hidden">
+                {(['7d', '3w', '12m'] as const).map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setTrendPeriod(p)}
+                    className={`px-3 py-2 text-sm font-medium transition-colors ${trendPeriod === p ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
+                  >
+                    {p === '7d' ? 'Week' : p === '3w' ? '3 weeks' : 'Year'}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </CardHeader>
-        <CardContent className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <TrendBar values={trends.parents} label="Parents" />
-          <TrendBar values={trends.coaches} label="Coaches" />
-          <TrendBar values={trends.athletes} label="Athletes" />
-          <TrendBar values={trends.sessions} label="Sessions" />
-          <TrendBar values={trends.bookings} label="Bookings" />
-          <TrendBar values={trends.earlyAccess} label="Early access" />
+        <CardContent>
+          <StandardBarChart
+            values={trendMetrics.find((m) => m.id === trendMetric)?.values ?? []}
+            labels={trendLabels}
+            metricLabel={trendMetrics.find((m) => m.id === trendMetric)?.label ?? ''}
+          />
         </CardContent>
       </Card>
 
