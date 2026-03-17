@@ -142,7 +142,7 @@ export function AdminCockpitView() {
     { label: 'New parents', value: d.newParents.length, icon: UserPlus },
     { label: 'New coaches', value: d.newCoaches.length, icon: Users },
     { label: 'New athletes', value: d.newAthletes.length, icon: Users },
-    { label: 'Sessions (this day)', value: d.sessionsScheduled.length, icon: Calendar },
+    { label: 'Sessions created', value: d.sessionsScheduled.length, icon: Calendar },
     { label: 'Bookings', value: d.bookings.length, icon: CreditCard },
     { label: 'Early access', value: d.earlyAccess.length, icon: ClipboardList },
     { label: 'Revenue (day)', value: `$${d.revenueThatDay.toFixed(0)}`, icon: DollarSign },
@@ -306,9 +306,9 @@ export function AdminCockpitView() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Calendar className="h-4 w-4" />
-                Sessions scheduled this day
+                Sessions created
               </CardTitle>
-              <CardDescription>Sessions with start time on this date (Eastern)</CardDescription>
+              <CardDescription>Sessions created this day</CardDescription>
             </CardHeader>
             <CardContent>
               <ul className="space-y-2 text-sm">
@@ -334,7 +334,7 @@ export function AdminCockpitView() {
                 <CreditCard className="h-4 w-4" />
                 Bookings
               </CardTitle>
-              <CardDescription>Participants in sessions scheduled this day</CardDescription>
+              <CardDescription>Signups this day</CardDescription>
             </CardHeader>
             <CardContent>
               <ul className="space-y-2 text-sm">

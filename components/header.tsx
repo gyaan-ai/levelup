@@ -539,7 +539,7 @@ export function Header() {
             <div className="md:hidden flex items-center gap-2">
               <Link
                 href="/login"
-                className="py-2 px-4 min-h-[44px] flex items-center rounded font-medium text-sm bg-accent text-black hover:bg-accent/90 shrink-0"
+                className="py-2.5 px-5 min-h-[44px] flex items-center rounded-md font-semibold text-base bg-accent text-black hover:bg-accent/90 shrink-0"
                 onClick={() => setMobileOpen(false)}
               >
                 Login
@@ -557,13 +557,24 @@ export function Header() {
             {mobileOpen && (
               <nav className="absolute left-0 right-0 top-full bg-primary border-b border-accent/20 shadow-lg md:hidden" aria-label="Mobile navigation">
                 <div className="container mx-auto px-0 py-2">
+                  <Link
+                    href="/login"
+                    className="flex items-center min-h-[48px] px-4 py-3 font-semibold text-accent bg-accent/15 hover:bg-accent/25 text-base"
+                    onClick={() => setMobileOpen(false)}
+                  >
+                    Login
+                  </Link>
+                  <Link
+                    href="/signup"
+                    className="flex items-center min-h-[48px] px-4 py-3 font-semibold text-accent hover:bg-white/10 text-base"
+                    onClick={() => setMobileOpen(false)}
+                  >
+                    Sign up / Book Training
+                  </Link>
+                  <div className="border-t border-white/20 my-1" />
                   <Link href="/browse" className={navLinkClass} onClick={() => setMobileOpen(false)}>Browse Coaches</Link>
                   <Link href="/signup?role=coach" className={navLinkClass} onClick={() => setMobileOpen(false)}>For Coaches</Link>
                   <Link href="/how-it-works" className={navLinkClass} onClick={() => setMobileOpen(false)}>How It Works</Link>
-                  <Link href="/login" className={navLinkClass} onClick={() => setMobileOpen(false)}>Login</Link>
-                  <Link href="/signup" className={navLinkClass} onClick={() => setMobileOpen(false)}>
-                    <span className="font-semibold text-accent">Book Training</span>
-                  </Link>
                 </div>
               </nav>
             )}

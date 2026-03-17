@@ -69,12 +69,12 @@ export default async function HomePage() {
                   instruction. Master the details that separate good from elite.
                 </p>
                 <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4 justify-center lg:justify-start">
-                  <div className="flex flex-row flex-wrap gap-3 sm:gap-4 justify-center lg:justify-start w-full sm:w-auto">
+                  <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4 justify-center lg:justify-start w-full sm:w-auto">
                     <Button
                       size="xl"
                       variant="premium"
                       asChild
-                      className="gold-glow-hover flex-1 sm:flex-initial min-w-[140px]"
+                      className="gold-glow-hover w-full sm:w-auto min-w-0 sm:min-w-[140px]"
                     >
                       <Link href="/browse">Browse Elite Coaches</Link>
                     </Button>
@@ -82,7 +82,7 @@ export default async function HomePage() {
                       size="xl"
                       variant="outline"
                       asChild
-                      className="bg-transparent text-white border-white hover:bg-white hover:text-black flex-1 sm:flex-initial min-w-[140px]"
+                      className="w-full sm:w-auto min-w-0 sm:min-w-[140px] bg-transparent text-white border-2 border-accent text-accent hover:bg-accent hover:text-black font-semibold"
                     >
                       <Link href="/login">Login</Link>
                     </Button>
