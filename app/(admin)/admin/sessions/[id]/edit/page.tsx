@@ -36,7 +36,6 @@ export default async function AdminEditSessionPage({
       session_type,
       session_mode,
       focus_area,
-      focus_area_2,
       join_policy,
       current_participants,
       max_participants,

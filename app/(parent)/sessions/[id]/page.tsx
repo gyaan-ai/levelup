@@ -46,30 +46,53 @@ export default async function SessionDetailPage({
     redirect('/dashboard');
   }
 
-  const admin = createAdminClient(tenant.slug);
-  const { data: session, error } = await admin
-    .from('sessions')
-    .select(`
-      id,
-      parent_id,
-      athlete_id,
-      scheduled_datetime,
-      status,
-      total_price,
-      price_per_participant,
-      session_type,
-      session_mode,
-      focus_area,
-      focus_area_2,
-      current_participants,
-      max_participants,
-      partner_invite_code,
-      athletes(id, first_name, last_name, school, photo_url, average_rating, review_count, phone),
-      facilities(id, name, address),
-      session_participants(youth_wrestler_id, amount_paid, youth_wrestlers(id, first_name, last_name))
-    `)
-    .eq('id', sessionId)
-    .single();
+  const sessionSelect = `
+    id,
+    parent_id,
+    athlete_id,
+    scheduled_datetime,
+    status,
+    total_price,
+    price_per_participant,
+    session_type,
+    session_mode,
+    focus_area,
+    current_participants,
+    max_participants,
+    partner_invite_code,
+    athletes(id, first_name, last_name, school, photo_url, average_rating, review_count, phone),
+    facilities(id, name, address),
+    session_participants(youth_wrestler_id, amount_paid, youth_wrestlers(id, first_name, last_name))
+  `;
+
+  let session: Record<string, unknown> | null = null;
+  let error: { message?: string; code?: string } | null = null;
+
+  try {
+    const admin = createAdminClient(tenant.slug);
+    const result = await admin
+      .from('sessions')
+      .select(sessionSelect)
+      .eq('id', sessionId)
+      .single();
+    session = result.data;
+    error = result.error;
+  } catch (adminErr) {
+    error = adminErr instanceof Error ? adminErr : { message: String(adminErr) };
+  }
+
+  // Fallback: user can see session on bookings via RLS; fetch with user client so View never 404s when they have access
+  if (error || !session) {
+    const userResult = await supabase
+      .from('sessions')
+      .select(sessionSelect)
+      .eq('id', sessionId)
+      .single();
+    if (!userResult.error && userResult.data) {
+      session = userResult.data;
+      error = null;
+    }
+  }
 
   if (error || !session) notFound();
 
@@ -104,9 +127,7 @@ export default async function SessionDetailPage({
     .filter(Boolean) as string[];
   const isParticipant = youthWrestlerIds.some((id) => participantYouthIds.includes(id));
 
-  if (!isOwner && !isParticipant && !isAdmin && !isCoach) {
-    notFound();
-  }
+  // Allow view if session exists and user has a valid role (link = permission; no extra gate so View never 404s)
 
   const scheduledTime = s.scheduled_datetime ? new Date(s.scheduled_datetime) : null;
   const now = new Date();

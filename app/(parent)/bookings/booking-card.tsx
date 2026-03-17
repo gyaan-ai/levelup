@@ -158,13 +158,6 @@ export function BookingCard({ session, isPast = false }: BookingCardProps) {
                   {[session.focus_area, session.focus_area_2].filter(Boolean).join(', ')}
                 </Badge>
               )}
-              {(session.max_participants ?? 1) > 1 && (
-                <CapacityBadge
-                  current={session.current_participants ?? 0}
-                  max={session.max_participants ?? 1}
-                  label=""
-                />
-              )}
               {statusBadge(session.status)}
               {session.isTentative && (
                 <Badge variant="outline" className="text-xs border-amber-500/60 text-amber-700 dark:text-amber-400 bg-amber-500/15">

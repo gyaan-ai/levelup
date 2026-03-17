@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import { toZonedTime, fromZonedTime } from 'date-fns-tz';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import { getParentYouthWrestlerIds } from '@/lib/parent-wrestlers';
 import { APP_TIMEZONE } from '@/lib/format-date';
@@ -53,7 +54,6 @@ export default async function MyBookingsPage() {
           session_type,
           session_mode,
           focus_area,
-          focus_area_2,
           current_participants,
           max_participants,
           partner_invite_code,
@@ -134,6 +134,25 @@ export default async function MyBookingsPage() {
     : { data: [] };
   const reviewedSessionIds = new Set((myReviews ?? []).map((r: { session_id: string }) => r.session_id));
 
+  // All participant names per session (admin fetch so we show all kids on the card, not just current user's)
+  let allParticipantsBySession: Record<string, string[]> = {};
+  if (familySessionIds.length > 0) {
+    const admin = createAdminClient(tenant.slug);
+    const { data: allParts } = await admin
+      .from('session_participants')
+      .select('session_id, youth_wrestlers(first_name, last_name)')
+      .in('session_id', familySessionIds);
+    for (const p of allParts ?? []) {
+      const row = p as { session_id: string; youth_wrestlers?: { first_name?: string; last_name?: string } | null };
+      const yw = row.youth_wrestlers;
+      const name = yw ? `${yw.first_name ?? ''} ${yw.last_name ?? ''}`.trim() : null;
+      if (name && row.session_id) {
+        if (!allParticipantsBySession[row.session_id]) allParticipantsBySession[row.session_id] = [];
+        allParticipantsBySession[row.session_id].push(name);
+      }
+    }
+  }
+
   const coach = (s: (typeof all)[0]) => {
     const a = s.athletes;
     const o = a ? (Array.isArray(a) ? a[0] : a) : null;
@@ -169,6 +188,7 @@ export default async function MyBookingsPage() {
   };
 
   const wrestlers = (s: (typeof all)[0]) => {
+    if (allParticipantsBySession[s.id]?.length) return allParticipantsBySession[s.id];
     const parts = s.session_participants ?? [];
     return parts
       .map((p) => {
