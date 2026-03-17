@@ -35,7 +35,9 @@ export default async function SessionReviewPage({
     .single();
 
   if (error || !session) notFound();
-  if (session.status !== 'completed') notFound();
+  const sessionDate = session.scheduled_datetime ? new Date(session.scheduled_datetime) : null;
+  const isPast = sessionDate ? sessionDate < new Date() : false;
+  if (session.status !== 'completed' && !isPast) notFound();
 
   const isOwner = session.parent_id === user.id;
   let isParticipant = false;
