@@ -245,6 +245,7 @@ export function BookingCard({ session, isPast = false }: BookingCardProps) {
                   )}
                 </div>
               )}
+              {/* Past completed: Leave/View feedback first — must show on mobile and desktop, never hidden */}
               {isPast && session.status === 'completed' && (
                 <Link href={`/sessions/${session.id}/review`} className="inline-flex w-full sm:w-auto">
                   <Button size="sm" className="w-full sm:w-auto min-h-[44px] px-4 bg-accent hover:bg-accent/90 text-primary">

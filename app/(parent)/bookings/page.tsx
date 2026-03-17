@@ -8,6 +8,8 @@ import { APP_TIMEZONE } from '@/lib/format-date';
 import { BookingCard, type BookingSession } from './booking-card';
 import { BookingsTabsClient } from './bookings-tabs-client';
 
+export const metadata = { title: 'My bookings' };
+
 export default async function MyBookingsPage() {
   const headersList = await headers();
   const host = headersList.get('host') || '';
@@ -213,7 +215,7 @@ export default async function MyBookingsPage() {
   const pastSessions = past.map(transformSession);
 
   return (
-    <div className="container mx-auto px-4 py-5 pb-8 md:py-8 max-w-full" data-page="my-bookings-full">
+    <div className="container mx-auto px-4 py-5 pb-8 md:py-8 max-w-full" data-page="my-bookings-full" data-bookings-version="full-with-reviews">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-foreground md:text-3xl mb-1">My bookings</h1>
         <p className="text-muted-foreground text-sm md:text-base">
