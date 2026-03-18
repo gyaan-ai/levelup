@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { User, CreditCard, Calendar, DollarSign } from 'lucide-react';
 import { AccountSignOut } from '@/components/account-sign-out';
 import { RedeemCodeCard } from './redeem-code-card';
+import { AccountPhoneCard } from './account-phone-card';
 
 export const dynamic = 'force-dynamic';
 
@@ -22,7 +23,7 @@ export default async function AccountPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/login');
 
-  const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
+  const { data: userData } = await supabase.from('users').select('role, phone').eq('id', user.id).single();
   if (userData?.role === 'coach') redirect('/athlete-dashboard');
   if (userData?.role !== 'parent' && userData?.role !== 'admin') redirect('/dashboard');
 
@@ -96,6 +97,8 @@ export default async function AccountPage() {
             </Link>
           </CardContent>
         </Card>
+
+        <AccountPhoneCard initialPhone={(userData as { phone?: string | null })?.phone ?? null} />
 
         <RedeemCodeCard hasEntitlements={hasEarlyAdopterEntitlements} />
 

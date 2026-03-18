@@ -7,6 +7,7 @@ import { getTenantByDomain } from '@/config/tenants';
 import { getParentYouthWrestlerIds } from '@/lib/parent-wrestlers';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { SessionTypeBadge } from '@/components/session-type-badge';
 import { ProfileImage } from '@/components/profile-image';
 import { StarRating } from '@/components/star-rating';
@@ -60,6 +61,7 @@ export default async function SessionDetailPage({
     current_participants,
     max_participants,
     partner_invite_code,
+    join_policy,
     athletes(id, first_name, last_name, school, photo_url, average_rating, review_count),
     facilities(id, name, address),
     session_participants(youth_wrestler_id, amount_paid, youth_wrestlers(id, first_name, last_name))
@@ -113,6 +115,7 @@ export default async function SessionDetailPage({
     focus_area_2?: string | null;
     current_participants?: number;
     max_participants?: number;
+    join_policy?: string | null;
     athletes?: { id: string; first_name?: string; last_name?: string; school?: string; photo_url?: string | null; average_rating?: number | null; review_count?: number | null; phone?: string | null } | { id: string; first_name?: string; last_name?: string; school?: string; photo_url?: string | null; average_rating?: number | null; review_count?: number | null; phone?: string | null }[];
     facilities?: { id: string; name?: string; address?: string | null } | { id: string; name?: string; address?: string | null }[];
     session_participants?: Array<{
@@ -147,6 +150,12 @@ export default async function SessionDetailPage({
     scheduledTime > now &&
     isOwner;
   const canLeave = canCancel && !isOwner;
+  const joinPolicy = s.join_policy ?? 'private';
+  const canRegister =
+    !isPast &&
+    (s.status === 'scheduled' || s.status === 'pending_payment') &&
+    openings > 0 &&
+    (isOwner || (!isParticipant && (joinPolicy === 'public' || joinPolicy === 'invite_only')));
 
   const coach = Array.isArray(s.athletes) ? s.athletes[0] : s.athletes;
   const coachName = coach
@@ -314,7 +323,14 @@ export default async function SessionDetailPage({
             </p>
           </div>
 
-          <div className="pt-2 border-t">
+          <div className="pt-2 border-t space-y-3">
+            {canRegister && (
+              <Link href={`/sessions/${sessionId}/register`} className="inline-flex">
+                <Button className="min-h-[44px] px-4 w-full sm:w-auto bg-accent hover:bg-accent/90 text-primary">
+                  Register now
+                </Button>
+              </Link>
+            )}
             <SessionDetailActions
               sessionId={sessionId}
               isPast={isPast}
