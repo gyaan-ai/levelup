@@ -150,6 +150,9 @@ export default async function SessionDetailPage({
     scheduledTime > now &&
     isOwner;
   const canLeave = canCancel && !isOwner;
+  const current = s.current_participants ?? 0;
+  const max = s.max_participants ?? 1;
+  const openings = Math.max(0, max - current);
   const joinPolicy = s.join_policy ?? 'private';
   const canRegister =
     !isPast &&
@@ -174,10 +177,6 @@ export default async function SessionDetailPage({
       return o ? `${o.first_name ?? ''} ${o.last_name ?? ''}`.trim() : null;
     })
     .filter(Boolean) as string[];
-
-  const current = s.current_participants ?? 0;
-  const max = s.max_participants ?? 1;
-  const openings = Math.max(0, max - current);
 
   let amountPaid = 0;
   const myParticipantIds = new Set(youthWrestlerIds);
