@@ -71,6 +71,16 @@ export type CockpitData = {
     earlyAccess: number[];
     reviews: number[];
   };
+  /** All-time row counts at end of each trend bucket (same keys as trends) */
+  trendCumulativeTotals?: {
+    parents: number[];
+    coaches: number[];
+    athletes: number[];
+    sessions: number[];
+    bookings: number[];
+    earlyAccess: number[];
+    reviews: number[];
+  };
   trendDays: string[];
   trendLabels?: string[];
   trendPeriod?: '7d' | '3w' | '12m';
@@ -123,27 +133,16 @@ function niceYMax(max: number): number {
   return n * step;
 }
 
-function cumulativeSeries(values: number[]): number[] {
-  let sum = 0;
-  return values.map((v) => {
-    sum += v;
-    return sum;
-  });
-}
-
 function TrendLineChart({
   values,
   labels,
   metricLabel,
-  cumulative,
 }: {
   values: number[];
   labels: string[];
   metricLabel: string;
-  cumulative: boolean;
 }) {
-  const raw = values.slice(0, labels.length);
-  const vals = cumulative ? cumulativeSeries(raw) : raw;
+  const vals = values.slice(0, labels.length);
   const maxVal = Math.max(0, ...vals, 0);
   const yMax = niceYMax(maxVal);
   const chartHeight = 240;
@@ -170,9 +169,7 @@ function TrendLineChart({
 
   return (
     <div className="space-y-2">
-      <p className="text-sm text-muted-foreground">
-        {metricLabel} · {cumulative ? 'cumulative total (running sum over period)' : 'count per period'}
-      </p>
+      <p className="text-sm text-muted-foreground">{metricLabel} · count per period</p>
       <div className="w-full overflow-x-auto">
         <svg
           viewBox={`0 0 ${chartWidth} ${chartHeight}`}
@@ -254,15 +251,12 @@ function StandardBarChart({
   values,
   labels,
   metricLabel,
-  cumulative,
 }: {
   values: number[];
   labels: string[];
   metricLabel: string;
-  cumulative: boolean;
 }) {
-  const raw = values.slice(0, labels.length);
-  const vals = cumulative ? cumulativeSeries(raw) : raw;
+  const vals = values.slice(0, labels.length);
   const maxVal = Math.max(0, ...vals);
   const yMax = niceYMax(maxVal);
   const chartHeight = 240;
@@ -270,9 +264,7 @@ function StandardBarChart({
 
   return (
     <div className="space-y-2">
-      <p className="text-sm text-muted-foreground">
-        {metricLabel} · {cumulative ? 'cumulative total (running sum over period)' : 'count per period'}
-      </p>
+      <p className="text-sm text-muted-foreground">{metricLabel} · count per period</p>
       <div className="flex gap-4 overflow-x-auto pb-2">
         {/* Y-axis */}
         <div className="flex flex-col justify-between shrink-0 text-right pr-2 border-r border-border" style={{ height: chartHeight }}>
@@ -315,15 +307,158 @@ function StandardBarChart({
   );
 }
 
+const GROWTH_LINE_SPECS: { id: keyof NonNullable<CockpitData['trendCumulativeTotals']>; label: string; color: string }[] = [
+  { id: 'bookings', label: 'Bookings', color: '#dc2626' },
+  { id: 'athletes', label: 'Athletes (kids)', color: '#16a34a' },
+  { id: 'coaches', label: 'Coaches', color: '#7c3aed' },
+  { id: 'parents', label: 'Parents', color: '#2563eb' },
+  { id: 'sessions', label: 'Sessions', color: '#ea580c' },
+  { id: 'earlyAccess', label: 'Early access', color: '#64748b' },
+  { id: 'reviews', label: 'Reviews', color: '#c026d3' },
+];
+
+function MultiLineGrowthChart({
+  labels,
+  cumulative,
+  visible,
+  onToggle,
+}: {
+  labels: string[];
+  cumulative: NonNullable<CockpitData['trendCumulativeTotals']>;
+  visible: Record<string, boolean>;
+  onToggle: (id: string) => void;
+}) {
+  const chartHeight = 280;
+  const chartWidth = 800;
+  const padL = 52;
+  const padR = 16;
+  const padT = 16;
+  const padB = 52;
+  const innerW = chartWidth - padL - padR;
+  const innerH = chartHeight - padT - padB;
+  const n = labels.length;
+
+  const series = GROWTH_LINE_SPECS.map((spec) => ({
+    ...spec,
+    values: (cumulative[spec.id] ?? []).slice(0, n),
+  })).filter((s) => s.values.length > 0);
+
+  const active = series.filter((s) => visible[s.id] !== false);
+  const allVals = active.flatMap((s) => s.values);
+  const maxVal = Math.max(0, ...allVals, 0);
+  const yMax = niceYMax(maxVal);
+  const yTicks = yMax <= 0 ? [0] : [0, ...(yMax <= 5 ? [yMax] : [Math.floor(yMax / 2), yMax])];
+
+  const xPos = (i: number) => {
+    if (n <= 1) return padL + innerW / 2;
+    return padL + (i / (n - 1)) * innerW;
+  };
+  const yPos = (v: number) => {
+    if (yMax <= 0) return padT + innerH;
+    return padT + innerH - (v / yMax) * innerH;
+  };
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm text-muted-foreground">
+        Total records in the database at each period end (all-time growth — lines rise left → right).
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {GROWTH_LINE_SPECS.map((spec) => (
+          <button
+            key={spec.id}
+            type="button"
+            onClick={() => onToggle(spec.id)}
+            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
+              visible[spec.id] !== false ? 'border-primary bg-primary/10' : 'border-border bg-muted/50 opacity-60'
+            }`}
+          >
+            <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: spec.color }} />
+            {spec.label}
+          </button>
+        ))}
+      </div>
+      <div className="w-full overflow-x-auto">
+        <svg
+          viewBox={`0 0 ${chartWidth} ${chartHeight}`}
+          className="w-full min-w-[360px] h-[280px]"
+          role="img"
+          aria-label="Platform growth over time"
+        >
+          {yTicks.map((t) => {
+            const y = yPos(t);
+            return (
+              <line
+                key={t}
+                x1={padL}
+                y1={y}
+                x2={chartWidth - padR}
+                y2={y}
+                className="stroke-muted"
+                strokeOpacity={0.35}
+                strokeWidth={1}
+                strokeDasharray="4 4"
+              />
+            );
+          })}
+          {[...yTicks].reverse().map((t) => (
+            <text
+              key={`gy-${t}`}
+              x={padL - 4}
+              y={yPos(t) + 4}
+              textAnchor="end"
+              className="fill-muted-foreground text-[11px] font-medium tabular-nums"
+            >
+              {t}
+            </text>
+          ))}
+          {active.map((s) => {
+            const pts = s.values.map((v, i) => `${xPos(i)},${yPos(v)}`).join(' ');
+            return (
+              <polyline
+                key={s.id}
+                fill="none"
+                stroke={s.color}
+                strokeWidth={2.25}
+                strokeLinejoin="round"
+                strokeLinecap="round"
+                points={pts}
+              />
+            );
+          })}
+          {active.map((s) =>
+            s.values.map((v, i) => (
+              <circle key={`${s.id}-${i}`} cx={xPos(i)} cy={yPos(v)} r={3} fill={s.color} stroke="#fff" strokeWidth={1} />
+            ))
+          )}
+          {labels.map((l, i) => (
+            <text
+              key={i}
+              x={xPos(i)}
+              y={chartHeight - 12}
+              textAnchor="middle"
+              className="fill-muted-foreground text-[10px] font-medium"
+            >
+              {l.length > 14 ? `${l.slice(0, 12)}…` : l}
+            </text>
+          ))}
+        </svg>
+      </div>
+    </div>
+  );
+}
+
 export function AdminCockpitView() {
   const today = todayInTz(COCKPIT_TIMEZONE);
   const [date, setDate] = useState(today);
   const [range, setRange] = useState<'today' | 'yesterday' | 'week' | 'month'>('today');
   const [trendPeriod, setTrendPeriod] = useState<'7d' | '3w' | '12m'>('7d');
   const [trendMetric, setTrendMetric] = useState<'parents' | 'coaches' | 'athletes' | 'sessions' | 'bookings' | 'earlyAccess' | 'reviews'>('bookings');
-  /** Line chart (default) vs bars; cumulative = running sum over buckets in the selected period */
-  const [trendChartStyle, setTrendChartStyle] = useState<'line' | 'bar'>('line');
-  const [trendCumulative, setTrendCumulative] = useState(false);
+  /** Period activity: bar (default) or line — same per-bucket counts */
+  const [trendChartStyle, setTrendChartStyle] = useState<'line' | 'bar'>('bar');
+  const [growthLineVisible, setGrowthLineVisible] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(GROWTH_LINE_SPECS.map((s) => [s.id, true]))
+  );
   const [data, setData] = useState<CockpitData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -503,17 +638,20 @@ export function AdminCockpitView() {
         </Card>
       </div>
 
-      {/* Trends: standard bar chart with x/y axes and filters */}
+      {/* Activity by period: bar + line (same per-bucket counts) */}
       <Card>
         <CardHeader>
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-4 w-4" />
-              Trends
-            </CardTitle>
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <TrendingUp className="h-4 w-4" />
+                Activity by period
+              </CardTitle>
+              <CardDescription>New signups / records created in each bucket (not all-time totals).</CardDescription>
+            </div>
             <div className="flex flex-wrap items-center gap-3">
               <span className="text-sm font-medium text-muted-foreground">Metric</span>
-              <div className="flex rounded-md border border-input bg-background overflow-hidden">
+              <div className="flex rounded-md border border-input bg-background overflow-hidden flex-wrap">
                 {trendMetrics.map((m) => (
                   <button
                     key={m.id}
@@ -525,7 +663,7 @@ export function AdminCockpitView() {
                   </button>
                 ))}
               </div>
-              <span className="text-sm font-medium text-muted-foreground">Period</span>
+              <span className="text-sm font-medium text-muted-foreground">Window</span>
               <div className="flex rounded-md border border-input bg-background overflow-hidden">
                 {(['7d', '3w', '12m'] as const).map((p) => (
                   <button
@@ -542,28 +680,19 @@ export function AdminCockpitView() {
               <div className="flex rounded-md border border-input bg-background overflow-hidden">
                 <button
                   type="button"
-                  onClick={() => setTrendChartStyle('line')}
-                  className={`px-3 py-2 text-sm font-medium transition-colors ${trendChartStyle === 'line' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
-                >
-                  Line
-                </button>
-                <button
-                  type="button"
                   onClick={() => setTrendChartStyle('bar')}
                   className={`px-3 py-2 text-sm font-medium transition-colors ${trendChartStyle === 'bar' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
                 >
                   Bar
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setTrendChartStyle('line')}
+                  className={`px-3 py-2 text-sm font-medium transition-colors ${trendChartStyle === 'line' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
+                >
+                  Line
+                </button>
               </div>
-              <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
-                <input
-                  type="checkbox"
-                  className="rounded border-input"
-                  checked={trendCumulative}
-                  onChange={(e) => setTrendCumulative(e.target.checked)}
-                />
-                <span className="font-medium text-muted-foreground">Cumulative</span>
-              </label>
             </div>
           </div>
         </CardHeader>
@@ -573,15 +702,43 @@ export function AdminCockpitView() {
               values={trendMetrics.find((m) => m.id === trendMetric)?.values ?? []}
               labels={trendLabels}
               metricLabel={trendMetrics.find((m) => m.id === trendMetric)?.label ?? ''}
-              cumulative={trendCumulative}
             />
           ) : (
             <StandardBarChart
               values={trendMetrics.find((m) => m.id === trendMetric)?.values ?? []}
               labels={trendLabels}
               metricLabel={trendMetrics.find((m) => m.id === trendMetric)?.label ?? ''}
-              cumulative={trendCumulative}
             />
+          )}
+        </CardContent>
+      </Card>
+
+      {/* All-time growth: multiple lines on one chart */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <TrendingUp className="h-4 w-4" />
+            Platform growth (all-time)
+          </CardTitle>
+          <CardDescription>
+            Cumulative totals: how many parents, coaches, kids, sessions, bookings, etc. existed in the database at the end of each period below. Toggle series to compare.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {d.trendCumulativeTotals ? (
+            <MultiLineGrowthChart
+              labels={trendLabels}
+              cumulative={d.trendCumulativeTotals}
+              visible={growthLineVisible}
+              onToggle={(id) =>
+                setGrowthLineVisible((prev) => ({
+                  ...prev,
+                  [id]: !(prev[id] !== false),
+                }))
+              }
+            />
+          ) : (
+            <p className="text-sm text-muted-foreground">Upgrade the app — growth data loads from the latest API.</p>
           )}
         </CardContent>
       </Card>

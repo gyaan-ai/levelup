@@ -206,6 +206,35 @@ export async function GET(req: NextRequest) {
     const trendLabels = trendRanges.map((r) => r.label);
     const trendDaysForResponse = trendRanges.map((r) => r.start.slice(0, 10));
 
+    /** All-time count at end of each bucket (created_at <= period end) — monotone growth curves */
+    const [
+      cumParentsRes,
+      cumCoachesRes,
+      cumAthletesRes,
+      cumSessionsRes,
+      cumBookingsRes,
+      cumEarlyRes,
+      cumReviewsRes,
+    ] = await Promise.all([
+      cumulativeTotalsAtRangeEnds(admin, 'users', 'parent', trendRanges),
+      cumulativeTotalsAtRangeEnds(admin, 'athletes', null, trendRanges),
+      cumulativeTotalsAtRangeEnds(admin, 'youth_wrestlers', null, trendRanges),
+      cumulativeTotalsAtRangeEnds(admin, 'sessions', null, trendRanges),
+      cumulativeTotalsAtRangeEnds(admin, 'session_participants', null, trendRanges),
+      cumulativeTotalsAtRangeEnds(admin, 'early_access', null, trendRanges),
+      cumulativeTotalsAtRangeEnds(admin, 'reviews', null, trendRanges),
+    ]);
+
+    const trendCumulativeTotals = {
+      parents: cumParentsRes,
+      coaches: cumCoachesRes,
+      athletes: cumAthletesRes,
+      sessions: cumSessionsRes,
+      bookings: cumBookingsRes,
+      earlyAccess: cumEarlyRes,
+      reviews: cumReviewsRes,
+    };
+
     // Detail records for the full trend period (so table below chart shows list for selected metric)
     const trendStart = trendRanges[0]?.start ?? dayStart;
     const trendEnd = trendRanges[trendRanges.length - 1]?.end ?? dayEnd;
@@ -391,6 +420,7 @@ export async function GET(req: NextRequest) {
       payoutsPaidList,
       revenueThatDay,
       trends,
+      trendCumulativeTotals,
       trendDays: trendDaysForResponse,
       trendLabels,
       trendPeriod,
@@ -428,6 +458,23 @@ async function trendCountByRanges(
   const counts: number[] = [];
   for (const { start, end } of ranges) {
     const base = (admin as any).from(table).select('*', { count: 'exact', head: true }).gte('created_at', start).lte('created_at', end);
+    const q = table === 'users' && role != null ? base.eq('role', role) : base;
+    const { count, error } = await q;
+    counts.push(error ? 0 : (count ?? 0));
+  }
+  return counts;
+}
+
+/** Total rows ever created with created_at <= end of each bucket (platform growth over time). */
+async function cumulativeTotalsAtRangeEnds(
+  admin: ReturnType<typeof createAdminClient>,
+  table: 'users' | 'athletes' | 'youth_wrestlers' | 'sessions' | 'session_participants' | 'early_access' | 'reviews',
+  role: string | null,
+  ranges: { start: string; end: string }[]
+): Promise<number[]> {
+  const counts: number[] = [];
+  for (const { end } of ranges) {
+    const base = (admin as any).from(table).select('*', { count: 'exact', head: true }).lte('created_at', end);
     const q = table === 'users' && role != null ? base.eq('role', role) : base;
     const { count, error } = await q;
     counts.push(error ? 0 : (count ?? 0));
