@@ -38,6 +38,8 @@ const signupSchema = z.object({
   lastName: z.string().optional(),
   school: z.string().optional(),
   discountCode: z.string().optional(),
+  /** Required when role is youth_wrestler (athlete account) */
+  athletePhone: z.string().optional(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don&apos;t match",
   path: ['confirmPassword'],
@@ -49,7 +51,14 @@ const signupSchema = z.object({
 }, {
   message: 'First name, last name, coach type, and school/club are required for coaches',
   path: ['firstName'],
-});
+}).refine(
+  (data) => {
+    if (data.role !== 'youth_wrestler') return true;
+    const d = (data.athletePhone ?? '').replace(/\D/g, '');
+    return d.length >= 10;
+  },
+  { message: 'Enter a valid 10-digit cell number for the athlete', path: ['athletePhone'] }
+);
 
 type SignupFormValues = z.infer<typeof signupSchema>;
 
@@ -84,6 +93,7 @@ export default function SignupPage() {
       lastName: '',
       school: '',
       discountCode: '',
+      athletePhone: '',
     },
   });
 
@@ -115,6 +125,7 @@ export default function SignupPage() {
           school: values.school?.trim(),
           discountCode: values.discountCode?.trim() || undefined,
           inviteToken: inviteToken || undefined,
+          athletePhone: values.role === 'youth_wrestler' ? values.athletePhone?.trim() : undefined,
         }),
       });
 
@@ -263,6 +274,25 @@ export default function SignupPage() {
                       </FormItem>
                     )}
                   />
+
+                  {selectedRole === 'youth_wrestler' && (
+                    <FormField
+                      control={form.control}
+                      name="athletePhone"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Your cell phone</FormLabel>
+                          <FormControl>
+                            <Input type="tel" inputMode="tel" autoComplete="tel" placeholder="10-digit number" {...field} />
+                          </FormControl>
+                          <FormDescription>
+                            Coaches use this to reach you about sessions (texts).
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
 
                   {selectedRole === 'coach' && (
                     <>

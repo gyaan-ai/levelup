@@ -8,6 +8,7 @@ import { getStripeInstance } from '@/lib/stripe/webhooks';
 import { createNotification } from '@/lib/notifications';
 import type { SessionMode, JoinPolicy } from '@/types';
 import { formatEST } from '@/lib/format-date';
+import { hasMinPhoneDigits } from '@/lib/phone';
 
 export async function POST(req: NextRequest) {
   try {
@@ -72,6 +73,23 @@ export async function POST(req: NextRequest) {
     }
 
     const admin = createAdminClient(tenant.slug);
+
+    const { data: ywPhoneRows } = await admin
+      .from('youth_wrestlers')
+      .select('id, phone')
+      .in('id', youthWrestlerIds);
+    if (!ywPhoneRows || ywPhoneRows.length !== youthWrestlerIds.length) {
+      return NextResponse.json({ error: 'One or more athletes not found' }, { status: 400 });
+    }
+    for (const row of ywPhoneRows) {
+      if (!hasMinPhoneDigits(row.phone)) {
+        return NextResponse.json(
+          { error: 'Each athlete must have a cell number on file. Open Wrestlers and edit their profile.' },
+          { status: 400 }
+        );
+      }
+    }
+
     const numParticipants = youthWrestlerIds.length;
     const isPartner = sessionMode === 'partner-invite' || sessionMode === 'partner-open';
     const maxParticipants = isPartner ? 2 : Math.max(1, numParticipants);

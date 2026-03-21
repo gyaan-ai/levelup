@@ -33,6 +33,13 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
+    // Cell phone lives on users.phone (not athletes)
+    const { data: userRow } = await supabase
+      .from('users')
+      .select('phone')
+      .eq('id', user.id)
+      .maybeSingle();
+
     // Get facilities for dropdown
     const { data: facilities } = await supabase
       .from('facilities')
@@ -40,7 +47,7 @@ export async function GET(req: NextRequest) {
       .order('name');
 
     return NextResponse.json({
-      athlete: athlete || null,
+      athlete: athlete ? { ...athlete, phone: userRow?.phone ?? null } : null,
       facilities: facilities || [],
     });
   } catch (error) {
@@ -87,6 +94,14 @@ export async function PUT(req: NextRequest) {
       return NextResponse.json({ error: 'User is not an athlete' }, { status: 400 });
     }
 
+    // Cell phone is stored on users.phone (athletes.phone was removed)
+    let phoneForUser: string | null | undefined = undefined;
+    if (phone !== undefined) {
+      const trimmed = String(phone).trim();
+      if (trimmed === '') phoneForUser = null;
+      else if (trimmed.replace(/\D/g, '').length >= 10) phoneForUser = trimmed;
+    }
+
     // Use admin client to bypass RLS completely
     // We've already verified the user is authenticated and is an athlete
     let supabaseAdmin;
@@ -98,6 +113,22 @@ export async function PUT(req: NextRequest) {
         error: 'Server configuration error. Please contact support.' 
       }, { status: 500 });
     }
+
+    const applyUserPhone = async (): Promise<NextResponse | null> => {
+      if (phoneForUser === undefined) return null;
+      const { error: phoneErr } = await supabaseAdmin
+        .from('users')
+        .update({ phone: phoneForUser })
+        .eq('id', user.id);
+      if (phoneErr) {
+        console.error('users.phone update error:', phoneErr);
+        return NextResponse.json(
+          { error: `Update failed: ${phoneErr.message}` },
+          { status: 500 }
+        );
+      }
+      return null;
+    };
 
     // Get existing athlete data to preserve first_name, last_name, school
     // This MUST work with admin client (bypasses RLS)
@@ -129,11 +160,6 @@ export async function PUT(req: NextRequest) {
     if (zelleEmail !== undefined) {
       updateData.zelle_email = zelleEmail === '' ? null : normalizeZelleInput(String(zelleEmail).trim()) ?? null;
     }
-    if (phone !== undefined) {
-      const trimmed = String(phone).trim();
-      if (trimmed === '') updateData.phone = null;
-      else if (trimmed.replace(/\D/g, '').length >= 10) updateData.phone = trimmed;
-    }
 
     // ALWAYS try UPDATE first (record should exist from signup)
     // Admin client bypasses RLS, so this should work
@@ -143,23 +169,26 @@ export async function PUT(req: NextRequest) {
       .eq('id', user.id)
       .select('id');
 
-    // If UPDATE succeeded (affected at least 1 row), verify and return
+    // If UPDATE succeeded (affected at least 1 row), persist phone on users and return
     if (updateResult && updateResult.length > 0) {
       console.log('Profile updated successfully for user:', user.id);
-      
+
+      const phoneFail = await applyUserPhone();
+      if (phoneFail) return phoneFail;
+
       // Verify the update by fetching the record
       const { data: verified } = await supabaseAdmin
         .from('athletes')
         .select('bio, photo_url, weight_class')
         .eq('id', user.id)
         .single();
-      
+
       console.log('Verified profile data:', verified);
-      
-      return NextResponse.json({ 
-        success: true, 
+
+      return NextResponse.json({
+        success: true,
         updated: true,
-        athlete: verified 
+        athlete: verified,
       });
     }
 
@@ -215,7 +244,8 @@ export async function PUT(req: NextRequest) {
             error: `Failed to save profile: ${retryUpdateError.message}` 
           }, { status: 500 });
         }
-        // Success on retry
+        const phoneFailRetry = await applyUserPhone();
+        if (phoneFailRetry) return phoneFailRetry;
         return NextResponse.json({ success: true });
       } else {
         console.error('Insert error:', insertError);
@@ -226,6 +256,8 @@ export async function PUT(req: NextRequest) {
     }
 
     // INSERT succeeded
+    const phoneFailInsert = await applyUserPhone();
+    if (phoneFailInsert) return phoneFailInsert;
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error updating athlete profile:', error);

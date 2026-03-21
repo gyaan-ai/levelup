@@ -8,6 +8,7 @@ import { formatEST } from '@/lib/format-date';
 import { createRegisterConfirmationToken } from '@/lib/confirmation-token';
 import { createNotification } from '@/lib/notifications';
 import { sendCoachNewSignupSms } from '@/lib/twilio';
+import { hasMinPhoneDigits } from '@/lib/phone';
 
 /**
  * POST - Pay & register a youth wrestler for a session (public or invite_only).
@@ -77,7 +78,7 @@ export async function POST(
     if (isOwner) {
       const { data: yw } = await supabase
         .from('youth_wrestlers')
-        .select('id, parent_id')
+        .select('id, parent_id, phone')
         .eq('id', youthWrestlerId)
         .single();
       const ywParentId = (yw as { parent_id?: string } | null)?.parent_id;
@@ -87,6 +88,12 @@ export async function POST(
         : { data: null };
       if (!yw || (!isPrimaryParent && !link)) {
         return NextResponse.json({ error: 'Youth wrestler not found or not yours' }, { status: 400 });
+      }
+      if (!hasMinPhoneDigits((yw as { phone?: string | null }).phone)) {
+        return NextResponse.json(
+          { error: 'Add this athlete’s cell number on their profile (Wrestlers → Edit) before registering.' },
+          { status: 400 }
+        );
       }
       const { data: existing } = await supabase
         .from('session_participants')
@@ -142,11 +149,17 @@ export async function POST(
 
     const { data: yw } = await supabase
       .from('youth_wrestlers')
-      .select('id, parent_id')
+      .select('id, parent_id, phone')
       .eq('id', youthWrestlerId)
       .single();
     const ywParentId = (yw as { parent_id?: string } | null)?.parent_id;
     const isPrimaryParent = yw && ywParentId === user.id;
+    if (yw && !hasMinPhoneDigits((yw as { phone?: string | null }).phone)) {
+      return NextResponse.json(
+        { error: 'Add this athlete’s cell number on their profile (Wrestlers → Edit) before registering.' },
+        { status: 400 }
+      );
+    }
     const { data: link } = !isPrimaryParent && !isSelf && yw
       ? await supabase.from('youth_wrestler_parents').select('id').eq('youth_wrestler_id', youthWrestlerId).eq('parent_id', user.id).maybeSingle()
       : { data: null };

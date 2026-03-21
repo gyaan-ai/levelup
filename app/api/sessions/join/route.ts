@@ -3,6 +3,7 @@ import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
+import { hasMinPhoneDigits } from '@/lib/phone';
 
 /**
  * POST - Join a session by invite code. Adds the current user's youth wrestler as a participant.
@@ -50,12 +51,18 @@ export async function POST(req: NextRequest) {
 
     const { data: yw, error: ywErr } = await supabase
       .from('youth_wrestlers')
-      .select('id, parent_id')
+      .select('id, parent_id, phone')
       .eq('id', youthWrestlerId)
       .single();
 
     if (ywErr || !yw) {
       return NextResponse.json({ error: 'Youth wrestler not found' }, { status: 404 });
+    }
+    if (!hasMinPhoneDigits(yw.phone)) {
+      return NextResponse.json(
+        { error: 'Add this athlete’s cell number on their profile (Wrestlers → Edit) before joining.' },
+        { status: 400 }
+      );
     }
     if (yw.parent_id !== user.id) {
       return NextResponse.json({ error: 'You can only add your own youth wrestler' }, { status: 403 });

@@ -40,6 +40,10 @@ const youthWrestlerSchema = z.object({
   wrestlingExperience: z.string().optional(),
   goals: z.string().optional(),
   medicalNotes: z.string().optional(),
+  phone: z
+    .string()
+    .min(1, 'Cell phone is required')
+    .refine((v) => v.replace(/\D/g, '').length >= 10, 'Enter a valid 10-digit cell number'),
 });
 
 type YouthWrestlerFormValues = z.infer<typeof youthWrestlerSchema>;
@@ -69,6 +73,7 @@ export default function AddYouthWrestlerPage() {
       wrestlingExperience: '',
       goals: '',
       medicalNotes: '',
+      phone: '',
     },
   });
 
@@ -90,6 +95,19 @@ export default function AddYouthWrestlerPage() {
         const ok = await form.trigger(['firstName', 'lastName']);
         if (!ok) {
           setError('First and last name are required.');
+          return;
+        }
+      }
+      if (step === 2) {
+        const ok = await form.trigger([
+          'phone',
+          'dateOfBirth',
+          'graduationYear',
+          'weightClass',
+          'skillLevel',
+        ]);
+        if (!ok) {
+          setError('Cell phone is required (10 digits) for coach communications.');
           return;
         }
       }
@@ -364,8 +382,30 @@ export default function AddYouthWrestlerPage() {
             <Card className="border-0 shadow-none">
               <CardContent className="p-0 space-y-4">
                 <p className="text-muted-foreground mb-4">
-                  Age, weight, skill level.
+                  Athlete cell, age, weight, and skill level.
                 </p>
+                <FormField
+                  control={form.control}
+                  name="phone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Athlete cell phone *</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="tel"
+                          inputMode="tel"
+                          autoComplete="tel"
+                          placeholder="e.g. 678-555-0100"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Required so coaches can reach {form.watch('firstName') || 'your athlete'} for session updates (texts).
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
                 <FormField
                   control={form.control}
                   name="dateOfBirth"

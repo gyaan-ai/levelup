@@ -197,9 +197,9 @@ export function EditSessionForm({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="public">Public — anyone can discover and pay</SelectItem>
-                    <SelectItem value="private">Private — no one else</SelectItem>
-                    <SelectItem value="invite_only">Invite only — need link, then pay</SelectItem>
+                    <SelectItem value="public">Public — listed on Training; anyone can join</SelectItem>
+                    <SelectItem value="private">Private — not listed; only you add wrestlers</SelectItem>
+                    <SelectItem value="invite_only">Invite only — not listed; share link to register</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

@@ -5,7 +5,7 @@ import { getTenantByDomain } from '@/config/tenants';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { ArrowLeft, Edit, Calendar, User, School, Target, Heart, Award } from 'lucide-react';
+import { ArrowLeft, Edit, Calendar, User, School, Target, Heart, Award, Smartphone } from 'lucide-react';
 import { CoachSessionBadge } from '@/components/coach-session-badge';
 import { ProfileImage } from '@/components/profile-image';
 import { formatEST } from '@/lib/format-date';
@@ -172,6 +172,31 @@ export default async function YouthWrestlerProfilePage({
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Smartphone className="h-5 w-5" />
+              Athlete cell
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {(youthWrestler as { phone?: string | null }).phone ? (
+              <p className="font-medium">{(youthWrestler as { phone?: string | null }).phone}</p>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Not on file —{' '}
+                <Link href={`/wrestlers/${id}/edit`} className="text-accent underline">
+                  add a number
+                </Link>{' '}
+                before booking sessions.
+              </p>
+            )}
+            <p className="text-xs text-muted-foreground mt-2">
+              Used so coaches can text session updates to this athlete.
+            </p>
+          </CardContent>
+        </Card>
+
         {/* School Info */}
         {(youthWrestler.school || youthWrestler.graduation_year) && (
           <Card>

@@ -118,7 +118,7 @@ export default async function FindTrainingPage({
         });
       }
 
-      sessions = list.filter((s) => (s as { join_policy?: string }).join_policy === 'public' || (s as { join_policy?: string }).join_policy === 'invite_only');
+      sessions = list.filter((s) => (s as { join_policy?: string }).join_policy === 'public');
     }
   }
   /* When only location is set (no date), show sessions at that facility in the next 14 days */
@@ -146,7 +146,7 @@ export default async function FindTrainingPage({
       list2.push(r);
     }
     list2.sort((a, b) => a.scheduled_datetime.localeCompare(b.scheduled_datetime));
-    sessions = list2.filter((s) => (s as { join_policy?: string }).join_policy === 'public' || (s as { join_policy?: string }).join_policy === 'invite_only');
+    sessions = list2.filter((s) => (s as { join_policy?: string }).join_policy === 'public');
   }
 
   const { data: athletes } = await supabase

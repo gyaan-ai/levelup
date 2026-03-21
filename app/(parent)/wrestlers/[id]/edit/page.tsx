@@ -40,6 +40,10 @@ const youthWrestlerSchema = z.object({
   wrestlingExperience: z.string().optional(),
   goals: z.string().optional(),
   medicalNotes: z.string().optional(),
+  phone: z
+    .string()
+    .min(1, 'Cell phone is required')
+    .refine((v) => v.replace(/\D/g, '').length >= 10, 'Enter a valid 10-digit cell number'),
 });
 
 type YouthWrestlerFormValues = z.infer<typeof youthWrestlerSchema>;
@@ -72,6 +76,7 @@ export default function EditYouthWrestlerPage() {
       wrestlingExperience: '',
       goals: '',
       medicalNotes: '',
+      phone: '',
     },
   });
 
@@ -101,6 +106,7 @@ export default function EditYouthWrestlerPage() {
           wrestlingExperience: youthWrestler.wrestling_experience || '',
           goals: youthWrestler.goals || '',
           medicalNotes: youthWrestler.medical_notes || '',
+          phone: youthWrestler.phone || '',
         });
 
         if (youthWrestler.photo_url) {
@@ -293,6 +299,23 @@ export default function EditYouthWrestlerPage() {
                   </div>
                 )}
               </div>
+
+              <FormField
+                control={form.control}
+                name="phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Athlete cell phone *</FormLabel>
+                    <FormControl>
+                      <Input type="tel" inputMode="tel" autoComplete="tel" placeholder="10-digit cell" {...field} />
+                    </FormControl>
+                    <FormDescription>
+                      Required for coaches to text session updates to this athlete.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               {/* Name Fields */}
               <div className="grid grid-cols-2 gap-4">

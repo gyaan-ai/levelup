@@ -1,7 +1,7 @@
 /**
  * Twilio SMS for coach alerts (e.g. when someone signs up for their session).
  * Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER in env.
- * Coaches can add their phone in profile (athletes.phone); we send only when present.
+ * Coaches store cell on users.phone; we send only when present (with zelle-shaped fallback).
  */
 
 const getConfig = () => {
@@ -60,7 +60,7 @@ export async function sendSms(to: string, body: string): Promise<boolean> {
 
 export type SupabaseAdmin = import('@supabase/supabase-js').SupabaseClient;
 
-/** Prefer athletes.phone; fall back to zelle_email if it looks like a phone (coaches often put cell there for Zelle). */
+/** Prefer users.phone; fall back to athletes.zelle_email if it looks like a phone (coaches often put cell there for Zelle). */
 function pickCoachPhone(row: { phone?: string; zelle_email?: string } | null): string | null {
   if (!row) return null;
   const p = (row as { phone?: string }).phone;
@@ -71,7 +71,7 @@ function pickCoachPhone(row: { phone?: string; zelle_email?: string } | null): s
 }
 
 /**
- * If the coach (athlete_id) has a phone on file (athletes.phone or athletes.zelle_email when phone-shaped), send SMS.
+ * If the coach has a phone on file (users.phone or athletes.zelle_email when phone-shaped), send SMS.
  * Call after createNotification for session_booked.
  */
 export async function sendCoachNewSignupSms(
@@ -79,12 +79,14 @@ export async function sendCoachNewSignupSms(
   coachUserId: string,
   dateStr: string
 ): Promise<void> {
-  const { data: row } = await admin
-    .from('athletes')
-    .select('phone, zelle_email')
-    .eq('id', coachUserId)
-    .maybeSingle();
-  const phone = pickCoachPhone(row as { phone?: string; zelle_email?: string } | null);
+  const [{ data: userRow }, { data: athleteRow }] = await Promise.all([
+    admin.from('users').select('phone').eq('id', coachUserId).maybeSingle(),
+    admin.from('athletes').select('zelle_email').eq('id', coachUserId).maybeSingle(),
+  ]);
+  const phone = pickCoachPhone({
+    phone: userRow?.phone ?? undefined,
+    zelle_email: athleteRow?.zelle_email ?? undefined,
+  });
   if (!phone) return;
   await sendSms(
     phone,

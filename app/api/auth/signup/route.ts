@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import { verifyInviteToken } from '@/lib/invite-parent-token';
+import { validateRequiredYouthPhone } from '@/lib/phone';
 
 export async function POST(req: NextRequest) {
   try {
@@ -16,7 +17,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { email, password, role, coachType, firstName, lastName, school, discountCode, inviteToken } = body;
+    const { email, password, role, coachType, firstName, lastName, school, discountCode, inviteToken, athletePhone } = body;
 
     // Validate required fields
     if (!email || !password || !role) {
@@ -57,12 +58,19 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // For youth wrestlers, require name fields
-    if (role === 'youth_wrestler' && (!firstName || !lastName)) {
-      return NextResponse.json(
-        { error: 'First name and last name are required for youth wrestlers' },
-        { status: 400 }
-      );
+    let youthAthletePhone: string | undefined;
+    if (role === 'youth_wrestler') {
+      if (!firstName || !lastName) {
+        return NextResponse.json(
+          { error: 'First name and last name are required for youth wrestlers' },
+          { status: 400 }
+        );
+      }
+      const ph = validateRequiredYouthPhone(athletePhone);
+      if (!ph.ok) {
+        return NextResponse.json({ error: ph.message }, { status: 400 });
+      }
+      youthAthletePhone = ph.phone;
     }
 
     const supabaseAdmin = createAdminClient(tenant.slug);
@@ -231,6 +239,7 @@ export async function POST(req: NextRequest) {
           parent_id: null, // Null for self-managed accounts, can be linked to parent later
           first_name: firstName,
           last_name: lastName,
+          phone: youthAthletePhone!,
           active: true,
         });
 

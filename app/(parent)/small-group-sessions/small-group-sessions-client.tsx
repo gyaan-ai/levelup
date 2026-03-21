@@ -72,7 +72,8 @@ export function SmallGroupSessionsClient({
         const mine = s.parent_id === userId || s.athlete_id === userId;
         if (mine) return true;
         const policy = (s as SmallGroupSession).join_policy;
-        return policy === 'public' || policy === 'invite_only';
+        // Only public sessions are discoverable; invite_only/private need the shared link.
+        return policy === 'public';
       }),
     [allSessions, userId]
   );

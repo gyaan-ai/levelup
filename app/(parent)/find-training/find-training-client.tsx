@@ -388,11 +388,6 @@ export function FindTrainingClient({
                       <div className="flex flex-wrap items-center gap-2">
                         <SessionTypeBadge sessionType={s.session_type} sessionMode={s.session_mode} />
                         <SessionStatusPill current={current} max={max} />
-                        {s.join_policy === 'invite_only' && (
-                          <span className="text-[10px] font-medium uppercase tracking-wide text-amber-600 dark:text-amber-400 border border-amber-500/40 rounded px-1.5 py-0.5">
-                            Invite only
-                          </span>
-                        )}
                       </div>
                       <p className="font-semibold text-foreground">
                         {formatEST(dt, 'EEE, MMM d')} · {formatEST(dt, 'h:mm a')}
@@ -450,8 +445,10 @@ export function FindTrainingClient({
                     <div className="shrink-0 flex flex-col sm:items-end gap-2">
                       {openSlots > 0 ? (
                         <Button asChild size="sm" className="min-h-[40px]">
-                          <Link href={`/sessions/${s.id}/register${preselectedWrestlerId ? `?wrestler=${encodeURIComponent(preselectedWrestlerId)}` : ''}`}>
-                            {s.join_policy === 'invite_only' ? 'Get link' : 'Book'}
+                          <Link
+                            href={`/sessions/${s.id}/register${preselectedWrestlerId ? `?wrestler=${encodeURIComponent(preselectedWrestlerId)}` : ''}`}
+                          >
+                            Join now
                           </Link>
                         </Button>
                       ) : (

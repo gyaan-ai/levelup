@@ -42,7 +42,12 @@ export interface Athlete {
 export type SessionType = '1-on-1' | '2-athlete' | 'group';
 export type SessionStatus = 'scheduled' | 'completed' | 'cancelled' | 'no-show' | 'pending_payment';
 export type SessionMode = 'private' | 'sibling' | 'partner-invite' | 'partner-open';
-/** Who can join this session (everyone pays in app): public = discover & pay; private = no one else; invite_only = link then pay */
+/**
+ * Who can discover the session in Training / small-group browse:
+ * - public: listed for all parents; anyone can register
+ * - invite_only: not listed; register only via shared session link
+ * - private: not listed; only organizer/coach adds wrestlers (no self-serve register for others)
+ */
 export type JoinPolicy = 'public' | 'private' | 'invite_only';
 
 export interface Session {

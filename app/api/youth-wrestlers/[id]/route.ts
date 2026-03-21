@@ -3,6 +3,7 @@ import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
+import { validateRequiredYouthPhone } from '@/lib/phone';
 
 // GET - Get single youth wrestler (parent, linked parent, or admin)
 export async function GET(
@@ -112,7 +113,13 @@ export async function PUT(
       photoUrl,
       photoFocusX,
       photoFocusY,
+      phone,
     } = body;
+
+    const phoneCheck = validateRequiredYouthPhone(phone);
+    if (!phoneCheck.ok) {
+      return NextResponse.json({ error: phoneCheck.message }, { status: 400 });
+    }
 
     const clamp = (n: number) => Math.min(100, Math.max(0, Math.round(n)));
     const focusX = photoFocusX != null ? clamp(Number(photoFocusX)) : undefined;
@@ -143,6 +150,7 @@ export async function PUT(
       goals: goals || null,
       medical_notes: medicalNotes || null,
       photo_url: photoUrl || null,
+      phone: phoneCheck.phone,
     };
     if (focusX !== undefined) updatePayload.photo_focus_x = focusX;
     if (focusY !== undefined) updatePayload.photo_focus_y = focusY;

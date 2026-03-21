@@ -185,9 +185,8 @@ export default async function TrainingPage({
       return h >= startHour && h < endHour;
     });
   }
-  availabilitySessions = list.filter(
-    (s) => (s as { join_policy?: string }).join_policy === 'public' || (s as { join_policy?: string }).join_policy === 'invite_only'
-  );
+  // Only list publicly discoverable sessions. invite_only / private = share link only (not shown here).
+  availabilitySessions = list.filter((s) => (s as { join_policy?: string }).join_policy === 'public');
 
   const isAdmin = userData?.role === 'admin';
 

@@ -164,7 +164,20 @@ export default async function SessionDetailPage({
   const coachName = coach
     ? `${coach.first_name ?? ''} ${coach.last_name ?? ''}`.trim() || 'Coach'
     : 'Coach';
-  const coachPhone = coach && 'phone' in coach ? (coach.phone as string | null) : null;
+  let coachPhone: string | null = null;
+  if (s.athlete_id) {
+    try {
+      const adminPhone = createAdminClient(tenant.slug);
+      const { data: coachUser } = await adminPhone
+        .from('users')
+        .select('phone')
+        .eq('id', s.athlete_id)
+        .maybeSingle();
+      coachPhone = coachUser?.phone ?? null;
+    } catch {
+      coachPhone = null;
+    }
+  }
   const coachIdForLink = (coach?.id && String(coach.id).trim()) || (s.athlete_id && String(s.athlete_id).trim()) || null;
   const fac = Array.isArray(s.facilities) ? s.facilities[0] : s.facilities;
   const facilityName = fac?.name ?? '—';

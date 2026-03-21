@@ -17,8 +17,8 @@ Add to `.env.local` (and your host’s env, e.g. Vercel):
 
 We look for a coach phone in this order:
 
-1. **`athletes.phone`** — optional column for SMS (migration `20240162000000_athletes_phone_sms.sql`). Best for a dedicated “session alerts” number.
-2. **`athletes.zelle_email`** — already used for Zelle payouts; the field accepts “email or phone”. If the value looks like a phone (e.g. 10+ digits), we use it for SMS so coaches who already entered their cell for Zelle get alerts without a second field.
+1. **`users.phone`** — cell number from coach onboarding / profile (migration `20240320000000_users_phone.sql`). Same column parents use on Account.
+2. **`athletes.zelle_email`** — Zelle field accepts “email or phone”. If the value looks like a phone (e.g. 10+ digits), we use it for SMS so coaches who already entered their cell for Zelle get alerts without a second field.
 
 If neither is set or neither looks like a valid phone, we only send the in-app notification.
 
@@ -29,6 +29,6 @@ If neither is set or neither looks like a valid phone, we only send the in-app n
 
 ## Testing
 
-1. Set Twilio env vars and run the migration so `athletes.phone` exists.
-2. Set a coach’s `athletes.phone` (e.g. via SQL or profile UI).
+1. Set Twilio env vars and ensure `users.phone` exists (see migration `20240320000000_users_phone.sql`).
+2. Set a coach’s phone via onboarding, coach profile, or SQL on `users.phone`.
 3. Have a parent (or you) sign up for that coach’s session; coach should get in-app notification and an SMS.

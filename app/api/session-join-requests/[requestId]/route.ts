@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import { createNotification } from '@/lib/notifications';
+import { hasMinPhoneDigits } from '@/lib/phone';
 
 export async function PATCH(
   req: NextRequest,
@@ -48,6 +49,18 @@ export async function PATCH(
     const newStatus = action === 'approve' ? 'approved' : 'declined';
 
     if (action === 'approve') {
+      const ywId = (joinRequest as { youth_wrestler_id?: string }).youth_wrestler_id;
+      if (ywId) {
+        const adminCheck = createAdminClient(tenant.slug);
+        const { data: ywRow } = await adminCheck.from('youth_wrestlers').select('phone').eq('id', ywId).maybeSingle();
+        if (!hasMinPhoneDigits(ywRow?.phone)) {
+          return NextResponse.json(
+            { error: 'That athlete must have a cell number on their profile before they can join.' },
+            { status: 400 }
+          );
+        }
+      }
+
       const current = (session as { current_participants?: number }).current_participants ?? 1;
       const max = (session as { max_participants?: number }).max_participants ?? 2;
       if (current >= max) return NextResponse.json({ error: 'Session is full' }, { status: 400 });

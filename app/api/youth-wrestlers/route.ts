@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
+import { validateRequiredYouthPhone } from '@/lib/phone';
 
 // GET - List all youth wrestlers for the authenticated parent
 export async function GET(req: NextRequest) {
@@ -95,7 +96,13 @@ export async function POST(req: NextRequest) {
       medicalNotes,
       photoUrl,
       allowDuplicate,
+      phone,
     } = body;
+
+    const phoneCheck = validateRequiredYouthPhone(phone);
+    if (!phoneCheck.ok) {
+      return NextResponse.json({ error: phoneCheck.message }, { status: 400 });
+    }
 
     const norm = (s: string) => (s ?? '').trim().toLowerCase();
     const firstNorm = norm(firstName);
@@ -165,6 +172,7 @@ export async function POST(req: NextRequest) {
         goals: goals || null,
         medical_notes: medicalNotes || null,
         photo_url: photoUrl || null,
+        phone: phoneCheck.phone,
         active: true,
       })
       .select()
