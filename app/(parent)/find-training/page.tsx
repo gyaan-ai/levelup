@@ -93,7 +93,7 @@ export default async function FindTrainingPage({
       };
 
       const [groupRes, partnerRes] = await Promise.all([
-        baseQuery().in('session_type', ['group', 'small_group']).order('scheduled_datetime', { ascending: true }),
+        baseQuery().in('session_type', ['group', 'small_group', '2-athlete']).order('scheduled_datetime', { ascending: true }),
         baseQuery().eq('session_mode', 'partner-open').order('scheduled_datetime', { ascending: true }),
       ]);
 
@@ -134,7 +134,7 @@ export default async function FindTrainingPage({
       return q;
     };
     const [groupRes2, partnerRes2] = await Promise.all([
-      baseQ().in('session_type', ['group', 'small_group']).order('scheduled_datetime', { ascending: true }),
+      baseQ().in('session_type', ['group', 'small_group', '2-athlete']).order('scheduled_datetime', { ascending: true }),
       baseQ().eq('session_mode', 'partner-open').order('scheduled_datetime', { ascending: true }),
     ]);
     const seen2 = new Set<string>();

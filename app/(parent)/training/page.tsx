@@ -161,9 +161,9 @@ export default async function TrainingPage({
   };
 
   const [groupUpcoming, partnerUpcoming, groupPast, partnerPast] = await Promise.all([
-    withOptFilters(sessions(dayStart, dayEnd)).in('status', ['scheduled', 'pending_payment']).in('session_type', ['group', 'small_group']).order('scheduled_datetime', { ascending: true }),
+    withOptFilters(sessions(dayStart, dayEnd)).in('status', ['scheduled', 'pending_payment']).in('session_type', ['group', 'small_group', '2-athlete']).order('scheduled_datetime', { ascending: true }),
     withOptFilters(sessions(dayStart, dayEnd)).in('status', ['scheduled', 'pending_payment']).eq('session_mode', 'partner-open').order('scheduled_datetime', { ascending: true }),
-    withOptFilters(sessions(pastDayStart, pastDayEnd)).in('status', ['completed', 'cancelled', 'no-show']).in('session_type', ['group', 'small_group']).order('scheduled_datetime', { ascending: true }),
+    withOptFilters(sessions(pastDayStart, pastDayEnd)).in('status', ['completed', 'cancelled', 'no-show']).in('session_type', ['group', 'small_group', '2-athlete']).order('scheduled_datetime', { ascending: true }),
     withOptFilters(sessions(pastDayStart, pastDayEnd)).in('status', ['completed', 'cancelled', 'no-show']).eq('session_mode', 'partner-open').order('scheduled_datetime', { ascending: true }),
   ]);
   const seen = new Set<string>();
