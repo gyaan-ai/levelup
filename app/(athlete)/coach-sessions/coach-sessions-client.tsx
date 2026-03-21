@@ -5,7 +5,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { MessageCircle, FolderOpen, Check, X, DollarSign, Users } from 'lucide-react';
+import { MessageCircle, FolderOpen, Check, X, DollarSign, Users, Smartphone } from 'lucide-react';
+import { CoachTextGroupDialog } from '@/components/coach-text-group-dialog';
 import { formatEST } from '@/lib/format-date';
 import { COACH_REVENUE_FRACTION } from '@/lib/pricing';
 import { AddToCalendarButton } from '@/components/add-to-calendar-button';
@@ -30,6 +31,19 @@ function wrestlerNames(s: CoachSession): string[] {
       return o && (o.first_name || o.last_name) ? [o.first_name, o.last_name].filter(Boolean).join(' ') : null;
     })
     .filter((n): n is string => Boolean(n));
+}
+
+/** SMS blast to all parents — only for multi-athlete / group-style sessions with at least one signup */
+function showTextGroup(session: CoachSession): boolean {
+  const current = session.current_participants ?? 0;
+  if (current < 1) return false;
+  const st = session.session_type ?? '';
+  const mode = session.session_mode ?? '';
+  const max = session.max_participants ?? 1;
+  if (st === 'small_group' || st === 'group' || st === '2-athlete') return true;
+  if (max > 1) return true;
+  if (mode === 'partner-open' || mode === 'partner-invite') return true;
+  return false;
 }
 
 function coachPayout(session: CoachSession): number {
@@ -71,6 +85,7 @@ export function CoachSessionsClient({
   const [tab, setTab] = useState<Tab>(initialTab);
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [requests, setRequests] = useState<RequestItem[]>(pendingRequests);
+  const [textGroupSession, setTextGroupSession] = useState<CoachSession | null>(null);
 
   const handleApproveDecline = async (requestId: string, sessionId: string, action: 'approve' | 'decline') => {
     setLoadingId(requestId);
@@ -99,6 +114,17 @@ export function CoachSessionsClient({
 
   return (
     <>
+      {textGroupSession && (
+        <CoachTextGroupDialog
+          sessionId={textGroupSession.id}
+          open={!!textGroupSession}
+          onOpenChange={(open) => {
+            if (!open) setTextGroupSession(null);
+          }}
+          sessionLabel={`${formatEST(new Date(textGroupSession.scheduled_datetime), 'EEE, MMM d · h:mm a')} · ${facilityName(textGroupSession)}`}
+          onSent={() => router.refresh()}
+        />
+      )}
       <div className="flex gap-2 border-b border-border mb-6 overflow-x-auto">
         {tabs.map((t) => (
           <button
@@ -171,6 +197,18 @@ export function CoachSessionsClient({
                           Message
                         </Button>
                       </Link>
+                      {showTextGroup(session) && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="min-h-[44px] touch-manipulation border-accent/50 text-accent"
+                          onClick={() => setTextGroupSession(session)}
+                        >
+                          <Smartphone className="h-4 w-4 mr-1" />
+                          Text group
+                        </Button>
+                      )}
                       <Link href={`/workspaces/from-session/${session.id}`}>
                         <Button variant="ghost" size="sm" className="min-h-[44px] touch-manipulation">
                           <FolderOpen className="h-4 w-4 mr-1" />

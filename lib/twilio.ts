@@ -13,7 +13,7 @@ const getConfig = () => {
 };
 
 /** Normalize to E.164-ish: digits only, assume US +1 if 10 digits. */
-function normalizePhone(value: string | null | undefined): string | null {
+export function normalizePhone(value: string | null | undefined): string | null {
   if (!value || typeof value !== 'string') return null;
   const digits = value.replace(/\D/g, '');
   if (digits.length === 10) return `+1${digits}`;
