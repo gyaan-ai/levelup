@@ -75,7 +75,6 @@ export async function POST(
     const isOwner = s.parent_id === user.id;
 
     if (isOwner) {
-      const adminOwner = createAdminClient(tenant.slug);
       const { data: yw } = await supabase
         .from('youth_wrestlers')
         .select('id, parent_id, phone')
@@ -104,8 +103,8 @@ export async function POST(
       if (existing) {
         return NextResponse.json({ error: 'This wrestler is already in this session' }, { status: 409 });
       }
-      // Service role: RLS only allows session organizer to INSERT with user JWT; use admin to avoid edge-case denials.
-      const { error: insertErr } = await adminOwner.from('session_participants').insert({
+      // Organizer is sessions.parent_id; RLS allows this INSERT for that user (no service role).
+      const { error: insertErr } = await supabase.from('session_participants').insert({
         session_id: sessionId,
         youth_wrestler_id: youthWrestlerId,
         parent_id: user.id,
@@ -113,12 +112,12 @@ export async function POST(
         amount_paid: 0,
       });
       if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 });
-      await adminOwner.from('sessions').update({ current_participants: current + 1, updated_at: new Date().toISOString() }).eq('id', sessionId);
+      await supabase.from('sessions').update({ current_participants: current + 1, updated_at: new Date().toISOString() }).eq('id', sessionId);
       const coachId = (session as { athlete_id?: string }).athlete_id;
       const dt = s.scheduled_datetime;
       if (coachId && coachId !== user.id) {
         const dateStr = dt ? formatEST(new Date(dt), 'EEE MMM d, h:mm a') : 'your session';
-        const admin = adminOwner;
+        const admin = createAdminClient(tenant.slug);
         await createNotification(admin, {
           user_id: coachId,
           type: 'session_booked',
