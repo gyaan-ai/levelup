@@ -3,11 +3,12 @@ import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
+import { resolveDiscountPercentOff } from '@/lib/discount-codes';
 
 /**
  * POST - Parent redeems a discount code after signup (e.g. they forgot at signup).
  * Body: { code: string }
- * Only percent-off codes (e.g. FAMILY10) are accepted; early-adopter free sessions are disabled.
+ * Percent-off codes (e.g. FAMILY10) grant `parent_percentage_discounts`. Early-adopter free sessions are disabled.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -59,9 +60,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'This discount code has reached its limit' }, { status: 400 });
     }
 
-    const percentOff = codeRow.percent_off != null ? Number(codeRow.percent_off) : null;
+    const percentOff = resolveDiscountPercentOff(codeRow.code, codeRow.percent_off);
 
-    if (percentOff != null && percentOff >= 1 && percentOff <= 100) {
+    if (percentOff != null) {
       // Percentage-off code (e.g. family 10% off): grant this parent the discount
       const { data: existingPct } = await admin
         .from('parent_percentage_discounts')
@@ -82,7 +83,10 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json(
-      { error: 'This promotion has ended. Only percent-off discount codes can be applied.' },
+      {
+        error:
+          'This code does not include a percent discount. Family codes use FAMILY10-style (10% off), or an admin must set "Percent off" on the code in Admin → Discount codes.',
+      },
       { status: 400 }
     );
   } catch (e) {

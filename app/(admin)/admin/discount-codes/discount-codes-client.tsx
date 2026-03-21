@@ -67,7 +67,7 @@ export function DiscountCodesClient({ initialCodes }: { initialCodes: CodeRow[] 
       <CardHeader>
         <CardTitle>Create a new code</CardTitle>
         <CardDescription>
-          Early adopter: 1 free private + 1 free small group. Or set &quot;Percent off&quot; (e.g. 10) for a family discount — parent gets that % off all sessions.
+          Set &quot;Percent off&quot; (e.g. 10) for family pricing — parent gets that % off sessions. Codes like FAMILY10 also work if the code string matches that pattern. Leave blank only for non-discount / legacy rows.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -121,7 +121,7 @@ export function DiscountCodesClient({ initialCodes }: { initialCodes: CodeRow[] 
               className="mt-1"
               disabled={loading}
             />
-            <p className="text-xs text-muted-foreground mt-1">Leave blank for early adopter (free sessions). Set 10 for family 10% off.</p>
+            <p className="text-xs text-muted-foreground mt-1">Set 10 for 10% off. FAMILY10-style codes infer percent if this is left blank.</p>
           </div>
           {error && <p className="text-sm text-destructive">{error}</p>}
           <Button type="submit" disabled={loading}>

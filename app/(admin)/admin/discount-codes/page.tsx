@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { DiscountCodesClient } from './discount-codes-client';
 import { DiscountCodePauseButton } from './discount-code-pause-button';
 import { formatEST } from '@/lib/format-date';
+import { resolveDiscountPercentOff } from '@/lib/discount-codes';
 
 type DiscountCodeRow = {
   id: string;
@@ -89,7 +90,12 @@ export default async function AdminDiscountCodesPage() {
                     <tr key={c.id} className="border-b">
                       <td className="p-2 font-mono font-medium">{c.code}</td>
                       <td className="p-2 text-muted-foreground">{c.name ?? '—'}</td>
-                      <td className="p-2 text-muted-foreground">{c.percent_off != null ? `${c.percent_off}% off` : 'Early adopter'}</td>
+                      <td className="p-2 text-muted-foreground">
+                        {(() => {
+                          const pct = resolveDiscountPercentOff(c.code, c.percent_off);
+                          return pct != null ? `${pct}% off` : '—';
+                        })()}
+                      </td>
                       <td className="p-2">
                         {c.active !== false ? (
                           <span className="text-green-600 dark:text-green-400 font-medium">Active</span>

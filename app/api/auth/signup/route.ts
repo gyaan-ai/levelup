@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import { verifyInviteToken } from '@/lib/invite-parent-token';
 import { validateRequiredYouthPhone } from '@/lib/phone';
+import { resolveDiscountPercentOff } from '@/lib/discount-codes';
 
 export async function POST(req: NextRequest) {
   try {
@@ -104,10 +105,13 @@ export async function POST(req: NextRequest) {
           { status: 400 }
         );
       }
-      const po = row.percent_off != null ? Number(row.percent_off) : null;
-      if (po == null || po < 1 || po > 100) {
+      const po = resolveDiscountPercentOff(row.code, row.percent_off);
+      if (po == null) {
         return NextResponse.json(
-          { error: 'This promotion has ended. Only percent-off discount codes are accepted at signup.' },
+          {
+            error:
+              'This code is not a percent-off discount. Use a family code like FAMILY10, or ask an admin to set "Percent off" on this code.',
+          },
           { status: 400 }
         );
       }
