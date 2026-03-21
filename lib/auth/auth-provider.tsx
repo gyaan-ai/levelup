@@ -4,8 +4,18 @@ import { createContext, useContext, useEffect, useState, useCallback, ReactNode 
 import { createClient } from '@/lib/supabase/client';
 import { useRouter } from 'next/navigation';
 import { User } from '@supabase/supabase-js';
+import { VIEW_AS_COOKIE_NAME } from '@/lib/auth/view-as-cookie';
 
 const VIEW_AS_STORAGE_KEY = 'levelup_view_as_role';
+
+function syncViewAsCookie(role: ViewAsRole | null) {
+  if (typeof document === 'undefined') return;
+  if (role) {
+    document.cookie = `${VIEW_AS_COOKIE_NAME}=${encodeURIComponent(role)}; path=/; max-age=31536000; SameSite=Lax`;
+  } else {
+    document.cookie = `${VIEW_AS_COOKIE_NAME}=; path=/; max-age=0`;
+  }
+}
 
 export type ViewAsRole = 'admin' | 'coach' | 'parent' | 'youth_wrestler';
 
@@ -43,6 +53,7 @@ export function AuthProvider({
     if (typeof window !== 'undefined') {
       if (role) window.localStorage.setItem(VIEW_AS_STORAGE_KEY, role);
       else window.localStorage.removeItem(VIEW_AS_STORAGE_KEY);
+      syncViewAsCookie(role);
     }
   }, []);
 
@@ -98,6 +109,7 @@ export function AuthProvider({
       const stored = window.localStorage.getItem(VIEW_AS_STORAGE_KEY) as ViewAsRole | null;
       if (stored && ['admin', 'coach', 'parent', 'youth_wrestler'].includes(stored)) {
         setViewAsRoleState(stored);
+        syncViewAsCookie(stored);
       }
     }
   }, []);
@@ -134,7 +146,10 @@ export function AuthProvider({
     setUser(null);
     setUserRole(null);
     setViewAsRoleState(null);
-    if (typeof window !== 'undefined') window.localStorage.removeItem(VIEW_AS_STORAGE_KEY);
+    if (typeof window !== 'undefined') {
+      window.localStorage.removeItem(VIEW_AS_STORAGE_KEY);
+      syncViewAsCookie(null);
+    }
     router.push('/login');
   };
 

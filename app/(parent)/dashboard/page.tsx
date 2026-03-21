@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
-import { headers } from 'next/headers';
+import { headers, cookies } from 'next/headers';
+import { VIEW_AS_COOKIE_NAME } from '@/lib/auth/view-as-cookie';
 import { getParentYouthWrestlerIds } from '@/lib/parent-wrestlers';
 
 export const dynamic = 'force-dynamic';
@@ -32,9 +33,13 @@ export default async function HomePage() {
   if (userData?.role === 'coach') redirect('/athlete-dashboard');
 
   const isAdmin = userData?.role === 'admin';
+  const cookieStore = await cookies();
+  const viewAsCookie = cookieStore.get(VIEW_AS_COOKIE_NAME)?.value;
+  /** Admin + "Preview as Parent" in header should match a real parent’s Home (family sessions only). */
+  const adminPreviewAsParent = isAdmin && viewAsCookie === 'parent';
   const nowISO = new Date().toISOString();
 
-  // Admin: fetch ALL scheduled/pending sessions (no date filter) so admin always sees every session
+  // Admin (not previewing as parent): fetch ALL scheduled/pending sessions
   type AdminUpcomingRow = {
     id: string;
     athlete_id?: string | null;
@@ -52,10 +57,15 @@ export default async function HomePage() {
     partner_invite_code?: string | null;
     athletes?: { id: string; first_name?: string; last_name?: string; school?: string; photo_url?: string } | { id: string; first_name?: string; last_name?: string; school?: string; photo_url?: string }[] | null;
     facilities?: { id?: string; name?: string; address?: string } | { id?: string; name?: string; address?: string }[] | null;
-    session_participants?: Array<{ youth_wrestler_id?: string; youth_wrestlers?: { first_name?: string; last_name?: string } | null }>;
+    join_policy?: string | null;
+    session_participants?: Array<{
+      youth_wrestler_id?: string;
+      parent_id?: string;
+      youth_wrestlers?: { first_name?: string; last_name?: string } | null;
+    }>;
   };
   let allUpcomingForAdmin: AdminUpcomingRow[] = [];
-  if (isAdmin) {
+  if (isAdmin && !adminPreviewAsParent) {
     const admin = createAdminClient(tenant.slug);
     const { data: adminSessions } = await admin
       .from('sessions')
@@ -69,13 +79,14 @@ export default async function HomePage() {
         parent_id,
         session_type,
         session_mode,
+        join_policy,
         focus_area,
         current_participants,
         max_participants,
         partner_invite_code,
         athletes(id, first_name, last_name, school, photo_url, average_rating, review_count),
         facilities(id, name, address),
-        session_participants(youth_wrestler_id, youth_wrestlers(first_name, last_name))
+        session_participants(youth_wrestler_id, parent_id, youth_wrestlers(first_name, last_name))
       `)
       .in('status', ['scheduled', 'pending_payment'])
       .order('scheduled_datetime', { ascending: true })
@@ -148,6 +159,7 @@ export default async function HomePage() {
           session_type,
           session_mode,
           focus_area,
+          join_policy,
           current_participants,
           max_participants,
           partner_invite_code,
@@ -176,6 +188,7 @@ export default async function HomePage() {
     focus_area_2?: string | null;
     current_participants?: number;
     max_participants?: number;
+    join_policy?: string | null;
     partner_invite_code?: string | null;
     athletes?: { id: string; first_name?: string; last_name?: string; school?: string } | { id: string; first_name?: string; last_name?: string; school?: string }[];
     facilities?: { id: string; name?: string; address?: string } | { id: string; name?: string; address?: string }[];
@@ -254,6 +267,8 @@ export default async function HomePage() {
       partner_invite_code: s.partner_invite_code ?? null,
       isTentative: false,
       isOwner: s.parent_id === user.id,
+      isFamilyParticipant: true,
+      joinPolicy: (s as { join_policy?: string | null }).join_policy ?? null,
       coach: {
         name: coach ? `${coach.first_name ?? ''} ${coach.last_name ?? ''}`.trim() || 'Coach' : 'Coach',
         school: coach?.school ?? '',
@@ -275,7 +290,13 @@ export default async function HomePage() {
     const coach = Array.isArray(a) ? a[0] : a;
     const f = s.facilities;
     const fac = Array.isArray(f) ? f[0] : f;
-    const wrestlers = (s.session_participants ?? [])
+    const parts = s.session_participants ?? [];
+    const isFamilyParticipant = parts.some((p) => {
+      const pid = (p as { parent_id?: string }).parent_id;
+      const ywid = (p as { youth_wrestler_id?: string }).youth_wrestler_id;
+      return pid === user.id || (ywid != null && youthWrestlerIds.includes(ywid));
+    });
+    const wrestlers = parts
       .map((p) => {
         const yw = p.youth_wrestlers;
         const o = Array.isArray(yw) ? yw[0] : yw;
@@ -300,6 +321,8 @@ export default async function HomePage() {
       partner_invite_code: s.partner_invite_code ?? null,
       isTentative: false,
       isOwner: s.parent_id === user.id,
+      isFamilyParticipant,
+      joinPolicy: s.join_policy ?? null,
       coach: {
         name: coach ? `${coach.first_name ?? ''} ${coach.last_name ?? ''}`.trim() || 'Coach' : 'Coach',
         school: coach?.school ?? '',
@@ -325,15 +348,15 @@ export default async function HomePage() {
       {/* Upcoming session(s): when admin, show all as cards; otherwise show family next session */}
       <section className="mt-6 mb-6">
         <h2 className="text-lg font-semibold text-foreground mb-3">
-          {isAdmin ? 'All sessions (scheduled & pending)' : 'Next Session'}
+          {isAdmin && !adminPreviewAsParent ? 'All sessions (scheduled & pending)' : 'Next Session'}
         </h2>
-        {isAdmin && allUpcomingForAdmin.length > 0 ? (
+        {isAdmin && !adminPreviewAsParent && allUpcomingForAdmin.length > 0 ? (
           <div className="space-y-4">
             {allUpcomingForAdmin.map((s) => (
               <BookingCard key={s.id} session={adminRowToBookingSession(s)} />
             ))}
           </div>
-        ) : isAdmin && allUpcomingForAdmin.length === 0 ? (
+        ) : isAdmin && !adminPreviewAsParent && allUpcomingForAdmin.length === 0 ? (
           <Card>
             <CardContent className="py-8 text-center">
               <p className="text-muted-foreground mb-4">No upcoming sessions.</p>

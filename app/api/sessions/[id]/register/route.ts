@@ -9,6 +9,7 @@ import { createRegisterConfirmationToken } from '@/lib/confirmation-token';
 import { createNotification } from '@/lib/notifications';
 import { sendCoachNewSignupSms } from '@/lib/twilio';
 import { hasMinPhoneDigits } from '@/lib/phone';
+import { rosterSnapshotFromYouthRow } from '@/lib/session-roster-snapshot';
 
 /**
  * POST - Pay & register a youth wrestler for a session (public or invite_only).
@@ -77,7 +78,7 @@ export async function POST(
     if (isOwner) {
       const { data: yw } = await supabase
         .from('youth_wrestlers')
-        .select('id, parent_id, phone')
+        .select('id, parent_id, phone, first_name, last_name, photo_url')
         .eq('id', youthWrestlerId)
         .single();
       const ywParentId = (yw as { parent_id?: string } | null)?.parent_id;
@@ -110,6 +111,7 @@ export async function POST(
         parent_id: user.id,
         paid: true,
         amount_paid: 0,
+        ...rosterSnapshotFromYouthRow((yw ?? {}) as { first_name?: string; last_name?: string; photo_url?: string }),
       });
       if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 });
       await supabase.from('sessions').update({ current_participants: current + 1, updated_at: new Date().toISOString() }).eq('id', sessionId);

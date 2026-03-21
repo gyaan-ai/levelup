@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import { createNotification } from '@/lib/notifications';
 import { hasMinPhoneDigits } from '@/lib/phone';
+import { rosterSnapshotFromYouthRow } from '@/lib/session-roster-snapshot';
 
 export async function PATCH(
   req: NextRequest,
@@ -50,9 +51,15 @@ export async function PATCH(
 
     if (action === 'approve') {
       const ywId = (joinRequest as { youth_wrestler_id?: string }).youth_wrestler_id;
+      let ywRow: { phone?: string | null; first_name?: string | null; last_name?: string | null; photo_url?: string | null } | null = null;
       if (ywId) {
         const adminCheck = createAdminClient(tenant.slug);
-        const { data: ywRow } = await adminCheck.from('youth_wrestlers').select('phone').eq('id', ywId).maybeSingle();
+        const { data: ywFetched } = await adminCheck
+          .from('youth_wrestlers')
+          .select('phone, first_name, last_name, photo_url')
+          .eq('id', ywId)
+          .maybeSingle();
+        ywRow = ywFetched;
         if (!hasMinPhoneDigits(ywRow?.phone)) {
           return NextResponse.json(
             { error: 'That athlete must have a cell number on their profile before they can join.' },
@@ -77,6 +84,7 @@ export async function PATCH(
         parent_id: (joinRequest as { requesting_parent_id?: string }).requesting_parent_id,
         paid: false,
         amount_paid: null,
+        ...rosterSnapshotFromYouthRow((ywRow ?? {}) as { first_name?: string; last_name?: string; photo_url?: string }),
       });
       if (partErr) {
         await supabase.from('sessions').update({ current_participants: current }).eq('id', sessionId);

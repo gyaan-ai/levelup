@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import { hasMinPhoneDigits } from '@/lib/phone';
+import { rosterSnapshotFromYouthRow } from '@/lib/session-roster-snapshot';
 
 /**
  * POST - Join a session by invite code. Adds the current user's youth wrestler as a participant.
@@ -51,7 +52,7 @@ export async function POST(req: NextRequest) {
 
     const { data: yw, error: ywErr } = await supabase
       .from('youth_wrestlers')
-      .select('id, parent_id, phone')
+      .select('id, parent_id, phone, first_name, last_name, photo_url')
       .eq('id', youthWrestlerId)
       .single();
 
@@ -76,6 +77,7 @@ export async function POST(req: NextRequest) {
       parent_id: user.id,
       paid: false,
       amount_paid: null,
+      ...rosterSnapshotFromYouthRow((yw ?? {}) as { first_name?: string; last_name?: string; photo_url?: string }),
     });
 
     if (insertErr) {

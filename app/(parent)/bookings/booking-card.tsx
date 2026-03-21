@@ -14,6 +14,7 @@ import { SessionTypeBadge } from '@/components/session-type-badge';
 import { ProfileImage } from '@/components/profile-image';
 import { StarRating } from '@/components/star-rating';
 import { CapacityBadge } from '@/components/capacity-badge';
+import { isSessionOpenForParentBrowse } from '@/lib/sessions';
 
 const CANCELLATION_WINDOW_HOURS = 24;
 
@@ -40,6 +41,13 @@ export type BookingSession = {
   isTentative?: boolean;
   /** True if current user created this session (can cancel whole session). False = participant (can leave session). */
   isOwner?: boolean;
+  /**
+   * False = this user’s family has no spot (e.g. admin seeing all sessions on Home).
+   * Omit/true = family is enrolled — show Leave when applicable.
+   */
+  isFamilyParticipant?: boolean;
+  /** For Join CTA when not enrolled */
+  joinPolicy?: string | null;
   coach: { name: string; school: string; id: string; photo_url?: string | null; average_rating?: number | null; review_count?: number | null };
   facility: string;
   facility_id?: string | null;
@@ -81,7 +89,13 @@ export function BookingCard({ session, isPast = false }: BookingCardProps) {
     (session.status === 'scheduled' || session.status === 'pending_payment') &&
     scheduledTime > new Date();
   
-  const canLeave = canCancel && !session.isOwner;
+  const familyHasSpot = session.isFamilyParticipant !== false;
+  const canLeave = canCancel && !session.isOwner && familyHasSpot;
+  const showJoinWhenNotEnrolled =
+    session.isFamilyParticipant === false &&
+    !isPast &&
+    isSessionOpenForParentBrowse(session) &&
+    (session.joinPolicy === 'public' || session.joinPolicy === 'invite_only');
   const willGetRefund = hoursUntilSession >= CANCELLATION_WINDOW_HOURS && session.status === 'scheduled';
 
   const handleLeaveSession = async () => {
@@ -230,6 +244,13 @@ export function BookingCard({ session, isPast = false }: BookingCardProps) {
                   <Button size="sm" className="min-h-[44px] px-4">
                     <ExternalLink className="h-4 w-4 mr-1 shrink-0" />
                     View
+                  </Button>
+                </Link>
+              )}
+              {!isPast && showJoinWhenNotEnrolled && (
+                <Link href={`/sessions/${session.id}/register`} className="inline-flex" prefetch={false}>
+                  <Button size="sm" className="min-h-[44px] px-4 bg-accent text-primary hover:bg-accent/90">
+                    Join now
                   </Button>
                 </Link>
               )}

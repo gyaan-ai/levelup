@@ -47,7 +47,14 @@ type SessionRow = {
   facility_id: string;
   athletes?: { id: string; first_name?: string; last_name?: string; school?: string; photo_url?: string; average_rating?: number | null; review_count?: number | null } | null;
   facilities?: { id: string; name?: string; address?: string } | null;
-  session_participants?: Array<{ youth_wrestlers?: { id: string; first_name?: string; last_name?: string; photo_url?: string } | { id: string; first_name?: string; last_name?: string; photo_url?: string }[] | null } | null>;
+  session_participants?: Array<{
+    id?: string;
+    youth_wrestler_id?: string | null;
+    roster_first_name?: string | null;
+    roster_last_name?: string | null;
+    roster_photo_url?: string | null;
+    youth_wrestlers?: { id: string; first_name?: string; last_name?: string; photo_url?: string } | { id: string; first_name?: string; last_name?: string; photo_url?: string }[] | null;
+  } | null>;
 };
 
 type CoachOption = { id: string; first_name?: string; last_name?: string; school?: string };
@@ -55,9 +62,15 @@ type CoachOption = { id: string; first_name?: string; last_name?: string; school
 function participantsFromSession(s: SessionRow): { id: string; first_name?: string | null; last_name?: string | null; photo_url?: string | null }[] {
   const parts = s.session_participants ?? [];
   return parts.map((p) => {
+    if (!p) return null;
     const yw = Array.isArray(p?.youth_wrestlers) ? (p?.youth_wrestlers as { id: string; first_name?: string; last_name?: string; photo_url?: string }[])[0] : (p?.youth_wrestlers as { id: string; first_name?: string; last_name?: string; photo_url?: string } | undefined);
-    return yw ? { id: yw.id, first_name: yw.first_name ?? null, last_name: yw.last_name ?? null, photo_url: yw.photo_url ?? null } : { id: '', first_name: null, last_name: null, photo_url: null };
-  }).filter((x) => x.id);
+    const first = p.roster_first_name ?? yw?.first_name ?? null;
+    const last = p.roster_last_name ?? yw?.last_name ?? null;
+    const photo = p.roster_photo_url ?? yw?.photo_url ?? null;
+    const id = yw?.id ?? p.youth_wrestler_id ?? p.id ?? '';
+    if (!id && !first && !last) return null;
+    return { id: id || `row-${p.id ?? ''}`, first_name: first, last_name: last, photo_url: photo };
+  }).filter((x): x is NonNullable<typeof x> => x != null);
 }
 
 export function FindTrainingClient({

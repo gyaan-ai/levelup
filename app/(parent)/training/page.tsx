@@ -28,7 +28,14 @@ type SessionRow = {
   facility_id: string;
   athletes?: { id: string; first_name?: string; last_name?: string; school?: string } | null;
   facilities?: { id: string; name?: string; address?: string } | null;
-  session_participants?: Array<{ youth_wrestlers?: { id: string; first_name?: string; last_name?: string; photo_url?: string } | { id: string; first_name?: string; last_name?: string; photo_url?: string }[] | null } | null>;
+  session_participants?: Array<{
+    id?: string;
+    youth_wrestler_id?: string | null;
+    roster_first_name?: string | null;
+    roster_last_name?: string | null;
+    roster_photo_url?: string | null;
+    youth_wrestlers?: { id: string; first_name?: string; last_name?: string; photo_url?: string } | { id: string; first_name?: string; last_name?: string; photo_url?: string }[] | null;
+  } | null>;
 };
 
 export default async function TrainingPage({
@@ -150,7 +157,7 @@ export default async function TrainingPage({
     id, scheduled_datetime, status, session_type, session_mode, join_policy, focus_area,
     current_participants, max_participants, total_price, price_per_participant,
     athlete_id, facility_id, athletes(id, first_name, last_name, school, photo_url, average_rating, review_count), facilities(id, name, address),
-    session_participants(youth_wrestlers(id, first_name, last_name, photo_url))
+    session_participants(id, youth_wrestler_id, roster_first_name, roster_last_name, roster_photo_url, youth_wrestlers(id, first_name, last_name, photo_url))
   `;
   const sessions = (start: string, end: string) =>
     supabase.from('sessions').select(baseSelect).gte('scheduled_datetime', start).lte('scheduled_datetime', end);

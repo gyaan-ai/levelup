@@ -7,6 +7,7 @@ import { createNotification } from '@/lib/notifications';
 import { sendCoachNewSignupSms } from '@/lib/twilio';
 import { formatEST } from '@/lib/format-date';
 import { headers } from 'next/headers';
+import { rosterSnapshotFromYouthRow } from '@/lib/session-roster-snapshot';
 
 export async function POST(req: NextRequest) {
   try {
@@ -63,12 +64,18 @@ export async function POST(req: NextRequest) {
             .eq('id', sessionId)
             .single();
           const current = (sess as { current_participants?: number } | null)?.current_participants ?? 0;
+          const { data: ywSnap } = await supabase
+            .from('youth_wrestlers')
+            .select('first_name, last_name, photo_url')
+            .eq('id', youthWrestlerId)
+            .maybeSingle();
           const { error: insertErr } = await supabase.from('session_participants').insert({
             session_id: sessionId,
             youth_wrestler_id: youthWrestlerId,
             parent_id: parentId,
             paid: true,
             amount_paid: amountPaid,
+            ...rosterSnapshotFromYouthRow((ywSnap ?? {}) as { first_name?: string; last_name?: string; photo_url?: string }),
           });
           if (insertErr) {
             console.error('Webhook: failed to insert session_participant (register)', insertErr);

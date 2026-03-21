@@ -9,6 +9,7 @@ import { createNotification } from '@/lib/notifications';
 import type { SessionMode, JoinPolicy } from '@/types';
 import { formatEST } from '@/lib/format-date';
 import { hasMinPhoneDigits } from '@/lib/phone';
+import { rosterSnapshotFromYouthRow } from '@/lib/session-roster-snapshot';
 
 export async function POST(req: NextRequest) {
   try {
@@ -76,7 +77,7 @@ export async function POST(req: NextRequest) {
 
     const { data: ywPhoneRows } = await admin
       .from('youth_wrestlers')
-      .select('id, phone')
+      .select('id, phone, first_name, last_name, photo_url')
       .in('id', youthWrestlerIds);
     if (!ywPhoneRows || ywPhoneRows.length !== youthWrestlerIds.length) {
       return NextResponse.json({ error: 'One or more athletes not found' }, { status: 400 });
@@ -195,12 +196,14 @@ export async function POST(req: NextRequest) {
     }
 
     for (const ywId of youthWrestlerIds) {
+      const ywRow = ywPhoneRows?.find((r) => r.id === ywId);
       const { error: partError } = await supabase.from('session_participants').insert({
         session_id: session.id,
         youth_wrestler_id: ywId,
         parent_id: user.id,
         paid: false,
         amount_paid: testModePenny ? (0.50 / numParticipants) : (pricePerParticipant ?? totalPrice / numParticipants),
+        ...rosterSnapshotFromYouthRow((ywRow ?? {}) as { first_name?: string; last_name?: string; photo_url?: string }),
       });
       if (partError) {
         await supabase.from('sessions').delete().eq('id', session.id);
