@@ -6,6 +6,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import { generateInviteCode } from '@/lib/sessions';
 import { APP_TIMEZONE } from '@/lib/format-date';
+import { notifySessionScheduledFollowers } from '@/lib/notify-session-scheduled-followers';
 
 /**
  * POST - Admin creates a small-group session: assign coach, set time/facility, get shareable link.
@@ -158,6 +159,12 @@ export async function POST(req: NextRequest) {
       process.env.NEXT_PUBLIC_APP_URL ||
       (host.startsWith('localhost') ? `http://${host}` : `https://${host}`);
     const shareUrl = `${baseUrl}/join/${session.partner_invite_code}`;
+
+    void notifySessionScheduledFollowers(tenant.slug, athleteId, {
+      sessionId: session.id,
+      scheduledDatetime: session.scheduled_datetime,
+      joinUrlPath: `/join/${session.partner_invite_code}`,
+    });
 
     return NextResponse.json({
       success: true,

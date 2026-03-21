@@ -7,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { MessageCircle, FolderOpen, Check, X, DollarSign, Users, Smartphone } from 'lucide-react';
 import { CoachTextGroupDialog } from '@/components/coach-text-group-dialog';
+import { CopySessionPhonesButton } from '@/components/copy-session-phones-button';
 import { formatEST } from '@/lib/format-date';
 import { COACH_REVENUE_FRACTION } from '@/lib/pricing';
 import { AddToCalendarButton } from '@/components/add-to-calendar-button';
@@ -198,16 +199,22 @@ export function CoachSessionsClient({
                         </Button>
                       </Link>
                       {showTextGroup(session) && (
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="min-h-[44px] touch-manipulation border-accent/50 text-accent"
-                          onClick={() => setTextGroupSession(session)}
-                        >
-                          <Smartphone className="h-4 w-4 mr-1" />
-                          Text group
-                        </Button>
+                        <>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="min-h-[44px] touch-manipulation border-accent/50 text-accent"
+                            onClick={() => setTextGroupSession(session)}
+                          >
+                            <Smartphone className="h-4 w-4 mr-1" />
+                            Text group
+                          </Button>
+                          <CopySessionPhonesButton
+                            sessionId={session.id}
+                            className="min-h-[44px] touch-manipulation"
+                          />
+                        </>
                       )}
                       <Link href={`/workspaces/from-session/${session.id}`}>
                         <Button variant="ghost" size="sm" className="min-h-[44px] touch-manipulation">

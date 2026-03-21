@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { formatPhoneForSmsPaste } from '@/lib/phone';
 import { normalizePhone, sendSms } from '@/lib/twilio';
 
 type Admin = SupabaseClient;
@@ -171,4 +172,124 @@ export async function sendSessionSms(
   }
 
   return sendSessionGroupSms(admin, sessionId, body, prefix, 'parents');
+}
+
+function shortEmail(email: string | null | undefined): string {
+  if (!email) return 'Parent';
+  const local = email.split('@')[0] ?? email;
+  return local.length > 24 ? `${local.slice(0, 22)}…` : local;
+}
+
+/** One row for coach clipboard (text from personal phone — two-way SMS). */
+export type SessionSmsPhoneRow = { kind: 'parent' | 'athlete'; label: string; phone: string };
+
+/**
+ * Resolved parent + athlete cells for this session (same rules as SMS send).
+ * Use comma-separated strings to paste into iOS/Android Messages “To” field.
+ */
+export async function getSessionSmsPhonesForPersonalText(
+  admin: Admin,
+  sessionId: string
+): Promise<{
+  rows: SessionSmsPhoneRow[];
+  commaParents: string;
+  commaAthletes: string;
+  commaAll: string;
+  skippedParents: number;
+  skippedAthletes: number;
+}> {
+  const { data: parts, error } = await admin
+    .from('session_participants')
+    .select('parent_id, youth_wrestler_id, youth_wrestlers(first_name, last_name)')
+    .eq('session_id', sessionId);
+  if (error) throw new Error(error.message);
+  const rows = parts ?? [];
+  if (rows.length === 0) {
+    return {
+      rows: [],
+      commaParents: '',
+      commaAthletes: '',
+      commaAll: '',
+      skippedParents: 0,
+      skippedAthletes: 0,
+    };
+  }
+
+  const parentIds = [...new Set(rows.map((r) => r.parent_id as string).filter(Boolean))];
+  const { data: parentUsers } =
+    parentIds.length > 0
+      ? await admin.from('users').select('id, email').in('id', parentIds)
+      : { data: [] };
+
+  const parentKidNames = new Map<string, Set<string>>();
+  for (const r of rows) {
+    const pid = r.parent_id as string | undefined;
+    if (!pid) continue;
+    const yw = r.youth_wrestlers as { first_name?: string; last_name?: string } | { first_name?: string; last_name?: string }[] | null | undefined;
+    const o = Array.isArray(yw) ? yw[0] : yw;
+    const kid = o ? [o.first_name, o.last_name].filter(Boolean).join(' ').trim() : '';
+    if (!parentKidNames.has(pid)) parentKidNames.set(pid, new Set());
+    if (kid) parentKidNames.get(pid)!.add(kid);
+  }
+
+  const parentRows: SessionSmsPhoneRow[] = [];
+  let skippedParents = 0;
+  for (const pid of parentIds) {
+    const first = rows.find((r) => r.parent_id === pid);
+    const ywId = (first as { youth_wrestler_id?: string | null } | undefined)?.youth_wrestler_id ?? null;
+    const phone = await resolveParentSmsPhone(admin, pid, ywId);
+    if (!phone) {
+      skippedParents += 1;
+      continue;
+    }
+    const u = parentUsers?.find((x) => x.id === pid);
+    const kids = [...(parentKidNames.get(pid) ?? [])].join(', ') || 'athlete';
+    parentRows.push({
+      kind: 'parent',
+      label: `Parent: ${shortEmail(u?.email)} (${kids})`,
+      phone,
+    });
+  }
+
+  const athleteRows: SessionSmsPhoneRow[] = [];
+  let skippedAthletes = 0;
+  const seenYw = new Set<string>();
+  for (const r of rows) {
+    const ywid = (r as { youth_wrestler_id?: string | null }).youth_wrestler_id;
+    if (!ywid || seenYw.has(ywid)) continue;
+    seenYw.add(ywid);
+    const phone = await resolveAthleteSmsPhone(admin, ywid);
+    if (!phone) {
+      skippedAthletes += 1;
+      continue;
+    }
+    const yw = r.youth_wrestlers as { first_name?: string; last_name?: string } | null;
+    const o = Array.isArray(yw) ? yw[0] : yw;
+    const name = o ? [o.first_name, o.last_name].filter(Boolean).join(' ').trim() : 'Athlete';
+    athleteRows.push({ kind: 'athlete', label: `Athlete: ${name}`, phone });
+  }
+
+  const rowsOut = [...parentRows, ...athleteRows];
+
+  const fmt = (e164: string) => formatPhoneForSmsPaste(e164);
+  const commaParents = [...new Set(parentRows.map((r) => r.phone))].map(fmt).join(', ');
+  const commaAthletes = [...new Set(athleteRows.map((r) => r.phone))].map(fmt).join(', ');
+  const allOrder: string[] = [];
+  const seenPhone = new Set<string>();
+  for (const r of rowsOut) {
+    if (!seenPhone.has(r.phone)) {
+      seenPhone.add(r.phone);
+      allOrder.push(fmt(r.phone));
+    }
+  }
+  const commaAll = allOrder.join(', ');
+
+  return {
+    rows: rowsOut,
+    commaParents,
+    commaAthletes,
+    commaAll,
+    skippedParents,
+    skippedAthletes,
+  };
 }

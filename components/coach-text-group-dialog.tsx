@@ -22,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Smartphone } from 'lucide-react';
+import { Copy, Smartphone } from 'lucide-react';
 
 type RecipientOption = { value: string; label: string; group: 'everyone' | 'individual' };
 
@@ -43,6 +43,15 @@ export function CoachTextGroupDialog({ sessionId, open, onOpenChange, sessionLab
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ sent: number; skippedNoPhone: number } | null>(null);
+  const [phones, setPhones] = useState<{
+    commaAll: string;
+    commaParents: string;
+    commaAthletes: string;
+    skippedParents: number;
+    skippedAthletes: number;
+  } | null>(null);
+  const [loadingPhones, setLoadingPhones] = useState(false);
+  const [copiedKind, setCopiedKind] = useState<'all' | 'parents' | 'athletes' | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -65,6 +74,53 @@ export function CoachTextGroupDialog({ sessionId, open, onOpenChange, sessionLab
       cancelled = true;
     };
   }, [open, sessionId]);
+
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    setLoadingPhones(true);
+    setPhones(null);
+    fetch(`/api/sessions/${sessionId}/sms-phones`)
+      .then((r) => r.json())
+      .then(
+        (data: {
+          commaAll?: string;
+          commaParents?: string;
+          commaAthletes?: string;
+          skippedParents?: number;
+          skippedAthletes?: number;
+        }) => {
+          if (cancelled) return;
+          setPhones({
+            commaAll: data.commaAll ?? '',
+            commaParents: data.commaParents ?? '',
+            commaAthletes: data.commaAthletes ?? '',
+            skippedParents: data.skippedParents ?? 0,
+            skippedAthletes: data.skippedAthletes ?? 0,
+          });
+        }
+      )
+      .catch(() => {
+        if (!cancelled) setPhones(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingPhones(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, sessionId]);
+
+  const copyPhones = async (kind: 'all' | 'parents' | 'athletes', value: string) => {
+    if (!value.trim()) return;
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopiedKind(kind);
+      window.setTimeout(() => setCopiedKind(null), 2000);
+    } catch {
+      setError('Could not copy — try again or copy manually.');
+    }
+  };
 
   const handleSend = async () => {
     const msg = text.trim();
@@ -100,6 +156,8 @@ export function CoachTextGroupDialog({ sessionId, open, onOpenChange, sessionLab
       setResult(null);
       setText('');
       setTarget('broadcast:parents');
+      setPhones(null);
+      setCopiedKind(null);
     }
     onOpenChange(v);
   };
@@ -134,6 +192,10 @@ export function CoachTextGroupDialog({ sessionId, open, onOpenChange, sessionLab
           <DialogDescription className="text-left space-y-2">
             <span className="block text-foreground/90">{sessionLabel}</span>
             <span className="block text-muted-foreground text-sm">Requires Twilio on the server. {targetHint}</span>
+            <span className="block text-muted-foreground text-sm pt-1">
+              Replies to this app’s number don’t go to your personal phone — use{' '}
+              <strong className="text-foreground/90">Copy Cell #s</strong> below to text from your own phone for two-way chats.
+            </span>
           </DialogDescription>
         </DialogHeader>
         {result ? (
@@ -188,6 +250,68 @@ export function CoachTextGroupDialog({ sessionId, open, onOpenChange, sessionLab
               </Select>
               {loadingOptions && <p className="text-xs text-muted-foreground">Loading roster…</p>}
             </div>
+
+            <div className="rounded-lg border border-border bg-muted/20 p-3 space-y-2">
+              <p className="text-sm font-medium text-foreground">Copy Cell #s (your phone)</p>
+              <p className="text-xs text-muted-foreground">
+                US numbers copy as <strong>10 digits</strong>, comma-separated — paste into Messages <strong>To</strong>{' '}
+                (no editing needed). Non-US stays international format.
+              </p>
+              {loadingPhones && <p className="text-xs text-muted-foreground">Loading numbers…</p>}
+              {!loadingPhones && phones && (
+                <>
+                  <div className="flex flex-col gap-2">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      className="justify-start min-h-[44px]"
+                      disabled={!phones.commaAll}
+                      onClick={() => copyPhones('all', phones.commaAll)}
+                    >
+                      <Copy className="h-4 w-4 mr-2 shrink-0" />
+                      {copiedKind === 'all' ? 'Copied!' : 'Copy all Cell #s (deduped)'}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="justify-start min-h-[44px]"
+                      disabled={!phones.commaParents}
+                      onClick={() => copyPhones('parents', phones.commaParents)}
+                    >
+                      <Copy className="h-4 w-4 mr-2 shrink-0" />
+                      {copiedKind === 'parents' ? 'Copied!' : 'Copy parent Cell #s only'}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="justify-start min-h-[44px]"
+                      disabled={!phones.commaAthletes}
+                      onClick={() => copyPhones('athletes', phones.commaAthletes)}
+                    >
+                      <Copy className="h-4 w-4 mr-2 shrink-0" />
+                      {copiedKind === 'athletes' ? 'Copied!' : 'Copy athlete Cell #s only'}
+                    </Button>
+                  </div>
+                  {!phones.commaAll && (
+                    <p className="text-xs text-amber-700 dark:text-amber-300">
+                      No cells on file for this session — add numbers on parent accounts or athlete profiles.
+                    </p>
+                  )}
+                  {(phones.skippedParents > 0 || phones.skippedAthletes > 0) && phones.commaAll && (
+                    <p className="text-xs text-muted-foreground">
+                      {phones.skippedParents > 0 &&
+                        `${phones.skippedParents} parent${phones.skippedParents === 1 ? '' : 's'} with no phone. `}
+                      {phones.skippedAthletes > 0 &&
+                        `${phones.skippedAthletes} athlete${phones.skippedAthletes === 1 ? '' : 's'} with no phone.`}
+                    </p>
+                  )}
+                </>
+              )}
+            </div>
+
             <Textarea
               placeholder="e.g. Practice moved to 11:30 — see you at UNC."
               value={text}

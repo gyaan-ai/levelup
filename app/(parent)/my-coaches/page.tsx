@@ -25,7 +25,8 @@ export default async function MyCoachesPage() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold font-serif text-foreground">My Coaches</h1>
         <p className="text-muted-foreground mt-1">
-          Coaches you follow. You’ll be notified when they add new availability.
+          Coaches you follow. You’ll get in-app alerts when they add availability or schedule a new session you can book;
+          add your cell on your profile if you want a text for new sessions.
         </p>
       </div>
       <MyCoachesClient />

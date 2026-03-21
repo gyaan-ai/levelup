@@ -22,3 +22,14 @@ export function validateRequiredYouthPhone(raw: unknown):
   }
   return { ok: true, phone: s };
 }
+
+/**
+ * Format E.164 for pasting into iOS/Android Messages **To** field (group text).
+ * US/Canada (+1 + 10 digits): outputs **10 digits only** (no +1, no punctuation) — most reliable for one-tap paste.
+ * Other countries: keeps full E.164 (e.g. +44…).
+ */
+export function formatPhoneForSmsPaste(e164: string): string {
+  const s = e164.trim();
+  if (/^\+1\d{10}$/.test(s)) return s.slice(2);
+  return s;
+}
