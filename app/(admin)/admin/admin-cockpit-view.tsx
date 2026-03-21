@@ -123,8 +123,146 @@ function niceYMax(max: number): number {
   return n * step;
 }
 
-function StandardBarChart({ values, labels, metricLabel }: { values: number[]; labels: string[]; metricLabel: string }) {
-  const vals = values.slice(0, labels.length);
+function cumulativeSeries(values: number[]): number[] {
+  let sum = 0;
+  return values.map((v) => {
+    sum += v;
+    return sum;
+  });
+}
+
+function TrendLineChart({
+  values,
+  labels,
+  metricLabel,
+  cumulative,
+}: {
+  values: number[];
+  labels: string[];
+  metricLabel: string;
+  cumulative: boolean;
+}) {
+  const raw = values.slice(0, labels.length);
+  const vals = cumulative ? cumulativeSeries(raw) : raw;
+  const maxVal = Math.max(0, ...vals, 0);
+  const yMax = niceYMax(maxVal);
+  const chartHeight = 240;
+  const chartWidth = 720;
+  const padL = 44;
+  const padR = 12;
+  const padT = 12;
+  const padB = 36;
+  const innerW = chartWidth - padL - padR;
+  const innerH = chartHeight - padT - padB;
+  const n = vals.length;
+  const yTicks = yMax <= 0 ? [0] : [0, ...(yMax <= 5 ? [yMax] : [Math.floor(yMax / 2), yMax])];
+
+  const xPos = (i: number) => {
+    if (n <= 1) return padL + innerW / 2;
+    return padL + (i / (n - 1)) * innerW;
+  };
+  const yPos = (v: number) => {
+    if (yMax <= 0) return padT + innerH;
+    return padT + innerH - (v / yMax) * innerH;
+  };
+
+  const points = vals.map((v, i) => `${xPos(i)},${yPos(v)}`).join(' ');
+
+  return (
+    <div className="space-y-2">
+      <p className="text-sm text-muted-foreground">
+        {metricLabel} · {cumulative ? 'cumulative total (running sum over period)' : 'count per period'}
+      </p>
+      <div className="w-full overflow-x-auto">
+        <svg
+          viewBox={`0 0 ${chartWidth} ${chartHeight}`}
+          className="w-full min-w-[320px] h-[240px] text-primary"
+          role="img"
+          aria-label={`${metricLabel} trend`}
+        >
+          {/* grid */}
+          {yTicks.map((t) => {
+            const y = yPos(t);
+            return (
+              <line
+                key={t}
+                x1={padL}
+                y1={y}
+                x2={chartWidth - padR}
+                y2={y}
+                className="stroke-muted"
+                strokeOpacity={0.35}
+                strokeWidth={1}
+                strokeDasharray="4 4"
+              />
+            );
+          })}
+          {/* Y-axis labels */}
+          {[...yTicks].reverse().map((t) => (
+            <text
+              key={`y-${t}`}
+              x={padL - 4}
+              y={yPos(t) + 4}
+              textAnchor="end"
+              className="fill-muted-foreground text-[11px] font-medium tabular-nums"
+            >
+              {t}
+            </text>
+          ))}
+          {/* Line */}
+          {n > 0 && yMax > 0 && (
+            <polyline
+              fill="none"
+              stroke="currentColor"
+              strokeWidth={2.5}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+              points={points}
+              className="text-primary"
+            />
+          )}
+          {/* Points */}
+          {vals.map((v, i) => (
+            <circle
+              key={i}
+              cx={xPos(i)}
+              cy={yPos(v)}
+              r={4}
+              className="fill-primary stroke-background"
+              strokeWidth={2}
+            />
+          ))}
+          {/* X labels */}
+          {labels.map((l, i) => (
+            <text
+              key={i}
+              x={xPos(i)}
+              y={chartHeight - 8}
+              textAnchor="middle"
+              className="fill-muted-foreground text-[10px] font-medium"
+            >
+              {l.length > 12 ? `${l.slice(0, 10)}…` : l}
+            </text>
+          ))}
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+function StandardBarChart({
+  values,
+  labels,
+  metricLabel,
+  cumulative,
+}: {
+  values: number[];
+  labels: string[];
+  metricLabel: string;
+  cumulative: boolean;
+}) {
+  const raw = values.slice(0, labels.length);
+  const vals = cumulative ? cumulativeSeries(raw) : raw;
   const maxVal = Math.max(0, ...vals);
   const yMax = niceYMax(maxVal);
   const chartHeight = 240;
@@ -132,7 +270,9 @@ function StandardBarChart({ values, labels, metricLabel }: { values: number[]; l
 
   return (
     <div className="space-y-2">
-      <p className="text-sm text-muted-foreground">{metricLabel} · count per period</p>
+      <p className="text-sm text-muted-foreground">
+        {metricLabel} · {cumulative ? 'cumulative total (running sum over period)' : 'count per period'}
+      </p>
       <div className="flex gap-4 overflow-x-auto pb-2">
         {/* Y-axis */}
         <div className="flex flex-col justify-between shrink-0 text-right pr-2 border-r border-border" style={{ height: chartHeight }}>
@@ -146,7 +286,6 @@ function StandardBarChart({ values, labels, metricLabel }: { values: number[]; l
         <div className="flex-1 min-w-0">
           <div className="flex gap-1 items-end" style={{ height: chartHeight }}>
             {vals.map((v, i) => {
-              const heightPct = yMax > 0 ? (v / yMax) * 100 : 0;
               const barHeightPx = yMax > 0 ? Math.max(2, (v / yMax) * chartHeight) : 0;
               return (
                 <div
@@ -182,6 +321,9 @@ export function AdminCockpitView() {
   const [range, setRange] = useState<'today' | 'yesterday' | 'week' | 'month'>('today');
   const [trendPeriod, setTrendPeriod] = useState<'7d' | '3w' | '12m'>('7d');
   const [trendMetric, setTrendMetric] = useState<'parents' | 'coaches' | 'athletes' | 'sessions' | 'bookings' | 'earlyAccess' | 'reviews'>('bookings');
+  /** Line chart (default) vs bars; cumulative = running sum over buckets in the selected period */
+  const [trendChartStyle, setTrendChartStyle] = useState<'line' | 'bar'>('line');
+  const [trendCumulative, setTrendCumulative] = useState(false);
   const [data, setData] = useState<CockpitData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -396,15 +538,51 @@ export function AdminCockpitView() {
                   </button>
                 ))}
               </div>
+              <span className="text-sm font-medium text-muted-foreground">Chart</span>
+              <div className="flex rounded-md border border-input bg-background overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setTrendChartStyle('line')}
+                  className={`px-3 py-2 text-sm font-medium transition-colors ${trendChartStyle === 'line' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
+                >
+                  Line
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTrendChartStyle('bar')}
+                  className={`px-3 py-2 text-sm font-medium transition-colors ${trendChartStyle === 'bar' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
+                >
+                  Bar
+                </button>
+              </div>
+              <label className="flex items-center gap-2 text-sm cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  className="rounded border-input"
+                  checked={trendCumulative}
+                  onChange={(e) => setTrendCumulative(e.target.checked)}
+                />
+                <span className="font-medium text-muted-foreground">Cumulative</span>
+              </label>
             </div>
           </div>
         </CardHeader>
         <CardContent>
-          <StandardBarChart
-            values={trendMetrics.find((m) => m.id === trendMetric)?.values ?? []}
-            labels={trendLabels}
-            metricLabel={trendMetrics.find((m) => m.id === trendMetric)?.label ?? ''}
-          />
+          {trendChartStyle === 'line' ? (
+            <TrendLineChart
+              values={trendMetrics.find((m) => m.id === trendMetric)?.values ?? []}
+              labels={trendLabels}
+              metricLabel={trendMetrics.find((m) => m.id === trendMetric)?.label ?? ''}
+              cumulative={trendCumulative}
+            />
+          ) : (
+            <StandardBarChart
+              values={trendMetrics.find((m) => m.id === trendMetric)?.values ?? []}
+              labels={trendLabels}
+              metricLabel={trendMetrics.find((m) => m.id === trendMetric)?.label ?? ''}
+              cumulative={trendCumulative}
+            />
+          )}
         </CardContent>
       </Card>
 
