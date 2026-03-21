@@ -10,6 +10,7 @@ import { CoachTextGroupDialog } from '@/components/coach-text-group-dialog';
 import { CopySessionPhonesButton } from '@/components/copy-session-phones-button';
 import { formatEST } from '@/lib/format-date';
 import { COACH_REVENUE_FRACTION } from '@/lib/pricing';
+import { showSessionSmsCopyAndTextGroup } from '@/lib/session-sms-tools';
 import { AddToCalendarButton } from '@/components/add-to-calendar-button';
 import { SessionTypeBadge } from '@/components/session-type-badge';
 import { CapacityBadge } from '@/components/capacity-badge';
@@ -32,19 +33,6 @@ function wrestlerNames(s: CoachSession): string[] {
       return o && (o.first_name || o.last_name) ? [o.first_name, o.last_name].filter(Boolean).join(' ') : null;
     })
     .filter((n): n is string => Boolean(n));
-}
-
-/** SMS blast to all parents — only for multi-athlete / group-style sessions with at least one signup */
-function showTextGroup(session: CoachSession): boolean {
-  const current = session.current_participants ?? 0;
-  if (current < 1) return false;
-  const st = session.session_type ?? '';
-  const mode = session.session_mode ?? '';
-  const max = session.max_participants ?? 1;
-  if (st === 'small_group' || st === 'group' || st === '2-athlete') return true;
-  if (max > 1) return true;
-  if (mode === 'partner-open' || mode === 'partner-invite') return true;
-  return false;
 }
 
 function coachPayout(session: CoachSession): number {
@@ -198,7 +186,7 @@ export function CoachSessionsClient({
                           Message
                         </Button>
                       </Link>
-                      {showTextGroup(session) && (
+                      {showSessionSmsCopyAndTextGroup(session) && (
                         <>
                           <Button
                             type="button"

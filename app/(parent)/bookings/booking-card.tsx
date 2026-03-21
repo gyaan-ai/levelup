@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { Calendar, User, MapPin, X, Share2, Check, ExternalLink, RotateCcw, Star } from 'lucide-react';
+import { Calendar, User, MapPin, X, Share2, Check, ExternalLink, RotateCcw, Star, Smartphone } from 'lucide-react';
 import { SchoolLogo } from '@/components/school-logo';
 import { differenceInHours } from 'date-fns';
 import { formatEST } from '@/lib/format-date';
@@ -15,6 +15,9 @@ import { ProfileImage } from '@/components/profile-image';
 import { StarRating } from '@/components/star-rating';
 import { CapacityBadge } from '@/components/capacity-badge';
 import { isSessionOpenForParentBrowse } from '@/lib/sessions';
+import { showSessionSmsCopyAndTextGroup } from '@/lib/session-sms-tools';
+import { CopySessionPhonesButton } from '@/components/copy-session-phones-button';
+import { CoachTextGroupDialog } from '@/components/coach-text-group-dialog';
 
 const CANCELLATION_WINDOW_HOURS = 24;
 
@@ -60,15 +63,18 @@ export type BookingSession = {
 interface BookingCardProps {
   session: BookingSession;
   isPast?: boolean;
+  /** Admin Home (all sessions): show Copy Cell #s + Text group — APIs allow admin only */
+  showAdminSmsTools?: boolean;
 }
 
-export function BookingCard({ session, isPast = false }: BookingCardProps) {
+export function BookingCard({ session, isPast = false, showAdminSmsTools = false }: BookingCardProps) {
   const router = useRouter();
   const [cancelling, setCancelling] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [textGroupOpen, setTextGroupOpen] = useState(false);
 
   const handleCopyShareLink = async () => {
     if (!session.partner_invite_code) return;
@@ -153,8 +159,20 @@ export function BookingCard({ session, isPast = false }: BookingCardProps) {
     return <Badge variant="outline">{status}</Badge>;
   };
 
+  const adminSmsRow =
+    showAdminSmsTools && !isPast && showSessionSmsCopyAndTextGroup(session);
+
   return (
     <Card className={isPast ? 'bg-muted/20' : ''}>
+      {adminSmsRow && (
+        <CoachTextGroupDialog
+          sessionId={session.id}
+          open={textGroupOpen}
+          onOpenChange={setTextGroupOpen}
+          sessionLabel={`${formatEST(scheduledTime, 'EEE, MMM d · h:mm a')} · ${session.facility}`}
+          onSent={() => router.refresh()}
+        />
+      )}
       <CardContent className="p-4 sm:p-5">
         <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-start sm:justify-between gap-4">
           <div className="flex gap-3 flex-1 min-w-0">
@@ -246,6 +264,21 @@ export function BookingCard({ session, isPast = false }: BookingCardProps) {
                     View
                   </Button>
                 </Link>
+              )}
+              {adminSmsRow && (
+                <div className="flex flex-col gap-2 w-full sm:w-auto sm:items-end">
+                  <CopySessionPhonesButton sessionId={session.id} className="min-h-[40px] text-xs px-2 w-full sm:w-auto" />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="min-h-[40px] gap-1 border-accent/50 text-accent w-full sm:w-auto"
+                    onClick={() => setTextGroupOpen(true)}
+                  >
+                    <Smartphone className="h-4 w-4 shrink-0" />
+                    Text group
+                  </Button>
+                </div>
               )}
               {!isPast && showJoinWhenNotEnrolled && (
                 <Link href={`/sessions/${session.id}/register`} className="inline-flex" prefetch={false}>

@@ -55,6 +55,7 @@ import { formatEST } from '@/lib/format-date';
 import { CopySessionPhonesButton } from '@/components/copy-session-phones-button';
 import { CoachTextGroupDialog } from '@/components/coach-text-group-dialog';
 import { AdminCockpitView } from './admin-cockpit-view';
+import { showSessionSmsCopyAndTextGroup } from '@/lib/session-sms-tools';
 
 export type AdminSession = {
   id: string;
@@ -75,19 +76,6 @@ export type AdminSession = {
   athlete_school: string;
   facility_name: string;
 };
-
-/** Same rules as coach “Text group” / Copy Cell #s — group-style sessions with at least one signup */
-function showAdminSessionSmsTools(s: AdminSession): boolean {
-  const current = s.current_participants ?? 0;
-  if (current < 1) return false;
-  const st = s.session_type ?? '';
-  const mode = s.session_mode ?? '';
-  const max = s.max_participants ?? 1;
-  if (st === 'small_group' || st === 'group' || st === '2-athlete') return true;
-  if (max > 1) return true;
-  if (mode === 'partner-open' || mode === 'partner-invite') return true;
-  return false;
-}
 
 export type AdminUser = {
   id: string;
@@ -599,7 +587,7 @@ export function AdminDashboardClient({
                           )}
                         </td>
                         <td className="py-2 text-right align-top">
-                          {showAdminSessionSmsTools(s) ? (
+                          {showSessionSmsCopyAndTextGroup(s) ? (
                             <div className="flex flex-col gap-1 items-end">
                               <CopySessionPhonesButton sessionId={s.id} className="h-8 text-xs px-2" />
                               <Button

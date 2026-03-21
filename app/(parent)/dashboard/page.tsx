@@ -353,7 +353,7 @@ export default async function HomePage() {
         {isAdmin && !adminPreviewAsParent && allUpcomingForAdmin.length > 0 ? (
           <div className="space-y-4">
             {allUpcomingForAdmin.map((s) => (
-              <BookingCard key={s.id} session={adminRowToBookingSession(s)} />
+              <BookingCard key={s.id} session={adminRowToBookingSession(s)} showAdminSmsTools />
             ))}
           </div>
         ) : isAdmin && !adminPreviewAsParent && allUpcomingForAdmin.length === 0 ? (
