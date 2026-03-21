@@ -46,11 +46,14 @@ import {
   Tag,
   Gauge,
   List,
+  Smartphone,
 } from 'lucide-react';
 import Link from 'next/link';
 import { ProfileImage } from '@/components/profile-image';
 import { CapacityBadge } from '@/components/capacity-badge';
 import { formatEST } from '@/lib/format-date';
+import { CopySessionPhonesButton } from '@/components/copy-session-phones-button';
+import { CoachTextGroupDialog } from '@/components/coach-text-group-dialog';
 import { AdminCockpitView } from './admin-cockpit-view';
 
 export type AdminSession = {
@@ -72,6 +75,19 @@ export type AdminSession = {
   athlete_school: string;
   facility_name: string;
 };
+
+/** Same rules as coach “Text group” / Copy Cell #s — group-style sessions with at least one signup */
+function showAdminSessionSmsTools(s: AdminSession): boolean {
+  const current = s.current_participants ?? 0;
+  if (current < 1) return false;
+  const st = s.session_type ?? '';
+  const mode = s.session_mode ?? '';
+  const max = s.max_participants ?? 1;
+  if (st === 'small_group' || st === 'group' || st === '2-athlete') return true;
+  if (max > 1) return true;
+  if (mode === 'partner-open' || mode === 'partner-invite') return true;
+  return false;
+}
 
 export type AdminUser = {
   id: string;
@@ -156,6 +172,7 @@ export function AdminDashboardClient({
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
   const [sessionDeleteLoading, setSessionDeleteLoading] = useState(false);
   const [sessionCompletingId, setSessionCompletingId] = useState<string | null>(null);
+  const [textGroupAdminSession, setTextGroupAdminSession] = useState<AdminSession | null>(null);
   const [userRoleFilter, setUserRoleFilter] = useState<string>('all');
   const [userSearch, setUserSearch] = useState('');
   const [athleteSearch, setAthleteSearch] = useState('');
@@ -418,6 +435,17 @@ export function AdminDashboardClient({
 
   return (
     <div className="space-y-6">
+      {textGroupAdminSession && (
+        <CoachTextGroupDialog
+          sessionId={textGroupAdminSession.id}
+          open={!!textGroupAdminSession}
+          onOpenChange={(open) => {
+            if (!open) setTextGroupAdminSession(null);
+          }}
+          sessionLabel={`${formatEST(new Date(textGroupAdminSession.scheduled_datetime), 'EEE, MMM d · h:mm a')} · ${textGroupAdminSession.facility_name}`}
+          onSent={() => router.refresh()}
+        />
+      )}
       <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-4 border-b border-border pb-4">
         <div className="flex flex-wrap gap-2">
           {tabs.map((t) => (
@@ -454,7 +482,8 @@ export function AdminDashboardClient({
           <CardHeader>
             <CardTitle>All privates by date</CardTitle>
             <CardDescription>
-              All sessions (newest first). Use &quot;Copy link&quot; to get the invite URL for a session and send to families.
+              All sessions (newest first). Use &quot;Copy link&quot; for the join URL. For group-style sessions with signups, use{' '}
+              <strong className="text-foreground">Copy Cell #s</strong> (paste into your phone) or <strong className="text-foreground">Text group</strong> (Twilio), same as coaches.
             </CardDescription>
             <div className="flex flex-wrap gap-4 pt-2 items-center">
               <Link href="/admin/sessions/create">
@@ -500,13 +529,14 @@ export function AdminDashboardClient({
                     <th className="text-right py-2 font-medium">Total</th>
                     <th className="text-right py-2 font-medium">Coach $</th>
                     <th className="text-right py-2 font-medium">Share link</th>
+                    <th className="text-right py-2 font-medium">Cells / SMS</th>
                     <th className="text-right py-2 font-medium">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredSessions.length === 0 ? (
                     <tr>
-                      <td colSpan={10} className="py-8 text-center text-muted-foreground">
+                      <td colSpan={11} className="py-8 text-center text-muted-foreground">
                         No sessions match filters. Clear date filters to see all.
                       </td>
                     </tr>
@@ -564,6 +594,25 @@ export function AdminDashboardClient({
                               {copiedSessionId === s.id ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
                               {copiedSessionId === s.id ? 'Copied' : 'Copy link'}
                             </Button>
+                          ) : (
+                            <span className="text-muted-foreground text-xs">—</span>
+                          )}
+                        </td>
+                        <td className="py-2 text-right align-top">
+                          {showAdminSessionSmsTools(s) ? (
+                            <div className="flex flex-col gap-1 items-end">
+                              <CopySessionPhonesButton sessionId={s.id} className="h-8 text-xs px-2" />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="h-8 gap-1 text-xs px-2 border-accent/50 text-accent"
+                                onClick={() => setTextGroupAdminSession(s)}
+                              >
+                                <Smartphone className="h-3.5 w-3.5" />
+                                Text group
+                              </Button>
+                            </div>
                           ) : (
                             <span className="text-muted-foreground text-xs">—</span>
                           )}
