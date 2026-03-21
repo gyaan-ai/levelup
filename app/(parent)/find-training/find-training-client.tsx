@@ -28,6 +28,7 @@ import { StarRating } from '@/components/star-rating';
 import { SessionStatusPill, ParticipantAvatars } from '@/components/session-tile-utils';
 import { SessionTypeBadge } from '@/components/session-type-badge';
 import { ProfileImage } from '@/components/profile-image';
+import { isSessionClosedForParentBrowse, isSessionOpenForParentBrowse } from '@/lib/sessions';
 
 type Facility = { id: string; name?: string; school?: string; address?: string | null };
 type SessionRow = {
@@ -79,7 +80,7 @@ export function FindTrainingClient({
   initialCoach?: string;
   coaches?: CoachOption[];
   searchBasePath?: string;
-  /** e.g. "Next 7 days" — when set, show results without requiring date (smart default) */
+  /** e.g. "Next 14 days" — when set, show results without requiring date (smart default) */
   defaultRangeLabel?: string;
   /** Preselect this wrestler on the register page (e.g. from Book again) */
   preselectedWrestlerId?: string;
@@ -115,15 +116,8 @@ export function FindTrainingClient({
   const showResults = initialSessions.length > 0 && (hasSearchCriteria || !!defaultRangeLabel);
   const showNoResults = (hasSearchCriteria || !!defaultRangeLabel) && initialSessions.length === 0;
 
-  const closedStatuses = ['completed', 'cancelled', 'no-show'];
-  const openSessions = initialSessions.filter((s) => {
-    if (closedStatuses.includes((s.status ?? '') as string)) return false;
-    return (s.current_participants ?? 0) < (s.max_participants ?? 1);
-  });
-  const closedSessions = initialSessions.filter((s) => {
-    const atCapacity = (s.current_participants ?? 0) >= (s.max_participants ?? 1);
-    return closedStatuses.includes((s.status ?? '') as string) || atCapacity;
-  });
+  const openSessions = initialSessions.filter((s) => isSessionOpenForParentBrowse(s));
+  const closedSessions = initialSessions.filter((s) => isSessionClosedForParentBrowse(s));
   const displayedSessions = sessionsTab === 'open' ? openSessions : closedSessions;
 
   return (

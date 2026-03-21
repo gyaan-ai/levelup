@@ -91,3 +91,34 @@ export const NOTIFICATION_TITLES: Record<NotificationType, string> = {
   join_request_declined: 'Your join request was declined',
   partner_24h_reminder: '24 hours until your session - still need a partner?',
 };
+
+const TERMINAL_SESSION_STATUSES = new Set(['completed', 'cancelled', 'no-show']);
+
+/**
+ * For Training / find-training lists: is this session bookable as "open" (has spots left)?
+ * If max_participants is missing in DB, do not treat as max=1 (that wrongly marked multi-kid groups as full).
+ */
+export function isSessionOpenForParentBrowse(s: {
+  status?: string | null;
+  current_participants?: number | null;
+  max_participants?: number | null;
+}): boolean {
+  if (TERMINAL_SESSION_STATUSES.has((s.status ?? '') as string)) return false;
+  const cur = s.current_participants ?? 0;
+  const max = s.max_participants;
+  if (max == null || max <= 0) return true;
+  return cur < max;
+}
+
+/** Past/cancelled or truly at capacity (requires valid max_participants). */
+export function isSessionClosedForParentBrowse(s: {
+  status?: string | null;
+  current_participants?: number | null;
+  max_participants?: number | null;
+}): boolean {
+  if (TERMINAL_SESSION_STATUSES.has((s.status ?? '') as string)) return true;
+  const cur = s.current_participants ?? 0;
+  const max = s.max_participants;
+  if (max == null || max <= 0) return false;
+  return cur >= max;
+}

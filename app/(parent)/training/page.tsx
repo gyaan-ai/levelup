@@ -112,7 +112,7 @@ export default async function TrainingPage({
     nextAvailable: nextByAthlete.get(a.id) ?? null,
   }));
 
-  // Sessions list: smart default = next 7 days when no date; optional filters for facility/coach/time
+  // Sessions list: smart default = next 14 days when no date; optional filters for facility/coach/time
   let availabilitySessions: SessionRow[] = [];
   const dateParam = sp.date;
   const now = new Date();
@@ -136,12 +136,12 @@ export default async function TrainingPage({
         end.setDate(end.getDate() + 7);
         return end.toISOString();
       })();
-  // Past/completed sessions: when no date = last 7 days; when date = that day
+  // Past/completed sessions: when no date = last 14 days; when date = that day
   const pastDayStart = dateParam
     ? dayStart
     : (() => {
         const start = new Date(now);
-        start.setDate(start.getDate() - 7);
+        start.setDate(start.getDate() - 14);
         return start.toISOString();
       })();
   const pastDayEnd = dateParam ? dayEnd : now.toISOString();

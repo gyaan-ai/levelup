@@ -97,7 +97,7 @@ export function TrainingClient({
           initialCoach={availabilityCoach}
           coaches={coaches}
           searchBasePath="/training"
-          defaultRangeLabel="Next 7 days"
+          defaultRangeLabel="Next 14 days"
           preselectedWrestlerId={preselectedWrestlerId}
         />
       )}
