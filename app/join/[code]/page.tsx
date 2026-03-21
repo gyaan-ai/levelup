@@ -11,6 +11,11 @@ import { ProfileImage } from '@/components/profile-image';
 import { formatEST } from '@/lib/format-date';
 import { JoinSessionClient } from './join-session-client';
 import { hasMinPhoneDigits } from '@/lib/phone';
+import { getEffectiveFilledCount } from '@/lib/sessions';
+
+/** Always fresh roster from DB (avoid stale cached HTML after admin adds a participant). */
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export default async function JoinByCodePage({
   params,
@@ -36,25 +41,32 @@ export default async function JoinByCodePage({
 
   if (error || !session) notFound();
 
-  const currentParticipants = (session as { current_participants?: number }).current_participants ?? 1;
   const maxParticipants = (session as { max_participants?: number }).max_participants ?? 2;
-  const isFull = currentParticipants >= maxParticipants;
 
   const { data: participants } = await admin
     .from('session_participants')
     .select('*, youth_wrestlers(id, first_name, last_name, age, weight_class, skill_level)')
     .eq('session_id', session.id);
 
+  const currentParticipants = getEffectiveFilledCount({
+    current_participants: (session as { current_participants?: number }).current_participants,
+    max_participants: maxParticipants,
+    session_participants: participants ?? [],
+  });
+  const isFull = currentParticipants >= maxParticipants;
+
   type YouthInfo = { first_name?: string; last_name?: string; age?: number; weight_class?: string };
   const participantsList = (participants ?? []).map((p) => {
     const raw = p.youth_wrestlers;
     const yw = (Array.isArray(raw) ? raw[0] : raw) as YouthInfo | null;
-    if (!yw) return null;
-    const name = `${yw.first_name ?? ''} ${yw.last_name ?? ''}`.trim();
+    const pAny = p as { roster_first_name?: string | null; roster_last_name?: string | null };
+    const fromRoster = [pAny.roster_first_name, pAny.roster_last_name].filter(Boolean).join(' ').trim();
+    const fromYw = yw ? `${yw.first_name ?? ''} ${yw.last_name ?? ''}`.trim() : '';
+    const name = (fromYw || fromRoster).trim();
     if (!name) return null;
     const parts = [name];
-    if (yw.age != null) parts.push(`${yw.age} yrs`);
-    if (yw.weight_class) parts.push(`${yw.weight_class} lbs`);
+    if (yw?.age != null) parts.push(`${yw.age} yrs`);
+    if (yw?.weight_class) parts.push(`${yw.weight_class} lbs`);
     return parts.join(' · ');
   }).filter(Boolean) as string[];
 

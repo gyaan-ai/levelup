@@ -13,6 +13,11 @@ import { ProfileImage } from '@/components/profile-image';
 import { StarRating } from '@/components/star-rating';
 import { SchoolLogo } from '@/components/school-logo';
 import { formatEST } from '@/lib/format-date';
+import { getEffectiveFilledCountWithListedNames } from '@/lib/sessions';
+
+/** Roster + badge must match DB; avoid cached 4/6 when SQL shows 5 kids. */
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 import { SessionDetailActions } from './session-detail-actions';
 import { CapacityBadge } from '@/components/capacity-badge';
 import { Calendar, User, MapPin, Users } from 'lucide-react';
@@ -150,8 +155,25 @@ export default async function SessionDetailPage({
     scheduledTime > now &&
     isOwner;
   const canLeave = canCancel && !isOwner;
-  const current = s.current_participants ?? 0;
   const max = s.max_participants ?? 1;
+
+  const participantsList = (s.session_participants ?? [])
+    .map((p) => {
+      const yw = p.youth_wrestlers;
+      const o = Array.isArray(yw) ? yw[0] : yw;
+      return o ? `${o.first_name ?? ''} ${o.last_name ?? ''}`.trim() : null;
+    })
+    .filter(Boolean) as string[];
+
+  /** Badge must match visible roster; sessions.current_participants often lags after manual SQL. */
+  const current = getEffectiveFilledCountWithListedNames(
+    {
+      current_participants: s.current_participants,
+      max_participants: s.max_participants,
+      session_participants: s.session_participants ?? [],
+    },
+    participantsList.length
+  );
   const openings = Math.max(0, max - current);
   const joinPolicy = s.join_policy ?? 'private';
   const canRegister =
@@ -182,14 +204,6 @@ export default async function SessionDetailPage({
   const fac = Array.isArray(s.facilities) ? s.facilities[0] : s.facilities;
   const facilityName = fac?.name ?? '—';
   const facilityAddress = fac?.address ?? null;
-
-  const participantsList = (s.session_participants ?? [])
-    .map((p) => {
-      const yw = p.youth_wrestlers;
-      const o = Array.isArray(yw) ? yw[0] : yw;
-      return o ? `${o.first_name ?? ''} ${o.last_name ?? ''}`.trim() : null;
-    })
-    .filter(Boolean) as string[];
 
   let amountPaid = 0;
   const myParticipantIds = new Set(youthWrestlerIds);

@@ -15,6 +15,7 @@ import {
 import { User, Calendar, MapPin, X } from 'lucide-react';
 import { formatEST } from '@/lib/format-date';
 import { SessionStatusPill, ParticipantAvatars, getSessionAvailability } from '@/components/session-tile-utils';
+import { getEffectiveFilledCount } from '@/lib/sessions';
 import { ProfileImage } from '@/components/profile-image';
 
 type StatusFilter = 'all' | 'open' | 'filling' | 'full';
@@ -233,7 +234,7 @@ export function PartnerSessionsClient({
           const dt = s.scheduled_datetime ? new Date(s.scheduled_datetime) : null;
           const price = s.price_per_participant ?? 40;
           const participantList = participantsFromSession(s);
-          const current = s.current_participants ?? 0;
+          const current = getEffectiveFilledCount(s);
           const max = s.max_participants ?? 0;
           return (
             <Card key={s.id}>

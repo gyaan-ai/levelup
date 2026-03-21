@@ -11,6 +11,7 @@ import { sendCoachNewSignupSms } from '@/lib/twilio';
 import { hasMinPhoneDigits } from '@/lib/phone';
 import { rosterSnapshotFromYouthRow } from '@/lib/session-roster-snapshot';
 import { finalizeRegisterFromCheckoutSession } from '@/lib/finalize-session-register-from-stripe';
+import { getEffectiveFilledCount } from '@/lib/sessions';
 
 /**
  * POST - Pay & register a youth wrestler for a session (public or invite_only).
@@ -68,11 +69,26 @@ export async function POST(
       status?: string;
     };
 
-    const current = s.current_participants ?? 1;
+    const admin = createAdminClient(tenant.slug);
+    const { count: participantRowCount } = await admin
+      .from('session_participants')
+      .select('*', { count: 'exact', head: true })
+      .eq('session_id', sessionId);
+
     const max = s.max_participants ?? 2;
-    if (current >= max) {
+    const filled = getEffectiveFilledCount(
+      {
+        current_participants: s.current_participants,
+        max_participants: s.max_participants,
+        session_participants: null,
+      },
+      participantRowCount ?? 0
+    );
+    if (filled >= max) {
       return NextResponse.json({ error: 'Session is full' }, { status: 400 });
     }
+
+    const current = s.current_participants ?? 1;
 
     const isOwner = s.parent_id === user.id;
 
@@ -120,7 +136,6 @@ export async function POST(
       const dt = s.scheduled_datetime;
       if (coachId && coachId !== user.id) {
         const dateStr = dt ? formatEST(new Date(dt), 'EEE MMM d, h:mm a') : 'your session';
-        const admin = createAdminClient(tenant.slug);
         await createNotification(admin, {
           user_id: coachId,
           type: 'session_booked',
@@ -174,8 +189,6 @@ export async function POST(
     if (existing) {
       return NextResponse.json({ error: 'This wrestler is already registered for this session' }, { status: 409 });
     }
-
-    const admin = createAdminClient(tenant.slug);
 
     const stripeEnabled = process.env.STRIPE_CHECKOUT_ENABLED === 'true';
     if (!stripeEnabled) {

@@ -28,7 +28,11 @@ import { StarRating } from '@/components/star-rating';
 import { SessionStatusPill, ParticipantAvatars } from '@/components/session-tile-utils';
 import { SessionTypeBadge } from '@/components/session-type-badge';
 import { ProfileImage } from '@/components/profile-image';
-import { isSessionClosedForParentBrowse, isSessionOpenForParentBrowse } from '@/lib/sessions';
+import {
+  getEffectiveFilledCount,
+  isSessionClosedForParentBrowse,
+  isSessionOpenForParentBrowse,
+} from '@/lib/sessions';
 
 type Facility = { id: string; name?: string; school?: string; address?: string | null };
 type SessionRow = {
@@ -393,10 +397,10 @@ export function FindTrainingClient({
               displayedSessions.map((s) => {
                 const coach = Array.isArray(s.athletes) ? s.athletes[0] : s.athletes;
                 const fac = Array.isArray(s.facilities) ? s.facilities[0] : s.facilities;
-                const current = s.current_participants ?? 0;
                 const max = s.max_participants ?? 1;
+                const current = getEffectiveFilledCount(s);
                 const dt = new Date(s.scheduled_datetime);
-                const openSlots = max - current;
+                const openSlots = Math.max(0, max - current);
 
                 return (
                   <div

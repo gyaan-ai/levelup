@@ -95,6 +95,61 @@ export const NOTIFICATION_TITLES: Record<NotificationType, string> = {
 const TERMINAL_SESSION_STATUSES = new Set(['completed', 'cancelled', 'no-show']);
 
 /**
+ * Seats filled for capacity UI and gates. Uses the higher of `current_participants` and
+ * actual roster rows (or `participantRowCountOverride` from a COUNT query) so we don't show
+ * "2 spots left" when the counter drifted after a failed webhook, manual DB edits, or Stripe refunds.
+ */
+function participantRowCount(session: {
+  session_participants?: unknown[] | null;
+}, override?: number): number {
+  if (typeof override === 'number' && Number.isFinite(override)) return Math.max(0, override);
+  const sp = session.session_participants;
+  if (Array.isArray(sp)) return sp.length;
+  return 0;
+}
+
+export function getEffectiveFilledCount(
+  session: {
+    current_participants?: number | null;
+    max_participants?: number | null;
+    session_participants?: unknown[] | null;
+  },
+  participantRowCountOverride?: number
+): number {
+  const fromColRaw = session.current_participants;
+  const fromCol =
+    typeof fromColRaw === 'number' && Number.isFinite(fromColRaw)
+      ? fromColRaw
+      : typeof fromColRaw === 'string'
+        ? parseInt(fromColRaw, 10)
+        : 0;
+  const fromColSafe = Number.isFinite(fromCol) ? fromCol : 0;
+  const rows = participantRowCount(session, participantRowCountOverride);
+  const raw = Math.max(fromColSafe, rows);
+  const max = session.max_participants;
+  if (max == null || max <= 0) return raw;
+  return Math.min(raw, max);
+}
+
+/** Use when UI lists names from session_participants so the badge cannot stay behind the roster (stale current_participants column). */
+export function getEffectiveFilledCountWithListedNames(
+  session: {
+    current_participants?: number | null;
+    max_participants?: number | null;
+    session_participants?: unknown[] | null;
+  },
+  listedNameCount: number,
+  participantRowCountOverride?: number
+): number {
+  const base = getEffectiveFilledCount(session, participantRowCountOverride);
+  const listed = Math.max(0, Math.floor(listedNameCount));
+  const max = session.max_participants;
+  const raw = Math.max(base, listed);
+  if (max == null || max <= 0) return raw;
+  return Math.min(raw, max);
+}
+
+/**
  * For Training / find-training lists: is this session bookable as "open" (has spots left)?
  * If max_participants is missing in DB, do not treat as max=1 (that wrongly marked multi-kid groups as full).
  */
@@ -102,12 +157,13 @@ export function isSessionOpenForParentBrowse(s: {
   status?: string | null;
   current_participants?: number | null;
   max_participants?: number | null;
+  session_participants?: unknown[] | null;
 }): boolean {
   if (TERMINAL_SESSION_STATUSES.has((s.status ?? '') as string)) return false;
-  const cur = s.current_participants ?? 0;
   const max = s.max_participants;
   if (max == null || max <= 0) return true;
-  return cur < max;
+  const filled = getEffectiveFilledCount(s);
+  return filled < max;
 }
 
 /** Past/cancelled or truly at capacity (requires valid max_participants). */
@@ -115,10 +171,11 @@ export function isSessionClosedForParentBrowse(s: {
   status?: string | null;
   current_participants?: number | null;
   max_participants?: number | null;
+  session_participants?: unknown[] | null;
 }): boolean {
   if (TERMINAL_SESSION_STATUSES.has((s.status ?? '') as string)) return true;
-  const cur = s.current_participants ?? 0;
   const max = s.max_participants;
   if (max == null || max <= 0) return false;
-  return cur >= max;
+  const filled = getEffectiveFilledCount(s);
+  return filled >= max;
 }
