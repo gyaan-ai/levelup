@@ -60,6 +60,15 @@ export type CockpitData = {
   payoutsPaid: number;
   payoutsPaidList: { session_id: string; amount: number; coach_name: string }[];
   revenueThatDay: number;
+  /** Per-period signup economics: count, gross from parents, session-level coach/Stripe/Guild */
+  bookingEconomics?: {
+    bookingCount: number;
+    gross: number;
+    coachPayouts: number;
+    stripeFees: number;
+    guildOrgFees: number;
+    remainder: number;
+  };
   pageViews?: number;
   visitors?: number;
   trends: {
@@ -133,16 +142,34 @@ function niceYMax(max: number): number {
   return n * step;
 }
 
+/** Additive series: month 1 + month 3 → second point shows 4 */
+function runningSum(values: number[]): number[] {
+  let s = 0;
+  return values.map((v) => {
+    s += v;
+    return s;
+  });
+}
+
+/** Line + points: visible on dark backgrounds */
+const ACTIVITY_LINE_STROKE = '#38bdf8';
+const ACTIVITY_LINE_POINT_FILL = '#38bdf8';
+const ACTIVITY_BAR_CLASS = 'bg-sky-500/90 hover:bg-sky-400';
+
 function TrendLineChart({
   values,
   labels,
   metricLabel,
+  mode,
 }: {
   values: number[];
   labels: string[];
   metricLabel: string;
+  /** runningTotal = 1+3+… additive; perPeriod = each bucket alone */
+  mode: 'runningTotal' | 'perPeriod';
 }) {
-  const vals = values.slice(0, labels.length);
+  const raw = values.slice(0, labels.length);
+  const vals = mode === 'runningTotal' ? runningSum(raw) : raw;
   const maxVal = Math.max(0, ...vals, 0);
   const yMax = niceYMax(maxVal);
   const chartHeight = 240;
@@ -169,11 +196,16 @@ function TrendLineChart({
 
   return (
     <div className="space-y-2">
-      <p className="text-sm text-muted-foreground">{metricLabel} · count per period</p>
+      <p className="text-sm text-muted-foreground">
+        {metricLabel} ·{' '}
+        {mode === 'runningTotal'
+          ? 'running total in this window (each period adds to the last)'
+          : 'new in each period only'}
+      </p>
       <div className="w-full overflow-x-auto">
         <svg
           viewBox={`0 0 ${chartWidth} ${chartHeight}`}
-          className="w-full min-w-[320px] h-[240px] text-primary"
+          className="w-full min-w-[320px] h-[240px]"
           role="img"
           aria-label={`${metricLabel} trend`}
         >
@@ -210,12 +242,11 @@ function TrendLineChart({
           {n > 0 && yMax > 0 && (
             <polyline
               fill="none"
-              stroke="currentColor"
+              stroke={ACTIVITY_LINE_STROKE}
               strokeWidth={2.5}
               strokeLinejoin="round"
               strokeLinecap="round"
               points={points}
-              className="text-primary"
             />
           )}
           {/* Points */}
@@ -225,8 +256,9 @@ function TrendLineChart({
               cx={xPos(i)}
               cy={yPos(v)}
               r={4}
-              className="fill-primary stroke-background"
-              strokeWidth={2}
+              fill={ACTIVITY_LINE_POINT_FILL}
+              stroke="#0369a1"
+              strokeWidth={1.5}
             />
           ))}
           {/* X labels */}
@@ -251,12 +283,15 @@ function StandardBarChart({
   values,
   labels,
   metricLabel,
+  mode,
 }: {
   values: number[];
   labels: string[];
   metricLabel: string;
+  mode: 'runningTotal' | 'perPeriod';
 }) {
-  const vals = values.slice(0, labels.length);
+  const raw = values.slice(0, labels.length);
+  const vals = mode === 'runningTotal' ? runningSum(raw) : raw;
   const maxVal = Math.max(0, ...vals);
   const yMax = niceYMax(maxVal);
   const chartHeight = 240;
@@ -264,7 +299,12 @@ function StandardBarChart({
 
   return (
     <div className="space-y-2">
-      <p className="text-sm text-muted-foreground">{metricLabel} · count per period</p>
+      <p className="text-sm text-muted-foreground">
+        {metricLabel} ·{' '}
+        {mode === 'runningTotal'
+          ? 'running total in this window (each period adds to the last)'
+          : 'new in each period only'}
+      </p>
       <div className="flex gap-4 overflow-x-auto pb-2">
         {/* Y-axis */}
         <div className="flex flex-col justify-between shrink-0 text-right pr-2 border-r border-border" style={{ height: chartHeight }}>
@@ -287,7 +327,7 @@ function StandardBarChart({
                   title={`${labels[i] ?? '—'}: ${v}`}
                 >
                   <div
-                    className="w-full rounded-t bg-primary/80 hover:bg-primary transition-colors min-h-[2px] flex-shrink-0"
+                    className={`w-full rounded-t transition-colors min-h-[2px] flex-shrink-0 ${ACTIVITY_BAR_CLASS}`}
                     style={{ height: barHeightPx }}
                   />
                 </div>
@@ -454,8 +494,10 @@ export function AdminCockpitView() {
   const [range, setRange] = useState<'today' | 'yesterday' | 'week' | 'month'>('today');
   const [trendPeriod, setTrendPeriod] = useState<'7d' | '3w' | '12m'>('7d');
   const [trendMetric, setTrendMetric] = useState<'parents' | 'coaches' | 'athletes' | 'sessions' | 'bookings' | 'earlyAccess' | 'reviews'>('bookings');
-  /** Period activity: bar (default) or line — same per-bucket counts */
+  /** Period activity: bar (default) or line */
   const [trendChartStyle, setTrendChartStyle] = useState<'line' | 'bar'>('bar');
+  /** Additive running total in the selected window (default) vs raw per bucket */
+  const [activityMode, setActivityMode] = useState<'runningTotal' | 'perPeriod'>('runningTotal');
   const [growthLineVisible, setGrowthLineVisible] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(GROWTH_LINE_SPECS.map((s) => [s.id, true]))
   );
@@ -518,9 +560,12 @@ export function AdminCockpitView() {
     { id: 'reviews' as const, label: 'Reviews', values: trends.reviews ?? [] },
   ];
 
+  const be = d.bookingEconomics;
+  const bookingN = be?.bookingCount ?? d.bookings.length;
+
   const summaryCards = [
-    { label: 'Revenue booked', value: `$${d.revenueThatDay.toFixed(0)}`, icon: DollarSign },
-    { label: 'Bookings (signups)', value: d.bookings.length, icon: CreditCard },
+    { label: 'Gross (parent payments)', value: `$${d.revenueThatDay.toFixed(0)}`, icon: DollarSign },
+    { label: 'Bookings (# signups)', value: bookingN, icon: CreditCard },
     { label: 'New parents', value: d.newParents.length, icon: UserPlus },
     { label: 'New coaches', value: d.newCoaches.length, icon: Users },
     { label: 'New athletes', value: d.newAthletes.length, icon: Users },
@@ -587,12 +632,10 @@ export function AdminCockpitView() {
           </CardTitle>
         </CardHeader>
         <CardContent className="flex flex-wrap items-baseline gap-x-6 gap-y-2 text-lg">
-          <span className="font-semibold text-foreground tabular-nums">{d.bookings.length} bookings</span>
-          <span className="font-bold text-2xl tabular-nums">
-            ${d.revenueThatDay.toFixed(0)} total
-          </span>
-          {d.bookings.length > 0 && d.revenueThatDay > 0 && (
-            <span className="text-muted-foreground">(~${(d.revenueThatDay / d.bookings.length).toFixed(0)} each)</span>
+          <span className="font-semibold text-foreground tabular-nums">{bookingN} bookings</span>
+          <span className="font-bold text-2xl tabular-nums">${d.revenueThatDay.toFixed(0)} gross</span>
+          {bookingN > 0 && d.revenueThatDay > 0 && (
+            <span className="text-muted-foreground">(~${(d.revenueThatDay / bookingN).toFixed(0)} / signup)</span>
           )}
           <span className="text-muted-foreground">
             <span className="font-semibold text-foreground tabular-nums">{d.newParents.length}</span> parents,{' '}
@@ -604,6 +647,44 @@ export function AdminCockpitView() {
           </span>
         </CardContent>
       </Card>
+
+      {be && (
+        <Card className="border-border">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-medium text-muted-foreground">Gross vs payouts &amp; fees</CardTitle>
+            <p className="text-xs text-muted-foreground mt-1 max-w-3xl leading-relaxed">
+              <strong className="text-foreground">{be.bookingCount}</strong> signup rows ·{' '}
+              <strong className="text-foreground tabular-nums">${be.gross.toFixed(0)}</strong> gross from parents (sum of{' '}
+              <code className="rounded bg-muted px-1 py-0.5 text-[10px]">amount_paid</code>). Coach, Stripe, and Guild use each
+              session&apos;s values <em>once per session</em> (shared when multiple kids book the same session).
+            </p>
+          </CardHeader>
+          <CardContent>
+            <dl className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 text-sm">
+              <div className="rounded-lg border border-border bg-muted/20 px-3 py-2">
+                <dt className="text-xs font-medium text-muted-foreground">Gross (parents)</dt>
+                <dd className="text-lg font-semibold tabular-nums">${be.gross.toFixed(0)}</dd>
+              </div>
+              <div className="rounded-lg border border-border bg-muted/20 px-3 py-2">
+                <dt className="text-xs font-medium text-muted-foreground">Coach payouts</dt>
+                <dd className="text-lg font-semibold tabular-nums">${be.coachPayouts.toFixed(0)}</dd>
+              </div>
+              <div className="rounded-lg border border-border bg-muted/20 px-3 py-2">
+                <dt className="text-xs font-medium text-muted-foreground">Stripe</dt>
+                <dd className="text-lg font-semibold tabular-nums">${be.stripeFees.toFixed(0)}</dd>
+              </div>
+              <div className="rounded-lg border border-border bg-muted/20 px-3 py-2">
+                <dt className="text-xs font-medium text-muted-foreground">Guild (org fee)</dt>
+                <dd className="text-lg font-semibold tabular-nums">${be.guildOrgFees.toFixed(0)}</dd>
+              </div>
+              <div className="rounded-lg border border-dashed border-primary/40 bg-primary/5 px-3 py-2 lg:col-span-2">
+                <dt className="text-xs font-medium text-muted-foreground">Check (gross − coach − Stripe − Guild)</dt>
+                <dd className="text-lg font-semibold tabular-nums">${be.remainder.toFixed(2)}</dd>
+              </div>
+            </dl>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Summary cards: consistent grid and styling */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
@@ -647,7 +728,9 @@ export function AdminCockpitView() {
                 <TrendingUp className="h-4 w-4" />
                 Activity by period
               </CardTitle>
-              <CardDescription>New signups / records created in each bucket (not all-time totals).</CardDescription>
+              <CardDescription>
+                By default shows a <strong className="text-foreground">running total</strong> in the window (each bucket adds to the previous). Switch to “Per period only” for new-in-bucket counts.
+              </CardDescription>
             </div>
             <div className="flex flex-wrap items-center gap-3">
               <span className="text-sm font-medium text-muted-foreground">Metric</span>
@@ -693,6 +776,23 @@ export function AdminCockpitView() {
                   Line
                 </button>
               </div>
+              <span className="text-sm font-medium text-muted-foreground">Values</span>
+              <div className="flex rounded-md border border-input bg-background overflow-hidden">
+                <button
+                  type="button"
+                  onClick={() => setActivityMode('runningTotal')}
+                  className={`px-3 py-2 text-sm font-medium transition-colors ${activityMode === 'runningTotal' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
+                >
+                  Running total
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActivityMode('perPeriod')}
+                  className={`px-3 py-2 text-sm font-medium transition-colors ${activityMode === 'perPeriod' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
+                >
+                  Per period only
+                </button>
+              </div>
             </div>
           </div>
         </CardHeader>
@@ -702,12 +802,14 @@ export function AdminCockpitView() {
               values={trendMetrics.find((m) => m.id === trendMetric)?.values ?? []}
               labels={trendLabels}
               metricLabel={trendMetrics.find((m) => m.id === trendMetric)?.label ?? ''}
+              mode={activityMode}
             />
           ) : (
             <StandardBarChart
               values={trendMetrics.find((m) => m.id === trendMetric)?.values ?? []}
               labels={trendLabels}
               metricLabel={trendMetrics.find((m) => m.id === trendMetric)?.label ?? ''}
+              mode={activityMode}
             />
           )}
         </CardContent>

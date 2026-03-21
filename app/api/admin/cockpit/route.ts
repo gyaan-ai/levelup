@@ -175,14 +175,47 @@ export async function GET(req: NextRequest) {
       // Table may not exist yet or drain not configured
     }
 
-    // Revenue that day: sum of amount_paid for participants CREATED that day (signups that day)
+    // Revenue: sum of amount_paid for participants created in range (each signup row).
+    // Session-level fees (coach / Stripe / org) are summed once per distinct session.
+    const bookingRowsRaw = bookingsRes.data ?? [];
     let revenueThatDay = 0;
-    if (bookingsRes.data) {
-      for (const b of bookingsRes.data as { amount_paid?: number | null }[]) {
-        const amt = (b as { amount_paid?: number | null }).amount_paid;
-        if (amt != null && Number(amt) > 0) revenueThatDay += Number(amt);
+    const sessionIdsForEconomics = new Set<string>();
+    for (const b of bookingRowsRaw as { session_id?: string; amount_paid?: number | null }[]) {
+      if (b.session_id) sessionIdsForEconomics.add(b.session_id);
+      const amt = b.amount_paid;
+      if (amt != null && Number(amt) > 0) revenueThatDay += Number(amt);
+    }
+    const bookingCount = bookingRowsRaw.length;
+
+    let coachPayoutsAllocated = 0;
+    let stripeFeesTotal = 0;
+    let orgFeesGuildTotal = 0;
+    const sessionIdList = [...sessionIdsForEconomics];
+    if (sessionIdList.length > 0) {
+      const { data: sessFin } = await admin
+        .from('sessions')
+        .select('athlete_payment, org_fee, stripe_fee')
+        .in('id', sessionIdList);
+      for (const s of sessFin ?? []) {
+        const row = s as { athlete_payment?: number | null; org_fee?: number | null; stripe_fee?: number | null };
+        coachPayoutsAllocated += Number(row.athlete_payment ?? 0);
+        stripeFeesTotal += Number(row.stripe_fee ?? 0);
+        orgFeesGuildTotal += Number(row.org_fee ?? 0);
       }
     }
+
+    const round2 = (n: number) => Math.round(n * 100) / 100;
+    const remainderAfterModel = round2(revenueThatDay - coachPayoutsAllocated - stripeFeesTotal - orgFeesGuildTotal);
+
+    const bookingEconomics = {
+      bookingCount,
+      gross: revenueThatDay,
+      coachPayouts: round2(coachPayoutsAllocated),
+      stripeFees: round2(stripeFeesTotal),
+      guildOrgFees: round2(orgFeesGuildTotal),
+      /** Should be ~0 if gross matches session model; otherwise rounding or stale session rows */
+      remainder: remainderAfterModel,
+    };
 
     const payoutsPaid = (payoutsPaidRes.data ?? []).reduce((sum: number, s: { athlete_payment?: number }) => sum + Number(s.athlete_payment ?? 0), 0);
     const payoutsPaidList = (payoutsPaidRes.data ?? []).map((s: { id: string; athlete_payment?: number; athletes?: { first_name?: string; last_name?: string } | { first_name?: string; last_name?: string }[] }) => {
@@ -419,6 +452,7 @@ export async function GET(req: NextRequest) {
       payoutsPaid,
       payoutsPaidList,
       revenueThatDay,
+      bookingEconomics,
       trends,
       trendCumulativeTotals,
       trendDays: trendDaysForResponse,
