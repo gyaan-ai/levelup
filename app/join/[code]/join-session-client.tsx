@@ -27,7 +27,6 @@ interface JoinSessionClientProps {
   sessionId: string;
   code: string;
   isSmallGroup?: boolean;
-  freeSmallGroupJoin?: boolean;
   pricePerParticipant: number;
   priceAfterDiscount?: number;
   percentOff?: number;
@@ -38,7 +37,6 @@ export function JoinSessionClient({
   sessionId,
   code,
   isSmallGroup = false,
-  freeSmallGroupJoin = false,
   pricePerParticipant,
   priceAfterDiscount,
   percentOff,
@@ -53,7 +51,6 @@ export function JoinSessionClient({
   const [registered, setRegistered] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const freeWithCode = freeSmallGroupJoin;
   const displayPrice = priceAfterDiscount ?? pricePerParticipant;
 
   const handleApplyCode = async () => {
@@ -187,21 +184,17 @@ export function JoinSessionClient({
             onChange={(e) => { setPromoCode(e.target.value.toUpperCase()); setError(null); setCodeApplied(false); }}
             className="uppercase flex-1"
             autoComplete="off"
-            disabled={!!freeWithCode}
           />
           <Button
             type="button"
             variant="outline"
             onClick={handleApplyCode}
-            disabled={!promoCode.trim() || applyingCode || !!freeWithCode}
+            disabled={!promoCode.trim() || applyingCode}
           >
-            {applyingCode ? 'Applying…' : freeWithCode ? 'Applied' : 'Apply'}
+            {applyingCode ? 'Applying…' : 'Apply'}
           </Button>
         </div>
-        {freeWithCode && (
-          <p className="text-sm text-green-600 dark:text-green-400 font-medium">Promo applied — this session is free.</p>
-        )}
-        {!freeWithCode && percentOff != null && isSmallGroup && (
+        {percentOff != null && isSmallGroup && (
           <p className="text-sm text-green-600 dark:text-green-400 font-medium">
             {codeApplied ? `Code applied. You get ${percentOff}% off — pay & register below.` : `Your ${percentOff}% discount applies — pay & register below.`}
           </p>
@@ -213,10 +206,8 @@ export function JoinSessionClient({
         className="w-full bg-accent text-black hover:bg-accent-hover"
       >
         {joining
-          ? (freeWithCode ? 'Adding…' : 'Redirecting to payment…')
-          : freeWithCode
-            ? 'Register free (early adopter)'
-            : `Pay $${displayPrice.toFixed(2)} & register`}
+          ? 'Redirecting to payment…'
+          : `Pay $${displayPrice.toFixed(2)} & register`}
       </Button>
     </div>
   );

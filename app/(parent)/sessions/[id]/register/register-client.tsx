@@ -32,10 +32,9 @@ interface SessionRegisterClientProps {
   percentOff?: number;
   youthWrestlers: YouthWrestlerItem[];
   initialWrestlerId?: string;
-  freeSmallGroupJoin?: boolean;
 }
 
-export function SessionRegisterClient({ sessionId, isOwner, isSmallGroup = false, pricePerParticipant, priceAfterDiscount, percentOff, youthWrestlers, initialWrestlerId = '', freeSmallGroupJoin = false }: SessionRegisterClientProps) {
+export function SessionRegisterClient({ sessionId, isOwner, isSmallGroup = false, pricePerParticipant, priceAfterDiscount, percentOff, youthWrestlers, initialWrestlerId = '' }: SessionRegisterClientProps) {
   const router = useRouter();
   const [selectedWrestlerId, setSelectedWrestlerId] = useState(initialWrestlerId);
   const [promoCode, setPromoCode] = useState('');
@@ -44,8 +43,6 @@ export function SessionRegisterClient({ sessionId, isOwner, isSmallGroup = false
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Free when server says parent has early adopter entitlement for small group (freeSmallGroupJoin).
-  const freeWithCode = freeSmallGroupJoin;
   const displayPrice = priceAfterDiscount ?? pricePerParticipant;
 
   const handleApplyCode = async () => {
@@ -62,7 +59,6 @@ export function SessionRegisterClient({ sessionId, isOwner, isSmallGroup = false
       const data = await redeemRes.json();
       if (redeemRes.ok && (data.success || data.alreadyUsed)) {
         setCodeApplied(true);
-        // Re-fetch so server sees new entitlement and freeSmallGroupJoin is true next render.
         router.refresh();
       } else {
         setError(data.error || 'Invalid or expired promo code');
@@ -178,42 +174,33 @@ export function SessionRegisterClient({ sessionId, isOwner, isSmallGroup = false
               onChange={(e) => { setPromoCode(e.target.value.toUpperCase()); setError(null); setCodeApplied(false); }}
               className="uppercase flex-1"
               autoComplete="off"
-              disabled={!!freeWithCode}
             />
             <Button
               type="button"
               variant="outline"
               onClick={handleApplyCode}
-              disabled={!promoCode.trim() || applyingCode || !!freeWithCode}
+              disabled={!promoCode.trim() || applyingCode}
             >
-              {applyingCode ? 'Applying…' : freeWithCode ? 'Applied' : 'Apply'}
+              {applyingCode ? 'Applying…' : 'Apply'}
             </Button>
           </div>
-          {freeWithCode && (
-            <p className="text-sm text-green-600 dark:text-green-400 font-medium">Promo applied — this session is free.</p>
-          )}
-          {!freeWithCode && isSmallGroup && percentOff != null && (
+          {isSmallGroup && percentOff != null && (
             <p className="text-sm text-green-600 dark:text-green-400 font-medium">
               {codeApplied ? `Code applied. You get ${percentOff}% off — pay & register below.` : `Your ${percentOff}% discount applies — pay & register below.`}
             </p>
-          )}
-          {codeApplied && !freeWithCode && isSmallGroup && percentOff == null && (
-            <p className="text-sm text-muted-foreground">Code applied. You have no free spots left — use the button below to pay & register.</p>
           )}
         </div>
       )}
       <Button
         type="submit"
         disabled={loading}
-        className={`w-full ${freeWithCode ? 'bg-accent text-black hover:bg-accent-hover' : ''}`}
+        className="w-full"
       >
         {loading
-          ? (isOwner || freeWithCode ? 'Adding…' : 'Redirecting to payment…')
+          ? (isOwner ? 'Adding…' : 'Redirecting to payment…')
           : isOwner
             ? 'Add wrestler'
-            : freeWithCode
-              ? 'Register free (early adopter)'
-              : `Pay $${displayPrice.toFixed(2)} & register`}
+            : `Pay $${displayPrice.toFixed(2)} & register`}
       </Button>
     </form>
   );

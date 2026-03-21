@@ -7,7 +7,7 @@ import { getTenantByDomain } from '@/config/tenants';
 /**
  * POST - Parent redeems a discount code after signup (e.g. they forgot at signup).
  * Body: { code: string }
- * Validates code, ensures parent has not already redeemed it, grants 1 free 1-on-1 + 1 free 2-athlete and increments code redemptions.
+ * Only percent-off codes (e.g. FAMILY10) are accepted; early-adopter free sessions are disabled.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -81,41 +81,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, message: `Code applied. You get ${percentOff}% off all sessions.` });
     }
 
-    // Early adopter code: 1 free 1-on-1 + 2 free small group spots
-    const { data: existing } = await admin
-      .from('early_adopter_entitlements')
-      .select('id')
-      .eq('parent_id', user.id)
-      .eq('discount_code', codeRow.code)
-      .limit(1)
-      .maybeSingle();
-
-    if (existing) {
-      return NextResponse.json({ success: true, alreadyUsed: true, message: 'You already have this benefit.' }, { status: 200 });
-    }
-
-    const { error: ent1 } = await admin.from('early_adopter_entitlements').insert({
-      parent_id: user.id,
-      session_type: '1-on-1',
-      remaining: 1,
-      discount_code: codeRow.code,
-    });
-    if (ent1) return NextResponse.json({ error: ent1.message }, { status: 500 });
-
-    const { error: ent2 } = await admin.from('early_adopter_entitlements').insert({
-      parent_id: user.id,
-      session_type: '2-athlete',
-      remaining: 2,
-      discount_code: codeRow.code,
-    });
-    if (ent2) return NextResponse.json({ error: ent2.message }, { status: 500 });
-
-    await admin
-      .from('discount_codes')
-      .update({ redemptions: current + 1, updated_at: new Date().toISOString() })
-      .eq('id', codeRow.id);
-
-    return NextResponse.json({ success: true, message: 'Code applied. You have 1 free private session and 2 free small group spots (e.g. 2 kids in one session).' });
+    return NextResponse.json(
+      { error: 'This promotion has ended. Only percent-off discount codes can be applied.' },
+      { status: 400 }
+    );
   } catch (e) {
     console.error('Redeem discount code error:', e);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

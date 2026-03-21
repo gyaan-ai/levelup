@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
 
     const supabaseAdmin = createAdminClient(tenant.slug);
 
-    // Discount code: only for parents; validate code before creating user (early adopter or percent off)
+    // Discount code: only for parents; percent-off codes only (early-adopter free sessions disabled)
     let discountCodeValid: { id: string; code: string; redemptions: number; percent_off?: number | null } | null = null;
     if (role === 'parent' && typeof discountCode === 'string' && discountCode.trim()) {
       const codeNormalized = discountCode.trim().toUpperCase();
@@ -104,7 +104,14 @@ export async function POST(req: NextRequest) {
           { status: 400 }
         );
       }
-      discountCodeValid = { id: row.id, code: row.code, redemptions: current, percent_off: row.percent_off != null ? Number(row.percent_off) : null };
+      const po = row.percent_off != null ? Number(row.percent_off) : null;
+      if (po == null || po < 1 || po > 100) {
+        return NextResponse.json(
+          { error: 'This promotion has ended. Only percent-off discount codes are accepted at signup.' },
+          { status: 400 }
+        );
+      }
+      discountCodeValid = { id: row.id, code: row.code, redemptions: current, percent_off: po };
     }
 
     // Create Supabase admin client (to create user)
@@ -155,47 +162,21 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Grant discount benefits for parents who used a valid code (percent off or early adopter)
+    // Grant percent-off discount for parents who used a valid code (validated above as 1–100%)
     if (discountCodeValid && role === 'parent') {
-      const percentOff = discountCodeValid.percent_off != null && discountCodeValid.percent_off >= 1 && discountCodeValid.percent_off <= 100
-        ? discountCodeValid.percent_off
-        : null;
-
-      if (percentOff != null) {
-        const { error: pctErr } = await supabaseAdmin.from('parent_percentage_discounts').insert({
-          parent_id: userId,
-          discount_code_id: discountCodeValid.id,
-          percent_off: percentOff,
-        });
-        if (pctErr) {
-          await supabaseAdmin.from('users').delete().eq('id', userId);
-          await supabaseAdmin.auth.admin.deleteUser(userId);
-          return NextResponse.json(
-            { error: 'Failed to apply discount code benefits' },
-            { status: 500 }
-          );
-        }
-      } else {
-        const { error: ent1 } = await supabaseAdmin.from('early_adopter_entitlements').insert({
-          parent_id: userId,
-          session_type: '1-on-1',
-          remaining: 1,
-          discount_code: discountCodeValid.code,
-        });
-        const { error: ent2 } = await supabaseAdmin.from('early_adopter_entitlements').insert({
-          parent_id: userId,
-          session_type: '2-athlete',
-          remaining: 2,
-          discount_code: discountCodeValid.code,
-        });
-        if (ent1 || ent2) {
-          await supabaseAdmin.from('users').delete().eq('id', userId);
-          await supabaseAdmin.auth.admin.deleteUser(userId);
-          return NextResponse.json(
-            { error: 'Failed to apply discount code benefits' },
-            { status: 500 }
-          );
-        }
+      const percentOff = discountCodeValid.percent_off!;
+      const { error: pctErr } = await supabaseAdmin.from('parent_percentage_discounts').insert({
+        parent_id: userId,
+        discount_code_id: discountCodeValid.id,
+        percent_off: percentOff,
+      });
+      if (pctErr) {
+        await supabaseAdmin.from('users').delete().eq('id', userId);
+        await supabaseAdmin.auth.admin.deleteUser(userId);
+        return NextResponse.json(
+          { error: 'Failed to apply discount code benefits' },
+          { status: 500 }
+        );
       }
       const { error: incErr } = await supabaseAdmin
         .from('discount_codes')

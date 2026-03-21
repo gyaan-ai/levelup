@@ -95,19 +95,7 @@ export async function POST(req: NextRequest) {
     const maxParticipants = isPartner ? 2 : Math.max(1, numParticipants);
     const sessionType = sessionMode === 'private' ? '1-on-1' : '2-athlete';
 
-    // Check for early adopter free session (1 free 1-on-1, 1 free 2-athlete per parent who signed up with code)
-    const { data: entitlement } = await admin
-      .from('early_adopter_entitlements')
-      .select('id, remaining')
-      .eq('parent_id', user.id)
-      .eq('session_type', sessionType)
-      .gt('remaining', 0)
-      .limit(1)
-      .maybeSingle();
-
-    const useEarlyAdopter = !!entitlement?.id && (entitlement.remaining ?? 0) > 0;
-
-    // Family / percentage discount (e.g. 10% off) — apply before early adopter
+    // Family / percentage discount (e.g. 10% off). Early-adopter $0 sessions are disabled.
     const { data: pctDiscount } = await admin
       .from('parent_percentage_discounts')
       .select('percent_off')
@@ -123,7 +111,7 @@ export async function POST(req: NextRequest) {
     
     const testModePenny = process.env.TEST_MODE_PENNY_PRICING === 'true';
     const athletePayment = testModePenny ? 0.50 : totalPrice; // what we pay the coach (you pay manually)
-    const basePrice = useEarlyAdopter ? 0 : (testModePenny ? 0.50 : priceAfterPct);
+    const basePrice = testModePenny ? 0.50 : priceAfterPct;
     const stripeChargeAmount = basePrice;
     const orgFee = 0;
     const stripeFee = 0;
@@ -181,8 +169,7 @@ export async function POST(req: NextRequest) {
         org_fee: orgFee,
         stripe_fee: stripeFee,
         paid_with_credit: false,
-        early_adopter_entitlement_id: useEarlyAdopter ? entitlement!.id : undefined,
-        status: useEarlyAdopter && process.env.STRIPE_CHECKOUT_ENABLED !== 'true' ? 'scheduled' : 'pending_payment',
+        status: 'pending_payment',
         athlete_paid: false,
       })
       .select('id, partner_invite_code, session_mode')
@@ -193,15 +180,6 @@ export async function POST(req: NextRequest) {
     }
     if (!session) {
       return NextResponse.json({ error: 'Failed to create session' }, { status: 500 });
-    }
-
-    // Consume early-adopter entitlement only when NOT going through Stripe (when Stripe is used, webhook decrements)
-    const stripeEnabled = process.env.STRIPE_CHECKOUT_ENABLED === 'true';
-    if (useEarlyAdopter && entitlement?.id && !stripeEnabled) {
-      await admin
-        .from('early_adopter_entitlements')
-        .update({ remaining: (entitlement.remaining ?? 1) - 1 })
-        .eq('id', entitlement.id);
     }
 
     try {
@@ -216,20 +194,16 @@ export async function POST(req: NextRequest) {
       console.warn('Notify coach of new session failed:', notifErr);
     }
 
-    const participantPaidNow = useEarlyAdopter && !stripeEnabled;
     for (const ywId of youthWrestlerIds) {
       const { error: partError } = await supabase.from('session_participants').insert({
         session_id: session.id,
         youth_wrestler_id: ywId,
         parent_id: user.id,
-        paid: participantPaidNow,
-        amount_paid: participantPaidNow ? 0 : (testModePenny ? (0.50 / numParticipants) : (pricePerParticipant ?? totalPrice / numParticipants)),
+        paid: false,
+        amount_paid: testModePenny ? (0.50 / numParticipants) : (pricePerParticipant ?? totalPrice / numParticipants),
       });
       if (partError) {
         await supabase.from('sessions').delete().eq('id', session.id);
-        if (useEarlyAdopter && entitlement?.id && !stripeEnabled) {
-          await admin.from('early_adopter_entitlements').update({ remaining: (entitlement.remaining ?? 1) }).eq('id', entitlement.id);
-        }
         return NextResponse.json({ error: 'Failed to add participants' }, { status: 500 });
       }
     }
@@ -241,7 +215,7 @@ export async function POST(req: NextRequest) {
     console.log('[Bookings API] Charge amount:', stripeChargeAmount);
     console.log('[Bookings API] Tenant slug:', tenant.slug);
     
-    if (process.env.STRIPE_CHECKOUT_ENABLED === 'true' && (stripeChargeAmount >= 0.50 || useEarlyAdopter)) {
+    if (process.env.STRIPE_CHECKOUT_ENABLED === 'true' && stripeChargeAmount >= 0.50) {
       try {
         console.log('[Bookings API] Attempting to create Stripe checkout session...');
         const stripe = getStripeInstance(tenant.slug);
@@ -251,25 +225,21 @@ export async function POST(req: NextRequest) {
         if (session.session_mode) successParams.set('mode', session.session_mode);
         
         const amountCents = Math.round(stripeChargeAmount * 100);
-        const isFreeCheckout = useEarlyAdopter && amountCents === 0;
         const metadata: Record<string, string> = { session_id: session.id, app: 'the-guild', test_mode: testModePenny ? 'true' : 'false' };
-        if (isFreeCheckout && entitlement?.id) metadata.early_adopter_entitlement_id = entitlement.id;
 
         const stripeSession = await stripe.checkout.sessions.create({
           mode: 'payment',
-          payment_method_types: amountCents > 0 ? ['card'] : undefined,
+          payment_method_types: ['card'],
           line_items: [{
             quantity: 1,
             price_data: {
               currency: 'usd',
               unit_amount: amountCents,
               product_data: {
-                name: isFreeCheckout ? 'The Guild – Free Session (Early Adopter)' : 'The Guild – Wrestling Session',
-                description: isFreeCheckout
-                  ? `Free session on ${scheduledDate} at ${scheduledTime}`
-                  : testModePenny
-                    ? `TEST MODE: Session on ${scheduledDate} at ${scheduledTime} (actual price: $${totalPrice.toFixed(2)})`
-                    : `Session on ${scheduledDate} at ${scheduledTime}`,
+                name: 'The Guild – Wrestling Session',
+                description: testModePenny
+                  ? `TEST MODE: Session on ${scheduledDate} at ${scheduledTime} (actual price: $${totalPrice.toFixed(2)})`
+                  : `Session on ${scheduledDate} at ${scheduledTime}`,
                 metadata: { app: 'the-guild', test_mode: testModePenny ? 'true' : 'false' },
               },
             },
@@ -280,7 +250,7 @@ export async function POST(req: NextRequest) {
           customer_email: user.email ?? undefined,
         });
         checkoutUrl = stripeSession.url ?? undefined;
-        console.log('[Bookings API] Stripe checkout URL created:', checkoutUrl, isFreeCheckout ? '(no-cost early adopter)' : '');
+        console.log('[Bookings API] Stripe checkout URL created:', checkoutUrl);
       } catch (stripeErr) {
         console.error('[Bookings API] Stripe Checkout ERROR:', stripeErr);
         console.error('[Bookings API] Error details:', JSON.stringify(stripeErr, null, 2));
@@ -310,7 +280,6 @@ export async function POST(req: NextRequest) {
       partnerInviteCode: session.partner_invite_code ?? undefined,
       sessionMode: session.session_mode,
       ...(checkoutUrl && { url: checkoutUrl }),
-      ...(useEarlyAdopter && { usedEarlyAdopter: true }),
     });
   } catch (e) {
     console.error('Bookings API error:', e);

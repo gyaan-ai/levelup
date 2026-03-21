@@ -84,21 +84,7 @@ export default async function SessionRegisterPage({
     s.session_type === 'small_group' ||
     (max >= 2 && s.session_type !== '1-on-1');
 
-  // Free only when parent has verified early-adopter entitlement (never default to free)
-  let freeSmallGroupJoin = false;
-  if (!isOwner && isSmallGroup) {
-    const admin = createAdminClient(tenant.slug);
-    const { data: entitlement } = await admin
-      .from('early_adopter_entitlements')
-      .select('id')
-      .eq('parent_id', user.id)
-      .eq('session_type', '2-athlete')
-      .gt('remaining', 0)
-      .limit(1)
-      .maybeSingle();
-    freeSmallGroupJoin = !!entitlement;
-  }
-  if (!isOwner && pricePer <= 0 && !freeSmallGroupJoin) notFound();
+  if (!isOwner && pricePer <= 0) notFound();
 
   // Youth wrestlers this user can add (primary parent or linked parent)
   const { data: primaryIds } = await supabase
@@ -166,14 +152,12 @@ export default async function SessionRegisterPage({
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
             <Users className="h-5 w-5" />
-            {isOwner ? 'Add your wrestler to this session' : freeSmallGroupJoin ? 'Join this session (free — early adopter)' : 'Pay & register for session'}
+            {isOwner ? 'Add your wrestler to this session' : 'Pay & register for session'}
           </CardTitle>
           <p className="text-sm text-muted-foreground">
             {isOwner
               ? 'Choose a wrestler to add. No extra charge — you’re the session owner.'
-              : freeSmallGroupJoin
-                ? 'Your early adopter benefit covers this small group join. Choose a wrestler and tap Add — no payment.'
-                : 'Choose a wrestler and pay to secure the spot. You’ll complete payment on the next screen.'}
+              : 'Choose a wrestler and pay to secure the spot. You’ll complete payment on the next screen.'}
           </p>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -238,7 +222,6 @@ export default async function SessionRegisterPage({
             percentOff={percentOff ?? undefined}
             youthWrestlers={youthWrestlers as Array<{ id: string; first_name?: string; last_name?: string; age?: number; weight_class?: string; skill_level?: string }>}
             initialWrestlerId={preselectedWrestlerId && youthWrestlers.some((yw) => yw.id === preselectedWrestlerId) ? preselectedWrestlerId : ''}
-            freeSmallGroupJoin={freeSmallGroupJoin}
           />
         </CardContent>
       </Card>

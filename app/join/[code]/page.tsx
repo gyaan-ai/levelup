@@ -71,20 +71,6 @@ export default async function JoinByCodePage({
     sessionType === 'small_group' ||
     (maxParticipants >= 2 && sessionType !== '1-on-1');
 
-  // Free only when parent has verified early-adopter entitlement (never default to free)
-  let freeSmallGroupJoin = false;
-  if (user && !isFull && isSmallGroup) {
-    const { data: entitlement } = await admin
-      .from('early_adopter_entitlements')
-      .select('id')
-      .eq('parent_id', user.id)
-      .eq('session_type', '2-athlete')
-      .gt('remaining', 0)
-      .limit(1)
-      .maybeSingle();
-    freeSmallGroupJoin = !!entitlement;
-  }
-
   // Parent percentage discount (e.g. FAMILY10) for logged-in user
   let percentOff: number | null = null;
   let priceAfterDiscount: number | null = null;
@@ -191,7 +177,6 @@ export default async function JoinByCodePage({
                   sessionId={session.id}
                   code={code}
                   isSmallGroup={isSmallGroup}
-                  freeSmallGroupJoin={freeSmallGroupJoin}
                   pricePerParticipant={pricePerParticipant}
                   priceAfterDiscount={priceAfterDiscount ?? undefined}
                   percentOff={percentOff ?? undefined}
