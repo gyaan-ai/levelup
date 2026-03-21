@@ -10,6 +10,7 @@ import { Calendar, MapPin } from 'lucide-react';
 import { ProfileImage } from '@/components/profile-image';
 import { formatEST } from '@/lib/format-date';
 import { JoinSessionClient } from './join-session-client';
+import { hasMinPhoneDigits } from '@/lib/phone';
 
 export default async function JoinByCodePage({
   params,
@@ -86,7 +87,15 @@ export default async function JoinByCodePage({
     }
   }
 
-  let youthWrestlers: Array<{ id: string; first_name: string; last_name: string; age?: number; weight_class?: string; skill_level?: string }> = [];
+  let youthWrestlers: Array<{
+    id: string;
+    first_name: string;
+    last_name: string;
+    age?: number;
+    weight_class?: string;
+    skill_level?: string;
+    hasValidCell: boolean;
+  }> = [];
   if (user && !isFull) {
     const { data: primaryRows } = await supabase
       .from('youth_wrestlers')
@@ -103,11 +112,30 @@ export default async function JoinByCodePage({
     if (allIds.length > 0) {
       const { data: yw } = await supabase
         .from('youth_wrestlers')
-        .select('id, first_name, last_name, age, weight_class, skill_level')
+        .select('id, first_name, last_name, age, weight_class, skill_level, phone')
         .in('id', allIds)
         .eq('active', true)
         .order('created_at', { ascending: false });
-      youthWrestlers = (yw ?? []) as typeof youthWrestlers;
+      youthWrestlers = (yw ?? []).map((row) => {
+        const r = row as {
+          id: string;
+          first_name: string;
+          last_name: string;
+          age?: number;
+          weight_class?: string;
+          skill_level?: string;
+          phone?: string | null;
+        };
+        return {
+          id: r.id,
+          first_name: r.first_name,
+          last_name: r.last_name,
+          age: r.age,
+          weight_class: r.weight_class,
+          skill_level: r.skill_level,
+          hasValidCell: hasMinPhoneDigits(r.phone),
+        };
+      });
     }
   }
 

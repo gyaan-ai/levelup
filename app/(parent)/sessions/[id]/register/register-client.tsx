@@ -21,6 +21,8 @@ interface YouthWrestlerItem {
   age?: number;
   weight_class?: string;
   skill_level?: string;
+  /** False = no 10-digit cell on file; payment API will reject until fixed */
+  hasValidCell?: boolean;
 }
 
 interface SessionRegisterClientProps {
@@ -44,6 +46,9 @@ export function SessionRegisterClient({ sessionId, isOwner, isSmallGroup = false
   const [error, setError] = useState<string | null>(null);
 
   const displayPrice = priceAfterDiscount ?? pricePerParticipant;
+
+  const selectedWrestler = youthWrestlers.find((yw) => yw.id === selectedWrestlerId);
+  const selectedHasCell = selectedWrestler?.hasValidCell !== false;
 
   const handleApplyCode = async () => {
     const codeTrimmed = promoCode.trim();
@@ -74,6 +79,10 @@ export function SessionRegisterClient({ sessionId, isOwner, isSmallGroup = false
     e.preventDefault();
     if (!selectedWrestlerId) {
       setError('Please select a wrestler.');
+      return;
+    }
+    if (selectedWrestler && selectedWrestler.hasValidCell === false) {
+      setError('Add this athlete’s cell number on their profile first.');
       return;
     }
     setError(null);
@@ -153,14 +162,33 @@ export function SessionRegisterClient({ sessionId, isOwner, isSmallGroup = false
               const name = [yw.first_name, yw.last_name].filter(Boolean).join(' ');
               const extra = [yw.age && `${yw.age} yrs`, yw.weight_class, yw.skill_level].filter(Boolean).join(', ');
               const label = extra ? `${name} (${extra})` : name;
+              const needPhone = yw.hasValidCell === false;
               return (
                 <SelectItem key={yw.id} value={yw.id}>
                   {label}
+                  {needPhone ? ' — add cell to register' : ''}
                 </SelectItem>
               );
             })}
           </SelectContent>
         </Select>
+        {selectedWrestlerId && !selectedHasCell && (
+          <div className="rounded-md border border-destructive/50 bg-destructive/5 p-3 text-sm space-y-2">
+            <p className="text-destructive font-medium">
+              Cell number required on this athlete’s profile before you can add them or pay.
+            </p>
+            <p className="text-muted-foreground">
+              Add a 10-digit mobile number (Wrestlers → Edit), then return here.
+            </p>
+            <Button asChild variant="outline" size="sm" className="w-full sm:w-auto">
+              <Link
+                href={`/wrestlers/${selectedWrestlerId}/edit?redirect=${encodeURIComponent(`/sessions/${sessionId}/register`)}`}
+              >
+                Edit {selectedWrestler?.first_name ?? 'athlete'} — add cell
+              </Link>
+            </Button>
+          </div>
+        )}
       </div>
       {!isOwner && (
         <div className="space-y-2">
@@ -193,7 +221,7 @@ export function SessionRegisterClient({ sessionId, isOwner, isSmallGroup = false
       )}
       <Button
         type="submit"
-        disabled={loading}
+        disabled={loading || (selectedWrestler != null && selectedWrestler.hasValidCell === false)}
         className="w-full"
       >
         {loading

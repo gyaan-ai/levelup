@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useRouter, useParams, useSearchParams } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -51,6 +51,7 @@ type YouthWrestlerFormValues = z.infer<typeof youthWrestlerSchema>;
 export default function EditYouthWrestlerPage() {
   const router = useRouter();
   const params = useParams();
+  const searchParams = useSearchParams();
   const id = params.id as string;
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -208,7 +209,13 @@ export default function EditYouthWrestlerPage() {
         throw new Error(data.error || 'Failed to update youth wrestler');
       }
 
-      router.push(`/wrestlers/${id}`);
+      const redirectTo = searchParams.get('redirect');
+      const safeRedirect =
+        redirectTo &&
+        redirectTo.startsWith('/') &&
+        !redirectTo.startsWith('//') &&
+        !redirectTo.includes(':');
+      router.push(safeRedirect ? redirectTo : `/wrestlers/${id}`);
       router.refresh();
     } catch (err: any) {
       setError(err.message || 'An unexpected error occurred');

@@ -9,6 +9,7 @@ import { SessionRegisterClient } from './register-client';
 import { User, Calendar, MapPin, Users } from 'lucide-react';
 import { formatEST } from '@/lib/format-date';
 import { SchoolLogo } from '@/components/school-logo';
+import { hasMinPhoneDigits } from '@/lib/phone';
 
 export default async function SessionRegisterPage({
   params,
@@ -101,12 +102,16 @@ export default async function SessionRegisterPage({
   const { data: youthWrestlersRaw } = allIds.length > 0
     ? await supabase
         .from('youth_wrestlers')
-        .select('id, first_name, last_name, age, weight_class, skill_level')
+        .select('id, first_name, last_name, age, weight_class, skill_level, phone')
         .in('id', allIds)
         .eq('active', true)
         .order('created_at', { ascending: false })
     : { data: [] };
-  const youthWrestlers = youthWrestlersRaw ?? [];
+  const youthWrestlers = (youthWrestlersRaw ?? []).map((yw) => {
+    const row = yw as { phone?: string | null; id: string; first_name?: string; last_name?: string; age?: number; weight_class?: string; skill_level?: string };
+    const { phone, ...rest } = row;
+    return { ...rest, hasValidCell: hasMinPhoneDigits(phone) };
+  });
 
   const coach = Array.isArray(s.athletes) ? s.athletes[0] : s.athletes;
   const fac = Array.isArray(s.facilities) ? s.facilities[0] : s.facilities;
@@ -220,7 +225,7 @@ export default async function SessionRegisterPage({
             pricePerParticipant={pricePer}
             priceAfterDiscount={priceAfterDiscount ?? undefined}
             percentOff={percentOff ?? undefined}
-            youthWrestlers={youthWrestlers as Array<{ id: string; first_name?: string; last_name?: string; age?: number; weight_class?: string; skill_level?: string }>}
+            youthWrestlers={youthWrestlers as Array<{ id: string; first_name?: string; last_name?: string; age?: number; weight_class?: string; skill_level?: string; hasValidCell: boolean }>}
             initialWrestlerId={preselectedWrestlerId && youthWrestlers.some((yw) => yw.id === preselectedWrestlerId) ? preselectedWrestlerId : ''}
           />
         </CardContent>

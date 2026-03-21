@@ -21,6 +21,7 @@ interface YouthWrestlerOption {
   age?: number;
   weight_class?: string;
   skill_level?: string;
+  hasValidCell?: boolean;
 }
 
 interface JoinSessionClientProps {
@@ -52,6 +53,8 @@ export function JoinSessionClient({
   const [error, setError] = useState<string | null>(null);
 
   const displayPrice = priceAfterDiscount ?? pricePerParticipant;
+  const selectedWrestler = youthWrestlers.find((w) => w.id === selectedWrestlerId);
+  const selectedHasCell = selectedWrestler?.hasValidCell !== false;
 
   const handleApplyCode = async () => {
     const codeTrimmed = promoCode.trim();
@@ -81,6 +84,10 @@ export function JoinSessionClient({
   const handlePayAndRegister = async () => {
     if (!selectedWrestlerId) {
       setError('Please select a youth wrestler.');
+      return;
+    }
+    if (selectedWrestler && selectedWrestler.hasValidCell === false) {
+      setError('Add this athlete’s cell number on their profile before paying.');
       return;
     }
     setError(null);
@@ -168,10 +175,24 @@ export function JoinSessionClient({
                 {w.first_name} {w.last_name}
                 {w.age != null ? ` (${w.age} yrs)` : ''}
                 {w.weight_class ? ` — ${w.weight_class} lbs` : ''}
+                {w.hasValidCell === false ? ' — add cell to register' : ''}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
+        {selectedWrestlerId && !selectedHasCell && (
+          <div className="rounded-md border border-destructive/50 bg-destructive/5 p-3 text-sm space-y-2">
+            <p className="text-destructive font-medium">Cell number required on this athlete’s profile before checkout.</p>
+            <p className="text-muted-foreground">Add a 10-digit mobile number, then come back to this page.</p>
+            <Button asChild variant="outline" size="sm" className="w-full sm:w-auto">
+              <Link
+                href={`/wrestlers/${selectedWrestlerId}/edit?redirect=${encodeURIComponent(`/join/${code}`)}`}
+              >
+                Edit {selectedWrestler?.first_name ?? 'athlete'} — add cell
+              </Link>
+            </Button>
+          </div>
+        )}
       </div>
       <div className="space-y-2">
         <Label htmlFor="promo">Promo code (optional)</Label>
@@ -202,7 +223,7 @@ export function JoinSessionClient({
       </div>
       <Button
         onClick={handlePayAndRegister}
-        disabled={!selectedWrestlerId || joining}
+        disabled={!selectedWrestlerId || joining || (selectedWrestler != null && selectedWrestler.hasValidCell === false)}
         className="w-full bg-accent text-black hover:bg-accent-hover"
       >
         {joining
