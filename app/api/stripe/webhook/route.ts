@@ -40,7 +40,10 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ received: true });
       }
 
-      const supabase = createAdminClient(tenant.slug);
+      /** Prefer explicit metadata when present (Host can be wrong behind some proxies). Only trust known slugs. */
+      const rawMetaTenant = (session.metadata?.tenant_slug as string | undefined)?.trim().toLowerCase();
+      const tenantSlug = rawMetaTenant === 'guild' ? 'guild' : tenant.slug;
+      const supabase = createAdminClient(tenantSlug);
       const paymentIntentId = typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id;
       const amountTotal = session.amount_total ?? 0;
       const isFreeOrder = amountTotal === 0;
@@ -49,7 +52,19 @@ export async function POST(req: NextRequest) {
       const youthWrestlerId = session.metadata?.youth_wrestler_id;
       const parentId = session.metadata?.parent_id;
 
-      if (isRegisterPayment && youthWrestlerId && parentId) {
+      /** Register checkouts MUST NOT fall through to the “private booking” path — that only updates `sessions`, never adds roster rows. */
+      if (isRegisterPayment) {
+        if (!youthWrestlerId || !parentId) {
+          console.error('Stripe webhook: register=true but missing youth_wrestler_id or parent_id', {
+            sessionId,
+            stripeCheckoutId: session.id,
+            metadata: session.metadata,
+          });
+          return NextResponse.json(
+            { error: 'Register checkout missing wrestler/parent metadata' },
+            { status: 500 }
+          );
+        }
         const amountPaid = amountTotal / 100;
         const { data: existing } = await supabase
           .from('session_participants')
@@ -117,6 +132,7 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ received: true });
       }
 
+      /* --- Private / booking checkout (metadata.register is NOT set) --- */
       const { error: updateError } = await supabase
         .from('sessions')
         .update({

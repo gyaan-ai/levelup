@@ -11,22 +11,33 @@ import { formatEST } from '@/lib/format-date';
 import { verifyRegisterConfirmationToken } from '@/lib/confirmation-token';
 import { ProfileImage } from '@/components/profile-image';
 import { SchoolLogo } from '@/components/school-logo';
+import { finalizeRegisterFromCheckoutSession } from '@/lib/finalize-session-register-from-stripe';
+import { RegisterConfirmedSync } from './register-confirmed-sync';
 
 export default async function SessionRegisterConfirmedPage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ t?: string }>;
+  searchParams: Promise<{ t?: string; stripe_cs?: string }>;
 }) {
   const { id: sessionId } = await params;
   const sp = await searchParams;
   const token = sp?.t?.trim();
+  const stripeCs = typeof sp?.stripe_cs === 'string' ? sp.stripe_cs.trim() : '';
 
   const headersList = await headers();
   const host = headersList.get('host') || '';
   const tenant = getTenantByDomain(host);
   if (!tenant) redirect('/404');
+
+  // Same as Stripe webhook: insert session_participant immediately if webhook is slow (fixes empty Home/bookings).
+  if (stripeCs) {
+    const fin = await finalizeRegisterFromCheckoutSession(tenant.slug, stripeCs);
+    if (!fin.ok) {
+      console.error('[register/confirmed] finalizeRegisterFromCheckoutSession:', fin.error);
+    }
+  }
 
   const supabase = await createClient(tenant.slug);
   const { data: { user } } = await supabase.auth.getUser();
@@ -81,6 +92,7 @@ export default async function SessionRegisterConfirmedPage({
           </p>
         </CardHeader>
         <CardContent className="space-y-6">
+          {user && <RegisterConfirmedSync sessionId={sessionId} />}
           {/* Coach photo + thank you — custom to this booking */}
           <div className="flex flex-col items-center text-center">
             <ProfileImage
@@ -123,7 +135,8 @@ export default async function SessionRegisterConfirmedPage({
           </div>
 
           <p className="text-sm text-muted-foreground text-center">
-            You&apos;ll see this session in My bookings.
+            You&apos;ll see this session on <strong className="text-foreground">Home</strong> and under{' '}
+            <strong className="text-foreground">My bookings</strong> once it finishes syncing (usually a few seconds).
           </p>
 
           <div className="space-y-2 pt-2">

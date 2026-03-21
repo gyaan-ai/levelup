@@ -254,8 +254,9 @@ export function CoachTextGroupDialog({ sessionId, open, onOpenChange, sessionLab
             <div className="rounded-lg border border-border bg-muted/20 p-3 space-y-2">
               <p className="text-sm font-medium text-foreground">Copy Cell #s (your phone)</p>
               <p className="text-xs text-muted-foreground">
-                US numbers copy as <strong>10 digits</strong>, comma-separated — paste into Messages <strong>To</strong>{' '}
-                (no editing needed). Non-US stays international format.
+                US numbers copy as <strong>10 digits, one per line</strong>. Paste into Messages <strong>To</strong> —{' '}
+                <strong className="text-foreground/90">Mac Messages often ignores commas</strong> and only texts one
+                person; line breaks usually split into separate recipients. Non-US stays international format.
               </p>
               {loadingPhones && <p className="text-xs text-muted-foreground">Loading numbers…</p>}
               {!loadingPhones && phones && (

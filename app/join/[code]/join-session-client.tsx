@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -51,6 +51,7 @@ export function JoinSessionClient({
   const [joining, setJoining] = useState(false);
   const [registered, setRegistered] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const payLock = useRef(false);
 
   const displayPrice = priceAfterDiscount ?? pricePerParticipant;
   const selectedWrestler = youthWrestlers.find((w) => w.id === selectedWrestlerId);
@@ -82,6 +83,7 @@ export function JoinSessionClient({
   };
 
   const handlePayAndRegister = async () => {
+    if (payLock.current || joining) return;
     if (!selectedWrestlerId) {
       setError('Please select a youth wrestler.');
       return;
@@ -91,6 +93,7 @@ export function JoinSessionClient({
       return;
     }
     setError(null);
+    payLock.current = true;
     setJoining(true);
     try {
       const codeTrimmed = promoCode.trim();
@@ -104,6 +107,7 @@ export function JoinSessionClient({
         if (!redeemRes.ok && !redeemData.alreadyUsed) {
           setError(redeemData.error || 'Invalid or expired promo code');
           setJoining(false);
+          payLock.current = false;
           return;
         }
         if (redeemRes.ok && (redeemData.success || redeemData.alreadyUsed)) setCodeApplied(true);
@@ -117,6 +121,7 @@ export function JoinSessionClient({
       const data = await res.json();
       if (!res.ok) {
         setError(data.error || 'Failed to start payment');
+        payLock.current = false;
         return;
       }
       if (data.url) {
@@ -126,6 +131,7 @@ export function JoinSessionClient({
       setRegistered(true);
     } catch {
       setError('Something went wrong. Please try again.');
+      payLock.current = false;
     } finally {
       setJoining(false);
     }

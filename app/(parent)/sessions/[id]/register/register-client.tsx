@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -44,6 +44,7 @@ export function SessionRegisterClient({ sessionId, isOwner, isSmallGroup = false
   const [applyingCode, setApplyingCode] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const submitLock = useRef(false);
 
   const displayPrice = priceAfterDiscount ?? pricePerParticipant;
 
@@ -77,6 +78,7 @@ export function SessionRegisterClient({ sessionId, isOwner, isSmallGroup = false
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (submitLock.current || loading) return;
     if (!selectedWrestlerId) {
       setError('Please select a wrestler.');
       return;
@@ -86,6 +88,7 @@ export function SessionRegisterClient({ sessionId, isOwner, isSmallGroup = false
       return;
     }
     setError(null);
+    submitLock.current = true;
     setLoading(true);
     try {
       const codeTrimmed = promoCode.trim();
@@ -99,6 +102,7 @@ export function SessionRegisterClient({ sessionId, isOwner, isSmallGroup = false
         if (!redeemRes.ok && !redeemData.alreadyUsed) {
           setError(redeemData.error || 'Invalid or expired promo code');
           setLoading(false);
+          submitLock.current = false;
           return;
         }
         if (redeemRes.ok && (redeemData.success || redeemData.alreadyUsed)) setCodeApplied(true);
@@ -113,6 +117,7 @@ export function SessionRegisterClient({ sessionId, isOwner, isSmallGroup = false
       if (!res.ok) {
         const msg = data.error || (isOwner ? 'Failed to add wrestler' : 'Failed to start payment');
         setError(msg);
+        submitLock.current = false;
         return;
       }
       if (data.added) {
@@ -129,6 +134,7 @@ export function SessionRegisterClient({ sessionId, isOwner, isSmallGroup = false
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : (isOwner ? 'Failed to add wrestler' : 'Payment failed');
       setError(msg);
+      submitLock.current = false;
     } finally {
       setLoading(false);
     }

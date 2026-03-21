@@ -185,13 +185,14 @@ export type SessionSmsPhoneRow = { kind: 'parent' | 'athlete'; label: string; ph
 
 /**
  * Resolved parent + athlete cells for this session (same rules as SMS send).
- * Use comma-separated strings to paste into iOS/Android Messages “To” field.
+ * Use newline-separated strings to paste into Messages “To” (Mac handles line breaks better than commas).
  */
 export async function getSessionSmsPhonesForPersonalText(
   admin: Admin,
   sessionId: string
 ): Promise<{
   rows: SessionSmsPhoneRow[];
+  /** Newline-separated 10-digit numbers (Mac/iOS Messages parses lines into separate recipients better than commas). */
   commaParents: string;
   commaAthletes: string;
   commaAll: string;
@@ -272,8 +273,9 @@ export async function getSessionSmsPhonesForPersonalText(
   const rowsOut = [...parentRows, ...athleteRows];
 
   const fmt = (e164: string) => formatPhoneForSmsPaste(e164);
-  const commaParents = [...new Set(parentRows.map((r) => r.phone))].map(fmt).join(', ');
-  const commaAthletes = [...new Set(athleteRows.map((r) => r.phone))].map(fmt).join(', ');
+  const sep = '\n';
+  const commaParents = [...new Set(parentRows.map((r) => r.phone))].map(fmt).join(sep);
+  const commaAthletes = [...new Set(athleteRows.map((r) => r.phone))].map(fmt).join(sep);
   const allOrder: string[] = [];
   const seenPhone = new Set<string>();
   for (const r of rowsOut) {
@@ -282,7 +284,7 @@ export async function getSessionSmsPhonesForPersonalText(
       allOrder.push(fmt(r.phone));
     }
   }
-  const commaAll = allOrder.join(', ');
+  const commaAll = allOrder.join(sep);
 
   return {
     rows: rowsOut,

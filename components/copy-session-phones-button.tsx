@@ -9,7 +9,7 @@ type Props = {
   className?: string;
 };
 
-/** Coach-only: copy comma-separated 10-digit US cells (paste into Messages To field). */
+/** Coach/admin: copy 10-digit US cells, one per line (better for Mac Messages than comma-separated). */
 export function CopySessionPhonesButton({ sessionId, className }: Props) {
   const [loading, setLoading] = useState(false);
   const [done, setDone] = useState(false);
@@ -49,7 +49,7 @@ export function CopySessionPhonesButton({ sessionId, className }: Props) {
       className={className}
       onClick={onClick}
       disabled={loading}
-      title="Copies comma-separated 10-digit numbers — paste into your phone’s Messages To field"
+      title="Copies one number per line — paste into Messages To (Mac: use line breaks; commas often don’t split recipients)"
     >
       {done ? <Check className="h-4 w-4 mr-1 text-green-600" /> : <Copy className="h-4 w-4 mr-1" />}
       {done ? 'Copied' : 'Copy Cell #s'}

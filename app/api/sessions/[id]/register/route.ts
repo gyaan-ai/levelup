@@ -10,6 +10,7 @@ import { createNotification } from '@/lib/notifications';
 import { sendCoachNewSignupSms } from '@/lib/twilio';
 import { hasMinPhoneDigits } from '@/lib/phone';
 import { rosterSnapshotFromYouthRow } from '@/lib/session-roster-snapshot';
+import { finalizeRegisterFromCheckoutSession } from '@/lib/finalize-session-register-from-stripe';
 
 /**
  * POST - Pay & register a youth wrestler for a session (public or invite_only).
@@ -200,7 +201,8 @@ export async function POST(
     const stripe = getStripeInstance(tenant.slug);
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (host.startsWith('localhost') ? `http://${host}` : `https://${host}`);
     const confirmToken = createRegisterConfirmationToken(sessionId);
-    const successUrl = `${baseUrl}/sessions/${sessionId}/register/confirmed?t=${encodeURIComponent(confirmToken)}`;
+    // stripe_cs lets the confirmed page finalize the DB row if the webhook is slow (fixes missing Home/bookings).
+    const successUrl = `${baseUrl}/sessions/${sessionId}/register/confirmed?t=${encodeURIComponent(confirmToken)}&stripe_cs={CHECKOUT_SESSION_ID}`;
     const cancelUrl = req.headers.get('referer') || `${baseUrl}/training`;
 
     const dt = s.scheduled_datetime ? new Date(s.scheduled_datetime) : null;
@@ -208,31 +210,56 @@ export async function POST(
       ? `Session on ${formatEST(dt, 'MMM d, yyyy')} at ${formatEST(dt, 'h:mm a')} – register one spot`
       : 'Register for session';
 
-    const stripeSession = await stripe.checkout.sessions.create({
-      mode: 'payment',
-      payment_method_types: ['card'],
-      line_items: [{
-        quantity: 1,
-        price_data: {
-          currency: 'usd',
-          unit_amount: amountCents,
-          product_data: {
-            name: 'The Guild – Session registration',
-            description: desc,
+    /** One checkout per parent+session+kid — retries / double-submit reuse the same Session (no extra charges). */
+    const idempotencyKey = `register-checkout-${sessionId}-${youthWrestlerId}-${user.id}`.slice(0, 255);
+
+    const stripeSession = await stripe.checkout.sessions.create(
+      {
+        mode: 'payment',
+        payment_method_types: ['card'],
+        line_items: [
+          {
+            quantity: 1,
+            price_data: {
+              currency: 'usd',
+              unit_amount: amountCents,
+              product_data: {
+                name: 'The Guild – Session registration',
+                description: desc,
+              },
+            },
           },
-        },
-      }],
+        ],
       metadata: {
         app: 'the-guild',
+        tenant_slug: tenant.slug,
         session_id: sessionId,
         youth_wrestler_id: youthWrestlerId,
         parent_id: user.id,
         register: 'true',
       },
-      success_url: successUrl,
-      cancel_url: cancelUrl,
-      customer_email: user.email ?? undefined,
-    });
+        success_url: successUrl,
+        cancel_url: cancelUrl,
+        customer_email: user.email ?? undefined,
+      },
+      { idempotencyKey }
+    );
+
+    const paid =
+      stripeSession.payment_status === 'paid' ||
+      stripeSession.status === 'complete';
+
+    if (paid) {
+      await finalizeRegisterFromCheckoutSession(tenant.slug, stripeSession.id).catch((err) =>
+        console.error('register: finalize after idempotent paid session', err)
+      );
+      const confirmUrl = `${baseUrl}/sessions/${sessionId}/register/confirmed?t=${encodeURIComponent(confirmToken)}&stripe_cs=${stripeSession.id}`;
+      return NextResponse.json({ url: confirmUrl });
+    }
+
+    if (!stripeSession.url) {
+      return NextResponse.json({ error: 'Could not start checkout' }, { status: 500 });
+    }
 
     return NextResponse.json({ url: stripeSession.url });
   } catch (e) {
