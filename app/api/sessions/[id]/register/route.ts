@@ -190,7 +190,9 @@ export async function POST(
         .limit(1)
         .maybeSingle();
       if (entitlement && (entitlement as { remaining?: number }).remaining != null) {
-        const { error: insertErr } = await supabase.from('session_participants').insert({
+        // Use service role: RLS only allows session *organizer* to INSERT on session_participants;
+        // non-owner parents must not hit user-scoped policies (same pattern as /api/sessions/join).
+        const { error: insertErr } = await admin.from('session_participants').insert({
           session_id: sessionId,
           youth_wrestler_id: youthWrestlerId,
           parent_id: user.id,
@@ -198,7 +200,7 @@ export async function POST(
           amount_paid: 0,
         });
         if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 });
-        await supabase.from('sessions').update({ current_participants: current + 1, updated_at: new Date().toISOString() }).eq('id', sessionId);
+        await admin.from('sessions').update({ current_participants: current + 1, updated_at: new Date().toISOString() }).eq('id', sessionId);
         const newRemaining = Math.max(0, ((entitlement as { remaining?: number }).remaining ?? 1) - 1);
         await admin.from('early_adopter_entitlements').update({ remaining: newRemaining, updated_at: new Date().toISOString() }).eq('id', entitlement.id);
         const coachId = (session as { athlete_id?: string }).athlete_id;
