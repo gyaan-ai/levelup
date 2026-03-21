@@ -101,6 +101,16 @@ export function FindTrainingClient({
     setCoach(initialCoach || 'all');
   }, [initialDate, initialTime, initialLocation, initialCoach]);
 
+  const openSessions = initialSessions.filter((s) => isSessionOpenForParentBrowse(s));
+  const closedSessions = initialSessions.filter((s) => isSessionClosedForParentBrowse(s));
+
+  /** When every session is full, default to "Closed" so parents see rows instead of an empty Open tab. */
+  useEffect(() => {
+    if (openSessions.length === 0 && closedSessions.length > 0) {
+      setSessionsTab('closed');
+    }
+  }, [initialSessions, openSessions.length, closedSessions.length]);
+
   const handleSearch = () => {
     const params = new URLSearchParams();
     if (searchBasePath === '/dashboard') params.set('tab', 'find-training');
@@ -116,8 +126,6 @@ export function FindTrainingClient({
   const showResults = initialSessions.length > 0 && (hasSearchCriteria || !!defaultRangeLabel);
   const showNoResults = (hasSearchCriteria || !!defaultRangeLabel) && initialSessions.length === 0;
 
-  const openSessions = initialSessions.filter((s) => isSessionOpenForParentBrowse(s));
-  const closedSessions = initialSessions.filter((s) => isSessionClosedForParentBrowse(s));
   const displayedSessions = sessionsTab === 'open' ? openSessions : closedSessions;
 
   return (
@@ -352,11 +360,22 @@ export function FindTrainingClient({
           <CardContent>
             <div className="space-y-4">
               {displayedSessions.length === 0 ? (
-                <p className="py-8 text-center text-muted-foreground">
-                  {sessionsTab === 'open'
-                    ? 'No open sessions for this search.'
-                    : 'No closed sessions for this search.'}
-                </p>
+                sessionsTab === 'open' && closedSessions.length > 0 ? (
+                  <div className="py-8 text-center space-y-3">
+                    <p className="text-muted-foreground">
+                      No open spots for this search — every session that matched is full.
+                    </p>
+                    <Button type="button" variant="outline" onClick={() => setSessionsTab('closed')}>
+                      View full sessions ({closedSessions.length})
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="py-8 text-center text-muted-foreground">
+                    {sessionsTab === 'open'
+                      ? 'No sessions with open spots for this search.'
+                      : 'No full or past sessions for this search.'}
+                  </p>
+                )
               ) : (
               displayedSessions.map((s) => {
                 const coach = Array.isArray(s.athletes) ? s.athletes[0] : s.athletes;
