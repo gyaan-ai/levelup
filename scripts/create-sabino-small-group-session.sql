@@ -1,54 +1,94 @@
--- Create a small group session for Sabino Portella (same time, location, focus, etc. as Liam's).
--- Run in Supabase SQL Editor. Uses the same criteria as add-cole-to-small-group.sql to find Liam's session.
+-- Clone Liam's *next upcoming* small-group session for Sabino Portella (same time, facility, focus, pricing).
+-- Run in Supabase SQL Editor.
+--
+-- If this still fails, run the diagnostic at the bottom to see Liam's sessions, then either:
+--   - Create/fix Liam's session in Admin, or
+--   - Set v_source_session_id to a specific session UUID and re-run (see OPTIONAL block).
 
 DO $$
 DECLARE
-  v_liam_session RECORD;
+  v_liam_athlete_id UUID;
   v_sabino_id UUID;
   v_new_session_id UUID;
   v_invite_code TEXT;
-  v_done BOOLEAN := false;
+  v_liam_session RECORD;
+  -- OPTIONAL: paste a session id to clone that row exactly (skips "find Liam's next session")
+  v_source_session_id UUID := NULL;  -- e.g. 'xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
 BEGIN
-  -- 1. Find Liam's small group: Sunday Mar 15, 2026 ~11:00 AM Eastern (15:00–17:00 UTC), UNC
-  SELECT
-    s.id,
-    s.facility_id,
-    s.scheduled_datetime,
-    s.duration_minutes,
-    s.session_type,
-    s.session_mode,
-    s.focus_area,
-    s.join_policy,
-    s.max_participants,
-    s.base_price,
-    s.price_per_participant,
-    s.product_id,
-    s.athlete_service_id
-  INTO v_liam_session
-  FROM public.sessions s
-  WHERE s.scheduled_datetime >= '2026-03-15T15:00:00Z'
-    AND s.scheduled_datetime < '2026-03-15T17:00:00Z'
-    AND s.status IN ('scheduled', 'pending_payment')
-    AND (s.session_type = 'small_group' OR s.session_type = 'group')
-  ORDER BY s.scheduled_datetime
+  -- 1) Liam (coach) — by account email from set-live-coaches-cam-liam-sabino.sql
+  SELECT a.id INTO v_liam_athlete_id
+  FROM public.athletes a
+  JOIN public.users u ON u.id = a.id
+  WHERE LOWER(TRIM(u.email)) = 'liampatrickhickey@gmail.com'
   LIMIT 1;
 
-  IF v_liam_session.id IS NULL THEN
-    RAISE EXCEPTION 'Liam''s session not found: no small group on 2026-03-15 ~11 AM. Check scheduled_datetime and session_type.';
+  IF v_liam_athlete_id IS NULL THEN
+    RAISE EXCEPTION 'Liam not found: no athlete with users.email = liampatrickhickey@gmail.com';
   END IF;
 
-  -- 2. Find Sabino Portella (coach)
+  -- 2) Source session: explicit id OR next upcoming small group for Liam
+  IF v_source_session_id IS NOT NULL THEN
+    SELECT
+      s.id,
+      s.facility_id,
+      s.scheduled_datetime,
+      s.duration_minutes,
+      s.session_type,
+      s.session_mode,
+      s.focus_area,
+      s.join_policy,
+      s.max_participants,
+      s.base_price,
+      s.price_per_participant,
+      s.product_id,
+      s.athlete_service_id
+    INTO v_liam_session
+    FROM public.sessions s
+    WHERE s.id = v_source_session_id;
+  ELSE
+    SELECT
+      s.id,
+      s.facility_id,
+      s.scheduled_datetime,
+      s.duration_minutes,
+      s.session_type,
+      s.session_mode,
+      s.focus_area,
+      s.join_policy,
+      s.max_participants,
+      s.base_price,
+      s.price_per_participant,
+      s.product_id,
+      s.athlete_service_id
+    INTO v_liam_session
+    FROM public.sessions s
+    WHERE s.athlete_id = v_liam_athlete_id
+      AND s.status IN ('scheduled', 'pending_payment')
+      AND s.session_type IN ('group', 'small_group', '2-athlete')
+      AND s.scheduled_datetime >= (NOW() AT TIME ZONE 'utc') - INTERVAL '1 hour'
+    ORDER BY s.scheduled_datetime ASC
+    LIMIT 1;
+  END IF;
+
+  IF v_liam_session.id IS NULL THEN
+    RAISE EXCEPTION
+      'No upcoming small group found for Liam (athlete_id=%). '
+      'Set v_source_session_id to a session UUID to clone, or run the diagnostic SELECT at the bottom of this file.',
+      v_liam_athlete_id;
+  END IF;
+
+  -- 3) Sabino Portella (coach)
   SELECT a.id INTO v_sabino_id
   FROM public.athletes a
-  WHERE LOWER(TRIM(a.first_name)) = 'sabino'
-    AND LOWER(TRIM(a.last_name)) = 'portella'
+  JOIN public.users u ON u.id = a.id
+  WHERE LOWER(TRIM(u.email)) = 'sabinoportella@gmail.com'
   LIMIT 1;
 
   IF v_sabino_id IS NULL THEN
-    RAISE EXCEPTION 'Sabino Portella not found in athletes. Check first_name / last_name.';
+    RAISE EXCEPTION 'Sabino not found: no athlete with users.email = sabinoportella@gmail.com';
   END IF;
 
-  -- 3. Generate unique partner_invite_code (for share/join link)
+  -- 4) Unique invite code
   LOOP
     v_invite_code := upper(substring(md5(gen_random_uuid()::text || clock_timestamp()::text) from 1 for 8));
     IF NOT EXISTS (SELECT 1 FROM public.sessions WHERE partner_invite_code = v_invite_code) THEN
@@ -56,7 +96,7 @@ BEGIN
     END IF;
   END LOOP;
 
-  -- 4. Insert new session: same time, location, focus, pricing; coach = Sabino; no participants yet
+  -- 5) Insert: Sabino owns it; copy pricing/time/facility; start with 0 participants
   INSERT INTO public.sessions (
     parent_id,
     athlete_id,
@@ -88,7 +128,7 @@ BEGIN
     COALESCE(v_liam_session.session_type, 'group'),
     COALESCE(v_liam_session.session_mode, 'partner-invite'),
     v_liam_session.focus_area,
-    COALESCE(v_liam_session.join_policy, 'invite_only'),
+    COALESCE(v_liam_session.join_policy, 'public'),
     v_invite_code,
     COALESCE(v_liam_session.max_participants, 6),
     0,
@@ -108,5 +148,13 @@ BEGIN
   )
   RETURNING id INTO v_new_session_id;
 
-  RAISE NOTICE 'Created session % for Sabino Portella (athlete_id %). Same time/location/focus as Liam''s. Share link code: %', v_new_session_id, v_sabino_id, v_invite_code;
+  RAISE NOTICE 'Created session % for Sabino (cloned from Liam session %). Invite code: %',
+    v_new_session_id, v_liam_session.id, v_invite_code;
 END $$;
+
+-- DIAGNOSTIC (run separately): Liam's recent/upcoming sessions
+-- SELECT id, scheduled_datetime, session_type, session_mode, status, join_policy, max_participants, current_participants
+-- FROM public.sessions
+-- WHERE athlete_id = (SELECT id FROM public.athletes a JOIN public.users u ON u.id = a.id WHERE LOWER(u.email) = 'liampatrickhickey@gmail.com')
+-- ORDER BY scheduled_datetime DESC
+-- LIMIT 30;
