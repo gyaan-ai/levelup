@@ -74,6 +74,14 @@ export async function finalizeRegisterFromCheckoutSession(
         ...rosterSnapshotFromYouthRow((ywSnap ?? {}) as { first_name?: string; last_name?: string; photo_url?: string }),
       });
       if (insertErr) {
+        if (insertErr.code === '23505') {
+          await supabase
+            .from('session_participants')
+            .update({ paid: true, amount_paid: amountPaid })
+            .eq('session_id', sessionId)
+            .eq('youth_wrestler_id', youthWrestlerId);
+          return { ok: true };
+        }
         console.error('finalizeRegisterFromCheckoutSession: insert failed', insertErr);
         return { ok: false, error: insertErr.message };
       }

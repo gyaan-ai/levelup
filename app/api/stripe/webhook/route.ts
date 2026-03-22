@@ -96,15 +96,36 @@ export async function POST(req: NextRequest) {
             ...rosterSnapshotFromYouthRow((ywSnap ?? {}) as { first_name?: string; last_name?: string; photo_url?: string }),
           });
           if (insertErr) {
-            console.error('Webhook: failed to insert session_participant (register)', insertErr);
-            return NextResponse.json({ error: 'Failed to add participant' }, { status: 500 });
-          }
-          const { error: upErr } = await supabase
-            .from('sessions')
-            .update({ current_participants: current + 1, updated_at: new Date().toISOString() })
-            .eq('id', sessionId);
-          if (upErr) {
-            console.error('Webhook: failed to increment current_participants', upErr);
+            // Concurrent webhook deliveries or Stripe retries: two workers both saw "no row" — second insert loses UNIQUE race.
+            if (insertErr.code === '23505') {
+              await supabase
+                .from('session_participants')
+                .update({ paid: true, amount_paid: amountPaid })
+                .eq('session_id', sessionId)
+                .eq('youth_wrestler_id', youthWrestlerId);
+            } else {
+              console.error('Webhook: failed to insert session_participant (register)', {
+                code: insertErr.code,
+                message: insertErr.message,
+                details: insertErr.details,
+                hint: insertErr.hint,
+                sessionId,
+                youthWrestlerId,
+                parentId,
+              });
+              return NextResponse.json(
+                { error: 'Failed to add participant', code: insertErr.code, message: insertErr.message },
+                { status: 500 }
+              );
+            }
+          } else {
+            const { error: upErr } = await supabase
+              .from('sessions')
+              .update({ current_participants: current + 1, updated_at: new Date().toISOString() })
+              .eq('id', sessionId);
+            if (upErr) {
+              console.error('Webhook: failed to increment current_participants', upErr);
+            }
           }
         } else {
           await supabase
