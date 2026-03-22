@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
-import { getTenantByDomain } from '@/config/tenants';
+import { getTenantByDomain, tenants } from '@/config/tenants';
 import { getParentYouthWrestlerIds } from '@/lib/parent-wrestlers';
 
 /**
@@ -12,8 +12,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     const { id: sessionId } = await params;
     const headersList = await headers();
     const host = headersList.get('host') || '';
-    const tenant = getTenantByDomain(host);
-    if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
+    const tenant = getTenantByDomain(host) ?? tenants.guild;
 
     const supabase = await createClient(tenant.slug);
     const {

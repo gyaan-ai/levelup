@@ -2,7 +2,7 @@ import { redirect, notFound } from 'next/navigation';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getTenantByDomain } from '@/config/tenants';
+import { getTenantByDomain, tenants } from '@/config/tenants';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -28,12 +28,13 @@ export default async function SessionRegisterConfirmedPage({
 
   const headersList = await headers();
   const host = headersList.get('host') || '';
-  const tenant = getTenantByDomain(host);
+  // After Stripe, Host must resolve OR we still finalize via stripe_cs + metadata (single-tenant fallback).
+  const tenant = getTenantByDomain(host) ?? (stripeCs ? tenants.guild : null);
   if (!tenant) redirect('/404');
 
   // Same as Stripe webhook: insert session_participant immediately if webhook is slow (fixes empty Home/bookings).
   if (stripeCs) {
-    const fin = await finalizeRegisterFromCheckoutSession(tenant.slug, stripeCs);
+    const fin = await finalizeRegisterFromCheckoutSession(stripeCs, tenant.slug);
     if (!fin.ok) {
       console.error('[register/confirmed] finalizeRegisterFromCheckoutSession:', fin.error);
     }

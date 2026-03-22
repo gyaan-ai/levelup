@@ -1,5 +1,6 @@
 import { getStripeInstance } from '@/lib/stripe/webhooks';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { tenants } from '@/config/tenants';
 import { createNotification } from '@/lib/notifications';
 import { sendCoachNewSignupSms } from '@/lib/twilio';
 import { formatEST } from '@/lib/format-date';
@@ -9,13 +10,16 @@ import { rosterSnapshotFromYouthRow } from '@/lib/session-roster-snapshot';
  * Idempotent: same logic as Stripe webhook `checkout.session.completed` for register payments.
  * Call from the register-confirmed page when `stripe_cs={CHECKOUT_SESSION_ID}` is present so the
  * participant row exists even if the webhook is slow or fails.
+ *
+ * `checkoutSessionId` first — tenant comes from Checkout metadata (`tenant_slug`) when present
+ * so we still write to the right Supabase if Host / getTenantByDomain failed (paid-in-Stripe, no row).
  */
 export async function finalizeRegisterFromCheckoutSession(
-  tenantSlug: string,
-  checkoutSessionId: string
+  checkoutSessionId: string,
+  tenantSlugHint?: string
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   try {
-    const stripe = getStripeInstance(tenantSlug);
+    const stripe = getStripeInstance(tenantSlugHint ?? 'guild');
     const session = await stripe.checkout.sessions.retrieve(checkoutSessionId);
     const sessionId = session.metadata?.session_id;
     const app = session.metadata?.app;
@@ -29,6 +33,12 @@ export async function finalizeRegisterFromCheckoutSession(
     if (session.payment_status !== 'paid') {
       return { ok: false, error: 'Payment not completed' };
     }
+
+    const metaSlug = (session.metadata?.tenant_slug as string | undefined)?.trim().toLowerCase();
+    const tenantSlug =
+      metaSlug && tenants[metaSlug as keyof typeof tenants]
+        ? metaSlug
+        : tenantSlugHint ?? 'guild';
 
     const amountTotal = session.amount_total ?? 0;
     const amountPaid = amountTotal / 100;

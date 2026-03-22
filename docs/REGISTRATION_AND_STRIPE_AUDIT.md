@@ -29,6 +29,8 @@
 
 **Failure modes:** Missing metadata (now 500, no silent fall-through), webhook delay, double clicks (mitigated by idempotency + locks), manual SQL without updating `current_participants`.
 
+**Production domain mismatch (paid in Stripe, no roster / parent “invisible”):** If `getTenantByDomain(host)` returned `null` for your real hostname (domain not listed in `config/tenants.ts` and `NEXT_PUBLIC_APP_URL` not set or wrong), the register **confirmed** page could **404 before `finalizeRegisterFromCheckoutSession`**, and **`GET registration-status`** could **404** — so the UI never created `session_participants` even though Checkout succeeded. **Mitigations in code:** (1) `NEXT_PUBLIC_APP_URL` hostname is treated as guild; (2) finalize + webhook resolve **Supabase tenant from Checkout `metadata.tenant_slug`**; (3) confirmed page allows single-tenant fallback when `stripe_cs` is present; (4) registration-status falls back to guild so polling works. **You should still set `NEXT_PUBLIC_APP_URL` in Vercel to your canonical site URL.**
+
 ### B. Partner / invite link join (no Stripe on join route in some modes)
 
 - **`POST /api/sessions/join`**: inserts participant, increments count (partner-invite / partner-open).

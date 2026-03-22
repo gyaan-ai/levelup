@@ -263,7 +263,7 @@ export async function POST(
       stripeSession.status === 'complete';
 
     if (paid) {
-      await finalizeRegisterFromCheckoutSession(tenant.slug, stripeSession.id).catch((err) =>
+      await finalizeRegisterFromCheckoutSession(stripeSession.id, tenant.slug).catch((err) =>
         console.error('register: finalize after idempotent paid session', err)
       );
       const confirmUrl = `${baseUrl}/sessions/${sessionId}/register/confirmed?t=${encodeURIComponent(confirmToken)}&stripe_cs=${stripeSession.id}`;

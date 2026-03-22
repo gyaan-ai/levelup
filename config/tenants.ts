@@ -123,6 +123,26 @@ export const tenants: Record<string, TenantConfig> = {
   },
 };
 
+/**
+ * Matches the deployed app hostname from NEXT_PUBLIC_APP_URL (www vs apex, etc.).
+ * Without this, getTenantByDomain returns null on production aliases → register/confirmed
+ * 404s before finalize, and registration-status 404s — paid Stripe, no session_participants row.
+ */
+function hostMatchesConfiguredAppUrl(host: string): boolean {
+  const raw = process.env.NEXT_PUBLIC_APP_URL;
+  if (!raw) return false;
+  try {
+    const u = new URL(raw);
+    const appHost = u.hostname.toLowerCase();
+    const h = host.toLowerCase();
+    if (appHost === h) return true;
+    const stripWww = (s: string) => (s.startsWith('www.') ? s.slice(4) : s);
+    return stripWww(appHost) === stripWww(h);
+  } catch {
+    return false;
+  }
+}
+
 export function getTenantByDomain(hostname: string): TenantConfig | null {
   const host = hostname.split(':')[0].toLowerCase();
   // Primary domain and localhost for dev
@@ -135,6 +155,9 @@ export function getTenantByDomain(hostname: string): TenantConfig | null {
   }
   // Vercel preview and other known hosts
   if (host.endsWith('.vercel.app')) {
+    return tenants.guild;
+  }
+  if (hostMatchesConfiguredAppUrl(host)) {
     return tenants.guild;
   }
   return null;

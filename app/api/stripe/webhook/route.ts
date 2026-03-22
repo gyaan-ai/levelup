@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { getStripeInstance, getWebhookSecret } from '@/lib/stripe/webhooks';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getTenantByDomain } from '@/config/tenants';
+import { getTenantByDomain, tenants } from '@/config/tenants';
 import { createNotification } from '@/lib/notifications';
 import { sendCoachNewSignupSms } from '@/lib/twilio';
 import { formatEST } from '@/lib/format-date';
@@ -40,9 +40,12 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ received: true });
       }
 
-      /** Prefer explicit metadata when present (Host can be wrong behind some proxies). Only trust known slugs. */
+      /** Prefer Checkout metadata — Host on webhook requests can be wrong / not in getTenantByDomain. */
       const rawMetaTenant = (session.metadata?.tenant_slug as string | undefined)?.trim().toLowerCase();
-      const tenantSlug = rawMetaTenant === 'guild' ? 'guild' : tenant.slug;
+      const tenantSlug =
+        rawMetaTenant && rawMetaTenant in tenants
+          ? rawMetaTenant
+          : (getTenantByDomain(host) ?? { slug: 'guild' }).slug;
       const supabase = createAdminClient(tenantSlug);
       const paymentIntentId = typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id;
       const amountTotal = session.amount_total ?? 0;
