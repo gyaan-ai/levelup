@@ -10,6 +10,17 @@ export async function copyTextToClipboard(text: string): Promise<boolean> {
       await navigator.clipboard.writeText(text);
       return true;
     } catch {
+      /* try ClipboardItem (some WebKit builds handle multiline better) */
+    }
+  }
+
+  if (window.isSecureContext && navigator.clipboard?.write && typeof ClipboardItem !== 'undefined') {
+    try {
+      await navigator.clipboard.write([
+        new ClipboardItem({ 'text/plain': new Blob([text], { type: 'text/plain' }) }),
+      ]);
+      return true;
+    } catch {
       /* try fallback */
     }
   }

@@ -276,15 +276,23 @@ export async function getSessionSmsPhonesForPersonalText(
   const sep = '\n';
   const commaParents = [...new Set(parentRows.map((r) => r.phone))].map(fmt).join(sep);
   const commaAthletes = [...new Set(athleteRows.map((r) => r.phone))].map(fmt).join(sep);
-  const allOrder: string[] = [];
-  const seenPhone = new Set<string>();
-  for (const r of rowsOut) {
-    if (!seenPhone.has(r.phone)) {
-      seenPhone.add(r.phone);
-      allOrder.push(fmt(r.phone));
-    }
+
+  /**
+   * "Copy all" for Messages: one line per **session_participant** row using the same phone rule
+   * as SMS to parents (`resolveParentSmsPhone`). Repeats the same formatted number when one parent
+   * has multiple kids on the session (intentional — some paste targets need one line per kid).
+   * Do **not** dedupe by E.164 here — that collapsed multiple families to a single line when numbers matched.
+   */
+  const linesPerParticipant: string[] = [];
+  for (const r of rows) {
+    const pid = r.parent_id as string | undefined;
+    const ywid = (r as { youth_wrestler_id?: string | null }).youth_wrestler_id ?? null;
+    if (!pid) continue;
+    const phone = await resolveParentSmsPhone(admin, pid, ywid);
+    if (!phone) continue;
+    linesPerParticipant.push(fmt(phone));
   }
-  const commaAll = allOrder.join(sep);
+  const commaAll = linesPerParticipant.join(sep);
 
   return {
     rows: rowsOut,
