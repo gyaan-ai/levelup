@@ -5,7 +5,6 @@ import { createClient } from '@/lib/supabase/server';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, Users, Award, Shield, Search, Star } from 'lucide-react';
-import { EarlyAccessForm } from '@/app/early-access-form';
 import { HomeHeroLogo } from '@/app/home-hero-logo';
 
 export const metadata = {
@@ -332,21 +331,6 @@ export default async function HomePage() {
             <Button size="xl" variant="premium" asChild>
               <Link href="/signup">Apply to Join The Guild</Link>
             </Button>
-          </div>
-        </div>
-      </section>
-
-      {/* Early Access */}
-      <section id="early-access" className="py-16 md:py-20 bg-black text-white">
-        <div className="container mx-auto px-4">
-          <div className="max-w-2xl mx-auto text-center">
-            <h2 className="text-3xl sm:text-4xl md:text-5xl font-serif font-bold mb-4">
-              Early Access
-            </h2>
-            <p className="text-lg sm:text-xl text-white/80 mb-8">
-              Help us test The Guild and be first to train with elite coaches. Join the list for early adopters and testers.
-            </p>
-            <EarlyAccessForm />
           </div>
         </div>
       </section>

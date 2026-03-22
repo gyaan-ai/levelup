@@ -226,12 +226,18 @@ export async function GET(req: NextRequest) {
 
     // Build trend arrays (last 7 days, oldest first)
     const trendDays = lastNDays(date, 7);
+    const [trendBookingGrossRes, cumBookingGrossRes] = await Promise.all([
+      trendSumAmountPaidByRanges(admin, trendRanges),
+      cumulativeBookingGrossAtRangeEnds(admin, trendRanges),
+    ]);
+
     const trends = {
       parents: trendParentsRes,
       coaches: trendCoachesRes,
       athletes: trendAthletesRes,
       sessions: trendSessionsRes,
       bookings: trendBookingsRes,
+      bookingGross: trendBookingGrossRes,
       earlyAccess: trendEarlyRes,
       reviews: trendReviewsRes,
     };
@@ -251,7 +257,7 @@ export async function GET(req: NextRequest) {
     ] = await Promise.all([
       cumulativeTotalsAtRangeEnds(admin, 'users', 'parent', trendRanges),
       cumulativeTotalsAtRangeEnds(admin, 'athletes', null, trendRanges),
-      cumulativeTotalsAtRangeEnds(admin, 'youth_wrestlers', null, trendRanges),
+      cumulativeYouthWrestlersAtRangeEnds(admin, trendRanges),
       cumulativeTotalsAtRangeEnds(admin, 'sessions', null, trendRanges),
       cumulativeTotalsAtRangeEnds(admin, 'session_participants', null, trendRanges),
       cumulativeTotalsAtRangeEnds(admin, 'early_access', null, trendRanges),
@@ -264,6 +270,7 @@ export async function GET(req: NextRequest) {
       athletes: cumAthletesRes,
       sessions: cumSessionsRes,
       bookings: cumBookingsRes,
+      bookingGross: cumBookingGrossRes,
       earlyAccess: cumEarlyRes,
       reviews: cumReviewsRes,
     };
@@ -514,4 +521,97 @@ async function cumulativeTotalsAtRangeEnds(
     counts.push(error ? 0 : (count ?? 0));
   }
   return counts;
+}
+
+/**
+ * Kids cumulative count: rows with created_at <= end OR created_at IS NULL (legacy imports).
+ * Plain .lte(created_at) excludes NULL and undercounted (e.g. chart showed ~30 vs 37 real kids).
+ */
+async function cumulativeYouthWrestlersAtRangeEnds(
+  admin: ReturnType<typeof createAdminClient>,
+  ranges: { start: string; end: string }[]
+): Promise<number[]> {
+  const { count: nullCount, error: nullErr } = await admin
+    .from('youth_wrestlers')
+    .select('*', { count: 'exact', head: true })
+    .is('created_at', null);
+  const nNull = nullErr ? 0 : (nullCount ?? 0);
+
+  const counts: number[] = [];
+  for (const { end } of ranges) {
+    const { count, error } = await admin
+      .from('youth_wrestlers')
+      .select('*', { count: 'exact', head: true })
+      .not('created_at', 'is', null)
+      .lte('created_at', end);
+    counts.push((error ? 0 : (count ?? 0)) + nNull);
+  }
+  return counts;
+}
+
+function roundMoney(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+/** Gross parent payments (sum amount_paid) per trend bucket for session_participants in that window. */
+async function trendSumAmountPaidByRanges(
+  admin: ReturnType<typeof createAdminClient>,
+  ranges: { start: string; end: string }[]
+): Promise<number[]> {
+  if (ranges.length === 0) return [];
+  const minStart = ranges[0].start;
+  const maxEnd = ranges[ranges.length - 1].end;
+  const { data, error } = await admin
+    .from('session_participants')
+    .select('amount_paid, created_at')
+    .gte('created_at', minStart)
+    .lte('created_at', maxEnd)
+    .limit(100000);
+  if (error || !data) return ranges.map(() => 0);
+  const rows = data as { amount_paid?: number | null; created_at: string }[];
+  return ranges.map(({ start, end }) => {
+    const t0 = new Date(start).getTime();
+    const t1 = new Date(end).getTime();
+    let s = 0;
+    for (const r of rows) {
+      const t = new Date(r.created_at).getTime();
+      if (t >= t0 && t <= t1) s += Number(r.amount_paid ?? 0);
+    }
+    return roundMoney(s);
+  });
+}
+
+/** Cumulative sum of amount_paid for all booking rows with created_at <= bucket end (or null timestamp). */
+async function cumulativeBookingGrossAtRangeEnds(
+  admin: ReturnType<typeof createAdminClient>,
+  ranges: { start: string; end: string }[]
+): Promise<number[]> {
+  if (ranges.length === 0) return [];
+  const maxEnd = ranges[ranges.length - 1].end;
+  const [{ data: datedRows, error: e1 }, { data: nullRows, error: e2 }] = await Promise.all([
+    admin
+      .from('session_participants')
+      .select('amount_paid, created_at')
+      .not('created_at', 'is', null)
+      .lte('created_at', maxEnd)
+      .limit(100000),
+    admin.from('session_participants').select('amount_paid, created_at').is('created_at', null).limit(10000),
+  ]);
+  if (e1 && e2) return ranges.map(() => 0);
+  const rows = [
+    ...((datedRows ?? []) as { amount_paid?: number | null; created_at: string }[]),
+    ...((nullRows ?? []) as { amount_paid?: number | null; created_at: string | null }[]),
+  ];
+  return ranges.map(({ end }) => {
+    const tEnd = new Date(end).getTime();
+    let s = 0;
+    for (const r of rows) {
+      if (r.created_at == null) {
+        s += Number(r.amount_paid ?? 0);
+        continue;
+      }
+      if (new Date(r.created_at).getTime() <= tEnd) s += Number(r.amount_paid ?? 0);
+    }
+    return roundMoney(s);
+  });
 }

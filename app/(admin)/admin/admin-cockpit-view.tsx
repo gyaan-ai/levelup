@@ -77,16 +77,19 @@ export type CockpitData = {
     athletes: number[];
     sessions: number[];
     bookings: number[];
+    /** Gross parent payments (sum amount_paid) per trend bucket */
+    bookingGross?: number[];
     earlyAccess: number[];
     reviews: number[];
   };
-  /** All-time row counts at end of each trend bucket (same keys as trends) */
+  /** All-time row counts at end of each trend bucket (same keys as trends; bookingGross = cumulative $) */
   trendCumulativeTotals?: {
     parents: number[];
     coaches: number[];
     athletes: number[];
     sessions: number[];
     bookings: number[];
+    bookingGross?: number[];
     earlyAccess: number[];
     reviews: number[];
   };
@@ -134,6 +137,13 @@ function yesterdayInTz(tz: string): string {
   return yesterdayNoon.toLocaleDateString('en-CA', { timeZone: tz });
 }
 
+function formatChartCurrency(n: number): string {
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 10_000) return `$${Math.round(n / 1000)}k`;
+  if (n >= 1000) return `$${(n / 1000).toFixed(1)}k`;
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
+}
+
 function niceYMax(max: number): number {
   if (max <= 0) return 5;
   const step = Math.pow(10, Math.floor(Math.log10(max)));
@@ -161,12 +171,14 @@ function TrendLineChart({
   labels,
   metricLabel,
   mode,
+  valueFormat = 'number',
 }: {
   values: number[];
   labels: string[];
   metricLabel: string;
   /** runningTotal = 1+3+… additive; perPeriod = each bucket alone */
   mode: 'runningTotal' | 'perPeriod';
+  valueFormat?: 'number' | 'currency';
 }) {
   const raw = values.slice(0, labels.length);
   const vals = mode === 'runningTotal' ? runningSum(raw) : raw;
@@ -235,7 +247,7 @@ function TrendLineChart({
               textAnchor="end"
               className="fill-muted-foreground text-[11px] font-medium tabular-nums"
             >
-              {t}
+              {valueFormat === 'currency' ? formatChartCurrency(t) : t}
             </text>
           ))}
           {/* Line */}
@@ -284,11 +296,13 @@ function StandardBarChart({
   labels,
   metricLabel,
   mode,
+  valueFormat = 'number',
 }: {
   values: number[];
   labels: string[];
   metricLabel: string;
   mode: 'runningTotal' | 'perPeriod';
+  valueFormat?: 'number' | 'currency';
 }) {
   const raw = values.slice(0, labels.length);
   const vals = mode === 'runningTotal' ? runningSum(raw) : raw;
@@ -310,7 +324,7 @@ function StandardBarChart({
         <div className="flex flex-col justify-between shrink-0 text-right pr-2 border-r border-border" style={{ height: chartHeight }}>
           {[...yTicks].reverse().map((t) => (
             <span key={t} className="text-xs font-medium tabular-nums text-muted-foreground">
-              {t}
+              {valueFormat === 'currency' ? formatChartCurrency(t) : t}
             </span>
           ))}
         </div>
@@ -324,7 +338,7 @@ function StandardBarChart({
                   key={i}
                   className="flex-1 min-w-[20px] max-w-[48px] flex flex-col items-center justify-end gap-0.5"
                   style={{ height: chartHeight }}
-                  title={`${labels[i] ?? '—'}: ${v}`}
+                  title={`${labels[i] ?? '—'}: ${valueFormat === 'currency' ? formatChartCurrency(v) : v}`}
                 >
                   <div
                     className={`w-full rounded-t transition-colors min-h-[2px] flex-shrink-0 ${ACTIVITY_BAR_CLASS}`}
@@ -349,6 +363,7 @@ function StandardBarChart({
 
 const GROWTH_LINE_SPECS: { id: keyof NonNullable<CockpitData['trendCumulativeTotals']>; label: string; color: string }[] = [
   { id: 'bookings', label: 'Bookings', color: '#dc2626' },
+  { id: 'bookingGross', label: 'Gross booked ($)', color: '#059669' },
   { id: 'athletes', label: 'Athletes (kids)', color: '#16a34a' },
   { id: 'coaches', label: 'Coaches', color: '#7c3aed' },
   { id: 'parents', label: 'Parents', color: '#2563eb' },
@@ -388,6 +403,7 @@ function MultiLineGrowthChart({
   const maxVal = Math.max(0, ...allVals, 0);
   const yMax = niceYMax(maxVal);
   const yTicks = yMax <= 0 ? [0] : [0, ...(yMax <= 5 ? [yMax] : [Math.floor(yMax / 2), yMax])];
+  const yAxisIsMoney = active.length > 0 && active.every((s) => s.id === 'bookingGross');
 
   const xPos = (i: number) => {
     if (n <= 1) return padL + innerW / 2;
@@ -401,7 +417,8 @@ function MultiLineGrowthChart({
   return (
     <div className="space-y-3">
       <p className="text-sm text-muted-foreground">
-        Total records in the database at each period end (all-time growth — lines rise left → right).
+        Total records in the database at each period end (all-time growth — lines rise left → right). Athletes (kids) includes legacy rows with no <code className="text-xs bg-muted px-1 rounded">created_at</code>.{' '}
+        <strong className="text-foreground">Gross booked ($)</strong> uses dollars — toggle it alone for a readable scale (it does not share the count axis).
       </p>
       <div className="flex flex-wrap gap-2">
         {GROWTH_LINE_SPECS.map((spec) => (
@@ -449,7 +466,7 @@ function MultiLineGrowthChart({
               textAnchor="end"
               className="fill-muted-foreground text-[11px] font-medium tabular-nums"
             >
-              {t}
+              {yAxisIsMoney ? formatChartCurrency(t) : t}
             </text>
           ))}
           {active.map((s) => {
@@ -493,14 +510,18 @@ export function AdminCockpitView() {
   const [date, setDate] = useState(today);
   const [range, setRange] = useState<'today' | 'yesterday' | 'week' | 'month'>('today');
   const [trendPeriod, setTrendPeriod] = useState<'7d' | '3w' | '12m'>('7d');
-  const [trendMetric, setTrendMetric] = useState<'parents' | 'coaches' | 'athletes' | 'sessions' | 'bookings' | 'earlyAccess' | 'reviews'>('bookings');
+  const [trendMetric, setTrendMetric] = useState<
+    'parents' | 'coaches' | 'athletes' | 'sessions' | 'bookings' | 'bookingGross' | 'earlyAccess' | 'reviews'
+  >('bookings');
   /** Period activity: bar (default) or line */
   const [trendChartStyle, setTrendChartStyle] = useState<'line' | 'bar'>('bar');
   /** Additive running total in the selected window (default) vs raw per bucket */
   const [activityMode, setActivityMode] = useState<'runningTotal' | 'perPeriod'>('runningTotal');
-  const [growthLineVisible, setGrowthLineVisible] = useState<Record<string, boolean>>(() =>
-    Object.fromEntries(GROWTH_LINE_SPECS.map((s) => [s.id, true]))
-  );
+  const [growthLineVisible, setGrowthLineVisible] = useState<Record<string, boolean>>(() => {
+    const o = Object.fromEntries(GROWTH_LINE_SPECS.map((s) => [s.id, true])) as Record<string, boolean>;
+    o.bookingGross = false;
+    return o;
+  });
   const [data, setData] = useState<CockpitData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -545,7 +566,7 @@ export function AdminCockpitView() {
 
   const d = data!;
   const trends = d.trends ?? {
-    parents: [], coaches: [], athletes: [], sessions: [], bookings: [], earlyAccess: [], reviews: [],
+    parents: [], coaches: [], athletes: [], sessions: [], bookings: [], bookingGross: [], earlyAccess: [], reviews: [],
   };
   const trendDays = d.trendDays ?? [];
   const trendLabels = d.trendLabels ?? trendDays.map((ds) => formatEST(new Date(ds + 'T12:00:00'), 'M/d'));
@@ -556,6 +577,7 @@ export function AdminCockpitView() {
     { id: 'athletes' as const, label: 'Athletes', values: trends.athletes ?? [] },
     { id: 'sessions' as const, label: 'Sessions', values: trends.sessions ?? [] },
     { id: 'bookings' as const, label: 'Bookings', values: trends.bookings ?? [] },
+    { id: 'bookingGross' as const, label: 'Booking $ (gross)', values: trends.bookingGross ?? [] },
     { id: 'earlyAccess' as const, label: 'Early access', values: trends.earlyAccess ?? [] },
     { id: 'reviews' as const, label: 'Reviews', values: trends.reviews ?? [] },
   ];
@@ -803,6 +825,7 @@ export function AdminCockpitView() {
               labels={trendLabels}
               metricLabel={trendMetrics.find((m) => m.id === trendMetric)?.label ?? ''}
               mode={activityMode}
+              valueFormat={trendMetric === 'bookingGross' ? 'currency' : 'number'}
             />
           ) : (
             <StandardBarChart
@@ -810,6 +833,7 @@ export function AdminCockpitView() {
               labels={trendLabels}
               metricLabel={trendMetrics.find((m) => m.id === trendMetric)?.label ?? ''}
               mode={activityMode}
+              valueFormat={trendMetric === 'bookingGross' ? 'currency' : 'number'}
             />
           )}
         </CardContent>
@@ -854,6 +878,7 @@ export function AdminCockpitView() {
             {trendMetric === 'athletes' && <Users className="h-4 w-4" />}
             {trendMetric === 'sessions' && <Calendar className="h-4 w-4" />}
             {trendMetric === 'bookings' && <CreditCard className="h-4 w-4" />}
+            {trendMetric === 'bookingGross' && <DollarSign className="h-4 w-4" />}
             {trendMetric === 'earlyAccess' && <ClipboardList className="h-4 w-4" />}
             {trendMetric === 'reviews' && <Star className="h-4 w-4" />}
             {trendMetrics.find((m) => m.id === trendMetric)?.label ?? ''} · {trendPeriod === '7d' ? 'Last 7 days' : trendPeriod === '3w' ? 'Last 3 weeks' : 'Last 12 months'}
@@ -864,6 +889,8 @@ export function AdminCockpitView() {
             {trendMetric === 'athletes' && 'Youth wrestlers added in this period'}
             {trendMetric === 'sessions' && 'Sessions created in this period'}
             {trendMetric === 'bookings' && 'Bookings (signups) in this period'}
+            {trendMetric === 'bookingGross' &&
+              'Sum of parent payments (amount_paid on new signup rows) in each period — use Running total to see dollars accumulate across the window.'}
             {trendMetric === 'earlyAccess' && 'Early access signups in this period'}
             {trendMetric === 'reviews' && 'Reviews left in this period — coach, reviewer, stars, comment'}
           </CardDescription>
@@ -908,6 +935,11 @@ export function AdminCockpitView() {
                 </li>
               ))}
             </ul>
+          )}
+          {trendMetric === 'bookingGross' && (
+            <p className="text-sm text-muted-foreground">
+              See the chart above for totals. For each signup line with amount, switch the metric to <strong className="text-foreground">Bookings</strong>.
+            </p>
           )}
           {trendMetric === 'bookings' && (d.trendDetailBookings ?? []).length > 0 && (
             <ul className="space-y-2 text-sm">
