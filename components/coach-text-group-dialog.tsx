@@ -23,6 +23,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Copy, Smartphone } from 'lucide-react';
+import { copyTextToClipboard } from '@/lib/copy-to-clipboard';
 
 type RecipientOption = { value: string; label: string; group: 'everyone' | 'individual' };
 
@@ -113,11 +114,11 @@ export function CoachTextGroupDialog({ sessionId, open, onOpenChange, sessionLab
 
   const copyPhones = async (kind: 'all' | 'parents' | 'athletes', value: string) => {
     if (!value.trim()) return;
-    try {
-      await navigator.clipboard.writeText(value);
+    const ok = await copyTextToClipboard(value);
+    if (ok) {
       setCopiedKind(kind);
       window.setTimeout(() => setCopiedKind(null), 2000);
-    } catch {
+    } else {
       setError('Could not copy — try again or copy manually.');
     }
   };

@@ -18,6 +18,7 @@ import { isSessionOpenForParentBrowse } from '@/lib/sessions';
 import { showSessionSmsCopyAndTextGroup } from '@/lib/session-sms-tools';
 import { CopySessionPhonesButton } from '@/components/copy-session-phones-button';
 import { CoachTextGroupDialog } from '@/components/coach-text-group-dialog';
+import { copyTextToClipboard } from '@/lib/copy-to-clipboard';
 
 const CANCELLATION_WINDOW_HOURS = 24;
 
@@ -79,12 +80,10 @@ export function BookingCard({ session, isPast = false, showAdminSmsTools = false
   const handleCopyShareLink = async () => {
     if (!session.partner_invite_code) return;
     const url = `${typeof window !== 'undefined' ? window.location.origin : ''}/join/${session.partner_invite_code}`;
-    try {
-      await navigator.clipboard.writeText(url);
+    const ok = await copyTextToClipboard(url);
+    if (ok) {
       setLinkCopied(true);
       setTimeout(() => setLinkCopied(false), 2000);
-    } catch {
-      setLinkCopied(false);
     }
   };
 
