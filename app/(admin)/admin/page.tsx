@@ -82,7 +82,8 @@ export default async function AdminPage() {
         max_participants,
         price_per_participant,
         athletes(id, first_name, last_name, school, venmo_handle, zelle_email),
-        facilities(id, name)
+        facilities(id, name),
+        session_participants(amount_paid)
       `)
       .order('scheduled_datetime', { ascending: false }),
     admin
@@ -151,9 +152,16 @@ export default async function AdminPage() {
     price_per_participant?: number | null;
     athletes?: { id: string; first_name: string; last_name: string; school: string; venmo_handle?: string | null; zelle_email?: string | null } | { id: string; first_name: string; last_name: string; school: string; venmo_handle?: string | null; zelle_email?: string | null }[];
     facilities?: { id: string; name: string } | { id: string; name: string }[];
+    session_participants?: { amount_paid?: number | null }[] | { amount_paid?: number | null };
   }>;
 
   const emailByUserId = new Map(usersRows.map((u) => [u.id, u.email]));
+
+  function participantAmountPaidSum(s: (typeof sessionsRows)[0]): number {
+    const raw = s.session_participants;
+    const rows = Array.isArray(raw) ? raw : raw ? [raw] : [];
+    return rows.reduce((sum, p) => sum + Number((p as { amount_paid?: number | null }).amount_paid ?? 0), 0);
+  }
 
   const sessions: AdminSession[] = sessionsRows.map((s) => {
     const a = s.athletes;
@@ -223,6 +231,7 @@ export default async function AdminPage() {
         athlete_payment: s.athlete_payment,
         price_per_participant: s.price_per_participant,
         current_participants: s.current_participants,
+        participant_amount_paid_sum: participantAmountPaidSum(s),
       });
       if (s.status === 'completed') r.completed_count += 1;
     }
@@ -243,6 +252,7 @@ export default async function AdminPage() {
       athlete_payment: s.athlete_payment,
       price_per_participant: s.price_per_participant,
       current_participants: s.current_participants,
+      participant_amount_paid_sum: participantAmountPaidSum(s),
     });
     if (existing) {
       existing.amount += payment;

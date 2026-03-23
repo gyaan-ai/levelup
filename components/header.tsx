@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/lib/auth/use-auth';
 import { useNotificationCount } from '@/lib/hooks/use-notification-count';
 import { useInboxUnreadCount } from '@/lib/hooks/use-inbox-unread-count';
@@ -25,6 +25,7 @@ const navLinkClass = 'block py-3 px-4 text-white hover:text-accent hover:bg-whit
 
 export function Header() {
   const tenant = useTenant();
+  const pathname = usePathname();
   const { user, userRole, viewAsRole, effectiveRole, setViewAsRole, loading, signOut } = useAuth();
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -55,16 +56,18 @@ export function Header() {
 
   return (
     <header className="bg-primary text-white border-b border-accent/20 sticky top-0 z-50 pt-[env(safe-area-inset-top,0px)]">
-      {/* Mobile: always show Log in bar so paying users are never locked out (no auth check) */}
-      <div className="md:hidden bg-accent text-black">
-        <Link
-          href="/login"
-          className="block text-center font-bold text-base py-3 px-4 min-h-[48px] flex items-center justify-center"
-          onClick={() => setMobileOpen(false)}
-        >
-          Log in
-        </Link>
-      </div>
+      {/* Mobile logged-out only, and not on / — homepage hero already has Log in + menu has Login (avoids double gold CTAs) */}
+      {!user && pathname !== '/' && (
+        <div className="md:hidden bg-accent text-black">
+          <Link
+            href="/login"
+            className="block text-center font-bold text-base py-3 px-4 min-h-[48px] flex items-center justify-center"
+            onClick={() => setMobileOpen(false)}
+          >
+            Log in
+          </Link>
+        </div>
+      )}
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-14 sm:h-16">
           <div className="flex items-center gap-2 min-w-0">
@@ -345,14 +348,8 @@ export function Header() {
               </Button>
             </nav>
 
+            {/* Mobile logged-out: gold bar above has Log in; avoid duplicating Login next to the menu */}
             <div className="md:hidden flex items-center gap-2">
-              <Link
-                href="/login"
-                className="py-2.5 px-5 min-h-[44px] flex items-center rounded-md font-semibold text-base bg-accent text-black hover:bg-accent/90 shrink-0"
-                onClick={() => setMobileOpen(false)}
-              >
-                Login
-              </Link>
               <button
                 type="button"
                 className="p-2 -mr-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-white hover:bg-white/10 rounded"

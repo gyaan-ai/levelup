@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
 
     const { data: sessionsToUpdate, error: fetchErr } = await admin
       .from('sessions')
-      .select('id, athlete_payment, price_per_participant, current_participants')
+      .select('id, athlete_payment, price_per_participant, current_participants, session_participants(amount_paid)')
       .eq('athlete_id', athleteId)
       .eq('status', 'completed')
       .is('athlete_payout_date', null);
@@ -54,14 +54,30 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ success: true, updatedCount: 0 });
     }
 
-    const rows = sessionsToUpdate as Array<{
+    type Row = {
       id: string;
       athlete_payment?: number | null;
       price_per_participant?: number | null;
       current_participants?: number | null;
-    }>;
+      session_participants?: { amount_paid?: number | null }[] | { amount_paid?: number | null };
+    };
 
-    const bases = rows.map((s) => coachPayoutUsd(s));
+    const rows = sessionsToUpdate as Row[];
+
+    function participantSum(s: Row): number {
+      const raw = s.session_participants;
+      const parts = Array.isArray(raw) ? raw : raw ? [raw] : [];
+      return parts.reduce((sum, p) => sum + Number(p.amount_paid ?? 0), 0);
+    }
+
+    const bases = rows.map((s) =>
+      coachPayoutUsd({
+        athlete_payment: s.athlete_payment,
+        price_per_participant: s.price_per_participant,
+        current_participants: s.current_participants,
+        participant_amount_paid_sum: participantSum(s),
+      })
+    );
     const sumB = bases.reduce((a, b) => a + b, 0);
     const count = rows.length;
 

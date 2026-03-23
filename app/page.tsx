@@ -50,13 +50,7 @@ export default async function HomePage() {
       {/* Hero */}
       <section className="relative bg-black min-h-[90vh] flex items-center overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-black via-black to-gray-900" />
-        {/* Mobile: Log in top-right on the same screen as THE GUILD / Browse — tell users "tap Log in top right" */}
-        <Link
-          href="/login"
-          className="absolute top-4 right-4 z-20 md:hidden py-2.5 px-4 rounded-full bg-accent text-black font-semibold text-sm shadow-lg hover:bg-accent/90"
-        >
-          Log in
-        </Link>
+        {/* Login: use header (gold bar + nav) on mobile — avoid a second pill overlapping the nav Login */}
         <div className="container mx-auto px-4 py-12 sm:py-20 relative z-10">
           <div className="max-w-6xl mx-auto">
             <div className="grid lg:grid-cols-2 gap-12 items-center">
@@ -74,7 +68,8 @@ export default async function HomePage() {
                   Train with NCAA wrestlers and elite coaches in your community for private technique
                   instruction. Master the details that separate good from elite.
                 </p>
-                <p className="text-sm text-white/70 mb-3 sm:mb-4 text-center lg:text-left">
+                {/* Desktop: extra text link. Mobile: skip — header menu + primary Log in below are enough (avoids 3× login on small screens) */}
+                <p className="hidden md:block text-sm text-white/70 mb-3 sm:mb-4 text-center lg:text-left">
                   Already have an account?{' '}
                   <Link href="/login" className="text-accent font-semibold underline underline-offset-2 hover:text-accent/90">
                     Log in

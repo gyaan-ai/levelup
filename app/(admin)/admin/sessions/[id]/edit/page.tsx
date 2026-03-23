@@ -44,7 +44,8 @@ export default async function AdminEditSessionPage({
       athlete_payment,
       athlete_payout_date,
       athletes(id, first_name, last_name, school),
-      facilities(id, name)
+      facilities(id, name),
+      session_participants(amount_paid)
     `)
     .eq('id', sessionId)
     .single();
@@ -57,6 +58,11 @@ export default async function AdminEditSessionPage({
   const fac = Array.isArray((session as { facilities?: unknown }).facilities)
     ? (session as { facilities: unknown[] }).facilities[0]
     : (session as { facilities?: { name?: string } }).facilities;
+
+  const partRows = (session as { session_participants?: { amount_paid?: number | null }[] }).session_participants;
+  const participantAmountPaidSum = Array.isArray(partRows)
+    ? partRows.reduce((sum, p) => sum + Number(p.amount_paid ?? 0), 0)
+    : 0;
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-lg">
@@ -87,6 +93,7 @@ export default async function AdminEditSessionPage({
             : null
         }
         athletePayoutDate={(session as { athlete_payout_date?: string | null }).athlete_payout_date ?? null}
+        participantAmountPaidSum={participantAmountPaidSum}
         scheduledDate={formatEST((session as { scheduled_datetime?: string }).scheduled_datetime ?? '', 'yyyy-MM-dd')}
         scheduledTime={formatEST((session as { scheduled_datetime?: string }).scheduled_datetime ?? '', 'HH:mm')}
       />

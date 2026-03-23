@@ -42,6 +42,8 @@ type Props = {
   athletePayment?: number | null;
   /** YYYY-MM-DD when payout was marked paid */
   athletePayoutDate?: string | null;
+  /** Sum of session_participants.amount_paid (parent $ after discounts) */
+  participantAmountPaidSum?: number;
 };
 
 export function EditSessionForm({
@@ -58,6 +60,7 @@ export function EditSessionForm({
   scheduledTime: initialTime,
   athletePayment = null,
   athletePayoutDate = null,
+  participantAmountPaidSum = 0,
 }: Props) {
   const router = useRouter();
   const [focus, setFocus] = useState(focusArea);
@@ -81,6 +84,7 @@ export function EditSessionForm({
         athlete_payment: athletePayment,
         price_per_participant: pricePerParticipant,
         current_participants: currentParticipants,
+        participant_amount_paid_sum: participantAmountPaidSum,
       })
     );
   }
@@ -97,7 +101,7 @@ export function EditSessionForm({
       setPayoutAmount(suggestedCoachPayoutAmount());
     }
     wasCompletedOnMount.current = nowCompleted;
-  }, [sessionStatus, athletePayoutDate, athletePayment, pricePerParticipant, currentParticipants]);
+  }, [sessionStatus, athletePayoutDate, athletePayment, pricePerParticipant, currentParticipants, participantAmountPaidSum]);
 
   useEffect(() => {
     fetch('/api/focus-areas')
@@ -362,7 +366,7 @@ export function EditSessionForm({
             <>After the session is marked complete (step 1), enter what you paid the coach and record it here. Use a custom amount when parents didn&apos;t pay but you still pay the coach (e.g. flat $50).</>
           ) : (
             <>
-              Sets <span className="font-medium">athlete payment</span> and today&apos;s payout date for this session. Adjust the amount if needed (e.g. cash comp or different split).
+              Sets <span className="font-medium">athlete payment</span> and today&apos;s payout date for this session. Suggested amount uses what parents paid (per wrestler) when available — that reflects family discounts. Adjust if you already paid a different number.
             </>
           )}
         </CardDescription>

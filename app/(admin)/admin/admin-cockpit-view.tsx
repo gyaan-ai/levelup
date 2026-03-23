@@ -58,6 +58,8 @@ export type CockpitData = {
   }[];
   earlyAccess: { id: string; email: string; name: string; created_at: string }[];
   payoutsPaid: number;
+  /** Sum of coach payouts marked paid, all time (any payout date) */
+  payoutsPaidAllTime?: number;
   payoutsPaidList: { session_id: string; amount: number; coach_name: string }[];
   revenueThatDay: number;
   /** Per-period signup economics: count, gross from parents, session-level coach/Stripe/Guild */
@@ -593,7 +595,14 @@ export function AdminCockpitView() {
     { label: 'New athletes', value: d.newAthletes.length, icon: Users },
     { label: 'Sessions created', value: d.sessionsScheduled.length, icon: Calendar },
     { label: 'Early access', value: d.earlyAccess.length, icon: ClipboardList },
-    { label: 'Payouts paid', value: `$${d.payoutsPaid.toFixed(0)}`, icon: Wallet },
+    {
+      label: 'Payouts paid (this period)',
+      value:
+        d.payoutsPaidAllTime != null
+          ? `$${d.payoutsPaid.toFixed(0)} · $${d.payoutsPaidAllTime.toFixed(0)} all-time`
+          : `$${d.payoutsPaid.toFixed(0)}`,
+      icon: Wallet,
+    },
   ];
 
   return (
@@ -1009,14 +1018,21 @@ export function AdminCockpitView() {
       </Card>
 
       <div className="grid gap-6 lg:grid-cols-2">
-        {(d.payoutsPaidList.length > 0 || d.payoutsPaid > 0) && (
+        {(d.payoutsPaidList.length > 0 || d.payoutsPaid > 0 || (d.payoutsPaidAllTime ?? 0) > 0) && (
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Wallet className="h-4 w-4" />
-                Payouts paid this day
+                Payouts recorded in this period
               </CardTitle>
-              <CardDescription>Total: ${d.payoutsPaid.toFixed(2)}</CardDescription>
+              <CardDescription>
+                Period total: ${d.payoutsPaid.toFixed(2)}
+                {d.payoutsPaidAllTime != null && (
+                  <span className="block mt-1 text-muted-foreground">
+                    All-time paid out (every marked session): ${d.payoutsPaidAllTime.toFixed(2)}
+                  </span>
+                )}
+              </CardDescription>
             </CardHeader>
             <CardContent>
               {d.payoutsPaidList.length === 0 ? (

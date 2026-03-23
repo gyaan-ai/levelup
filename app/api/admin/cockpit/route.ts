@@ -224,6 +224,17 @@ export async function GET(req: NextRequest) {
       return { session_id: s.id, amount: Number(s.athlete_payment ?? 0), coach_name: o ? `${o.first_name ?? ''} ${o.last_name ?? ''}`.trim() : '—' };
     });
 
+    /** All completed sessions ever marked paid (not limited to cockpit period) */
+    const { data: payoutsAllTimeRows } = await admin
+      .from('sessions')
+      .select('athlete_payment')
+      .eq('status', 'completed')
+      .not('athlete_payout_date', 'is', null);
+    const payoutsPaidAllTime = (payoutsAllTimeRows ?? []).reduce(
+      (sum: number, s: { athlete_payment?: number | null }) => sum + Number(s.athlete_payment ?? 0),
+      0
+    );
+
     // Build trend arrays (last 7 days, oldest first)
     const trendDays = lastNDays(date, 7);
     const [trendBookingGrossRes, cumBookingGrossRes] = await Promise.all([
@@ -457,6 +468,7 @@ export async function GET(req: NextRequest) {
       bookings,
       earlyAccess,
       payoutsPaid,
+      payoutsPaidAllTime,
       payoutsPaidList,
       revenueThatDay,
       bookingEconomics,
