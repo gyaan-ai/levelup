@@ -154,6 +154,14 @@ export function AdminDashboardClient({
   const [markingAthleteId, setMarkingAthleteId] = useState<string | null>(null);
   const [recordingAthleteId, setRecordingAthleteId] = useState<string | null>(null);
   const [customPayoutAmount, setCustomPayoutAmount] = useState('');
+  /** Per-coach total payout (editable); resets when server totals change */
+  const [payoutTotalByAthlete, setPayoutTotalByAthlete] = useState<Record<string, string>>({});
+  const payoutListKey = coachPayouts.map((p) => `${p.athlete_id}:${p.amount}`).join('|');
+  useEffect(() => {
+    setPayoutTotalByAthlete(
+      Object.fromEntries(coachPayouts.map((p) => [p.athlete_id, p.amount.toFixed(2)]))
+    );
+  }, [payoutListKey]);
   const [sessionDateFrom, setSessionDateFrom] = useState('');
   const [sessionDateTo, setSessionDateTo] = useState('');
   const [copiedSessionId, setCopiedSessionId] = useState<string | null>(null);
@@ -901,7 +909,7 @@ export function AdminDashboardClient({
           <CardHeader>
             <CardTitle>Coach payouts (manual)</CardTitle>
             <CardDescription>
-              <strong>Amount owed</strong> uses each session&apos;s recorded coach payout when set; otherwise it&apos;s estimated from the roster (registered participants × price × coach share, same as the coach&apos;s schedule). Pay via Venmo or Zelle, then <strong>Mark paid</strong> to lock it in. For a flat custom amount per session (cash outside the app, comp, etc.), enter it below and use <strong>Record $X &amp; mark paid</strong>.
+              <strong>Total to pay</strong> defaults from each session (booked amount or roster estimate). <strong>Edit the number in the row</strong> if you paid a different total (cash, adjustment, etc.), then <strong>Mark paid</strong>. For a <em>flat dollar amount on every unpaid session</em> for that coach, use <strong>Record $X &amp; mark paid</strong> with the field below.
             </CardDescription>
             <div className="flex flex-wrap items-center gap-3 pt-2">
               <label className="text-sm text-muted-foreground">Record custom payout amount:</label>
@@ -924,7 +932,7 @@ export function AdminDashboardClient({
                   <tr className="border-b">
                     <th className="text-left py-2 font-medium">Coach</th>
                     <th className="text-left py-2 font-medium">School</th>
-                    <th className="text-right py-2 font-medium">Amount owed</th>
+                    <th className="text-right py-2 font-medium">Total to pay</th>
                     <th className="text-left py-2 font-medium">Venmo</th>
                     <th className="text-left py-2 font-medium">Zelle</th>
                     <th className="text-right py-2 font-medium">Action</th>
@@ -952,8 +960,23 @@ export function AdminDashboardClient({
                           </Link>
                         </td>
                         <td className="py-2 text-muted-foreground">{p.school}</td>
-                        <td className="py-2 text-right font-medium">
-                          ${p.amount.toFixed(2)}
+                        <td className="py-2 text-right">
+                          <div className="flex justify-end">
+                            <Input
+                              type="number"
+                              min={0}
+                              step={0.01}
+                              className="w-28 h-9 text-right tabular-nums"
+                              aria-label={`Total payout for ${p.name}`}
+                              value={payoutTotalByAthlete[p.athlete_id] ?? p.amount.toFixed(2)}
+                              onChange={(e) =>
+                                setPayoutTotalByAthlete((prev) => ({
+                                  ...prev,
+                                  [p.athlete_id]: e.target.value,
+                                }))
+                              }
+                            />
+                          </div>
                         </td>
                         <td className="py-2 text-muted-foreground">
                           {p.venmo_handle ? `@${p.venmo_handle}` : '—'}
@@ -997,10 +1020,15 @@ export function AdminDashboardClient({
                               onClick={async () => {
                                 setMarkingAthleteId(p.athlete_id);
                                 try {
+                                  const raw = payoutTotalByAthlete[p.athlete_id];
+                                  const parsed =
+                                    raw != null && raw !== '' ? parseFloat(raw) : p.amount;
+                                  const total =
+                                    !Number.isNaN(parsed) && parsed >= 0 ? parsed : p.amount;
                                   const r = await fetch('/api/admin/mark-payout-paid', {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ athleteId: p.athlete_id }),
+                                    body: JSON.stringify({ athleteId: p.athlete_id, amount: total }),
                                   });
                                   const data = await r.json().catch(() => ({}));
                                   if (r.ok && data.success) {
