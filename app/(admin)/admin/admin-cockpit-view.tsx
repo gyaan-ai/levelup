@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,6 +20,13 @@ import {
 } from 'lucide-react';
 import { formatEST } from '@/lib/format-date';
 import Link from 'next/link';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 function formatRange(start: string, end: string, type: 'week' | 'month'): string {
   const s = new Date(start + 'T12:00:00.000Z');
@@ -101,7 +108,15 @@ export type CockpitData = {
   trendDetailParents?: { id: string; email: string; created_at: string }[];
   trendDetailCoaches?: { id: string; name: string; school: string; created_at: string }[];
   trendDetailAthletes?: { id: string; name: string; parent_id: string; created_at: string }[];
-  trendDetailReviews?: { id: string; coach_name: string; reviewed_by: string; rating: number; comment: string; created_at: string }[];
+  trendDetailReviews?: {
+    id: string;
+    athlete_id: string;
+    coach_name: string;
+    reviewed_by: string;
+    rating: number;
+    comment: string;
+    created_at: string;
+  }[];
   trendDetailSessions?: {
     id: string;
     scheduled_datetime: string;
@@ -515,6 +530,9 @@ export function AdminCockpitView() {
   const [trendMetric, setTrendMetric] = useState<
     'parents' | 'coaches' | 'athletes' | 'sessions' | 'bookings' | 'bookingGross' | 'earlyAccess' | 'reviews'
   >('bookings');
+  /** Cockpit reviews table filters (client-side on loaded period) */
+  const [reviewCoachFilter, setReviewCoachFilter] = useState<string>('');
+  const [reviewStarFilter, setReviewStarFilter] = useState<number | 'all'>('all');
   /** Period activity: bar (default) or line */
   const [trendChartStyle, setTrendChartStyle] = useState<'line' | 'bar'>('bar');
   /** Additive running total in the selected window (default) vs raw per bucket */
@@ -547,6 +565,30 @@ export function AdminCockpitView() {
       })
       .finally(() => setLoading(false));
   }, [date, range, trendPeriod]);
+
+  const reviewsAll = data?.trendDetailReviews ?? [];
+  const filteredReviews = useMemo(() => {
+    return reviewsAll.filter((r) => {
+      if (reviewCoachFilter && r.athlete_id !== reviewCoachFilter) return false;
+      if (reviewStarFilter !== 'all' && r.rating !== reviewStarFilter) return false;
+      return true;
+    });
+  }, [reviewsAll, reviewCoachFilter, reviewStarFilter]);
+
+  const reviewCoachOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const r of reviewsAll) {
+      if (r.athlete_id) map.set(r.athlete_id, r.coach_name);
+    }
+    return [...map.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+  }, [reviewsAll]);
+
+  useEffect(() => {
+    if (trendMetric !== 'reviews') {
+      setReviewCoachFilter('');
+      setReviewStarFilter('all');
+    }
+  }, [trendMetric]);
 
   if (loading && !data) {
     return (
@@ -974,33 +1016,90 @@ export function AdminCockpitView() {
             </ul>
           )}
           {trendMetric === 'reviews' && (d.trendDetailReviews ?? []).length > 0 && (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm border-collapse">
-                <thead>
-                  <tr className="border-b border-border">
-                    <th className="text-left py-2 pr-3 font-medium text-muted-foreground">Coach</th>
-                    <th className="text-left py-2 pr-3 font-medium text-muted-foreground">Reviewed by</th>
-                    <th className="text-left py-2 pr-3 font-medium text-muted-foreground">Stars</th>
-                    <th className="text-left py-2 font-medium text-muted-foreground">Comment</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {(d.trendDetailReviews ?? []).map((r) => (
-                    <tr key={r.id} className="border-b border-border/50">
-                      <td className="py-2 pr-3 font-medium">{r.coach_name}</td>
-                      <td className="py-2 pr-3 text-muted-foreground">{r.reviewed_by}</td>
-                      <td className="py-2 pr-3">
-                        <span className="inline-flex gap-0.5" aria-label={`${r.rating} stars`}>
-                          {[1, 2, 3, 4, 5].map((i) => (
-                            <Star key={i} className={`h-4 w-4 ${i <= r.rating ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/40'}`} />
-                          ))}
-                        </span>
-                      </td>
-                      <td className="py-2 text-muted-foreground max-w-[280px] truncate" title={r.comment || undefined}>{r.comment || '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-end gap-3">
+                <div className="space-y-1.5 min-w-[180px]">
+                  <label htmlFor="cockpit-review-coach" className="text-xs font-medium text-muted-foreground">
+                    Coach
+                  </label>
+                  <Select
+                    value={reviewCoachFilter || 'all'}
+                    onValueChange={(v) => setReviewCoachFilter(v === 'all' ? '' : v)}
+                  >
+                    <SelectTrigger id="cockpit-review-coach" className="h-9 w-[min(100%,220px)]">
+                      <SelectValue placeholder="All coaches" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All coaches</SelectItem>
+                      {reviewCoachOptions.map(([id, name]) => (
+                        <SelectItem key={id} value={id}>
+                          {name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5 min-w-[140px]">
+                  <label htmlFor="cockpit-review-stars" className="text-xs font-medium text-muted-foreground">
+                    Stars
+                  </label>
+                  <Select
+                    value={reviewStarFilter === 'all' ? 'all' : String(reviewStarFilter)}
+                    onValueChange={(v) =>
+                      setReviewStarFilter(v === 'all' ? 'all' : (Number(v) as 1 | 2 | 3 | 4 | 5))
+                    }
+                  >
+                    <SelectTrigger id="cockpit-review-stars" className="h-9 w-[min(100%,180px)]">
+                      <SelectValue placeholder="All ratings" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All ratings</SelectItem>
+                      {[5, 4, 3, 2, 1].map((n) => (
+                        <SelectItem key={n} value={String(n)}>
+                          {n} star{n === 1 ? '' : 's'}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              {filteredReviews.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No reviews match your filters.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm border-collapse">
+                    <thead>
+                      <tr className="border-b border-border">
+                        <th className="text-left py-2 pr-3 font-medium text-muted-foreground">Coach</th>
+                        <th className="text-left py-2 pr-3 font-medium text-muted-foreground">Reviewed by</th>
+                        <th className="text-left py-2 pr-3 font-medium text-muted-foreground">Stars</th>
+                        <th className="text-left py-2 font-medium text-muted-foreground">Comment</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredReviews.map((r) => (
+                        <tr key={r.id} className="border-b border-border/50">
+                          <td className="py-2 pr-3 font-medium">{r.coach_name}</td>
+                          <td className="py-2 pr-3 text-muted-foreground">{r.reviewed_by}</td>
+                          <td className="py-2 pr-3">
+                            <span className="inline-flex gap-0.5" aria-label={`${r.rating} stars`}>
+                              {[1, 2, 3, 4, 5].map((i) => (
+                                <Star
+                                  key={i}
+                                  className={`h-4 w-4 ${i <= r.rating ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/40'}`}
+                                />
+                              ))}
+                            </span>
+                          </td>
+                          <td className="py-2 text-muted-foreground max-w-[280px] truncate" title={r.comment || undefined}>
+                            {r.comment || '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
           {(

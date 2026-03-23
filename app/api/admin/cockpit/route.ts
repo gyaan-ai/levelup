@@ -380,6 +380,7 @@ export async function GET(req: NextRequest) {
       const o = Array.isArray(a) ? a[0] : a;
       return {
         id: r.id,
+        athlete_id: r.athlete_id,
         coach_name: o ? `${o.first_name} ${o.last_name}`.trim() : '—',
         reviewed_by: parentEmailById.get(r.parent_id) ?? '—',
         rating: r.rating,

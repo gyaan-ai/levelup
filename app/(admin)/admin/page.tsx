@@ -96,7 +96,7 @@ export default async function AdminPage() {
       .order('created_at', { ascending: false }),
     admin
       .from('athletes')
-      .select('id, first_name, last_name, school')
+      .select('id, first_name, last_name, school, average_rating, review_count')
       .order('last_name'),
   ]);
 
@@ -208,7 +208,14 @@ export default async function AdminPage() {
   };
 
   // Build coach list from all athletes so coaches with no sessions (e.g. Cam) still appear
-  const athletesRows = (athletesRes.data ?? []) as Array<{ id: string; first_name: string; last_name: string; school: string | null }>;
+  const athletesRows = (athletesRes.data ?? []) as Array<{
+    id: string;
+    first_name: string;
+    last_name: string;
+    school: string | null;
+    average_rating?: number | null;
+    review_count?: number | null;
+  }>;
   const athleteMap = new Map<string, AthleteReport>();
   for (const o of athletesRows) {
     athleteMap.set(o.id, {
@@ -218,6 +225,8 @@ export default async function AdminPage() {
       session_count: 0,
       total_earnings: 0,
       completed_count: 0,
+      average_rating: o.average_rating != null ? Number(o.average_rating) : null,
+      review_count: o.review_count != null ? Number(o.review_count) : 0,
     });
   }
   for (const s of sessionsRows) {

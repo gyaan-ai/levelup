@@ -93,3 +93,30 @@ export async function sendCoachNewSignupSms(
     `LevelUp: Someone signed up for your session on ${dateStr}. Check My sessions in the app.`
   );
 }
+
+/**
+ * SMS coach when a parent leaves a new review (not on edit/update of same review).
+ * Uses users.phone or phone-shaped athletes.zelle_email — same as signup SMS.
+ */
+export async function sendCoachNewReviewSms(
+  admin: SupabaseAdmin,
+  coachAthleteId: string,
+  rating: number,
+  profileUrl: string
+): Promise<void> {
+  const [{ data: userRow }, { data: athleteRow }] = await Promise.all([
+    admin.from('users').select('phone').eq('id', coachAthleteId).maybeSingle(),
+    admin.from('athletes').select('zelle_email').eq('id', coachAthleteId).maybeSingle(),
+  ]);
+  const phone = pickCoachPhone({
+    phone: userRow?.phone ?? undefined,
+    zelle_email: athleteRow?.zelle_email ?? undefined,
+  });
+  if (!phone) return;
+  const r = Math.min(5, Math.max(1, Math.round(rating)));
+  const starLabel = r === 1 ? '1-star' : `${r}-star`;
+  await sendSms(
+    phone,
+    `The Guild: You got a new ${starLabel} review. See it now: ${profileUrl}`
+  );
+}

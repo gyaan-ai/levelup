@@ -3,6 +3,7 @@ import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
+import { sendCoachNewReviewSms } from '@/lib/twilio';
 
 const REVIEW_TAGS = ['Technique', 'Great with kids', 'Punctual', 'Communication', 'My kid loved it'] as const;
 
@@ -149,6 +150,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'You did not participate in this session' }, { status: 403 });
     }
 
+    const coachId = session.athlete_id as string;
+    if (!coachId) {
+      return NextResponse.json({ error: 'Session has no coach' }, { status: 400 });
+    }
+
+    const { data: priorReview } = await admin
+      .from('reviews')
+      .select('id')
+      .eq('session_id', sessionId)
+      .eq('parent_id', user.id)
+      .maybeSingle();
+    const isFirstReviewForSession = !priorReview;
+
     const row = {
       session_id: sessionId,
       parent_id: user.id,
@@ -171,6 +185,16 @@ export async function POST(req: NextRequest) {
     if (upsertError) {
       console.error('Review upsert error:', upsertError);
       return NextResponse.json({ error: upsertError.message }, { status: 500 });
+    }
+
+    if (isFirstReviewForSession) {
+      const baseUrl =
+        process.env.NEXT_PUBLIC_APP_URL ||
+        (host.startsWith('localhost') ? `http://${host}` : `https://${host}`);
+      const profileUrl = `${baseUrl.replace(/\/$/, '')}/athlete/${coachId}`;
+      void sendCoachNewReviewSms(admin, coachId, rating, profileUrl).catch((err) =>
+        console.warn('Coach new review SMS failed:', err)
+      );
     }
 
     return NextResponse.json({ review });

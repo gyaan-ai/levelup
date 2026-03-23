@@ -102,6 +102,10 @@ export type AthleteReport = {
   session_count: number;
   total_earnings: number;
   completed_count: number;
+  /** From athletes.average_rating — same as public coach profile */
+  average_rating?: number | null;
+  /** From athletes.review_count */
+  review_count?: number;
 };
 
 export type CoachPayout = {
@@ -1256,7 +1260,10 @@ export function AdminDashboardClient({
           <CardHeader>
             <CardTitle>Coaches</CardTitle>
             <CardDescription>
-              Same coaches as on Browse Coaches. Edit profiles, visibility (show/hide on browse), and view sessions and earnings.
+              Same coaches as on Browse Coaches. Edit profiles, visibility (show/hide on browse), and view sessions and earnings.{' '}
+              <strong className="text-foreground">Overall rating and full parent reviews</strong> (anonymous on the site) are on each coach&apos;s{' '}
+              <strong className="text-foreground">public profile</strong> — tap the coach name or open{' '}
+              <code className="rounded bg-muted px-1 py-0.5 text-xs">/athlete/[id]</code>. Rating and count below match that page.
             </CardDescription>
             <div className="flex flex-wrap items-center gap-4 pt-2">
               <Button variant="outline" size="sm" asChild>
@@ -1283,6 +1290,8 @@ export function AdminDashboardClient({
                   <tr className="border-b">
                     <th className="text-left py-2 font-medium">Coach</th>
                     <th className="text-left py-2 font-medium">School</th>
+                    <th className="text-right py-2 font-medium">Rating</th>
+                    <th className="text-right py-2 font-medium">Reviews</th>
                     <th className="text-right py-2 font-medium">Sessions</th>
                     <th className="text-right py-2 font-medium">Completed</th>
                     <th className="text-right py-2 font-medium">Total earnings</th>
@@ -1292,7 +1301,7 @@ export function AdminDashboardClient({
                 <tbody>
                   {filteredAthletes.length === 0 ? (
                     <tr>
-                      <td colSpan={6} className="py-8 text-center text-muted-foreground">
+                      <td colSpan={8} className="py-8 text-center text-muted-foreground">
                         No athletes match filters.
                       </td>
                     </tr>
@@ -1303,11 +1312,18 @@ export function AdminDashboardClient({
                           <Link
                             href={`/athlete/${a.athlete_id}`}
                             className="text-accent hover:underline font-medium"
+                            title="Open public profile — full reviews &quot;What parents say&quot;"
                           >
                             {a.athlete_name}
                           </Link>
                         </td>
                         <td className="py-2 text-muted-foreground">{a.school}</td>
+                        <td className="py-2 text-right tabular-nums">
+                          {a.average_rating != null && Number(a.average_rating) > 0
+                            ? Number(a.average_rating).toFixed(1)
+                            : '—'}
+                        </td>
+                        <td className="py-2 text-right tabular-nums">{a.review_count ?? 0}</td>
                         <td className="py-2 text-right">{a.session_count}</td>
                         <td className="py-2 text-right">{a.completed_count}</td>
                         <td className="py-2 text-right font-medium">
