@@ -2,16 +2,17 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Gauge, Calendar, Users, CreditCard } from 'lucide-react';
+import { Home, Gauge, Calendar, Users, CreditCard, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-/** 5 items max. Admin uses same bottom-nav-on-mobile pattern. */
+/** Admin mobile bottom nav. Account = settings + sign out (same pattern as parent nav). */
 const ITEMS = [
   { href: '/dashboard', label: 'Dashboard', icon: Home },
   { href: '/admin', label: 'Cockpit', icon: Gauge },
   { href: '/admin?tab=sessions', label: 'Sessions', icon: Calendar },
   { href: '/admin?tab=users', label: 'Users', icon: Users },
   { href: '/admin?tab=billing', label: 'Billing', icon: CreditCard },
+  { href: '/account', label: 'Account', icon: User },
 ] as const;
 
 export function AdminBottomNav() {
@@ -24,7 +25,10 @@ export function AdminBottomNav() {
     >
       {ITEMS.map(({ href, label, icon: Icon }) => {
         const path = href.split('?')[0];
-        const isActive = pathname === path || (path === '/admin' && pathname.startsWith('/admin'));
+        const isActive =
+          path === '/account'
+            ? pathname === '/account' || pathname.startsWith('/account/')
+            : pathname === path || (path === '/admin' && pathname.startsWith('/admin'));
         return (
           <Link
             key={href}

@@ -44,7 +44,7 @@ const YOUTH_WRESTLER_ROUTES = [
   '/notifications',
 ];
 
-const ADMIN_ROUTES = ['/dashboard', '/admin'];
+const ADMIN_ROUTES = ['/dashboard', '/admin', '/account'];
 
 function isParentRoute(pathname: string | null): boolean {
   if (!pathname) return false;
