@@ -1067,7 +1067,13 @@ export function AdminCockpitView() {
                 <p className="text-sm text-muted-foreground">No reviews match your filters.</p>
               ) : (
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm border-collapse">
+                  <table className="w-full min-w-[640px] text-sm border-collapse table-fixed">
+                    <colgroup>
+                      <col className="w-[18%]" />
+                      <col className="w-[22%]" />
+                      <col className="w-[100px]" />
+                      <col />
+                    </colgroup>
                     <thead>
                       <tr className="border-b border-border">
                         <th className="text-left py-2 pr-3 font-medium text-muted-foreground">Coach</th>
@@ -1078,10 +1084,10 @@ export function AdminCockpitView() {
                     </thead>
                     <tbody>
                       {filteredReviews.map((r) => (
-                        <tr key={r.id} className="border-b border-border/50">
-                          <td className="py-2 pr-3 font-medium">{r.coach_name}</td>
-                          <td className="py-2 pr-3 text-muted-foreground">{r.reviewed_by}</td>
-                          <td className="py-2 pr-3">
+                        <tr key={r.id} className="border-b border-border/50 align-top">
+                          <td className="py-2 pr-3 font-medium break-words">{r.coach_name}</td>
+                          <td className="py-2 pr-3 text-muted-foreground break-words">{r.reviewed_by}</td>
+                          <td className="py-2 pr-3 whitespace-nowrap">
                             <span className="inline-flex gap-0.5" aria-label={`${r.rating} stars`}>
                               {[1, 2, 3, 4, 5].map((i) => (
                                 <Star
@@ -1091,7 +1097,7 @@ export function AdminCockpitView() {
                               ))}
                             </span>
                           </td>
-                          <td className="py-2 text-muted-foreground max-w-[280px] truncate" title={r.comment || undefined}>
+                          <td className="py-2 text-muted-foreground min-w-0 whitespace-normal break-words">
                             {r.comment || '—'}
                           </td>
                         </tr>
