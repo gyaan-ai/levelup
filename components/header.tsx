@@ -313,7 +313,33 @@ export function Header() {
               </div>
             </nav>
 
-            {/* Mobile logged-in: one menu system — bottom nav only (no hamburger) */}
+            {/* Mobile logged-in admin: same “Preview as” as desktop (bottom nav doesn’t include role switch) */}
+            {isAdmin && (
+              <div className="md:hidden flex items-center justify-end shrink-0 max-w-[min(100%,11rem)]">
+                <Select
+                  value={viewAsRole ?? 'admin'}
+                  onValueChange={(value) => {
+                    handleViewAsChange(value);
+                    setMobileOpen(false);
+                  }}
+                >
+                  <SelectTrigger
+                    aria-label="View site as"
+                    className="w-[min(100%,11rem)] min-h-[40px] h-9 border-white/30 bg-white/10 text-white text-xs hover:bg-white/20 [&>span]:line-clamp-1"
+                  >
+                    <SelectValue placeholder="View as" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="admin">Admin</SelectItem>
+                    <SelectItem value="coach">Coach</SelectItem>
+                    <SelectItem value="parent">Parent</SelectItem>
+                    <SelectItem value="youth_wrestler">Athlete</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+
+            {/* Mobile logged-in: primary nav is bottom nav; header adds admin role switch above */}
             </>
           ) : (
             <>
