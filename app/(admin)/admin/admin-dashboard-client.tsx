@@ -901,7 +901,7 @@ export function AdminDashboardClient({
           <CardHeader>
             <CardTitle>Coach payouts (manual)</CardTitle>
             <CardDescription>
-              Completed sessions not yet paid. Pay via Venmo or Zelle, then click Mark paid. To record a custom amount (e.g. $50 when parents didn&apos;t pay), enter the amount below and use &quot;Record $X & mark paid&quot; per coach.
+              <strong>Amount owed</strong> uses each session&apos;s recorded coach payout when set; otherwise it&apos;s estimated from the roster (registered participants × price × coach share, same as the coach&apos;s schedule). Pay via Venmo or Zelle, then <strong>Mark paid</strong> to lock it in. For a flat custom amount per session (cash outside the app, comp, etc.), enter it below and use <strong>Record $X &amp; mark paid</strong>.
             </CardDescription>
             <div className="flex flex-wrap items-center gap-3 pt-2">
               <label className="text-sm text-muted-foreground">Record custom payout amount:</label>
@@ -1000,7 +1000,7 @@ export function AdminDashboardClient({
                                   const r = await fetch('/api/admin/mark-payout-paid', {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ athleteId: p.athlete_id, amount: p.amount }),
+                                    body: JSON.stringify({ athleteId: p.athlete_id }),
                                   });
                                   const data = await r.json().catch(() => ({}));
                                   if (r.ok && data.success) {

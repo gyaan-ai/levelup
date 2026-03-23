@@ -11,7 +11,7 @@ import { Calendar as CalendarIcon, List, LayoutGrid, CalendarDays, MessageCircle
 import { UpcomingSessionActions } from './upcoming-session-actions';
 import { startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns';
 import { formatEST } from '@/lib/format-date';
-import { COACH_REVENUE_FRACTION } from '@/lib/pricing';
+import { coachPayoutUsd } from '@/lib/coach-session-payout';
 
 export type CoachSession = {
   id: string;
@@ -30,16 +30,6 @@ export type CoachSession = {
     youth_wrestlers?: { id: string; first_name?: string; last_name?: string } | { id: string; first_name?: string; last_name?: string }[] | null;
   }> | null;
 };
-
-/** Coach payout for this session (what they make). Uses athlete_payment when set, else 5/6 of price_per_participant × participants (guild 1/6, fees out of guild). */
-function coachPayout(session: CoachSession): number {
-  if (session.athlete_payment != null && Number(session.athlete_payment) > 0) {
-    return Math.round(Number(session.athlete_payment) * 100) / 100;
-  }
-  const per = Number(session.price_per_participant ?? 0);
-  const n = session.current_participants ?? 0;
-  return Math.round(per * COACH_REVENUE_FRACTION * n * 100) / 100;
-}
 
 /** Parent-facing total (for refund copy in cancel dialog). total_price when set, else price_per_participant × participants. */
 function parentRefundAmount(session: CoachSession): number {
@@ -214,7 +204,7 @@ export function CoachScheduleCard({
                         </div>
                       </div>
                       <div className="text-right flex flex-col items-end gap-1">
-                        <p className="font-medium">You make ${coachPayout(session).toFixed(2)}</p>
+                        <p className="font-medium">You make ${coachPayoutUsd(session).toFixed(2)}</p>
                         <p className="text-xs text-muted-foreground">{session.session_type || '—'}</p>
                         <UpcomingSessionActions
                           sessionId={session.id}
@@ -262,7 +252,7 @@ export function CoachScheduleCard({
                         </div>
                       </div>
                       <div className="text-right flex flex-col items-end gap-1">
-                        <p className="font-medium">You made ${coachPayout(session).toFixed(2)}</p>
+                        <p className="font-medium">You made ${coachPayoutUsd(session).toFixed(2)}</p>
                         <p className="text-xs text-muted-foreground">{session.session_type || '—'}</p>
                         <div className="flex gap-1 flex-wrap justify-end">
                           {['scheduled', 'pending_payment'].includes(session.status) && (
@@ -326,7 +316,7 @@ export function CoachScheduleCard({
                       <td className="py-2 px-2">{wrestlerNames(session).length > 0 ? wrestlerNames(session).join(', ') : '—'}</td>
                       <td className="py-2 px-2">{facilityName(session)}</td>
                       <td className="py-2 px-2">{session.session_type || '—'}</td>
-                      <td className="py-2 px-2 text-right">${coachPayout(session).toFixed(2)}</td>
+                      <td className="py-2 px-2 text-right">${coachPayoutUsd(session).toFixed(2)}</td>
                       <td className="py-2 px-2">
                         <div className="flex flex-wrap gap-1 items-center">
                           {isTentative(session) && (
@@ -424,7 +414,7 @@ export function CoachScheduleCard({
                         <p className="text-xs text-muted-foreground break-words">
                           {facilityName(session)}
                           {(session.current_participants ?? 0) > 0 && ` • ${session.current_participants} ${session.current_participants === 1 ? 'kid' : 'kids'}${wrestlerNames(session).length > 0 ? `: ${wrestlerNames(session).join(', ')}` : ''}`}
-                          {' • You make $'}{coachPayout(session).toFixed(2)}
+                          {' • You make $'}{coachPayoutUsd(session).toFixed(2)}
                         </p>
                       </div>
                       {['scheduled', 'pending_payment'].includes(session.status) && new Date(session.scheduled_datetime) > new Date() ? (

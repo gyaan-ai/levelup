@@ -12,6 +12,7 @@ import {
   type CoachPayout,
   type CreditRecord,
 } from './admin-dashboard-client';
+import { coachPayoutUsd } from '@/lib/coach-session-payout';
 
 function getAdminEmails(): Set<string> {
   const raw = process.env.ADMIN_EMAILS || '';
@@ -79,6 +80,7 @@ export default async function AdminPage() {
         partner_invite_code,
         current_participants,
         max_participants,
+        price_per_participant,
         athletes(id, first_name, last_name, school, venmo_handle, zelle_email),
         facilities(id, name)
       `)
@@ -146,6 +148,7 @@ export default async function AdminPage() {
     partner_invite_code?: string | null;
     current_participants?: number | null;
     max_participants?: number | null;
+    price_per_participant?: number | null;
     athletes?: { id: string; first_name: string; last_name: string; school: string; venmo_handle?: string | null; zelle_email?: string | null } | { id: string; first_name: string; last_name: string; school: string; venmo_handle?: string | null; zelle_email?: string | null }[];
     facilities?: { id: string; name: string } | { id: string; name: string }[];
   }>;
@@ -216,7 +219,11 @@ export default async function AdminPage() {
     const r = athleteMap.get(o.id);
     if (r) {
       r.session_count += 1;
-      r.total_earnings += Number(s.athlete_payment ?? 0);
+      r.total_earnings += coachPayoutUsd({
+        athlete_payment: s.athlete_payment,
+        price_per_participant: s.price_per_participant,
+        current_participants: s.current_participants,
+      });
       if (s.status === 'completed') r.completed_count += 1;
     }
   }
@@ -232,7 +239,11 @@ export default async function AdminPage() {
     const o = Array.isArray(a) ? a[0] : a;
     if (!o?.id) continue;
     const existing = payoutOwedByAthlete.get(o.id);
-    const payment = Number(s.athlete_payment ?? 0);
+    const payment = coachPayoutUsd({
+      athlete_payment: s.athlete_payment,
+      price_per_participant: s.price_per_participant,
+      current_participants: s.current_participants,
+    });
     if (existing) {
       existing.amount += payment;
     } else {

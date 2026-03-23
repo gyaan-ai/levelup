@@ -36,10 +36,13 @@ export default async function AdminEditSessionPage({
       session_type,
       session_mode,
       focus_area,
+      focus_area_2,
       join_policy,
       current_participants,
       max_participants,
       price_per_participant,
+      athlete_payment,
+      athlete_payout_date,
       athletes(id, first_name, last_name, school),
       facilities(id, name)
     `)
@@ -78,6 +81,12 @@ export default async function AdminEditSessionPage({
         maxParticipants={(session as { max_participants?: number }).max_participants ?? 6}
         pricePerParticipant={(session as { price_per_participant?: number }).price_per_participant ?? 0}
         currentParticipants={(session as { current_participants?: number }).current_participants ?? 0}
+        athletePayment={
+          (session as { athlete_payment?: number | null }).athlete_payment != null
+            ? Number((session as { athlete_payment?: number | null }).athlete_payment)
+            : null
+        }
+        athletePayoutDate={(session as { athlete_payout_date?: string | null }).athlete_payout_date ?? null}
         scheduledDate={formatEST((session as { scheduled_datetime?: string }).scheduled_datetime ?? '', 'yyyy-MM-dd')}
         scheduledTime={formatEST((session as { scheduled_datetime?: string }).scheduled_datetime ?? '', 'HH:mm')}
       />

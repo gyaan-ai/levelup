@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,6 +22,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { SESSION_FOCUS_AREAS } from '@/lib/focus-areas';
+import { formatEST } from '@/lib/format-date';
+import { coachPayoutUsd } from '@/lib/coach-session-payout';
 import { Loader2, Trash2 } from 'lucide-react';
 
 type Props = {
@@ -36,6 +38,10 @@ type Props = {
   currentParticipants: number;
   scheduledDate: string;
   scheduledTime: string;
+  /** Gross coach payout for this session (from bookings), if any */
+  athletePayment?: number | null;
+  /** YYYY-MM-DD when payout was marked paid */
+  athletePayoutDate?: string | null;
 };
 
 export function EditSessionForm({
@@ -50,6 +56,8 @@ export function EditSessionForm({
   currentParticipants,
   scheduledDate: initialDate,
   scheduledTime: initialTime,
+  athletePayment = null,
+  athletePayoutDate = null,
 }: Props) {
   const router = useRouter();
   const [focus, setFocus] = useState(focusArea);
@@ -64,9 +72,32 @@ export function EditSessionForm({
   const [focusAreaList, setFocusAreaList] = useState<string[]>([]);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteLoading, setDeleteLoading] = useState(false);
-  const [payoutAmount, setPayoutAmount] = useState('');
   const [payoutLoading, setPayoutLoading] = useState(false);
   const [completeLoading, setCompleteLoading] = useState(false);
+
+  function suggestedCoachPayoutAmount(): string {
+    return String(
+      coachPayoutUsd({
+        athlete_payment: athletePayment,
+        price_per_participant: pricePerParticipant,
+        current_participants: currentParticipants,
+      })
+    );
+  }
+
+  const [payoutAmount, setPayoutAmount] = useState(() => {
+    if (athletePayoutDate || sessionStatus !== 'completed') return '';
+    return suggestedCoachPayoutAmount();
+  });
+
+  const wasCompletedOnMount = useRef(sessionStatus === 'completed');
+  useEffect(() => {
+    const nowCompleted = sessionStatus === 'completed';
+    if (nowCompleted && !wasCompletedOnMount.current && !athletePayoutDate) {
+      setPayoutAmount(suggestedCoachPayoutAmount());
+    }
+    wasCompletedOnMount.current = nowCompleted;
+  }, [sessionStatus, athletePayoutDate, athletePayment, pricePerParticipant, currentParticipants]);
 
   useEffect(() => {
     fetch('/api/focus-areas')
@@ -281,9 +312,9 @@ export function EditSessionForm({
     {(sessionStatus === 'scheduled' || sessionStatus === 'pending_payment') && (
       <Card>
         <CardHeader>
-          <CardTitle>Mark session complete</CardTitle>
+          <CardTitle>1 · Mark session complete</CardTitle>
           <CardDescription>
-            Record that this session happened. This updates the session status to completed and will show in coach stats and payouts.
+            Do this first: record that this session happened. Status becomes completed so it counts in coach stats and unlocks payout below.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -292,6 +323,7 @@ export function EditSessionForm({
             disabled={completeLoading}
             onClick={async () => {
               setCompleteLoading(true);
+              setError(null);
               try {
                 const res = await fetch(`/api/sessions/${sessionId}/complete`, { method: 'POST' });
                 const data = await res.json();
@@ -320,65 +352,95 @@ export function EditSessionForm({
       </Card>
     )}
 
-    <Card>
+    <Card className={sessionStatus !== 'completed' ? 'opacity-90' : undefined}>
       <CardHeader>
-        <CardTitle>Record coach payout</CardTitle>
+        <CardTitle>2 · Record coach payout</CardTitle>
         <CardDescription>
-          When parents don&apos;t pay but you still pay the coach (e.g. flat $50), record the amount and mark paid for this session.
+          {athletePayoutDate ? (
+            <>This session is already marked paid.</>
+          ) : sessionStatus !== 'completed' ? (
+            <>After the session is marked complete (step 1), enter what you paid the coach and record it here. Use a custom amount when parents didn&apos;t pay but you still pay the coach (e.g. flat $50).</>
+          ) : (
+            <>
+              Sets <span className="font-medium">athlete payment</span> and today&apos;s payout date for this session. Adjust the amount if needed (e.g. cash comp or different split).
+            </>
+          )}
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <form
-          className="flex flex-wrap items-end gap-3"
-          onSubmit={async (e) => {
-            e.preventDefault();
-            const val = parseFloat(payoutAmount);
-            if (Number.isNaN(val) || val < 0) return;
-            setPayoutLoading(true);
-            try {
-              const res = await fetch('/api/admin/record-session-payout', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ sessionIds: [sessionId], amount: val }),
-              });
-              const data = await res.json();
-              if (res.ok && data.success) {
-                router.refresh();
-                setPayoutAmount('');
-              } else {
-                setError(data.error || 'Failed to record payout');
-              }
-            } catch {
-              setError('Failed to record payout');
-            } finally {
-              setPayoutLoading(false);
-            }
-          }}
-        >
-          <div className="flex items-center gap-2">
-            <Label htmlFor="payout-amount" className="whitespace-nowrap">Amount ($)</Label>
-            <Input
-              id="payout-amount"
-              type="number"
-              min={0}
-              step={5}
-              value={payoutAmount}
-              onChange={(e) => setPayoutAmount(e.target.value)}
-              className="w-24"
-              placeholder="50"
-            />
-          </div>
-          <Button type="submit" disabled={payoutLoading || payoutAmount.trim() === ''}>
-            {payoutLoading ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                Recording…
-              </>
-            ) : (
-              'Record payout'
+        {athletePayoutDate ? (
+          <p className="text-sm text-muted-foreground">
+            Payout recorded on{' '}
+            <span className="font-medium text-foreground">
+              {formatEST(`${athletePayoutDate}T12:00:00`, 'MMM d, yyyy')}
+            </span>
+            {athletePayment != null && Number(athletePayment) > 0 && (
+              <> · ${Number(athletePayment).toFixed(2)}</>
             )}
-          </Button>
-        </form>
+          </p>
+        ) : sessionStatus !== 'completed' ? (
+          <p className="text-sm text-muted-foreground border border-dashed rounded-md p-3">
+            Complete step 1 first — payout can only be recorded for completed sessions.
+          </p>
+        ) : (
+          <form
+            className="flex flex-wrap items-end gap-3"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              const val = parseFloat(payoutAmount);
+              if (Number.isNaN(val) || val < 0) return;
+              setPayoutLoading(true);
+              setError(null);
+              try {
+                const res = await fetch('/api/admin/record-session-payout', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ sessionIds: [sessionId], amount: val }),
+                });
+                const data = await res.json();
+                if (res.ok && data.success) {
+                  router.refresh();
+                  setPayoutAmount('');
+                } else {
+                  setError(data.error || 'Failed to record payout');
+                }
+              } catch {
+                setError('Failed to record payout');
+              } finally {
+                setPayoutLoading(false);
+              }
+            }}
+          >
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="payout-amount" className="whitespace-nowrap">
+                Coach payout ($)
+              </Label>
+              <Input
+                id="payout-amount"
+                type="number"
+                min={0}
+                step={5}
+                value={payoutAmount}
+                onChange={(e) => setPayoutAmount(e.target.value)}
+                className="w-28"
+                placeholder="50"
+              />
+              <p className="text-xs text-muted-foreground max-w-sm">
+                Suggested from recorded payout or roster (price × {currentParticipants} × coach share) — edit for cash, comps, or off-app payments.
+              </p>
+            </div>
+            <Button type="submit" disabled={payoutLoading || payoutAmount.trim() === ''}>
+              {payoutLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Recording…
+                </>
+              ) : (
+                'Record payout'
+              )}
+            </Button>
+          </form>
+        )}
       </CardContent>
     </Card>
 

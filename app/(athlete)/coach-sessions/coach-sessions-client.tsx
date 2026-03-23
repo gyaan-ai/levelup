@@ -9,7 +9,7 @@ import { MessageCircle, FolderOpen, Check, X, DollarSign, Users, Smartphone } fr
 import { CoachTextGroupDialog } from '@/components/coach-text-group-dialog';
 import { CopySessionPhonesButton } from '@/components/copy-session-phones-button';
 import { formatEST } from '@/lib/format-date';
-import { COACH_REVENUE_FRACTION } from '@/lib/pricing';
+import { coachPayoutUsd } from '@/lib/coach-session-payout';
 import { showSessionSmsCopyAndTextGroup } from '@/lib/session-sms-tools';
 import { AddToCalendarButton } from '@/components/add-to-calendar-button';
 import { SessionTypeBadge } from '@/components/session-type-badge';
@@ -33,15 +33,6 @@ function wrestlerNames(s: CoachSession): string[] {
       return o && (o.first_name || o.last_name) ? [o.first_name, o.last_name].filter(Boolean).join(' ') : null;
     })
     .filter((n): n is string => Boolean(n));
-}
-
-function coachPayout(session: CoachSession): number {
-  if (session.athlete_payment != null && Number(session.athlete_payment) > 0) {
-    return Math.round(Number(session.athlete_payment) * 100) / 100;
-  }
-  const per = Number(session.price_per_participant ?? 0);
-  const n = session.current_participants ?? 0;
-  return Math.round(per * COACH_REVENUE_FRACTION * n * 100) / 100;
 }
 
 type Tab = 'upcoming' | 'requests' | 'completed';
@@ -168,7 +159,7 @@ export function CoachSessionsClient({
                       </p>
                       <p className="text-sm font-medium text-accent mt-1 inline-flex items-center gap-1">
                         <DollarSign className="h-4 w-4" />
-                        You make ${coachPayout(session).toFixed(2)}
+                        You make ${coachPayoutUsd(session).toFixed(2)}
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
