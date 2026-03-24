@@ -942,7 +942,7 @@ export function AdminDashboardClient({
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <KpiCard
               title="Total Revenue"
-              value={billing.totalRevenue.toFixed(2)}
+              value={financeData.grossRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               prefix="$"
               icon={DollarSign}
               trend="up"
@@ -951,15 +951,15 @@ export function AdminDashboardClient({
             />
             <KpiCard
               title="App Net Profit"
-              value={billing.totalOrgFees.toFixed(2)}
+              value={financeData.guildProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               prefix="$"
-              icon={TrendingUp}
-              trend="up"
-              change={`${((billing.totalOrgFees / billing.totalRevenue) * 100 || 0).toFixed(1)}% margin`}
+              icon={financeData.guildProfit >= 0 ? TrendingUp : TrendingDown}
+              trend={financeData.guildProfit >= 0 ? 'up' : 'down'}
+              change={`${((financeData.guildNet / financeData.grossRevenue) * 100 || 0).toFixed(1)}% margin`}
             />
             <KpiCard
               title="Coach Payouts"
-              value={billing.totalAthletePayments.toFixed(2)}
+              value={financeData.coachPayouts.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               prefix="$"
               icon={Wallet}
               trend="neutral"

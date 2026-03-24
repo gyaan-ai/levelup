@@ -15,8 +15,8 @@
     --accent: var(--guild-gold);
     --accent-hover: var(--guild-gold-dark);
 
-    /* App-wide dark theme with gold accents */
-    --background: 220 50% 10%;
+    /* App-wide dark theme with gold accents - PURE BLACK */
+    --background: 0 0% 0%;
     --foreground: 0 0% 95%;
     --card: 0 0% 11%;
     --card-foreground: 0 0% 95%;
@@ -43,7 +43,7 @@
   }
 
   .dark {
-    --background: 220 50% 10%;
+    --background: 0 0% 0%;
     --foreground: 0 0% 95%;
     --card: 0 0% 11%;
     --card-foreground: 0 0% 95%;
