@@ -87,12 +87,13 @@ export function SessionDetailActions({
   };
 
   if (isPast) {
-    if (status === 'completed') {
+    // Only show Leave feedback button if session is completed and not yet reviewed
+    if (status === 'completed' && !hasReviewed) {
       return (
         <Link href={`/sessions/${sessionId}/review`} className="inline-flex">
           <Button className="min-h-[44px] px-4 bg-accent hover:bg-accent/90 text-primary">
             <Star className="h-4 w-4 mr-1 shrink-0 fill-current" />
-            {hasReviewed ? 'View feedback' : 'Leave feedback'}
+            Leave feedback
           </Button>
         </Link>
       );
