@@ -1,5 +1,7 @@
 import { redirect } from 'next/navigation';
+import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
+import { getTenantByDomain } from '@/config/tenants';
 import { CartCheckoutClient } from './cart-checkout-client';
 
 export const metadata = {
@@ -8,7 +10,15 @@ export const metadata = {
 };
 
 export default async function CartCheckoutPage() {
-  const supabase = await createClient();
+  const headersList = await headers();
+  const host = headersList.get('host') || '';
+  const tenant = getTenantByDomain(host);
+  
+  if (!tenant) {
+    redirect('/');
+  }
+
+  const supabase = await createClient(tenant.slug);
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {
