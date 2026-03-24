@@ -1708,7 +1708,7 @@ export function AdminDashboardClient({
                         <td className="py-3 px-4 text-center tabular-nums">{financeData.openBookings}</td>
                         <td className="py-3 px-4 text-right tabular-nums">${financeData.grossRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                         <td className="py-3 px-4 text-right tabular-nums text-blue-400">${financeData.coachPayouts.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                        <td className="py-3 px-4 text-right tabular-nums text-[#B89D60]">${financeData.netProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        <td className="py-3 px-4 text-right tabular-nums text-[#B89D60]">${financeData.guildNet.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                       </tr>
                     </tfoot>
                   )}
