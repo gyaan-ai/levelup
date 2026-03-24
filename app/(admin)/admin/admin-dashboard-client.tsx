@@ -659,6 +659,12 @@ export function AdminDashboardClient({
       return true;
     });
 
+    // Debug: log financeData filter results
+    console.log('[v0] financeData - sessions after filter:', filteredSess.length);
+    console.log('[v0] financeData - sum of participant_amount_paid_sum:', filteredSess.reduce((sum, s) => sum + (Number(s.participant_amount_paid_sum) || 0), 0));
+    console.log('[v0] financeData - financeTimeFilter:', financeTimeFilter);
+    console.log('[v0] financeData - financeTypeFilter:', financeTypeFilter);
+
     // Calculate aggregates
     // athlete_payment is the SOURCE OF TRUTH for what goes to coaches
     // (already accounts for discounts, family codes, special deals, etc.)
@@ -673,13 +679,6 @@ export function AdminDashboardClient({
 
     // Group by coach for breakdown
     const coachBreakdown = new Map<string, { name: string; school: string; revenue: number; payout: number; sessions: number; open: number }>();
-
-    // Debug: log first session's participant_amount_paid_sum
-    if (filteredSess.length > 0) {
-      console.log('[v0] First session participant_amount_paid_sum:', filteredSess[0].participant_amount_paid_sum);
-      console.log('[v0] Total sessions in filter:', filteredSess.length);
-      console.log('[v0] Sum of all participant_amount_paid_sum:', filteredSess.reduce((sum, s) => sum + (Number(s.participant_amount_paid_sum) || 0), 0));
-    }
 
     for (const s of filteredSess) {
       // participant_amount_paid_sum = what parents ACTUALLY paid (from Stripe checkout)
