@@ -1,6 +1,5 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 export type UserCredit = {
@@ -20,9 +19,9 @@ export type UserCredit = {
  * Get total available (unused, non-expired) credit balance for a user
  */
 export async function getUserCreditBalance(userId: string): Promise<number> {
-  const supabase = await createClient();
+  const admin = createAdminClient();
   
-  const { data, error } = await supabase
+  const { data, error } = await admin
     .from('user_credits')
     .select('amount')
     .eq('user_id', userId)
@@ -41,9 +40,9 @@ export async function getUserCreditBalance(userId: string): Promise<number> {
  * Get all available credits for a user (for display purposes)
  */
 export async function getUserCredits(userId: string): Promise<UserCredit[]> {
-  const supabase = await createClient();
+  const admin = createAdminClient();
   
-  const { data, error } = await supabase
+  const { data, error } = await admin
     .from('user_credits')
     .select('*')
     .eq('user_id', userId)
@@ -197,9 +196,9 @@ export async function applyCredits({
  * Get credit transaction history for a user
  */
 export async function getCreditHistory(userId: string) {
-  const supabase = await createClient();
+  const admin = createAdminClient();
 
-  const { data, error } = await supabase
+  const { data, error } = await admin
     .from('credit_transactions')
     .select('*')
     .eq('user_id', userId)
