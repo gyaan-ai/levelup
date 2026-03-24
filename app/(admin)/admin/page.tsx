@@ -192,6 +192,7 @@ export default async function AdminPage() {
       athlete_name: o ? `${o.first_name} ${o.last_name}` : '—',
       athlete_school: o?.school ?? '—',
       facility_name: fo?.name ?? '—',
+      participant_amount_paid_sum: participantAmountPaidSum(s),
     };
   });
 

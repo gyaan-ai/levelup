@@ -90,6 +90,8 @@ export type AdminSession = {
   athlete_name: string;
   athlete_school: string;
   facility_name: string;
+  /** Sum of session_participants.amount_paid - what parents actually paid (from Stripe) */
+  participant_amount_paid_sum: number;
 };
 
 export type AdminUser = {
@@ -673,19 +675,17 @@ export function AdminDashboardClient({
     const coachBreakdown = new Map<string, { name: string; school: string; revenue: number; payout: number; sessions: number; open: number }>();
 
     for (const s of filteredSess) {
-      const totalPrice = Number(s.total_price) || 0;
-      const athletePayment = Number(s.athlete_payment) || 0; // The "bible" - actual coach payout
-      // Check if this was a cash/manual payment
-      const isCashPayment = (s as any).payment_method === 'cash';
+      // participant_amount_paid_sum = what parents ACTUALLY paid (from Stripe checkout)
+      // athlete_payment = what you RECORDED paying the coach (the "bible" for payouts)
+      const parentsPaid = Number(s.participant_amount_paid_sum) || 0;
+      const coachPaid = Number(s.athlete_payment) || 0;
       
-      if (s.status === 'completed' || s.status === 'pending_payment') {
-        if (isCashPayment) {
-          cashRevenue += totalPrice;
-        } else {
-          stripeRevenue += totalPrice;
-          stripeTransactionCount += 1;
-        }
-        coachPayoutsTotal += athletePayment;
+      if (s.status === 'completed' || s.status === 'pending_payment' || s.status === 'scheduled') {
+        // Revenue = what parents paid (captured from Stripe)
+        stripeRevenue += parentsPaid;
+        if (parentsPaid > 0) stripeTransactionCount += s.current_participants || 1;
+        // Coach payouts = what you recorded paying them
+        coachPayoutsTotal += coachPaid;
       }
 
       if (s.status === 'scheduled') openBookings += 1;
@@ -693,7 +693,7 @@ export function AdminDashboardClient({
       if (s.status === 'pending_payment') pendingPayment += 1;
       if (s.status === 'cancelled') cancelledSessions += 1;
 
-      // Coach breakdown - use actual athlete_payment, not calculated %
+      // Coach breakdown
       const existing = coachBreakdown.get(s.athlete_id) || {
         name: s.athlete_name,
         school: s.athlete_school,
@@ -702,9 +702,9 @@ export function AdminDashboardClient({
         sessions: 0,
         open: 0,
       };
-      if (s.status === 'completed' || s.status === 'pending_payment') {
-        existing.revenue += totalPrice;
-        existing.payout += athletePayment; // Actual payout from database
+      if (s.status === 'completed' || s.status === 'pending_payment' || s.status === 'scheduled') {
+        existing.revenue += parentsPaid;
+        existing.payout += coachPaid;
         existing.sessions += 1;
       }
       if (s.status === 'scheduled') existing.open += 1;
