@@ -887,7 +887,6 @@ export function AdminDashboardClient({
           maxParticipants: session.max_participants || 6,
           pricePerParticipant: session.price_per_participant || 30,
           sessionType: session.session_type === 'group' ? 'small_group' : session.session_type === '2-athlete' ? 'partner' : 'private',
-          focusArea: session.focus_area || undefined,
         }),
       });
       
