@@ -6,6 +6,7 @@ import { ParentBottomNav } from './parent-bottom-nav';
 import { CoachBottomNav } from './coach-bottom-nav';
 import { YouthWrestlerBottomNav } from './youth-wrestler-bottom-nav';
 import { AdminBottomNav } from './admin-bottom-nav';
+import { FloatingCartButton } from './floating-cart-button';
 
 const PARENT_ROUTES = [
   '/dashboard',
@@ -21,6 +22,7 @@ const PARENT_ROUTES = [
   '/small-group-sessions',
   '/wrestlers',
   '/sessions',
+  '/cart',
 ];
 
 const COACH_ROUTES = [
@@ -98,6 +100,7 @@ export function ParentBottomNavWrapper({ children }: { children: React.ReactNode
         children
       )}
       {showParentNav && <ParentBottomNav />}
+      {showParentNav && <FloatingCartButton />}
       {showCoachNav && <CoachBottomNav />}
       {showYouthNav && <YouthWrestlerBottomNav />}
       {showAdminNav && <AdminBottomNav />}

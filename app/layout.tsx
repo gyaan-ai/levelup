@@ -4,6 +4,7 @@ import { getTenantByDomain } from '@/config/tenants';
 import { Analytics } from '@vercel/analytics/next';
 import { ThemeProvider } from '@/components/theme-provider';
 import { AuthProvider } from '@/lib/auth/auth-provider';
+import { CartProvider } from '@/lib/cart-context';
 import { Header } from '@/components/header';
 import { Footer } from '@/components/footer';
 import { ParentBottomNavWrapper } from '@/components/parent-bottom-nav-wrapper';
@@ -71,13 +72,15 @@ export default async function RootLayout({
       <body className="flex flex-col min-h-screen font-sans bg-background text-foreground">
         <ThemeProvider tenant={tenant}>
           <AuthProvider tenantSlug={tenant.slug}>
-            <Header />
-            <main className="flex-1 pb-[env(safe-area-inset-bottom)]">
-              <ParentBottomNavWrapper>
-                {children}
-              </ParentBottomNavWrapper>
-            </main>
-            <Footer />
+            <CartProvider>
+              <Header />
+              <main className="flex-1 pb-[env(safe-area-inset-bottom)]">
+                <ParentBottomNavWrapper>
+                  {children}
+                </ParentBottomNavWrapper>
+              </main>
+              <Footer />
+            </CartProvider>
           </AuthProvider>
         </ThemeProvider>
         <Analytics />

@@ -20,6 +20,7 @@ import { Bell, Menu, X, Mail } from 'lucide-react';
 import { AddToHomeScreen } from '@/components/add-to-home-screen';
 import { useTenant } from '@/components/theme-provider';
 import { BrandLogo } from '@/components/brand-logo';
+import { CartDropdown } from '@/components/cart-dropdown';
 
 const navLinkClass = 'block py-3 px-4 text-white hover:text-accent hover:bg-white/10 transition-colors font-medium min-h-[44px] flex items-center';
 
@@ -296,6 +297,7 @@ export function Header() {
                       </span>
                     )}
                   </Link>
+                  <CartDropdown />
                   <Link href="/account" className="text-white hover:text-accent transition-colors font-medium">Account</Link>
                   <NotificationBell count={notificationCount} onRefresh={refreshNotifications} />
                 </>

@@ -19,7 +19,8 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
-import { MapPin, Calendar, Users, ChevronDown, Clock } from 'lucide-react';
+import { MapPin, Calendar, Users, ChevronDown, Clock, ShoppingCart, Check } from 'lucide-react';
+import { useCart, type CartSession } from '@/lib/cart-context';
 import { formatEST } from '@/lib/format-date';
 import { startOfDay } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -103,6 +104,7 @@ export function FindTrainingClient({
   preselectedWrestlerId?: string;
 }) {
   const router = useRouter();
+  const { addItem, removeItem, isInCart } = useCart();
   const [date, setDate] = useState(initialDate || '');
   const [time, setTime] = useState(initialTime || 'any');
   const [location, setLocation] = useState(initialLocation || 'all');
@@ -474,13 +476,41 @@ export function FindTrainingClient({
                     </div>
                     <div className="shrink-0 flex flex-col sm:items-end gap-2">
                       {openSlots > 0 ? (
-                        <Button asChild size="sm" className="min-h-[40px]">
-                          <Link
-                            href={`/sessions/${s.id}/register${preselectedWrestlerId ? `?wrestler=${encodeURIComponent(preselectedWrestlerId)}` : ''}`}
-                          >
-                            Join now
-                          </Link>
-                        </Button>
+                        <>
+                          {isInCart(s.id) ? (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="min-h-[40px] gap-1.5 border-accent text-accent"
+                              onClick={() => removeItem(s.id)}
+                            >
+                              <Check className="h-4 w-4" />
+                              In cart
+                            </Button>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="default"
+                              className="min-h-[40px] gap-1.5"
+                              onClick={() => {
+                                const coachData = Array.isArray(s.athletes) ? s.athletes[0] : s.athletes;
+                                const facData = Array.isArray(s.facilities) ? s.facilities[0] : s.facilities;
+                                addItem({
+                                  id: s.id,
+                                  scheduled_datetime: s.scheduled_datetime,
+                                  session_type: s.session_type,
+                                  price_per_participant: s.price_per_participant,
+                                  coach_name: coachData ? [coachData.first_name, coachData.last_name].filter(Boolean).join(' ') : 'Coach',
+                                  coach_id: coachData?.id ?? s.athlete_id,
+                                  facility_name: facData?.name ?? '',
+                                });
+                              }}
+                            >
+                              <ShoppingCart className="h-4 w-4" />
+                              Add to cart
+                            </Button>
+                          )}
+                        </>
                       ) : (
                         <span className="text-sm text-muted-foreground">At capacity</span>
                       )}
