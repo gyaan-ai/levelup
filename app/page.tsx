@@ -56,19 +56,12 @@ export default async function HomePage() {
         </div>
         
         {/* Brand */}
-        <h1 className="text-3xl sm:text-4xl md:text-5xl font-serif font-black text-accent tracking-[0.08em] uppercase text-center mb-3">
+        <h1 className="text-4xl sm:text-5xl md:text-6xl font-serif font-black text-accent tracking-wide uppercase text-center mb-4">
           The Guild
         </h1>
         
-        {/* Decorative line */}
-        <div className="flex items-center gap-3 mb-4">
-          <div className="h-px w-12 bg-accent/60" />
-          <div className="h-1.5 w-1.5 bg-accent rounded-full" />
-          <div className="h-px w-12 bg-accent/60" />
-        </div>
-        
         {/* Tagline */}
-        <p className="text-sm sm:text-base text-accent font-medium tracking-[0.2em] uppercase mb-10">
+        <p className="text-sm sm:text-base text-accent/90 font-semibold tracking-[0.15em] uppercase mb-10">
           Mastery &bull; Technique &bull; Access The Elite
         </p>
         

@@ -4,12 +4,12 @@
 
 @layer base {
   :root {
-    /* Hall of Fame Navy + Gold palette */
+    /* Rich warm gold - Hall of Fame engraved plaque aesthetic */
     --guild-navy: #0A1628;
     --guild-navy-light: #121F33;
-    --guild-gold: #C9A227;
-    --guild-gold-dark: #A68923;
-    --guild-gold-light: #D4B84A;
+    --guild-gold: #D4B87A;
+    --guild-gold-dark: #C9A66B;
+    --guild-gold-light: #E5CFA0;
 
     --primary: var(--guild-navy);
     --accent: var(--guild-gold);
@@ -113,15 +113,15 @@
 }
 
 .gold-glow {
-  box-shadow: 0 0 20px rgba(201, 162, 39, 0.4);
+  box-shadow: 0 0 20px rgba(212, 184, 122, 0.4);
 }
 
 .gold-glow-hover:hover {
-  box-shadow: 0 0 30px rgba(201, 162, 39, 0.6);
+  box-shadow: 0 0 30px rgba(212, 184, 122, 0.6);
 }
 
 .gold-shimmer {
-  background: linear-gradient(90deg, #A68923 0%, #C9A227 50%, #D4B84A 100%);
+  background: linear-gradient(90deg, #C9A66B 0%, #D4B87A 50%, #E5CFA0 100%);
   background-size: 200% auto;
   animation: shimmer 3s linear infinite;
 }
