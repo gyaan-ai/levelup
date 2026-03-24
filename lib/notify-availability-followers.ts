@@ -26,7 +26,7 @@ export async function notifyAvailabilityFollowers(
       : 'A coach you follow';
 
     const title = `New availability: ${name}`;
-    const body = `${name} updated their calendar. Check their profile to book a session.`;
+    const body = `${name} updated their calendar. Tap to book!`;
     const link = `/athlete/${coachId}`;
 
     await Promise.all(

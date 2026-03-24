@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -15,13 +15,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ArrowLeft, User, Calendar, Trash2, Loader2 } from 'lucide-react';
+import { ArrowLeft, User, Calendar, Trash2, Loader2, Heart } from 'lucide-react';
 import { SchoolLogo } from '@/components/school-logo';
 import { CoachSessionBadge } from '@/components/coach-session-badge';
 import { ProfileImage } from '@/components/profile-image';
 import { StarRating } from '@/components/star-rating';
 import { formatEST } from '@/lib/format-date';
 import { Athlete } from '@/types';
+import { FollowCoachButton } from '@/components/follow-coach-button';
 
 interface AthleteWithNext extends Athlete {
   nextAvailable?: { slot_date: string; start_time: string } | null;
@@ -88,6 +89,19 @@ export function BrowseAthletesClient({ initialAthletes, isAdmin, initialYouthWre
   const [selectedWeightRanges, setSelectedWeightRanges] = useState<string[]>(['all']);
   const [loading, setLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [followedCoachIds, setFollowedCoachIds] = useState<Set<string>>(new Set());
+
+  // Fetch followed coaches to surface them first
+  useEffect(() => {
+    fetch('/api/coach-follows')
+      .then(r => r.json())
+      .then(d => {
+        if (d.follows) {
+          setFollowedCoachIds(new Set(d.follows.map((f: { coachId: string }) => f.coachId)));
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const handleDeleteCoach = async (e: React.MouseEvent, athleteId: string) => {
     e.preventDefault();
@@ -125,9 +139,9 @@ export function BrowseAthletesClient({ initialAthletes, isAdmin, initialYouthWre
     return uniqueSchools;
   }, [initialAthletes]);
 
-  // Filter athletes
+  // Filter athletes and sort followed coaches first
   const filteredAthletes = useMemo(() => {
-    return initialAthletes.filter(athlete => {
+    const filtered = initialAthletes.filter(athlete => {
       // Search filter
       const fullName = `${athlete.first_name} ${athlete.last_name}`.toLowerCase();
       const matchesSearch = searchQuery === '' || fullName.includes(searchQuery.toLowerCase());
@@ -140,7 +154,17 @@ export function BrowseAthletesClient({ initialAthletes, isAdmin, initialYouthWre
 
       return matchesSearch && matchesSchool && matchesWeight;
     });
-  }, [initialAthletes, searchQuery, selectedSchool, selectedWeightRanges]);
+
+    // Sort: followed coaches first, then by review count/rating
+    return filtered.sort((a, b) => {
+      const aFollowed = followedCoachIds.has(a.id);
+      const bFollowed = followedCoachIds.has(b.id);
+      if (aFollowed && !bFollowed) return -1;
+      if (!aFollowed && bFollowed) return 1;
+      // Then by total sessions (most experienced first)
+      return (b.total_sessions ?? 0) - (a.total_sessions ?? 0);
+    });
+  }, [initialAthletes, searchQuery, selectedSchool, selectedWeightRanges, followedCoachIds]);
 
   const getSchoolBadgeColor = (school: string) => {
     const normalizedSchool = school.trim();
@@ -285,6 +309,7 @@ export function BrowseAthletesClient({ initialAthletes, isAdmin, initialYouthWre
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredAthletes.map((athlete) => {
             const schoolColors = getSchoolBadgeColor(athlete.school);
+            const isFollowed = followedCoachIds.has(athlete.id);
             return (
               <div key={athlete.id} className="relative">
                 {isAdmin && (
@@ -299,7 +324,7 @@ export function BrowseAthletesClient({ initialAthletes, isAdmin, initialYouthWre
                     {deletingId === athlete.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
                   </Button>
                 )}
-                <Card className="h-full">
+                <Card className={`h-full ${isFollowed ? 'ring-1 ring-[#D4AF37]/30 bg-[#D4AF37]/5' : ''}`}>
                     <CardHeader>
                       <div className="flex items-center gap-4">
                         <ProfileImage
@@ -318,6 +343,12 @@ export function BrowseAthletesClient({ initialAthletes, isAdmin, initialYouthWre
                           </h3>
                         </Link>
                         <div className="flex items-center gap-2 mt-1 flex-wrap">
+                          {isFollowed && (
+                            <Badge className="bg-[#D4AF37]/20 text-[#D4AF37] text-xs border-0">
+                              <Heart className="h-3 w-3 mr-1 fill-current" />
+                              Following
+                            </Badge>
+                          )}
                           <CoachSessionBadge totalSessions={athlete.total_sessions ?? 0} size="sm" />
                           <SchoolLogo school={athlete.school} size="sm" />
                           <Badge
@@ -346,11 +377,14 @@ export function BrowseAthletesClient({ initialAthletes, isAdmin, initialYouthWre
                     )}
 
                     <div className="flex flex-col gap-2">
-                      <Button className="w-full" variant="outline" asChild>
-                        <Link href={initialYouthWrestlerId ? `/athlete/${athlete.id}?youthWrestlerId=${encodeURIComponent(initialYouthWrestlerId)}` : `/athlete/${athlete.id}`}>
-                          View Profile
-                        </Link>
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button className="flex-1" variant="outline" asChild>
+                          <Link href={initialYouthWrestlerId ? `/athlete/${athlete.id}?youthWrestlerId=${encodeURIComponent(initialYouthWrestlerId)}` : `/athlete/${athlete.id}`}>
+                            View Profile
+                          </Link>
+                        </Button>
+                        <FollowCoachButton coachId={athlete.id} />
+                      </div>
                       <Button className="w-full" variant="secondary" size="sm" asChild>
                         <Link href={`/book/${athlete.id}${initialYouthWrestlerId ? `?youthWrestlerId=${encodeURIComponent(initialYouthWrestlerId)}` : ''}`}>
                           <Calendar className="h-4 w-4 mr-2 shrink-0" />

@@ -1,0 +1,175 @@
+'use client';
+
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import useSWR from 'swr';
+import { Button } from '@/components/ui/button';
+import { ShoppingCart, X, Calendar, MapPin, User, ChevronRight, Wallet, Sparkles } from 'lucide-react';
+import { useCart } from '@/lib/cart-context';
+import { formatEST } from '@/lib/format-date';
+import { SessionTypeBadge } from '@/components/session-type-badge';
+import { useState } from 'react';
+import { Switch } from '@/components/ui/switch';
+
+const fetcher = (url: string) => fetch(url).then(r => r.json());
+
+export default function CartPage() {
+  const router = useRouter();
+  const { items, removeItem, total, count } = useCart();
+  const [useCredits, setUseCredits] = useState(true);
+
+  // Fetch credit balance
+  const { data: creditsData } = useSWR('/api/credits', fetcher);
+  const creditBalance = creditsData?.balance ?? 0;
+  const creditsToApply = useCredits ? Math.min(creditBalance, total) : 0;
+  const amountToPay = total - creditsToApply;
+
+  if (count === 0) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <div className="px-4 pt-6 pb-4">
+          <h1 className="text-2xl font-bold text-foreground">Cart</h1>
+        </div>
+        <div className="flex-1 flex flex-col items-center justify-center px-4 pb-24">
+          <div className="w-20 h-20 rounded-full bg-zinc-900 flex items-center justify-center mb-6">
+            <ShoppingCart className="h-10 w-10 text-zinc-600" />
+          </div>
+          <h2 className="text-xl font-semibold mb-2">Your cart is empty</h2>
+          <p className="text-zinc-500 text-center mb-8 max-w-xs">
+            Browse training sessions and add them to your cart to book
+          </p>
+          <Button asChild className="bg-[#D4AF37] hover:bg-[#C4A030] text-black font-semibold px-8">
+            <Link href="/training">Find Training</Link>
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen pb-40">
+      {/* Header */}
+      <div className="px-4 pt-6 pb-4">
+        <h1 className="text-2xl font-bold text-foreground">Cart</h1>
+        <p className="text-zinc-500 text-sm mt-0.5">{count} session{count !== 1 ? 's' : ''}</p>
+      </div>
+
+      {/* Session List */}
+      <div className="px-4 space-y-3">
+        {items.map((item) => {
+          const dt = new Date(item.scheduled_datetime);
+          return (
+            <div
+              key={item.id}
+              className="relative bg-zinc-900/50 border border-zinc-800/50 rounded-2xl p-4 group"
+            >
+              {/* Remove button */}
+              <button
+                type="button"
+                onClick={() => removeItem(item.id)}
+                className="absolute top-3 right-3 p-2 text-zinc-500 hover:text-red-400 transition-colors rounded-full hover:bg-red-500/10"
+                aria-label="Remove from cart"
+              >
+                <X className="h-4 w-4" />
+              </button>
+
+              {/* Session type badge */}
+              <div className="mb-3">
+                <SessionTypeBadge 
+                  sessionType={item.session_type} 
+                  sessionMode={null} 
+                  size="sm" 
+                />
+              </div>
+
+              {/* Date & Time */}
+              <div className="flex items-center gap-2 mb-2">
+                <Calendar className="h-4 w-4 text-[#D4AF37]" />
+                <span className="font-semibold">
+                  {formatEST(dt, 'EEE, MMM d')} · {formatEST(dt, 'h:mm a')}
+                </span>
+              </div>
+
+              {/* Coach */}
+              <div className="flex items-center gap-2 text-sm text-zinc-400 mb-1">
+                <User className="h-3.5 w-3.5" />
+                <span>{item.coach_name}</span>
+              </div>
+
+              {/* Facility */}
+              <div className="flex items-center gap-2 text-sm text-zinc-500">
+                <MapPin className="h-3.5 w-3.5" />
+                <span>{item.facility_name}</span>
+              </div>
+
+              {/* Price */}
+              <div className="mt-4 pt-3 border-t border-zinc-800 flex items-center justify-between">
+                <span className="text-sm text-zinc-500">Price</span>
+                <span className="text-lg font-bold">${Number(item.price_per_participant ?? 0).toFixed(2)}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Wallet Credits Toggle */}
+      {creditBalance > 0 && (
+        <div className="px-4 mt-6">
+          <div className="bg-gradient-to-r from-[#D4AF37]/10 to-[#D4AF37]/5 border border-[#D4AF37]/20 rounded-2xl p-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-full bg-[#D4AF37]/20 flex items-center justify-center shrink-0">
+                  <Wallet className="h-5 w-5 text-[#D4AF37]" />
+                </div>
+                <div>
+                  <p className="font-medium text-foreground">Use Wallet Credit</p>
+                  <p className="text-sm text-zinc-400">
+                    ${creditBalance.toFixed(2)} available
+                  </p>
+                </div>
+              </div>
+              <Switch
+                checked={useCredits}
+                onCheckedChange={setUseCredits}
+                className="data-[state=checked]:bg-[#D4AF37]"
+              />
+            </div>
+            {useCredits && creditsToApply > 0 && (
+              <div className="mt-3 pt-3 border-t border-[#D4AF37]/20 flex items-center gap-2 text-[#D4AF37]">
+                <Sparkles className="h-4 w-4" />
+                <span className="text-sm font-medium">
+                  -${creditsToApply.toFixed(2)} will be applied
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Fixed Bottom Checkout Bar */}
+      <div className="fixed bottom-16 md:bottom-0 left-0 right-0 bg-black/95 backdrop-blur-xl border-t border-zinc-800 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+        <div className="max-w-lg mx-auto">
+          {/* Totals */}
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <p className="text-sm text-zinc-500">Total</p>
+              <div className="flex items-baseline gap-2">
+                {creditsToApply > 0 && (
+                  <span className="text-sm text-zinc-500 line-through">${total.toFixed(2)}</span>
+                )}
+                <span className="text-2xl font-bold">${amountToPay.toFixed(2)}</span>
+              </div>
+            </div>
+            <Button 
+              onClick={() => router.push('/cart/checkout')}
+              className="bg-[#D4AF37] hover:bg-[#C4A030] text-black font-semibold px-8 h-12 text-base gap-2"
+            >
+              Checkout
+              <ChevronRight className="h-5 w-5" />
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

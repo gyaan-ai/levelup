@@ -3,13 +3,13 @@ import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
 import { getParentYouthWrestlerIds } from '@/lib/parent-wrestlers';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { User, CreditCard, Calendar, DollarSign, Wallet } from 'lucide-react';
+import { User, Wallet, Bell, Settings, ChevronRight, Users, Phone, Gift, LogOut, DollarSign } from 'lucide-react';
 import { AccountSignOut } from '@/components/account-sign-out';
 import { RedeemCodeCard } from './redeem-code-card';
 import { AccountPhoneCard } from './account-phone-card';
+import { getUserCreditBalance } from '@/lib/credits';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,170 +23,166 @@ export default async function AccountPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/login');
 
-  const { data: userData } = await supabase.from('users').select('role, phone').eq('id', user.id).single();
+  const { data: userData } = await supabase.from('users').select('role, phone, email').eq('id', user.id).single();
   if (userData?.role === 'coach') redirect('/athlete-dashboard');
   if (userData?.role !== 'parent' && userData?.role !== 'admin') redirect('/dashboard');
 
-  // Parent sees only their wrestlers (primary or linked).
+  // Get wrestler count
   const youthWrestlerIds = await getParentYouthWrestlerIds(supabase, user.id);
+  const wrestlerCount = youthWrestlerIds.length;
 
+  // Get credit balance
+  const creditBalance = await getUserCreditBalance(user.id, tenant.slug);
+
+  // Get spending summary
+  let totalSpent = 0;
+  if (youthWrestlerIds.length > 0) {
+    const { data: partRows } = await supabase
+      .from('session_participants')
+      .select('session_id')
+      .in('youth_wrestler_id', youthWrestlerIds);
+    const familySessionIds = [...new Set((partRows ?? []).map((r: { session_id: string }) => r.session_id))];
+    
+    if (familySessionIds.length > 0) {
+      const { data: paidSessions } = await supabase
+        .from('sessions')
+        .select('total_price, refunded_at')
+        .in('id', familySessionIds)
+        .in('status', ['scheduled', 'completed']);
+      
+      totalSpent = (paidSessions ?? [])
+        .filter((s: { refunded_at?: string | null }) => !s.refunded_at)
+        .reduce((sum: number, s: { total_price?: number }) => sum + Number(s.total_price ?? 0), 0);
+    }
+  }
+
+  // Early adopter check
   const { data: entitlements } = await supabase
     .from('early_adopter_entitlements')
     .select('id')
     .eq('parent_id', user.id);
   const hasEarlyAdopterEntitlements = (entitlements?.length ?? 0) > 0;
 
-  let familySessionIds: string[] = [];
-  if (youthWrestlerIds.length > 0) {
-    const { data: partRows } = await supabase
-      .from('session_participants')
-      .select('session_id')
-      .in('youth_wrestler_id', youthWrestlerIds);
-    familySessionIds = [...new Set((partRows ?? []).map((r: { session_id: string }) => r.session_id))];
-  }
-
-  const { data: paidSessions } = familySessionIds.length > 0
-    ? await supabase
-        .from('sessions')
-        .select('id, total_price, scheduled_datetime, refunded_at')
-        .in('id', familySessionIds)
-        .in('status', ['scheduled', 'completed'])
-    : { data: [] };
-
-  const nonRefunded = (paidSessions ?? []).filter(
-    (s: { refunded_at?: string | null }) => !s.refunded_at
-  ) as Array<{ total_price: number; scheduled_datetime: string }>;
-
-  const now = new Date();
-  const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const lastMonth = `${lastMonthDate.getFullYear()}-${String(lastMonthDate.getMonth() + 1).padStart(2, '0')}`;
-
-  let totalSpent = 0;
-  let thisMonthSpent = 0;
-  let lastMonthSpent = 0;
-  for (const s of nonRefunded) {
-    totalSpent += Number(s.total_price);
-    const month = s.scheduled_datetime.slice(0, 7);
-    if (month === thisMonth) thisMonthSpent += Number(s.total_price);
-    if (month === lastMonth) lastMonthSpent += Number(s.total_price);
-  }
+  const userEmail = user.email ?? '';
+  const userPhone = (userData as { phone?: string | null })?.phone;
 
   return (
-    <div className="container mx-auto px-4 py-5 pb-8 md:py-8 max-w-full">
-      <h1 className="text-2xl font-bold text-foreground md:text-3xl mb-1">Account</h1>
-      <p className="text-muted-foreground text-sm md:text-base mb-6">Settings and spending</p>
+    <div className="min-h-screen pb-24">
+      {/* Header */}
+      <div className="px-4 pt-6 pb-6">
+        <h1 className="text-2xl font-bold text-foreground">Account</h1>
+      </div>
 
-      <div className="space-y-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <User className="h-4 w-4" />
-              Wrestlers
-            </CardTitle>
-            <CardDescription>Manage your wrestler profiles</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <Link href="/my-wrestlers" className="block">
-              <Button variant="outline" className="w-full min-h-[44px] touch-manipulation">
-                View wrestlers
-              </Button>
-            </Link>
-            <Link href="/wrestlers/add" className="block">
-              <Button className="w-full min-h-[44px] touch-manipulation">Add wrestler</Button>
-            </Link>
-          </CardContent>
-        </Card>
-
-        <AccountPhoneCard initialPhone={(userData as { phone?: string | null })?.phone ?? null} />
-
-        <RedeemCodeCard hasEntitlements={hasEarlyAdopterEntitlements} />
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Wallet className="h-4 w-4" />
-              My Wallet
-            </CardTitle>
-            <CardDescription>View credits and transaction history</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground mb-3">Credits from cancelled sessions are stored here and automatically applied at checkout.</p>
-            <Link href="/wallet">
-              <Button variant="outline" className="w-full min-h-[44px] touch-manipulation">
-                View my wallet
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <CreditCard className="h-4 w-4" />
-              Payment
-            </CardTitle>
-            <CardDescription>Payment methods and billing</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground mb-3">Payment is collected at checkout when you book.</p>
-            <Link href="/bookings">
-              <Button variant="outline" className="w-full min-h-[44px] touch-manipulation">
-                View my bookings
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Calendar className="h-4 w-4" />
-              My bookings
-            </CardTitle>
-            <CardDescription>Upcoming and past sessions</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Link href="/bookings">
-              <Button variant="outline" className="w-full min-h-[44px] touch-manipulation">
-                View my bookings
-              </Button>
-            </Link>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base flex items-center gap-2">
-              <DollarSign className="h-4 w-4" />
-              Spending summary
-            </CardTitle>
-            <CardDescription>What you&apos;ve spent on sessions</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div>
-              <p className="text-xs text-muted-foreground">Total spent</p>
-              <p className="text-2xl font-bold text-accent">${totalSpent.toFixed(2)}</p>
+      {/* Profile Section */}
+      <div className="px-4 mb-6">
+        <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-2xl p-4">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-full bg-gradient-to-br from-[#D4AF37] to-[#B8960C] flex items-center justify-center">
+              <User className="h-7 w-7 text-black" />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-xs text-muted-foreground">This month</p>
-                <p className="text-lg font-semibold">${thisMonthSpent.toFixed(2)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Last month</p>
-                <p className="text-lg font-semibold">${lastMonthSpent.toFixed(2)}</p>
-              </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-semibold text-lg truncate">{userEmail}</p>
+              {userPhone && (
+                <p className="text-sm text-zinc-500">{userPhone}</p>
+              )}
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
+      </div>
 
-        <Card>
-          <CardContent className="pt-6">
-            <AccountSignOut />
-          </CardContent>
-        </Card>
+      {/* Quick Stats */}
+      <div className="px-4 mb-6">
+        <div className="grid grid-cols-3 gap-3">
+          <Link href="/my-wrestlers">
+            <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl p-4 text-center hover:border-zinc-700 transition-colors">
+              <Users className="h-5 w-5 mx-auto mb-2 text-[#D4AF37]" />
+              <p className="text-2xl font-bold">{wrestlerCount}</p>
+              <p className="text-xs text-zinc-500">Wrestlers</p>
+            </div>
+          </Link>
+          <Link href="/wallet">
+            <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl p-4 text-center hover:border-zinc-700 transition-colors">
+              <Wallet className="h-5 w-5 mx-auto mb-2 text-[#D4AF37]" />
+              <p className="text-2xl font-bold">${creditBalance.toFixed(0)}</p>
+              <p className="text-xs text-zinc-500">Credit</p>
+            </div>
+          </Link>
+          <Link href="/bookings">
+            <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl p-4 text-center hover:border-zinc-700 transition-colors">
+              <DollarSign className="h-5 w-5 mx-auto mb-2 text-[#D4AF37]" />
+              <p className="text-2xl font-bold">${totalSpent.toFixed(0)}</p>
+              <p className="text-xs text-zinc-500">Spent</p>
+            </div>
+          </Link>
+        </div>
+      </div>
+
+      {/* Menu Sections */}
+      <div className="px-4 space-y-3">
+        {/* Wrestlers */}
+        <MenuSection title="Wrestlers">
+          <MenuItem href="/my-wrestlers" icon={Users} label="My Wrestlers" />
+          <MenuItem href="/wrestlers/add" icon={User} label="Add Wrestler" />
+        </MenuSection>
+
+        {/* Wallet & Payments */}
+        <MenuSection title="Wallet & Payments">
+          <MenuItem href="/wallet" icon={Wallet} label="My Wallet" badge={creditBalance > 0 ? `$${creditBalance.toFixed(2)}` : undefined} />
+          <MenuItem href="/bookings" icon={DollarSign} label="Booking History" />
+        </MenuSection>
+
+        {/* Settings */}
+        <MenuSection title="Settings">
+          <AccountPhoneCard initialPhone={userPhone ?? null} compact />
+          <MenuItem href="/notifications" icon={Bell} label="Notifications" />
+        </MenuSection>
+
+        {/* Promo & Rewards */}
+        <MenuSection title="Rewards">
+          <RedeemCodeCard hasEntitlements={hasEarlyAdopterEntitlements} compact />
+        </MenuSection>
+
+        {/* Sign Out */}
+        <div className="pt-4">
+          <AccountSignOut />
+        </div>
       </div>
     </div>
+  );
+}
+
+function MenuSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <h2 className="text-xs font-medium text-zinc-500 uppercase tracking-wider mb-2 px-1">{title}</h2>
+      <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl overflow-hidden divide-y divide-zinc-800/50">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function MenuItem({ 
+  href, 
+  icon: Icon, 
+  label, 
+  badge 
+}: { 
+  href: string; 
+  icon: React.ComponentType<{ className?: string }>; 
+  label: string;
+  badge?: string;
+}) {
+  return (
+    <Link href={href}>
+      <div className="flex items-center gap-3 px-4 py-3.5 hover:bg-zinc-800/50 transition-colors">
+        <Icon className="h-5 w-5 text-zinc-400" />
+        <span className="flex-1 font-medium">{label}</span>
+        {badge && (
+          <span className="text-sm text-[#D4AF37] font-medium">{badge}</span>
+        )}
+        <ChevronRight className="h-4 w-4 text-zinc-600" />
+      </div>
+    </Link>
   );
 }

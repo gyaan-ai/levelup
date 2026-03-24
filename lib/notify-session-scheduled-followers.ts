@@ -40,7 +40,7 @@ export async function notifySessionScheduledFollowers(
     const link = base ? `${base}${path}` : path;
 
     const title = `New session: ${coachName}`;
-    const body = `${coachName} scheduled a session (${when}). Open the app to book.`;
+    const body = `${coachName} scheduled a session (${when}). Tap to book!`;
 
     await Promise.all(
       follows.map((f) =>
