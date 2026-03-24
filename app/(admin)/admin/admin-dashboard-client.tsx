@@ -321,6 +321,16 @@ export function AdminDashboardClient({
   const [financeTimeFilter, setFinanceTimeFilter] = useState<'all' | '7d' | '30d' | '90d' | 'ytd'>('all');
   const [financeTypeFilter, setFinanceTypeFilter] = useState<string>('all');
   const [financeSchoolFilter, setFinanceSchoolFilter] = useState<string>('all');
+  
+  // Manual payment entry
+  const [showManualPaymentDialog, setShowManualPaymentDialog] = useState(false);
+  const [manualPaymentForm, setManualPaymentForm] = useState({
+    sessionId: '',
+    amount: '',
+    paymentMethod: 'cash' as 'cash' | 'check' | 'venmo' | 'other',
+    notes: '',
+  });
+  const [savingManualPayment, setSavingManualPayment] = useState(false);
   const [editingAthleteId, setEditingAthleteId] = useState<string | null>(null);
   const hasOpenedEditFromUrl = useRef(false);
   
@@ -647,10 +657,13 @@ export function AdminDashboardClient({
       return true;
     });
 
+    // Revenue split: Coach gets 83.3%, Guild keeps 16.7%
+    const COACH_PERCENTAGE = 0.833;
+    const GUILD_PERCENTAGE = 0.167;
+
     // Calculate aggregates
-    let grossRevenue = 0;
-    let coachPayouts = 0;
-    let stripeFees = 0;
+    let stripeRevenue = 0; // Total collected via Stripe
+    let cashRevenue = 0; // Manual/cash payments
     let openBookings = 0;
     let completedSessions = 0;
     let pendingPayment = 0;
@@ -661,14 +674,15 @@ export function AdminDashboardClient({
 
     for (const s of filteredSess) {
       const totalPrice = Number(s.total_price) || 0;
-      const athletePayment = Number(s.athlete_payment) || 0;
-      // Estimate Stripe fee as ~2.9% + $0.30 per transaction
-      const estimatedStripeFee = totalPrice > 0 ? (totalPrice * 0.029 + 0.30) : 0;
-
+      // Check if this was a cash/manual payment (we'll use a field or assume Stripe if has payment intent)
+      const isCashPayment = (s as any).payment_method === 'cash';
+      
       if (s.status === 'completed' || s.status === 'pending_payment') {
-        grossRevenue += totalPrice;
-        coachPayouts += athletePayment;
-        stripeFees += estimatedStripeFee;
+        if (isCashPayment) {
+          cashRevenue += totalPrice;
+        } else {
+          stripeRevenue += totalPrice;
+        }
       }
 
       if (s.status === 'scheduled') openBookings += 1;
@@ -676,7 +690,7 @@ export function AdminDashboardClient({
       if (s.status === 'pending_payment') pendingPayment += 1;
       if (s.status === 'cancelled') cancelledSessions += 1;
 
-      // Coach breakdown
+      // Coach breakdown - coach gets 83.3% of revenue
       const existing = coachBreakdown.get(s.athlete_id) || {
         name: s.athlete_name,
         school: s.athlete_school,
@@ -687,15 +701,19 @@ export function AdminDashboardClient({
       };
       if (s.status === 'completed' || s.status === 'pending_payment') {
         existing.revenue += totalPrice;
-        existing.payout += athletePayment;
+        existing.payout += totalPrice * COACH_PERCENTAGE;
         existing.sessions += 1;
       }
       if (s.status === 'scheduled') existing.open += 1;
       coachBreakdown.set(s.athlete_id, existing);
     }
 
-    const netProfit = grossRevenue - coachPayouts - stripeFees;
-    const margin = grossRevenue > 0 ? (netProfit / grossRevenue) * 100 : 0;
+    const grossRevenue = stripeRevenue + cashRevenue;
+    const coachPayouts = grossRevenue * COACH_PERCENTAGE;
+    const guildNet = grossRevenue * GUILD_PERCENTAGE;
+    // Estimate Stripe fees only on Stripe revenue (~2.9% + $0.30 per transaction)
+    const stripeFees = stripeRevenue > 0 ? (stripeRevenue * 0.029) + (completedSessions * 0.30) : 0;
+    const guildNetAfterFees = guildNet - stripeFees;
 
     // Sort coach breakdown by revenue
     const coachBreakdownArray = Array.from(coachBreakdown.entries())
@@ -704,10 +722,12 @@ export function AdminDashboardClient({
 
     return {
       grossRevenue,
+      stripeRevenue,
+      cashRevenue,
       coachPayouts,
+      guildNet,
       stripeFees,
-      netProfit,
-      margin,
+      guildNetAfterFees,
       openBookings,
       completedSessions,
       pendingPayment,
@@ -1536,15 +1556,29 @@ export function AdminDashboardClient({
             </div>
           </Card>
 
-          {/* Hero KPIs */}
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Hero KPIs - Revenue Split: Coach 83.3%, Guild 16.7% */}
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
             <Card className="p-4 bg-gradient-to-br from-[#B89D60]/10 to-transparent border-[#B89D60]/20">
               <div className="flex items-center gap-2 mb-1">
                 <DollarSign className="h-4 w-4 text-[#B89D60]" />
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Guild Collected</p>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Collected</p>
               </div>
               <p className="text-2xl font-bold">${financeData.grossRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-              <p className="text-xs text-muted-foreground mt-1">Gross revenue</p>
+              <div className="flex gap-2 mt-1">
+                <p className="text-xs text-muted-foreground">Stripe: ${financeData.stripeRevenue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
+                {financeData.cashRevenue > 0 && (
+                  <p className="text-xs text-emerald-500">Cash: ${financeData.cashRevenue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
+                )}
+              </div>
+            </Card>
+            
+            <Card className="p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <Wallet className="h-4 w-4 text-blue-500" />
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Coach Payouts</p>
+              </div>
+              <p className="text-2xl font-bold text-blue-400">${financeData.coachPayouts.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+              <p className="text-xs text-muted-foreground mt-1">83.3% of revenue</p>
             </Card>
             
             <Card className="p-4 bg-gradient-to-br from-emerald-500/10 to-transparent border-emerald-500/20">
@@ -1552,17 +1586,8 @@ export function AdminDashboardClient({
                 <TrendingUp className="h-4 w-4 text-emerald-500" />
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Guild Net</p>
               </div>
-              <p className="text-2xl font-bold text-emerald-500">${financeData.netProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-              <p className="text-xs text-muted-foreground mt-1">{financeData.margin.toFixed(1)}% margin</p>
-            </Card>
-            
-            <Card className="p-4">
-              <div className="flex items-center gap-2 mb-1">
-                <Wallet className="h-4 w-4 text-blue-500" />
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Paid to Coaches</p>
-              </div>
-              <p className="text-2xl font-bold">${financeData.coachPayouts.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-              <p className="text-xs text-muted-foreground mt-1">Coach earnings</p>
+              <p className="text-2xl font-bold text-emerald-500">${financeData.guildNet.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+              <p className="text-xs text-muted-foreground mt-1">16.7% of revenue</p>
             </Card>
             
             <Card className="p-4">
@@ -1571,7 +1596,16 @@ export function AdminDashboardClient({
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Stripe Fees</p>
               </div>
               <p className="text-2xl font-bold text-red-400">${financeData.stripeFees.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-              <p className="text-xs text-muted-foreground mt-1">Processing costs</p>
+              <p className="text-xs text-muted-foreground mt-1">~2.9% + $0.30</p>
+            </Card>
+
+            <Card className="p-4 bg-gradient-to-br from-[#B89D60]/5 to-transparent">
+              <div className="flex items-center gap-2 mb-1">
+                <TrendingUp className="h-4 w-4 text-[#B89D60]" />
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Guild Profit</p>
+              </div>
+              <p className="text-2xl font-bold text-[#B89D60]">${financeData.guildNetAfterFees.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+              <p className="text-xs text-muted-foreground mt-1">After Stripe fees</p>
             </Card>
           </div>
 
