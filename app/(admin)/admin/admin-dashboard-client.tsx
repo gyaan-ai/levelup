@@ -314,6 +314,7 @@ export function AdminDashboardClient({
   const [athleteSearch, setAthleteSearch] = useState('');
   const [leaderboardTimeFilter, setLeaderboardTimeFilter] = useState<'all' | '7d' | '30d' | '90d'>('all');
   const [leaderboardTypeFilter, setLeaderboardTypeFilter] = useState<string>('all');
+  const [leaderboardSchoolFilter, setLeaderboardSchoolFilter] = useState<string>('all');
   const [leaderboardSort, setLeaderboardSort] = useState<'earnings' | 'sessions' | 'rating' | 'open'>('earnings');
   const [editingAthleteId, setEditingAthleteId] = useState<string | null>(null);
   const hasOpenedEditFromUrl = useRef(false);
@@ -560,6 +561,22 @@ export function AdminDashboardClient({
     // Convert to array
     let result = Array.from(coachMap.values());
 
+    // Apply school filter
+    if (leaderboardSchoolFilter !== 'all') {
+      if (leaderboardSchoolFilter === 'non-affiliated') {
+        // Non-affiliated = empty school or common non-NCAA indicators
+        result = result.filter(a => 
+          !a.school || 
+          a.school.trim() === '' || 
+          a.school.toLowerCase() === 'non-affiliated' ||
+          a.school.toLowerCase() === 'independent' ||
+          a.school.toLowerCase() === 'n/a'
+        );
+      } else {
+        result = result.filter(a => a.school === leaderboardSchoolFilter);
+      }
+    }
+
     // Apply search filter
     if (athleteSearch) {
       const q = athleteSearch.toLowerCase();
@@ -581,7 +598,18 @@ export function AdminDashboardClient({
     });
 
     return result;
-  }, [sessions, athleteReports, leaderboardTimeFilter, leaderboardTypeFilter, leaderboardSort, athleteSearch]);
+  }, [sessions, athleteReports, leaderboardTimeFilter, leaderboardTypeFilter, leaderboardSchoolFilter, leaderboardSort, athleteSearch]);
+  
+  // Get unique schools for the filter dropdown
+  const uniqueSchools = useMemo(() => {
+    const schools = new Set<string>();
+    for (const report of athleteReports) {
+      if (report.school && report.school.trim() !== '') {
+        schools.add(report.school);
+      }
+    }
+    return Array.from(schools).sort();
+  }, [athleteReports]);
 
   const filteredAthletes = athleteReports.filter((a) => {
     if (!athleteSearch) return true;
@@ -1438,23 +1466,39 @@ export function AdminDashboardClient({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-medium text-muted-foreground uppercase">Type:</span>
-                  <Select value={leaderboardTypeFilter} onValueChange={setLeaderboardTypeFilter}>
-                    <SelectTrigger className="w-36 h-9">
-                      <SelectValue placeholder="All types" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Types</SelectItem>
-                      {sessionTypesForFilter.map((t) => (
-                        <SelectItem key={t} value={t}>{t}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+<div className="flex items-center gap-2">
+  <span className="text-xs font-medium text-muted-foreground uppercase">Type:</span>
+  <Select value={leaderboardTypeFilter} onValueChange={setLeaderboardTypeFilter}>
+  <SelectTrigger className="w-36 h-9">
+  <SelectValue placeholder="All types" />
+  </SelectTrigger>
+  <SelectContent>
+  <SelectItem value="all">All Types</SelectItem>
+  {sessionTypesForFilter.map((t) => (
+  <SelectItem key={t} value={t}>{t}</SelectItem>
+  ))}
+  </SelectContent>
+  </Select>
+  </div>
 
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-medium text-muted-foreground uppercase">Sort:</span>
+  <div className="flex items-center gap-2">
+  <span className="text-xs font-medium text-muted-foreground uppercase">School:</span>
+  <Select value={leaderboardSchoolFilter} onValueChange={setLeaderboardSchoolFilter}>
+  <SelectTrigger className="w-40 h-9">
+  <SelectValue placeholder="All schools" />
+  </SelectTrigger>
+  <SelectContent>
+  <SelectItem value="all">All Schools</SelectItem>
+  <SelectItem value="non-affiliated">Non-Affiliated</SelectItem>
+  {uniqueSchools.map((school) => (
+  <SelectItem key={school} value={school}>{school}</SelectItem>
+  ))}
+  </SelectContent>
+  </Select>
+  </div>
+  
+  <div className="flex items-center gap-2">
+  <span className="text-xs font-medium text-muted-foreground uppercase">Sort:</span>
                   <Select value={leaderboardSort} onValueChange={(v) => setLeaderboardSort(v as typeof leaderboardSort)}>
                     <SelectTrigger className="w-36 h-9">
                       <SelectValue />
