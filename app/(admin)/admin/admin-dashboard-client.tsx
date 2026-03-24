@@ -85,6 +85,9 @@ export type AdminSession = {
   stripe_fee: number;
   session_type?: string;
   session_mode?: string;
+  join_policy?: string;
+  focus_area?: string | null;
+  focus_area_2?: string | null;
   partner_invite_code?: string | null;
   current_participants: number;
   max_participants: number;
@@ -887,6 +890,9 @@ export function AdminDashboardClient({
           maxParticipants: session.max_participants || 6,
           pricePerParticipant: session.price_per_participant || 30,
           sessionType: session.session_type === 'group' ? 'small_group' : session.session_type === '2-athlete' ? 'partner' : 'private',
+          joinPolicy: session.join_policy || 'public',
+          focusArea: session.focus_area || undefined,
+          focusArea2: session.focus_area_2 || undefined,
         }),
       });
       

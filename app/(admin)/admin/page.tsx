@@ -82,6 +82,9 @@ export default async function AdminPage() {
         stripe_fee,
         session_type,
         session_mode,
+        join_policy,
+        focus_area,
+        focus_area_2,
         partner_invite_code,
         current_participants,
         max_participants,
@@ -173,7 +176,7 @@ export default async function AdminPage() {
     const f = s.facilities;
     const fo = Array.isArray(f) ? f[0] : f;
     // Cast to access fields not in generated types
-    const row = s as typeof s & { duration_minutes?: number; price_per_participant?: number };
+    const row = s as typeof s & { duration_minutes?: number; price_per_participant?: number; join_policy?: string; focus_area?: string; focus_area_2?: string };
     return {
       id: s.id,
       athlete_id: s.athlete_id ?? '',
@@ -186,6 +189,9 @@ export default async function AdminPage() {
       stripe_fee: Number(s.stripe_fee ?? 0),
       session_type: s.session_type ?? undefined,
       session_mode: s.session_mode ?? undefined,
+      join_policy: row.join_policy ?? 'public',
+      focus_area: row.focus_area ?? null,
+      focus_area_2: row.focus_area_2 ?? null,
       partner_invite_code: s.partner_invite_code ?? null,
       current_participants: s.current_participants ?? 0,
       max_participants: s.max_participants ?? 1,
