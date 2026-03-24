@@ -135,7 +135,7 @@ export default async function HomePage() {
             </div>
             <div>
               <h3 className="text-white font-semibold mb-1">Find Training</h3>
-              <p className="text-white/60 text-sm">Browse private sessions and small groups near you.</p>
+              <p className="text-white/60 text-sm">Browse private and small group sessions with elite coaches near you.</p>
             </div>
           </div>
           <div className="flex items-start gap-4">
