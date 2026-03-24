@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { createSupabaseServer } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
 import { CartCheckoutClient } from './cart-checkout-client';
 
 export const metadata = {
@@ -8,7 +8,7 @@ export const metadata = {
 };
 
 export default async function CartCheckoutPage() {
-  const supabase = await createSupabaseServer();
+  const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {
