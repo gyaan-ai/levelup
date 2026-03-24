@@ -718,6 +718,7 @@ export function AdminDashboardClient({
     }
 
     const grossRevenue = stripeRevenue + cashRevenue;
+    console.log('[v0] financeData - stripeRevenue:', stripeRevenue, 'cashRevenue:', cashRevenue, 'grossRevenue:', grossRevenue);
     // Guild Net = what's left after paying coaches (Gross - Coach Payouts)
     const guildNet = grossRevenue - coachPayoutsTotal;
     // Stripe fees only apply to Stripe transactions (~2.9% + $0.30 per transaction)
