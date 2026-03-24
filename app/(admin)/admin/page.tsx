@@ -172,12 +172,14 @@ export default async function AdminPage() {
     const o = Array.isArray(a) ? a[0] : a;
     const f = s.facilities;
     const fo = Array.isArray(f) ? f[0] : f;
+    // Cast to access fields not in generated types
+    const row = s as typeof s & { duration_minutes?: number; price_per_participant?: number };
     return {
       id: s.id,
       athlete_id: s.athlete_id ?? '',
       scheduled_datetime: s.scheduled_datetime,
       status: s.status,
-      duration_minutes: s.duration_minutes ?? 60,
+      duration_minutes: row.duration_minutes ?? 60,
       total_price: Number(s.total_price ?? 0),
       athlete_payment: Number(s.athlete_payment ?? 0),
       org_fee: Number(s.org_fee ?? 0),
@@ -187,7 +189,7 @@ export default async function AdminPage() {
       partner_invite_code: s.partner_invite_code ?? null,
       current_participants: s.current_participants ?? 0,
       max_participants: s.max_participants ?? 1,
-      price_per_participant: s.price_per_participant ?? 30,
+      price_per_participant: row.price_per_participant ?? 30,
       parent_id: s.parent_id,
       parent_email: emailByUserId.get(s.parent_id) ?? '—',
       athlete_name: o ? `${o.first_name} ${o.last_name}` : '—',
