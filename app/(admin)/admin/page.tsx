@@ -187,6 +187,7 @@ export default async function AdminPage() {
       partner_invite_code: s.partner_invite_code ?? null,
       current_participants: s.current_participants ?? 0,
       max_participants: s.max_participants ?? 1,
+      price_per_participant: s.price_per_participant ?? 30,
       parent_id: s.parent_id,
       parent_email: emailByUserId.get(s.parent_id) ?? '—',
       athlete_name: o ? `${o.first_name} ${o.last_name}` : '—',

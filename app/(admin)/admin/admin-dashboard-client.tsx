@@ -88,6 +88,7 @@ export type AdminSession = {
   partner_invite_code?: string | null;
   current_participants: number;
   max_participants: number;
+  price_per_participant: number;
   parent_id: string;
   parent_email: string;
   athlete_name: string;
