@@ -7,6 +7,7 @@ import { getStripeInstance } from '@/lib/stripe/webhooks';
 import { formatEST } from '@/lib/format-date';
 import { hasMinPhoneDigits } from '@/lib/phone';
 import { getEffectiveFilledCount } from '@/lib/sessions';
+import { getUserCreditBalance, useCredits } from '@/lib/credits';
 
 /**
  * POST - Multi-session checkout: pay for multiple sessions in one Stripe transaction.
@@ -176,9 +177,84 @@ export async function POST(req: NextRequest) {
       sessionMetadata.push({ session_id: s.id, price: pricePer });
     }
 
+    // Calculate total price
+    const totalPrice = sessionMetadata.reduce((sum, m) => sum + m.price, 0);
+
+    // Check user's credit balance
+    const creditBalance = await getUserCreditBalance(user.id);
+    const creditsToUse = Math.min(creditBalance, totalPrice);
+    const amountToPay = totalPrice - creditsToUse;
+
+    // If credits cover the full amount, register directly without Stripe
+    if (amountToPay <= 0) {
+      // Use credits for each session
+      for (const meta of sessionMetadata) {
+        await useCredits({
+          userId: user.id,
+          amount: meta.price,
+          sessionId: meta.session_id,
+          description: `Session booking paid with credits`,
+        });
+
+        // Register the wrestler for the session
+        await admin.from('session_participants').insert({
+          session_id: meta.session_id,
+          youth_wrestler_id: wrestlerId,
+          parent_id: user.id,
+          amount_paid: meta.price,
+          payment_method: 'credit',
+          status: 'confirmed',
+        });
+
+        // Update session participant count
+        const session = sessions.find(s => s.id === meta.session_id);
+        if (session) {
+          await admin.from('sessions').update({
+            current_participants: ((session as { current_participants?: number }).current_participants ?? 0) + 1,
+          }).eq('id', meta.session_id);
+        }
+      }
+
+      return NextResponse.json({ 
+        success: true, 
+        paidWithCredits: true,
+        creditsUsed: creditsToUse,
+        redirectUrl: `/cart/success?credits_used=${creditsToUse}&sessions=${sessionIds.length}`,
+      });
+    }
+
     const stripeEnabled = process.env.STRIPE_CHECKOUT_ENABLED === 'true';
     if (!stripeEnabled) {
       return NextResponse.json({ error: 'Online payment is not enabled' }, { status: 503 });
+    }
+
+    // Adjust line items if partial credit is used
+    let adjustedLineItems = lineItems;
+    if (creditsToUse > 0) {
+      // Apply credit as a discount to the first item(s)
+      let remainingCredit = creditsToUse;
+      adjustedLineItems = lineItems.map((item, idx) => {
+        if (remainingCredit <= 0) return item;
+        const originalPrice = item.price_data.unit_amount / 100;
+        const discount = Math.min(remainingCredit, originalPrice);
+        remainingCredit -= discount;
+        const newAmount = Math.round((originalPrice - discount) * 100);
+        if (newAmount <= 0) {
+          // This item is fully covered by credit, skip it
+          return null;
+        }
+        return {
+          ...item,
+          price_data: {
+            ...item.price_data,
+            unit_amount: newAmount,
+            product_data: {
+              ...item.price_data.product_data,
+              description: `${item.price_data.product_data.description} (Credit applied: $${discount.toFixed(2)})`,
+            },
+          },
+        };
+      }).filter(Boolean) as typeof lineItems;
     }
 
     const stripe = getStripeInstance(tenant.slug);
@@ -187,13 +263,13 @@ export async function POST(req: NextRequest) {
     const successUrl = `${baseUrl}/cart/success?stripe_cs={CHECKOUT_SESSION_ID}`;
     const cancelUrl = `${baseUrl}/cart/checkout`;
 
-    const idempotencyKey = `cart-checkout-${user.id}-${sessionIds.sort().join('-')}-${wrestlerId}`.slice(0, 255);
+    const idempotencyKey = `cart-checkout-${user.id}-${sessionIds.sort().join('-')}-${wrestlerId}-${Date.now()}`.slice(0, 255);
 
     const stripeSession = await stripe.checkout.sessions.create(
       {
         mode: 'payment',
         payment_method_types: ['card'],
-        line_items: lineItems,
+        line_items: adjustedLineItems,
         metadata: {
           app: 'the-guild',
           tenant_slug: tenant.slug,
@@ -202,6 +278,7 @@ export async function POST(req: NextRequest) {
           parent_id: user.id,
           session_ids: sessionIds.join(','),
           session_prices: sessionMetadata.map(m => `${m.session_id}:${m.price}`).join(','),
+          credits_to_use: creditsToUse.toString(),
         },
         success_url: successUrl,
         cancel_url: cancelUrl,
@@ -214,7 +291,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Could not start checkout' }, { status: 500 });
     }
 
-    return NextResponse.json({ checkoutUrl: stripeSession.url });
+    return NextResponse.json({ 
+      checkoutUrl: stripeSession.url,
+      creditsApplied: creditsToUse,
+      totalAfterCredits: amountToPay,
+    });
   } catch (e) {
     console.error('Cart checkout API error:', e);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

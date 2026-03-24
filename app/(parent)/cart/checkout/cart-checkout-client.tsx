@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import useSWR from 'swr';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -13,10 +14,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ShoppingCart, X, ArrowLeft, CreditCard, Loader2 } from 'lucide-react';
+import { ShoppingCart, X, ArrowLeft, CreditCard, Loader2, Wallet } from 'lucide-react';
 import { useCart } from '@/lib/cart-context';
 import { formatEST } from '@/lib/format-date';
 import { getSessionTypeDisplay } from '@/components/session-type-badge';
+
+const fetcher = (url: string) => fetch(url).then(r => r.json());
 
 type Wrestler = {
   id: string;
@@ -37,6 +40,12 @@ export function CartCheckoutClient({
   const [selectedWrestler, setSelectedWrestler] = useState(wrestlers[0]?.id ?? '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Fetch credit balance
+  const { data: creditsData } = useSWR('/api/credits', fetcher);
+  const creditBalance = creditsData?.balance ?? 0;
+  const creditsToApply = Math.min(creditBalance, total);
+  const amountToPay = total - creditsToApply;
 
   const handleCheckout = async () => {
     if (!selectedWrestler) {
@@ -65,6 +74,13 @@ export function CartCheckoutClient({
 
       if (!res.ok) {
         setError(data.error || 'Checkout failed');
+        return;
+      }
+
+      // If paid with credits entirely, redirect to success
+      if (data.paidWithCredits && data.redirectUrl) {
+        clearCart();
+        router.push(data.redirectUrl);
         return;
       }
 
@@ -182,10 +198,33 @@ export function CartCheckoutClient({
             </div>
           </div>
 
-          {/* Total */}
-          <div className="flex items-center justify-between pt-4 border-t border-border">
-            <span className="text-lg font-medium">Total</span>
-            <span className="text-2xl font-bold">${total.toFixed(2)}</span>
+          {/* Totals */}
+          <div className="space-y-2 pt-4 border-t border-border">
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Subtotal</span>
+              <span>${total.toFixed(2)}</span>
+            </div>
+            
+            {creditBalance > 0 && (
+              <div className="flex items-center justify-between text-accent">
+                <span className="flex items-center gap-1.5">
+                  <Wallet className="h-4 w-4" />
+                  Credit applied
+                </span>
+                <span>-${creditsToApply.toFixed(2)}</span>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between pt-2 border-t border-border">
+              <span className="text-lg font-medium">Total due</span>
+              <span className="text-2xl font-bold">${amountToPay.toFixed(2)}</span>
+            </div>
+
+            {creditBalance > 0 && creditsToApply < creditBalance && (
+              <p className="text-xs text-muted-foreground">
+                Remaining credit balance after purchase: ${(creditBalance - creditsToApply).toFixed(2)}
+              </p>
+            )}
           </div>
 
           {error && (
@@ -203,16 +242,26 @@ export function CartCheckoutClient({
                 <Loader2 className="h-5 w-5 animate-spin" />
                 Processing...
               </>
+            ) : amountToPay <= 0 ? (
+              <>
+                <Wallet className="h-5 w-5" />
+                Pay with Credit
+              </>
             ) : (
               <>
                 <CreditCard className="h-5 w-5" />
-                Pay ${total.toFixed(2)}
+                Pay ${amountToPay.toFixed(2)}
               </>
             )}
           </Button>
 
           <p className="text-xs text-center text-muted-foreground">
-            You will be redirected to Stripe to complete payment
+            {amountToPay <= 0 
+              ? 'Your credit balance covers this purchase'
+              : creditsToApply > 0
+                ? `$${creditsToApply.toFixed(2)} credit applied. You'll pay $${amountToPay.toFixed(2)} via Stripe.`
+                : 'You will be redirected to Stripe to complete payment'
+            }
           </p>
         </CardContent>
       </Card>

@@ -7,6 +7,7 @@ import { getStripeInstance } from '@/lib/stripe/webhooks';
 import { createNotification } from '@/lib/notifications';
 import { differenceInHours } from 'date-fns';
 import { formatEST } from '@/lib/format-date';
+import { grantCredit } from '@/lib/credits';
 
 const CANCELLATION_WINDOW_HOURS = 24;
 
@@ -74,34 +75,59 @@ export async function POST(
       return NextResponse.json({ error: 'Session cannot be cancelled' }, { status: 400 });
     }
 
-    // Rule: refund only with 24+ hours notice (parent, coach, or admin)
+    // Get session participants to grant credits
+    const { data: participants } = await admin
+      .from('session_participants')
+      .select('id, parent_id, youth_wrestler_id, amount_paid')
+      .eq('session_id', sessionId);
+
     const scheduledTime = new Date(session.scheduled_datetime);
     const hoursUntilSession = differenceInHours(scheduledTime, new Date());
     const withinRefundWindow = hoursUntilSession >= CANCELLATION_WINDOW_HOURS;
 
-    const amountCents = Math.round(Number(session.total_price || 0) * 100);
-    let refundIssued = false;
+    const sessionDate = formatEST(scheduledTime, 'EEE, MMM d');
+    const coach = Array.isArray(session.athletes) ? session.athletes[0] : session.athletes;
+    const coachName = coach ? [coach.first_name, coach.last_name].filter(Boolean).join(' ') : 'Coach';
 
-    if (
-      withinRefundWindow &&
-      amountCents > 0 &&
-      session.stripe_payment_intent_id &&
-      !(session as { refunded_at?: string | null }).refunded_at
-    ) {
-      try {
-        const stripe = getStripeInstance(tenant.slug);
-        await stripe.refunds.create({
-          payment_intent: session.stripe_payment_intent_id,
-          amount: amountCents,
-          reason: 'requested_by_customer',
-          metadata: { session_id: sessionId, app: 'the-guild' },
+    let creditsGranted = 0;
+    let totalCreditsAmount = 0;
+
+    // Grant credits to all participants (coach/admin cancel always grants credits)
+    if (isCoach || isAdmin) {
+      for (const participant of participants ?? []) {
+        const amountPaid = Number(participant.amount_paid ?? 0);
+        if (amountPaid > 0 && participant.parent_id) {
+          const result = await grantCredit({
+            userId: participant.parent_id,
+            amount: amountPaid,
+            reason: `Cancelled: ${sessionDate} with ${coachName}. ${reason}`,
+            sourceType: 'cancellation',
+            sourceId: sessionId,
+          });
+          if (result.success) {
+            creditsGranted++;
+            totalCreditsAmount += amountPaid;
+          }
+        }
+      }
+    } else if (isOwner && withinRefundWindow) {
+      // Parent self-cancel with 24+ hours notice - grant credit
+      const amountPaid = Number(session.total_price || 0);
+      if (amountPaid > 0) {
+        const result = await grantCredit({
+          userId: user.id,
+          amount: amountPaid,
+          reason: `Self-cancelled: ${sessionDate} with ${coachName}`,
+          sourceType: 'cancellation',
+          sourceId: sessionId,
         });
-        refundIssued = true;
-      } catch (stripeErr) {
-        console.error('Stripe refund error:', stripeErr);
-        // Continue with cancellation; parent can contact support for refund
+        if (result.success) {
+          creditsGranted = 1;
+          totalCreditsAmount = amountPaid;
+        }
       }
     }
+    // Parent self-cancel with less than 24 hours - no credit (existing behavior)
 
     const { error: updateError } = await admin
       .from('sessions')
@@ -110,7 +136,6 @@ export async function POST(
         cancelled_at: new Date().toISOString(),
         cancelled_by: user.id,
         cancellation_reason: reason,
-        ...(refundIssued && { refunded_at: new Date().toISOString() }),
       })
       .eq('id', sessionId);
 
@@ -119,16 +144,33 @@ export async function POST(
       return NextResponse.json({ error: 'Failed to cancel session' }, { status: 500 });
     }
 
+    // Update participant statuses
+    if (participants && participants.length > 0) {
+      await admin
+        .from('session_participants')
+        .update({ status: 'cancelled' })
+        .eq('session_id', sessionId);
+    }
+
     const when = formatEST(new Date(session.scheduled_datetime), 'MMM d, h:mm a');
     try {
-      await createNotification(admin, {
-        user_id: session.parent_id,
-        type: 'session_cancelled',
-        title: 'Session cancelled',
-        body: `Session on ${when} was cancelled.`,
-        data: { link: '/bookings', session_id: sessionId },
-      });
-      if (session.athlete_id !== session.parent_id) {
+      // Notify participants
+      for (const participant of participants ?? []) {
+        if (participant.parent_id) {
+          const creditMsg = totalCreditsAmount > 0 
+            ? ` $${totalCreditsAmount.toFixed(2)} credit added to your account.`
+            : '';
+          await createNotification(admin, {
+            user_id: participant.parent_id,
+            type: 'session_cancelled',
+            title: 'Session cancelled',
+            body: `Session on ${when} with ${coachName} was cancelled.${creditMsg}`,
+            data: { link: '/bookings', session_id: sessionId },
+          });
+        }
+      }
+      // Notify coach if not the one cancelling
+      if (session.athlete_id !== user.id) {
         await createNotification(admin, {
           user_id: session.athlete_id,
           type: 'session_cancelled',
@@ -141,15 +183,16 @@ export async function POST(
       console.warn('Notify cancel failed:', notifErr);
     }
 
-    const message = refundIssued
-      ? `Session cancelled. Refund of $${Number(session.total_price || 0).toFixed(2)} will be processed.`
+    const message = totalCreditsAmount > 0
+      ? `Session cancelled. $${totalCreditsAmount.toFixed(2)} credit issued to ${creditsGranted} participant(s).`
       : withinRefundWindow
         ? 'Session cancelled.'
-        : 'Session cancelled. No refund (less than 24 hours notice).';
+        : 'Session cancelled. No credit (less than 24 hours notice).';
 
     return NextResponse.json({
       success: true,
-      refundIssued,
+      creditsGranted,
+      totalCreditsAmount,
       message,
     });
   } catch (e) {

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { MessageCircle, FolderOpen, Check, X, DollarSign, Users, Smartphone } from 'lucide-react';
+import { MessageCircle, FolderOpen, Check, X, DollarSign, Users, Smartphone, Trash2, Loader2 } from 'lucide-react';
 import { CoachTextGroupDialog } from '@/components/coach-text-group-dialog';
 import { CopySessionPhonesButton } from '@/components/copy-session-phones-button';
 import { formatEST } from '@/lib/format-date';
@@ -64,8 +64,33 @@ export function CoachSessionsClient({
   const router = useRouter();
   const [tab, setTab] = useState<Tab>(initialTab);
   const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [requests, setRequests] = useState<RequestItem[]>(pendingRequests);
   const [textGroupSession, setTextGroupSession] = useState<CoachSession | null>(null);
+
+  const handleCancelSession = async (sessionId: string) => {
+    const confirmed = window.confirm(
+      'Are you sure you want to cancel this session? All registered participants will receive a credit for their payment.'
+    );
+    if (!confirmed) return;
+
+    setCancellingId(sessionId);
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: 'Cancelled by coach' }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to cancel session');
+      alert(data.message || 'Session cancelled');
+      router.refresh();
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : 'Failed to cancel session');
+    } finally {
+      setCancellingId(null);
+    }
+  };
 
   const handleApproveDecline = async (requestId: string, sessionId: string, action: 'approve' | 'decline') => {
     setLoadingId(requestId);
@@ -201,6 +226,22 @@ export function CoachSessionsClient({
                           Workspace
                         </Button>
                       </Link>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="min-h-[44px] touch-manipulation text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => handleCancelSession(session.id)}
+                        disabled={cancellingId === session.id}
+                      >
+                        {cancellingId === session.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <>
+                            <Trash2 className="h-4 w-4 mr-1" />
+                            Cancel
+                          </>
+                        )}
+                      </Button>
                     </div>
                   </div>
                 </CardContent>
