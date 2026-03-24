@@ -78,6 +78,7 @@ export type AdminSession = {
   athlete_id: string;
   scheduled_datetime: string;
   status: string;
+  duration_minutes: number;
   total_price: number;
   athlete_payment: number;
   org_fee: number;
