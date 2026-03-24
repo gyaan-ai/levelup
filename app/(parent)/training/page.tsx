@@ -151,7 +151,7 @@ export default async function TrainingPage({
       })()
     : (() => {
         const end = new Date(now);
-        end.setDate(end.getDate() + 7);
+        end.setDate(end.getDate() + 14);
         return end.toISOString();
       })();
   // Past/completed sessions: when no date = last 14 days; when date = that day
@@ -215,11 +215,12 @@ export default async function TrainingPage({
   const isAdmin = userData?.role === 'admin';
 
   return (
-    <div className="container mx-auto px-4 py-5 pb-8 md:py-8 max-w-full">
-      <h1 className="text-2xl font-bold text-foreground md:text-3xl mb-1">Training</h1>
-      <p className="text-muted-foreground text-sm md:text-base mb-6">
-        Find sessions to book or pick a coach for private
-      </p>
+    <div className="min-h-screen pb-24">
+      <div className="px-4 pt-6 pb-4">
+        <h1 className="text-2xl font-bold text-foreground">Training</h1>
+        <p className="text-zinc-400 text-sm mt-0.5">Find and book sessions</p>
+      </div>
+      <div className="px-4">
       <TrainingClient
         key={`training-${tab}-${sp.coach ?? 'all'}`}
         initialTab={tab}
@@ -234,6 +235,7 @@ export default async function TrainingPage({
         coaches={athletesMerged.map((a) => ({ id: a.id, first_name: a.first_name, last_name: a.last_name, school: a.school }))}
         preselectedWrestlerId={sp.wrestler ?? ''}
       />
+      </div>
     </div>
   );
 }

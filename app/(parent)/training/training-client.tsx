@@ -77,16 +77,16 @@ export function TrainingClient({
 
   return (
     <>
-      <div className="flex gap-2 border-b border-border mb-6 overflow-x-auto">
+      <div className="flex gap-2 mb-6">
         {TABS.map((t) => (
           <button
             key={t.id}
             type="button"
             onClick={() => setActiveTab(t.id)}
-            className={`min-h-[44px] px-4 py-2 text-sm font-medium border-b-2 shrink-0 touch-manipulation ${
+            className={`min-h-[44px] px-5 py-2.5 text-sm font-medium rounded-full transition-all touch-manipulation ${
               activeTab === t.id
-                ? 'border-accent text-accent'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
+                ? 'bg-[#D4AF37] text-black'
+                : 'bg-zinc-900 text-zinc-400 hover:text-zinc-200 border border-zinc-800'
             }`}
           >
             {t.label}

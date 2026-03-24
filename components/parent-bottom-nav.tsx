@@ -2,31 +2,32 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Dumbbell, CalendarDays, MessageCircle, User } from 'lucide-react';
+import { Home, Dumbbell, ShoppingCart, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useCart } from '@/lib/cart-context';
 
 /**
- * Parent mobile bottom nav. 5 items max.
- * Training = find/book sessions. My bookings = the FULL bookings page: upcoming + past + leave reviews.
- * This link MUST go to /bookings only (never /training or any other page).
+ * Parent mobile bottom nav - 4 core items with gold active states.
+ * Modern app-style navigation: Home, Training, Cart, Account
  */
 const ITEMS = [
   { href: '/dashboard', label: 'Home', icon: Home },
   { href: '/training', label: 'Training', icon: Dumbbell },
-  { href: '/bookings', label: 'My bookings', icon: CalendarDays },
-  { href: '/inbox', label: 'Messages', icon: MessageCircle },
+  { href: '/cart', label: 'Cart', icon: ShoppingCart, showBadge: true },
   { href: '/account', label: 'Account', icon: User },
 ] as const;
 
 export function ParentBottomNav() {
   const pathname = usePathname();
+  const { items: cartItems } = useCart();
+  const cartCount = cartItems.length;
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 pb-[env(safe-area-inset-bottom)] md:hidden"
+      className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around border-t border-border/50 bg-black/95 backdrop-blur-xl supports-[backdrop-filter]:bg-black/90 pb-[env(safe-area-inset-bottom)] md:hidden"
       aria-label="Main navigation"
     >
-      {ITEMS.map(({ href, label, icon: Icon }) => {
+      {ITEMS.map(({ href, label, icon: Icon, showBadge }) => {
         const isActive =
           pathname === href ||
           (href !== '/dashboard' && pathname.startsWith(href));
@@ -34,15 +35,38 @@ export function ParentBottomNav() {
           <Link
             key={href}
             href={href}
-            data-nav={href === '/bookings' ? 'my-bookings' : undefined}
             className={cn(
-              'flex flex-col items-center justify-center min-h-[44px] min-w-0 flex-1 py-2 px-2 touch-manipulation text-[11px] font-medium transition-colors whitespace-nowrap overflow-visible',
-              isActive ? 'text-accent' : 'text-muted-foreground'
+              'relative flex flex-col items-center justify-center min-h-[56px] min-w-0 flex-1 py-2 px-3 touch-manipulation text-[11px] font-medium transition-all duration-200 whitespace-nowrap',
+              isActive 
+                ? 'text-[#D4AF37]' 
+                : 'text-zinc-500 active:text-zinc-400'
             )}
             aria-current={isActive ? 'page' : undefined}
           >
-            <Icon className="h-5 w-5 shrink-0 mb-0.5" aria-hidden />
-            <span className="overflow-visible whitespace-nowrap">{label}</span>
+            <div className="relative">
+              <Icon 
+                className={cn(
+                  "h-6 w-6 shrink-0 transition-transform duration-200",
+                  isActive && "scale-110"
+                )} 
+                strokeWidth={isActive ? 2.5 : 2}
+                aria-hidden 
+              />
+              {showBadge && cartCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-[#D4AF37] text-black text-[10px] font-bold px-1">
+                  {cartCount > 9 ? '9+' : cartCount}
+                </span>
+              )}
+            </div>
+            <span className={cn(
+              "mt-1 transition-all duration-200",
+              isActive ? "opacity-100" : "opacity-70"
+            )}>
+              {label}
+            </span>
+            {isActive && (
+              <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-[#D4AF37] rounded-full" />
+            )}
           </Link>
         );
       })}

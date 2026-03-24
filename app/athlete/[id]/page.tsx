@@ -9,7 +9,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import { ArrowLeft, Star, User, MapPin, Award, Shield, CheckCircle, MessageCircle, DollarSign, Pencil } from 'lucide-react';
+import { ArrowLeft, Star, User, MapPin, Award, Shield, CheckCircle, MessageCircle, DollarSign, Pencil, Calendar, Users, ChevronRight } from 'lucide-react';
+import { formatEST } from '@/lib/format-date';
+import { SessionTypeBadge } from '@/components/session-type-badge';
 import { SchoolLogo } from '@/components/school-logo';
 import { CoachSessionBadge } from '@/components/coach-session-badge';
 import { FollowCoachButton } from '@/components/follow-coach-button';
@@ -165,7 +167,8 @@ export default async function AthleteProfilePage({
   const isParent = userData?.role === 'parent';
   const isAdmin = userData?.role === 'admin';
   const isOwnProfile = !!user && user.id === id && userData?.role === 'coach';
-  const canDelete = isAdmin || isParent || isOwnProfile;
+  // Only admin or own profile can delete/edit - parents should NOT see these buttons
+  const canDelete = isAdmin || isOwnProfile;
   const canEdit = isOwnProfile || isAdmin;
   const athleteName = `${athlete.first_name} ${athlete.last_name}`.trim() || 'This coach';
 
@@ -211,6 +214,28 @@ export default async function AthleteProfilePage({
     });
 
   const rateCardProducts: RateCardItem[] = rateCardFromServices.length > 0 ? rateCardFromServices : rateCardFromProducts;
+
+  // Fetch upcoming public sessions for this coach
+  const nowISO = new Date().toISOString();
+  const { data: upcomingSessions } = await admin
+    .from('sessions')
+    .select(`
+      id,
+      scheduled_datetime,
+      session_type,
+      session_mode,
+      focus_area,
+      current_participants,
+      max_participants,
+      price_per_participant,
+      facilities(name)
+    `)
+    .eq('athlete_id', id)
+    .in('status', ['scheduled', 'pending_payment'])
+    .in('join_policy', ['public'])
+    .gte('scheduled_datetime', nowISO)
+    .order('scheduled_datetime', { ascending: true })
+    .limit(5);
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-5xl">
@@ -380,6 +405,86 @@ export default async function AthleteProfilePage({
                 </li>
               ))}
             </ul>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Upcoming Sessions Section */}
+      {(upcomingSessions ?? []).length > 0 && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Calendar className="h-5 w-5" />
+              Upcoming Sessions
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Open sessions you can join
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {(upcomingSessions ?? []).map((session) => {
+                const s = session as {
+                  id: string;
+                  scheduled_datetime: string;
+                  session_type?: string | null;
+                  session_mode?: string | null;
+                  focus_area?: string | null;
+                  current_participants?: number | null;
+                  max_participants?: number | null;
+                  price_per_participant?: number | null;
+                  facilities?: { name?: string } | { name?: string }[] | null;
+                };
+                const dt = new Date(s.scheduled_datetime);
+                const fac = Array.isArray(s.facilities) ? s.facilities[0] : s.facilities;
+                const current = s.current_participants ?? 0;
+                const max = s.max_participants ?? 1;
+                const openSlots = Math.max(0, max - current);
+                const price = s.price_per_participant;
+                return (
+                  <Link key={s.id} href={`/training?coach=${athlete.id}&tab=sessions`}>
+                    <div className="flex items-center gap-4 p-4 rounded-xl bg-zinc-900/50 border border-zinc-800/50 hover:border-zinc-700 transition-all">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <SessionTypeBadge sessionType={s.session_type ?? null} sessionMode={s.session_mode ?? null} size="sm" />
+                          {s.focus_area && (
+                            <span className="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400">
+                              {s.focus_area}
+                            </span>
+                          )}
+                        </div>
+                        <p className="font-semibold text-foreground">
+                          {formatEST(dt, 'EEE, MMM d')} · {formatEST(dt, 'h:mm a')}
+                        </p>
+                        <div className="flex items-center gap-3 mt-1 text-xs text-zinc-500">
+                          {fac?.name && (
+                            <span className="flex items-center gap-1">
+                              <MapPin className="h-3 w-3" />
+                              {fac.name}
+                            </span>
+                          )}
+                          <span className="flex items-center gap-1">
+                            <Users className="h-3 w-3" />
+                            {openSlots > 0 ? `${openSlots} spot${openSlots !== 1 ? 's' : ''} left` : 'Full'}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end shrink-0">
+                        {price != null && price > 0 && (
+                          <span className="text-lg font-bold text-foreground">${price}</span>
+                        )}
+                        <ChevronRight className="h-5 w-5 text-zinc-500" />
+                      </div>
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+            <Link href={`/training?coach=${athlete.id}&tab=sessions`}>
+              <Button variant="outline" className="w-full mt-4">
+                View all sessions
+              </Button>
+            </Link>
           </CardContent>
         </Card>
       )}
