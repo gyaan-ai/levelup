@@ -29,6 +29,7 @@ export async function PATCH(
     if (userData?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
     const body = (await req.json()) as {
+      session_type?: 'small_group' | 'partner' | 'private';
       focus_area?: string | null;
       focus_area_2?: string | null;
       join_policy?: 'public' | 'private' | 'invite_only';
@@ -57,6 +58,11 @@ export async function PATCH(
     }
 
     const updates: Record<string, unknown> = {};
+    if (body.session_type !== undefined && ['small_group', 'partner', 'private'].includes(body.session_type)) {
+      updates.session_type = body.session_type;
+      // Also update session_mode based on type
+      updates.session_mode = body.session_type === 'private' ? 'private' : 'partner-invite';
+    }
     if (body.focus_area !== undefined) {
       updates.focus_area = body.focus_area === '' || body.focus_area == null
         ? null

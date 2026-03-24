@@ -63,6 +63,7 @@ export function EditSessionForm({
   participantAmountPaidSum = 0,
 }: Props) {
   const router = useRouter();
+  const [sessionTypeState, setSessionTypeState] = useState(sessionType || 'small_group');
   const [focus, setFocus] = useState(focusArea);
   const [focus2, setFocus2] = useState(focusArea2);
   const [join, setJoin] = useState(joinPolicy);
@@ -70,6 +71,22 @@ export function EditSessionForm({
   const [price, setPrice] = useState(String(pricePerParticipant));
   const [date, setDate] = useState(initialDate);
   const [time, setTime] = useState(initialTime);
+  
+  // Session type presets for auto-fill
+  const SESSION_PRESETS = {
+    small_group: { label: 'Small Group', price: 30, maxParticipants: 6 },
+    partner: { label: 'Partner Session', price: 50, maxParticipants: 2 },
+    private: { label: 'Private Session', price: 60, maxParticipants: 1 },
+  } as const;
+
+  const handleSessionTypeChange = (newType: string) => {
+    setSessionTypeState(newType);
+    const preset = SESSION_PRESETS[newType as keyof typeof SESSION_PRESETS];
+    if (preset) {
+      setPrice(String(preset.price));
+      setMax(String(preset.maxParticipants));
+    }
+  };
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [focusAreaList, setFocusAreaList] = useState<string[]>([]);
@@ -132,6 +149,7 @@ export function EditSessionForm({
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          session_type: sessionTypeState,
           focus_area: focus.trim() || null,
           focus_area_2: focus2.trim() || null,
           join_policy: join,
@@ -169,6 +187,25 @@ export function EditSessionForm({
           {error && (
             <p className="text-sm text-destructive">{error}</p>
           )}
+          
+          {/* Session Type Selector */}
+          <div>
+            <Label htmlFor="session-type">Session Type</Label>
+            <Select value={sessionTypeState} onValueChange={handleSessionTypeChange}>
+              <SelectTrigger id="session-type">
+                <SelectValue placeholder="Select session type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="small_group">Small Group ($30/person, up to 6)</SelectItem>
+                <SelectItem value="partner">Partner Session ($50/person, 2 wrestlers)</SelectItem>
+                <SelectItem value="private">Private Session ($60, 1-on-1)</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground mt-1">
+              Changing type will update suggested price and max participants
+            </p>
+          </div>
+          
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="edit-date">Date</Label>
