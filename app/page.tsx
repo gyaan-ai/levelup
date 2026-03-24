@@ -8,9 +8,9 @@ import { CheckCircle, Users, Award, Shield, Search, Star } from 'lucide-react';
 import { HomeHeroLogo } from '@/app/home-hero-logo';
 
 export const metadata = {
-  title: 'The Guild | Elite Wrestling Technique Instruction',
+  title: 'The Wrestling Guild | Access The Elite. Master Technique.',
   description:
-    'Train with NCAA wrestlers and elite coaches in your community for private technique instruction. Master your wrestling through top-level coaching.',
+    'Train with NCAA wrestlers and elite coaches for private technique instruction. Access the elite. Master the details that separate good from great.',
 };
 
 export default async function HomePage() {
@@ -47,71 +47,73 @@ export default async function HomePage() {
 
   return (
     <main>
-      {/* Hero */}
-      <section className="relative bg-black min-h-[90vh] flex items-center overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-black via-black to-gray-900" />
-        {/* Login: use header (gold bar + nav) on mobile — avoid a second pill overlapping the nav Login */}
-        <div className="container mx-auto px-4 py-12 sm:py-20 relative z-10">
-          <div className="max-w-6xl mx-auto">
-            <div className="grid lg:grid-cols-2 gap-12 items-center">
-              <div className="text-center lg:text-left">
-                <div className="mb-4 sm:mb-8">
-                  <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-serif font-bold text-accent mb-4 tracking-wide">
-                    THE GUILD
-                  </h1>
-                  <div className="h-1 w-32 bg-accent mx-auto lg:mx-0" />
-                </div>
-                <p className="text-lg sm:text-xl md:text-2xl text-white font-light tracking-wide mb-4 sm:mb-10 uppercase">
-                  Mastery. Technique. Access the Elite.
-                </p>
-                <p className="text-base sm:text-lg text-white/80 mb-4 sm:mb-12 max-w-xl mx-auto lg:mx-0">
-                  Train with NCAA wrestlers and elite coaches in your community for private technique
-                  instruction. Master the details that separate good from elite.
-                </p>
-                {/* Desktop: extra text link. Mobile: skip — header menu + primary Log in below are enough (avoids 3× login on small screens) */}
-                <p className="hidden md:block text-sm text-white/70 mb-3 sm:mb-4 text-center lg:text-left">
-                  Already have an account?{' '}
-                  <Link href="/login" className="text-accent font-semibold underline underline-offset-2 hover:text-accent/90">
-                    Log in
-                  </Link>
-                </p>
-                <div className="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4 justify-center lg:justify-start">
-                  <Button
-                    size="xl"
-                    variant="premium"
-                    asChild
-                    className="gold-glow-hover w-full sm:w-auto min-w-0 sm:min-w-[140px]"
-                  >
-                    <Link href="/login">Log in</Link>
-                  </Button>
-                  <Button
-                    size="xl"
-                    variant="premium"
-                    asChild
-                    className="gold-glow-hover w-full sm:w-auto min-w-0 sm:min-w-[140px] bg-white/10 text-white border-2 border-accent hover:bg-accent hover:text-black"
-                  >
-                    <Link href="/browse">Browse Elite Coaches</Link>
-                  </Button>
-                  <Button
-                    size="xl"
-                    variant="outline"
-                    asChild
-                    className="w-full sm:w-auto bg-transparent text-white border-accent text-accent hover:bg-accent hover:text-black"
-                  >
-                    <Link href="/signup?role=coach">Coach? Join The Guild</Link>
-                  </Button>
-                  <Button
-                    size="xl"
-                    variant="outline"
-                    asChild
-                    className="w-full sm:w-auto bg-transparent text-white border-white hover:bg-white hover:text-black"
-                  >
-                    <Link href="/#how-it-works">How It Works</Link>
-                  </Button>
-                </div>
-              </div>
-              <div className="relative flex items-center justify-center min-h-[280px] lg:min-h-[360px]">
+      {/* Hero - Museum-like premium aesthetic */}
+      <section className="relative bg-black min-h-[100vh] flex items-center overflow-hidden">
+        <div className="absolute inset-0 bg-black" />
+        <div className="container mx-auto px-4 py-16 sm:py-24 relative z-10">
+          <div className="max-w-5xl mx-auto">
+            {/* Centered logo-first layout */}
+            <div className="flex flex-col items-center text-center">
+              {/* Logo - large and prominent */}
+              <div className="mb-8 sm:mb-12">
                 <HomeHeroLogo src={logoSrc} alt="The Guild — gold G lettermark with wrestlers" />
+              </div>
+              
+              {/* Brand name */}
+              <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-serif font-bold text-accent mb-6 tracking-widest">
+                THE WRESTLING GUILD
+              </h1>
+              
+              {/* Decorative line */}
+              <div className="flex items-center gap-4 mb-8">
+                <div className="h-px w-16 sm:w-24 bg-accent/40" />
+                <div className="h-1.5 w-1.5 bg-accent rounded-full" />
+                <div className="h-px w-16 sm:w-24 bg-accent/40" />
+              </div>
+              
+              {/* Tagline */}
+              <p className="text-base sm:text-lg md:text-xl text-accent font-light tracking-[0.25em] mb-10 sm:mb-14 uppercase">
+                Access The Elite. Master Technique.
+              </p>
+              
+              {/* Subtitle */}
+              <p className="text-base sm:text-lg text-white/70 mb-10 sm:mb-14 max-w-2xl leading-relaxed">
+                Train with NCAA wrestlers and elite coaches for private technique instruction. 
+                Master the details that separate good from elite.
+              </p>
+                {/* CTA Buttons - minimal, centered */}
+              <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
+                <Button
+                  size="xl"
+                  variant="premium"
+                  asChild
+                  className="gold-glow-hover min-w-[180px]"
+                >
+                  <Link href="/browse">Browse Coaches</Link>
+                </Button>
+                <Button
+                  size="xl"
+                  variant="outline"
+                  asChild
+                  className="min-w-[180px] bg-transparent text-accent border-accent hover:bg-accent hover:text-black"
+                >
+                  <Link href="/signup">Get Started</Link>
+                </Button>
+              </div>
+              
+              {/* Secondary links */}
+              <div className="flex flex-wrap items-center justify-center gap-6 text-sm text-white/50">
+                <Link href="/login" className="hover:text-accent transition-colors">
+                  Log in
+                </Link>
+                <span className="hidden sm:inline">|</span>
+                <Link href="/signup?role=coach" className="hover:text-accent transition-colors">
+                  Become a Coach
+                </Link>
+                <span className="hidden sm:inline">|</span>
+                <Link href="/#how-it-works" className="hover:text-accent transition-colors">
+                  How It Works
+                </Link>
               </div>
             </div>
           </div>
