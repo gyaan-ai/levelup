@@ -48,6 +48,8 @@ import {
   ChevronRight,
   Menu,
   X,
+  Trophy,
+  ArrowUpDown,
 } from 'lucide-react';
 import Link from 'next/link';
 import { ProfileImage } from '@/components/profile-image';
@@ -310,6 +312,9 @@ export function AdminDashboardClient({
   const [userRoleFilter, setUserRoleFilter] = useState<string>('all');
   const [userSearch, setUserSearch] = useState('');
   const [athleteSearch, setAthleteSearch] = useState('');
+  const [leaderboardTimeFilter, setLeaderboardTimeFilter] = useState<'all' | '7d' | '30d' | '90d'>('all');
+  const [leaderboardTypeFilter, setLeaderboardTypeFilter] = useState<string>('all');
+  const [leaderboardSort, setLeaderboardSort] = useState<'earnings' | 'sessions' | 'rating' | 'open'>('earnings');
   const [editingAthleteId, setEditingAthleteId] = useState<string | null>(null);
   const hasOpenedEditFromUrl = useRef(false);
   
@@ -472,6 +477,111 @@ export function AdminDashboardClient({
     }
     return true;
   });
+
+  // Compute leaderboard data from sessions
+  const leaderboardData = useMemo(() => {
+    const now = new Date();
+    const cutoff = leaderboardTimeFilter === '7d' 
+      ? new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+      : leaderboardTimeFilter === '30d'
+      ? new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+      : leaderboardTimeFilter === '90d'
+      ? new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
+      : null;
+
+    // Filter sessions by time and type
+    const filteredSess = sessions.filter(s => {
+      if (cutoff && new Date(s.scheduled_datetime) < cutoff) return false;
+      if (leaderboardTypeFilter !== 'all' && s.session_type !== leaderboardTypeFilter) return false;
+      return true;
+    });
+
+    // Aggregate by coach
+    const coachMap = new Map<string, {
+      athlete_id: string;
+      athlete_name: string;
+      school: string;
+      total_earnings: number;
+      session_count: number;
+      completed_count: number;
+      open_count: number;
+      pending_payment_count: number;
+      average_rating: number | null;
+      review_count: number;
+    }>();
+
+    for (const s of filteredSess) {
+      const existing = coachMap.get(s.athlete_id) || {
+        athlete_id: s.athlete_id,
+        athlete_name: s.athlete_name,
+        school: s.athlete_school,
+        total_earnings: 0,
+        session_count: 0,
+        completed_count: 0,
+        open_count: 0,
+        pending_payment_count: 0,
+        average_rating: null,
+        review_count: 0,
+      };
+      
+      existing.session_count += 1;
+      existing.total_earnings += Number(s.athlete_payment) || 0;
+      
+      if (s.status === 'completed') existing.completed_count += 1;
+      if (s.status === 'scheduled') existing.open_count += 1;
+      if (s.status === 'pending_payment') existing.pending_payment_count += 1;
+      
+      coachMap.set(s.athlete_id, existing);
+    }
+
+    // Merge with athlete reports for ratings
+    for (const report of athleteReports) {
+      const existing = coachMap.get(report.athlete_id);
+      if (existing) {
+        existing.average_rating = report.average_rating ?? null;
+        existing.review_count = report.review_count ?? 0;
+      } else if (leaderboardTimeFilter === 'all') {
+        // Include coaches with no sessions in this period only for 'all'
+        coachMap.set(report.athlete_id, {
+          athlete_id: report.athlete_id,
+          athlete_name: report.athlete_name,
+          school: report.school,
+          total_earnings: report.total_earnings,
+          session_count: report.session_count,
+          completed_count: report.completed_count,
+          open_count: 0,
+          pending_payment_count: 0,
+          average_rating: report.average_rating ?? null,
+          review_count: report.review_count ?? 0,
+        });
+      }
+    }
+
+    // Convert to array
+    let result = Array.from(coachMap.values());
+
+    // Apply search filter
+    if (athleteSearch) {
+      const q = athleteSearch.toLowerCase();
+      result = result.filter(a => 
+        a.athlete_name.toLowerCase().includes(q) ||
+        a.school.toLowerCase().includes(q)
+      );
+    }
+
+    // Sort
+    result.sort((a, b) => {
+      switch (leaderboardSort) {
+        case 'earnings': return b.total_earnings - a.total_earnings;
+        case 'sessions': return b.session_count - a.session_count;
+        case 'rating': return (b.average_rating ?? 0) - (a.average_rating ?? 0);
+        case 'open': return b.open_count - a.open_count;
+        default: return 0;
+      }
+    });
+
+    return result;
+  }, [sessions, athleteReports, leaderboardTimeFilter, leaderboardTypeFilter, leaderboardSort, athleteSearch]);
 
   const filteredAthletes = athleteReports.filter((a) => {
     if (!athleteSearch) return true;
@@ -1265,80 +1375,207 @@ export function AdminDashboardClient({
 
     // PEOPLE SECTION
     if (section === 'people') {
-      // Coaches sub-section
+      // Coaches Leaderboard sub-section
       if (subSection === 'coaches') {
+        const totalOpenBookings = leaderboardData.reduce((sum, c) => sum + c.open_count, 0);
+        const totalPendingPayment = leaderboardData.reduce((sum, c) => sum + c.pending_payment_count, 0);
+        const totalEarnings = leaderboardData.reduce((sum, c) => sum + c.total_earnings, 0);
+
         return (
           <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-semibold">Coaches</h2>
-                <p className="text-sm text-muted-foreground">{filteredAthletes.length} coaches</p>
-              </div>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search coaches..."
-                  className="pl-9 w-64"
-                  value={athleteSearch}
-                  onChange={(e) => setAthleteSearch(e.target.value)}
-                />
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-[#B89D60]/10">
+                  <Trophy className="h-5 w-5 text-[#B89D60]" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold">Coach Leaderboard</h2>
+                  <p className="text-sm text-muted-foreground">{leaderboardData.length} coaches</p>
+                </div>
               </div>
             </div>
 
+            {/* Summary Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <Card className="p-4">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Earnings</p>
+                <p className="text-xl font-semibold mt-1 text-[#B89D60]">${totalEarnings.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+              </Card>
+              <Card className="p-4">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Open Bookings</p>
+                <p className="text-xl font-semibold mt-1">{totalOpenBookings}</p>
+              </Card>
+              <Card className="p-4">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Pending Payment</p>
+                <p className="text-xl font-semibold mt-1 text-amber-500">{totalPendingPayment}</p>
+              </Card>
+              <Card className="p-4">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Active Coaches</p>
+                <p className="text-xl font-semibold mt-1">{leaderboardData.filter(c => c.open_count > 0).length}</p>
+              </Card>
+            </div>
+
+            {/* Filters */}
+            <Card className="p-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-muted-foreground uppercase">Time:</span>
+                  <div className="flex items-center rounded-lg border border-border bg-muted/30 p-1">
+                    {(['all', '7d', '30d', '90d'] as const).map((period) => (
+                      <button
+                        key={period}
+                        onClick={() => setLeaderboardTimeFilter(period)}
+                        className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                          leaderboardTimeFilter === period
+                            ? 'bg-[#B89D60] text-black'
+                            : 'text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        {period === 'all' ? 'All Time' : period}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-muted-foreground uppercase">Type:</span>
+                  <Select value={leaderboardTypeFilter} onValueChange={setLeaderboardTypeFilter}>
+                    <SelectTrigger className="w-36 h-9">
+                      <SelectValue placeholder="All types" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Types</SelectItem>
+                      {sessionTypesForFilter.map((t) => (
+                        <SelectItem key={t} value={t}>{t}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-muted-foreground uppercase">Sort:</span>
+                  <Select value={leaderboardSort} onValueChange={(v) => setLeaderboardSort(v as typeof leaderboardSort)}>
+                    <SelectTrigger className="w-36 h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="earnings">Earnings</SelectItem>
+                      <SelectItem value="sessions">Sessions</SelectItem>
+                      <SelectItem value="rating">Rating</SelectItem>
+                      <SelectItem value="open">Open Bookings</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="relative flex-1 min-w-[200px]">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search coaches..."
+                    className="pl-9"
+                    value={athleteSearch}
+                    onChange={(e) => setAthleteSearch(e.target.value)}
+                  />
+                </div>
+              </div>
+            </Card>
+
+            {/* Leaderboard Table */}
             <Card className="overflow-hidden">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead className="bg-muted/50">
                     <tr>
+                      <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider w-10">#</th>
                       <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Coach</th>
                       <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">School</th>
-                      <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Sessions</th>
+                      <th className="text-center py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Rating</th>
+                      <th className="text-center py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Open</th>
+                      <th className="text-center py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Completed</th>
+                      <th className="text-center py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Pending $</th>
                       <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Earnings</th>
-                      <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Rating</th>
                       <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {filteredAthletes.map((a) => (
-                      <tr key={a.athlete_id} className="hover:bg-muted/30 transition-colors">
-                        <td className="py-3 px-4 font-medium">{a.athlete_name}</td>
-                        <td className="py-3 px-4 text-muted-foreground">{a.school}</td>
-                        <td className="py-3 px-4 text-right tabular-nums">{a.session_count}</td>
-                        <td className="py-3 px-4 text-right tabular-nums font-medium">${a.total_earnings.toFixed(2)}</td>
-                        <td className="py-3 px-4 text-right">
-                          {a.average_rating ? (
-                            <div className="flex items-center justify-end gap-1">
-                              <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
-                              <span>{a.average_rating.toFixed(1)}</span>
-                              <span className="text-muted-foreground text-xs">({a.review_count})</span>
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground">-</span>
-                          )}
-                        </td>
-                        <td className="py-3 px-4 text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <Button variant="ghost" size="sm" className="h-8" onClick={() => openAthleteEdit(a.athlete_id)}>
-                              <Pencil className="h-3.5 w-3.5" />
-                            </Button>
-                            <Link href={`/coaches/${a.athlete_id}`} target="_blank">
-                              <Button variant="ghost" size="sm" className="h-8">
-                                <ExternalLink className="h-3.5 w-3.5" />
-                              </Button>
-                            </Link>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 text-red-500 hover:text-red-400"
-                              disabled={deactivatingId === a.athlete_id}
-                              onClick={() => handleDeactivateAthlete(a.athlete_id)}
-                            >
-                              {deactivatingId === a.athlete_id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserX className="h-3.5 w-3.5" />}
-                            </Button>
-                          </div>
+                    {leaderboardData.length === 0 ? (
+                      <tr>
+                        <td colSpan={9} className="py-12 text-center text-muted-foreground">
+                          <Trophy className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
+                          <p>No coaches found</p>
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      leaderboardData.map((a, idx) => (
+                        <tr key={a.athlete_id} className="hover:bg-muted/30 transition-colors">
+                          <td className="py-3 px-4">
+                            {idx < 3 ? (
+                              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                                idx === 0 ? 'bg-[#B89D60] text-black' :
+                                idx === 1 ? 'bg-gray-400 text-black' :
+                                'bg-amber-700 text-white'
+                              }`}>
+                                {idx + 1}
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground pl-1.5">{idx + 1}</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 font-medium">{a.athlete_name}</td>
+                          <td className="py-3 px-4 text-muted-foreground">{a.school}</td>
+                          <td className="py-3 px-4 text-center">
+                            {a.average_rating ? (
+                              <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-amber-500/10">
+                                <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
+                                <span className="font-medium">{a.average_rating.toFixed(1)}</span>
+                                <span className="text-muted-foreground text-xs">({a.review_count})</span>
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            {a.open_count > 0 ? (
+                              <Badge variant="outline" className="border-emerald-600 bg-emerald-600/20 text-emerald-400">{a.open_count}</Badge>
+                            ) : (
+                              <span className="text-muted-foreground">0</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-center tabular-nums">{a.completed_count}</td>
+                          <td className="py-3 px-4 text-center">
+                            {a.pending_payment_count > 0 ? (
+                              <Badge variant="outline" className="border-amber-500 bg-amber-500/20 text-amber-400">{a.pending_payment_count}</Badge>
+                            ) : (
+                              <span className="text-muted-foreground">0</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-right tabular-nums font-semibold text-[#B89D60]">
+                            ${a.total_earnings.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <Button variant="ghost" size="sm" className="h-8" onClick={() => openAthleteEdit(a.athlete_id)}>
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                              <Link href={`/coaches/${a.athlete_id}`} target="_blank">
+                                <Button variant="ghost" size="sm" className="h-8">
+                                  <ExternalLink className="h-3.5 w-3.5" />
+                                </Button>
+                              </Link>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 text-red-500 hover:text-red-400"
+                                disabled={deactivatingId === a.athlete_id}
+                                onClick={() => handleDeactivateAthlete(a.athlete_id)}
+                              >
+                                {deactivatingId === a.athlete_id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserX className="h-3.5 w-3.5" />}
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
