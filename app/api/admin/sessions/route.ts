@@ -35,6 +35,7 @@ export async function POST(req: NextRequest) {
       maxParticipants?: number;
       pricePerParticipant?: number;
       sessionType?: 'small_group' | 'partner' | 'private';
+      joinPolicy?: 'public' | 'invite_only' | 'private';
       focusArea?: string;
       focusArea2?: string;
     };
@@ -47,6 +48,7 @@ export async function POST(req: NextRequest) {
       maxParticipants = 8,
       pricePerParticipant: bodyPrice,
       sessionType = 'small_group',
+      joinPolicy = 'public',
       focusArea,
       focusArea2,
     } = body;
@@ -132,7 +134,7 @@ export async function POST(req: NextRequest) {
         // Map UI values to DB constraint values: '1-on-1', '2-athlete', 'group'
         session_type: sessionType === 'small_group' ? 'group' : sessionType === 'partner' ? '2-athlete' : '1-on-1',
         session_mode: sessionType === 'private' ? 'private' : 'partner-invite',
-        join_policy: 'public',
+        join_policy: joinPolicy,
         partner_invite_code: code,
         max_participants: max,
         current_participants: 0,

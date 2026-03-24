@@ -39,6 +39,7 @@ export function CreateSessionForm({
   facilities: Facility[];
 }) {
   const [sessionType, setSessionType] = useState<SessionTypeKey>('small_group');
+  const [joinPolicy, setJoinPolicy] = useState<'public' | 'invite_only' | 'private'>('public');
   const [athleteId, setAthleteId] = useState('');
   const [facilityId, setFacilityId] = useState('');
   // Support multiple dates
@@ -129,6 +130,7 @@ export function CreateSessionForm({
             maxParticipants,
             pricePerParticipant,
             sessionType,
+            joinPolicy,
             focusArea: focusArea || undefined,
             focusArea2: focusArea2 || undefined,
           }),
@@ -249,6 +251,26 @@ export function CreateSessionForm({
               </Select>
               <p className="text-xs text-muted-foreground mt-1">
                 Auto-fills suggested price (${SESSION_PRESETS[sessionType].price}) - you can change it below
+              </p>
+            </div>
+
+            {/* Who Can Join */}
+            <div>
+              <Label htmlFor="joinPolicy">Who Can Join</Label>
+              <Select value={joinPolicy} onValueChange={(v) => setJoinPolicy(v as typeof joinPolicy)}>
+                <SelectTrigger id="joinPolicy">
+                  <SelectValue placeholder="Select who can join" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="public">Anyone — Open registration, visible in Browse Training</SelectItem>
+                  <SelectItem value="invite_only">Invite Only — Visible in Browse Training, need invite link to register</SelectItem>
+                  <SelectItem value="private">Hidden — Not shown publicly, only you can add wrestlers</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                {joinPolicy === 'public' && 'Session shows in Browse Training and anyone can book.'}
+                {joinPolicy === 'invite_only' && 'Session shows but only people with the invite link can register.'}
+                {joinPolicy === 'private' && 'Session hidden from public. Only you can add wrestlers.'}
               </p>
             </div>
 
