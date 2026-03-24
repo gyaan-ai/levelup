@@ -4,18 +4,19 @@
 
 @layer base {
   :root {
-    --guild-black: #0A0A0A;
-    /* Hall of Fame Bronze palette - aged, muted, antique */
-    --guild-gold: #A8935D;
-    --guild-gold-dark: #8B7A4E;
-    --guild-gold-light: #C4AE72;
+    /* Hall of Fame Navy + Gold palette */
+    --guild-navy: #0A1628;
+    --guild-navy-light: #121F33;
+    --guild-gold: #C9A227;
+    --guild-gold-dark: #A68923;
+    --guild-gold-light: #D4B84A;
 
-    --primary: var(--guild-black);
+    --primary: var(--guild-navy);
     --accent: var(--guild-gold);
     --accent-hover: var(--guild-gold-dark);
 
     /* App-wide dark theme with gold accents */
-    --background: 0 0% 7%;
+    --background: 220 50% 10%;
     --foreground: 0 0% 95%;
     --card: 0 0% 11%;
     --card-foreground: 0 0% 95%;
@@ -42,7 +43,7 @@
   }
 
   .dark {
-    --background: 0 0% 7%;
+    --background: 220 50% 10%;
     --foreground: 0 0% 95%;
     --card: 0 0% 11%;
     --card-foreground: 0 0% 95%;
@@ -112,15 +113,15 @@
 }
 
 .gold-glow {
-  box-shadow: 0 0 20px rgba(184, 157, 96, 0.4);
+  box-shadow: 0 0 20px rgba(201, 162, 39, 0.4);
 }
 
 .gold-glow-hover:hover {
-  box-shadow: 0 0 30px rgba(184, 157, 96, 0.6);
+  box-shadow: 0 0 30px rgba(201, 162, 39, 0.6);
 }
 
 .gold-shimmer {
-  background: linear-gradient(90deg, #9A8550 0%, #B89D60 50%, #C9B078 100%);
+  background: linear-gradient(90deg, #A68923 0%, #C9A227 50%, #D4B84A 100%);
   background-size: 200% auto;
   animation: shimmer 3s linear infinite;
 }

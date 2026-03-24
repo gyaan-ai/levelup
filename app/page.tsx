@@ -46,29 +46,40 @@ export default async function HomePage() {
   }
 
   return (
-    <main className="bg-black min-h-screen">
+    <main className="min-h-screen" style={{ backgroundColor: '#0A1628' }}>
       {/* Hero - Full screen, mobile-first, Hall of Fame aesthetic */}
-      <section className="relative min-h-[100svh] flex flex-col items-center justify-center px-6 py-12">
+      <section 
+        className="relative min-h-[100svh] flex flex-col items-center justify-center px-6 py-12"
+        style={{ 
+          backgroundColor: '#0A1628',
+          border: '4px solid #C9A227',
+          borderTop: 'none'
+        }}
+      >
+        {/* Decorative gold frame corners */}
+        <div className="absolute top-0 left-0 w-8 h-8 border-t-4 border-l-4 border-accent" />
+        <div className="absolute top-0 right-0 w-8 h-8 border-t-4 border-r-4 border-accent" />
+        
         {/* Logo */}
-        <div className="mb-4">
+        <div className="mb-6">
           <HomeHeroLogo src={logoSrc} alt="The Wrestling Guild" />
         </div>
         
         {/* Brand */}
-        <h1 className="text-2xl sm:text-3xl md:text-4xl font-serif font-black text-accent tracking-[0.12em] uppercase text-center mb-2">
-          The Wrestling Guild
+        <h1 className="text-3xl sm:text-4xl md:text-5xl font-serif font-black text-accent tracking-[0.08em] uppercase text-center mb-3">
+          The Guild
         </h1>
         
         {/* Decorative line */}
-        <div className="flex items-center gap-2 mb-3">
-          <div className="h-px w-8 bg-accent/40" />
-          <div className="h-1 w-1 bg-accent rounded-full" />
-          <div className="h-px w-8 bg-accent/40" />
+        <div className="flex items-center gap-3 mb-4">
+          <div className="h-px w-12 bg-accent/60" />
+          <div className="h-1.5 w-1.5 bg-accent rounded-full" />
+          <div className="h-px w-12 bg-accent/60" />
         </div>
         
         {/* Tagline */}
-        <p className="text-xs sm:text-sm text-accent/80 font-medium tracking-[0.2em] uppercase mb-8">
-          Access The Elite. Master Technique.
+        <p className="text-sm sm:text-base text-accent font-medium tracking-[0.15em] uppercase mb-10">
+          Mastery &bull; Technique &bull; Access The Elite
         </p>
         
         {/* Single Primary CTA */}
@@ -76,7 +87,7 @@ export default async function HomePage() {
           size="lg"
           variant="premium"
           asChild
-          className="gold-glow-hover w-full max-w-[280px] text-base py-6"
+          className="gold-glow-hover w-full max-w-[280px] text-base py-6 border-2 border-accent"
         >
           <Link href="/browse">Find Training</Link>
         </Button>
@@ -84,20 +95,20 @@ export default async function HomePage() {
         {/* Secondary link */}
         <Link 
           href="/login" 
-          className="mt-4 text-sm text-white/50 hover:text-accent transition-colors"
+          className="mt-5 text-sm text-accent/60 hover:text-accent transition-colors"
         >
           Already have an account? Log in
         </Link>
         
         {/* Scroll indicator */}
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
-          <ChevronDown className="h-6 w-6 text-white/30" />
+          <ChevronDown className="h-6 w-6 text-accent/40" />
         </div>
       </section>
 
       {/* Social Proof - Parents trust us */}
       {featuredReviews.length > 0 && (
-        <section className="bg-black border-t border-white/10 py-12 px-6">
+        <section className="py-12 px-6 border-t border-accent/20" style={{ backgroundColor: '#0A1628' }}>
           <p className="text-center text-xs text-white/40 uppercase tracking-widest mb-6">
             What Parents Say
           </p>
@@ -123,7 +134,7 @@ export default async function HomePage() {
       )}
 
       {/* How It Works - 3 simple steps, training-focused */}
-      <section id="how-it-works" className="bg-black border-t border-white/10 py-12 px-6">
+      <section id="how-it-works" className="py-12 px-6 border-t border-accent/20" style={{ backgroundColor: '#0A1628' }}>
         <p className="text-center text-xs text-white/40 uppercase tracking-widest mb-8">
           How It Works
         </p>
@@ -170,7 +181,7 @@ export default async function HomePage() {
       </section>
 
       {/* For Coaches - minimal footer-style */}
-      <section className="bg-black border-t border-white/10 py-10 px-6">
+      <section className="py-10 px-6 border-t border-accent/20" style={{ backgroundColor: '#0A1628' }}>
         <div className="max-w-sm mx-auto text-center">
           <p className="text-white/60 text-sm mb-3">
             NCAA wrestler or elite coach?
