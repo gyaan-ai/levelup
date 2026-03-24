@@ -659,12 +659,6 @@ export function AdminDashboardClient({
       return true;
     });
 
-    // Debug: log financeData filter results
-    console.log('[v0] financeData - sessions after filter:', filteredSess.length);
-    console.log('[v0] financeData - sum of participant_amount_paid_sum:', filteredSess.reduce((sum, s) => sum + (Number(s.participant_amount_paid_sum) || 0), 0));
-    console.log('[v0] financeData - financeTimeFilter:', financeTimeFilter);
-    console.log('[v0] financeData - financeTypeFilter:', financeTypeFilter);
-
     // Calculate aggregates
     // athlete_payment is the SOURCE OF TRUTH for what goes to coaches
     // (already accounts for discounts, family codes, special deals, etc.)
@@ -718,7 +712,6 @@ export function AdminDashboardClient({
     }
 
     const grossRevenue = stripeRevenue + cashRevenue;
-    console.log('[v0] financeData - stripeRevenue:', stripeRevenue, 'cashRevenue:', cashRevenue, 'grossRevenue:', grossRevenue);
     // Guild Net = what's left after paying coaches (Gross - Coach Payouts)
     const guildNet = grossRevenue - coachPayoutsTotal;
     // Stripe fees only apply to Stripe transactions (~2.9% + $0.30 per transaction)
@@ -1042,19 +1035,19 @@ export function AdminDashboardClient({
                 <div className="space-y-4">
                   <div className="flex items-center justify-between py-2 border-b border-border">
                     <span className="text-sm text-muted-foreground">Gross Revenue</span>
-                    <span className="text-sm font-medium">${billing.totalRevenue.toFixed(2)}</span>
+                    <span className="text-sm font-medium">${financeData.grossRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </div>
                   <div className="flex items-center justify-between py-2 border-b border-border">
                     <span className="text-sm text-muted-foreground">Coach Payments</span>
-                    <span className="text-sm font-medium text-red-400">-${billing.totalAthletePayments.toFixed(2)}</span>
+                    <span className="text-sm font-medium text-red-400">-${financeData.coachPayouts.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </div>
                   <div className="flex items-center justify-between py-2 border-b border-border">
-                    <span className="text-sm text-muted-foreground">Stripe Fees</span>
-                    <span className="text-sm font-medium text-red-400">-${billing.totalStripeFees.toFixed(2)}</span>
+                    <span className="text-sm text-muted-foreground">Stripe Fees <span className="text-xs text-amber-500">(est.)</span></span>
+                    <span className="text-sm font-medium text-red-400">-${financeData.stripeFees.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </div>
                   <div className="flex items-center justify-between py-2">
                     <span className="text-sm font-medium">Net Profit</span>
-                    <span className="text-lg font-semibold text-[#B89D60]">${billing.totalOrgFees.toFixed(2)}</span>
+                    <span className={`text-lg font-semibold ${financeData.guildProfit >= 0 ? 'text-[#B89D60]' : 'text-red-500'}`}>${financeData.guildProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </div>
                 </div>
               </CardContent>
