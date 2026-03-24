@@ -16,7 +16,7 @@ export default async function HomePage() {
   const headersList = await headers();
   const host = headersList.get('host') || '';
   const tenant = getTenantByDomain(host);
-  const logoSrc = tenant?.logo ?? '/logos/guild-logo-hq.jpg';
+  const logoSrc = tenant?.logo ?? '/logos/guild-bronze.jpg';
 
   // Fetch reviews for social proof
   let featuredReviews: { id: string; rating: number; comment: string | null; coach_name: string }[] = [];
@@ -78,7 +78,7 @@ export default async function HomePage() {
           asChild
           className="gold-glow-hover w-full max-w-[280px] text-base py-6"
         >
-          <Link href="/browse">Find a Coach</Link>
+          <Link href="/browse">Find Training</Link>
         </Button>
         
         {/* Secondary link */}
@@ -122,7 +122,7 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* How It Works - 3 simple steps */}
+      {/* How It Works - 3 simple steps, training-focused */}
       <section id="how-it-works" className="bg-black border-t border-white/10 py-12 px-6">
         <p className="text-center text-xs text-white/40 uppercase tracking-widest mb-8">
           How It Works
@@ -133,8 +133,8 @@ export default async function HomePage() {
               <span className="text-accent font-bold text-sm">1</span>
             </div>
             <div>
-              <h3 className="text-white font-semibold mb-1">Browse Coaches</h3>
-              <p className="text-white/60 text-sm">NCAA athletes and elite coaches from top programs.</p>
+              <h3 className="text-white font-semibold mb-1">Find Training</h3>
+              <p className="text-white/60 text-sm">Browse private sessions and small groups near you.</p>
             </div>
           </div>
           <div className="flex items-start gap-4">
@@ -142,8 +142,8 @@ export default async function HomePage() {
               <span className="text-accent font-bold text-sm">2</span>
             </div>
             <div>
-              <h3 className="text-white font-semibold mb-1">Book a Session</h3>
-              <p className="text-white/60 text-sm">Private or small group. Pick a time that works.</p>
+              <h3 className="text-white font-semibold mb-1">Book & Pay</h3>
+              <p className="text-white/60 text-sm">Reserve your spot. Secure checkout.</p>
             </div>
           </div>
           <div className="flex items-start gap-4">
@@ -151,8 +151,8 @@ export default async function HomePage() {
               <span className="text-accent font-bold text-sm">3</span>
             </div>
             <div>
-              <h3 className="text-white font-semibold mb-1">Master Technique</h3>
-              <p className="text-white/60 text-sm">Train at elite facilities. See real improvement.</p>
+              <h3 className="text-white font-semibold mb-1">Train & Improve</h3>
+              <p className="text-white/60 text-sm">Elite instruction at top facilities. Real results.</p>
             </div>
           </div>
         </div>
@@ -164,7 +164,7 @@ export default async function HomePage() {
             asChild
             className="w-full max-w-[280px]"
           >
-            <Link href="/browse">Find a Coach</Link>
+            <Link href="/browse">Find Training</Link>
           </Button>
         </div>
       </section>
