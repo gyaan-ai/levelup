@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -146,9 +147,17 @@ export function CreateSessionForm({
             <p className="text-xs text-muted-foreground">
               Share this link with parents. They can open it, sign in, choose their wrestler, and join the session.
             </p>
-            <Button variant="ghost" onClick={() => setResult(null)}>
-              Create another session
-            </Button>
+            <div className="flex flex-wrap gap-2 pt-1">
+              <Button asChild variant="default" size="sm">
+                <Link href="/admin?tab=sessions">View in Admin → Sessions</Link>
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setResult(null)}>
+                Create another session
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              If the new row doesn’t appear yet, open Sessions and click <strong className="text-foreground">Refresh list</strong>.
+            </p>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">

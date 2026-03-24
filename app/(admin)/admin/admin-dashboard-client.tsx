@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -51,7 +51,9 @@ import {
 import Link from 'next/link';
 import { ProfileImage } from '@/components/profile-image';
 import { CapacityBadge } from '@/components/capacity-badge';
-import { formatEST } from '@/lib/format-date';
+import { formatEST, APP_TIMEZONE } from '@/lib/format-date';
+import { formatInTimeZone, toZonedTime } from 'date-fns-tz';
+import { startOfWeek, endOfWeek, addWeeks } from 'date-fns';
 import { CopySessionPhonesButton } from '@/components/copy-session-phones-button';
 import { CoachTextGroupDialog } from '@/components/coach-text-group-dialog';
 import { AdminCockpitView } from './admin-cockpit-view';
@@ -59,6 +61,7 @@ import { showSessionSmsCopyAndTextGroup } from '@/lib/session-sms-tools';
 
 export type AdminSession = {
   id: string;
+  athlete_id: string;
   scheduled_datetime: string;
   status: string;
   total_price: number;
@@ -168,6 +171,10 @@ export function AdminDashboardClient({
   }, [payoutListKey]);
   const [sessionDateFrom, setSessionDateFrom] = useState('');
   const [sessionDateTo, setSessionDateTo] = useState('');
+  /** scheduled | pending_payment */
+  const [sessionStatusFilter, setSessionStatusFilter] = useState<'all' | 'open' | 'completed' | 'cancelled_other'>('all');
+  const [sessionTypeFilter, setSessionTypeFilter] = useState<string>('all');
+  const [sessionCoachFilter, setSessionCoachFilter] = useState<string>('all');
   const [copiedSessionId, setCopiedSessionId] = useState<string | null>(null);
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
   const [sessionDeleteLoading, setSessionDeleteLoading] = useState(false);
@@ -239,12 +246,78 @@ export function AdminDashboardClient({
   const [kidsLoading, setKidsLoading] = useState(false);
   const [linkingKidId, setLinkingKidId] = useState<string | null>(null);
 
-  const filteredSessions = sessions.filter((s) => {
-    const d = s.scheduled_datetime.slice(0, 10);
-    if (sessionDateFrom && d < sessionDateFrom) return false;
-    if (sessionDateTo && d > sessionDateTo) return false;
-    return true;
-  });
+  const setPresetThisWeek = () => {
+    const z = toZonedTime(new Date(), APP_TIMEZONE);
+    const start = startOfWeek(z, { weekStartsOn: 0 });
+    const end = endOfWeek(z, { weekStartsOn: 0 });
+    setSessionDateFrom(formatInTimeZone(start, APP_TIMEZONE, 'yyyy-MM-dd'));
+    setSessionDateTo(formatInTimeZone(end, APP_TIMEZONE, 'yyyy-MM-dd'));
+  };
+
+  const setPresetNextWeek = () => {
+    const z = toZonedTime(addWeeks(new Date(), 1), APP_TIMEZONE);
+    const start = startOfWeek(z, { weekStartsOn: 0 });
+    const end = endOfWeek(z, { weekStartsOn: 0 });
+    setSessionDateFrom(formatInTimeZone(start, APP_TIMEZONE, 'yyyy-MM-dd'));
+    setSessionDateTo(formatInTimeZone(end, APP_TIMEZONE, 'yyyy-MM-dd'));
+  };
+
+  const clearSessionFilters = () => {
+    setSessionDateFrom('');
+    setSessionDateTo('');
+    setSessionStatusFilter('all');
+    setSessionTypeFilter('all');
+    setSessionCoachFilter('all');
+  };
+
+  const sessionTypesForFilter = useMemo(() => {
+    const set = new Set<string>();
+    for (const s of sessions) {
+      const t = s.session_type?.trim();
+      if (t) set.add(t);
+    }
+    return [...set].sort();
+  }, [sessions]);
+
+  const coachesForFilter = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const s of sessions) {
+      const id = s.athlete_id?.trim();
+      if (id) map.set(id, s.athlete_name);
+    }
+    return [...map.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+  }, [sessions]);
+
+  const filteredSessions = useMemo(() => {
+    const sessionDateKeyLocal = (iso: string) =>
+      formatInTimeZone(new Date(iso), APP_TIMEZONE, 'yyyy-MM-dd');
+    return sessions.filter((s) => {
+      const d = sessionDateKeyLocal(s.scheduled_datetime);
+      if (sessionDateFrom && d < sessionDateFrom) return false;
+      if (sessionDateTo && d > sessionDateTo) return false;
+
+      if (sessionStatusFilter === 'open') {
+        if (s.status !== 'scheduled' && s.status !== 'pending_payment') return false;
+      } else if (sessionStatusFilter === 'completed') {
+        if (s.status !== 'completed') return false;
+      } else if (sessionStatusFilter === 'cancelled_other') {
+        if (s.status === 'scheduled' || s.status === 'pending_payment' || s.status === 'completed') return false;
+      }
+
+      if (sessionTypeFilter !== 'all' && (s.session_type ?? '') !== sessionTypeFilter) return false;
+
+      if (sessionCoachFilter !== 'all' && s.athlete_id !== sessionCoachFilter) return false;
+
+      return true;
+    });
+  }, [
+    sessions,
+    sessionDateFrom,
+    sessionDateTo,
+    sessionStatusFilter,
+    sessionTypeFilter,
+    sessionCoachFilter,
+  ]);
 
   const filteredUsers = users.filter((u) => {
     if (userRoleFilter !== 'all' && u.role !== userRoleFilter) return false;
@@ -480,20 +553,29 @@ export function AdminDashboardClient({
       {tab === 'sessions' && (
         <Card>
           <CardHeader>
-            <CardTitle>All privates by date</CardTitle>
+            <CardTitle>All sessions</CardTitle>
             <CardDescription>
-              All sessions (newest first). Use &quot;Copy link&quot; for the join URL. For group-style sessions with signups, use{' '}
-              <strong className="text-foreground">Copy Cell #s</strong> (paste into your phone) or <strong className="text-foreground">Text group</strong> (Twilio), same as coaches.
+              Newest first ({sessions.length} loaded). Dates use {APP_TIMEZONE.replace('_', ' ')}. After creating a session, use{' '}
+              <strong className="text-foreground">Refresh</strong> if the list looks stale. Use &quot;Copy link&quot; for join URLs; for groups use{' '}
+              <strong className="text-foreground">Copy Cell #s</strong> or <strong className="text-foreground">Text group</strong>.
             </CardDescription>
-            <div className="flex flex-wrap gap-4 pt-2 items-center">
+            <div className="flex flex-wrap gap-3 pt-3 items-center">
               <Link href="/admin/sessions/create">
                 <Button size="sm" className="gap-2">
                   <Plus className="h-4 w-4" />
                   Add session
                 </Button>
               </Link>
+              <Button type="button" variant="outline" size="sm" className="gap-2" onClick={() => router.refresh()}>
+                Refresh list
+              </Button>
+              <span className="text-sm text-muted-foreground">
+                Showing {filteredSessions.length} of {sessions.length}
+              </span>
+            </div>
+            <div className="flex flex-wrap gap-3 pt-2 items-end">
               <div className="flex items-center gap-2">
-                <label className="text-sm text-muted-foreground">From</label>
+                <label className="text-sm text-muted-foreground whitespace-nowrap">From</label>
                 <Input
                   type="date"
                   value={sessionDateFrom}
@@ -502,7 +584,7 @@ export function AdminDashboardClient({
                 />
               </div>
               <div className="flex items-center gap-2">
-                <label className="text-sm text-muted-foreground">To</label>
+                <label className="text-sm text-muted-foreground whitespace-nowrap">To</label>
                 <Input
                   type="date"
                   value={sessionDateTo}
@@ -510,9 +592,63 @@ export function AdminDashboardClient({
                   className="w-40"
                 />
               </div>
-              <span className="text-sm text-muted-foreground">
-                Showing {filteredSessions.length} of {sessions.length} sessions
-              </span>
+              <Button type="button" variant="secondary" size="sm" onClick={setPresetThisWeek}>
+                This week
+              </Button>
+              <Button type="button" variant="secondary" size="sm" onClick={setPresetNextWeek}>
+                Next week
+              </Button>
+              <Button type="button" variant="ghost" size="sm" onClick={clearSessionFilters}>
+                Clear filters
+              </Button>
+            </div>
+            <div className="flex flex-wrap gap-3 pt-2 items-end">
+              <div className="space-y-1 min-w-[140px]">
+                <label className="text-xs font-medium text-muted-foreground">Status</label>
+                <Select value={sessionStatusFilter} onValueChange={(v) => setSessionStatusFilter(v as typeof sessionStatusFilter)}>
+                  <SelectTrigger className="w-[180px] h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All statuses</SelectItem>
+                    <SelectItem value="open">Open (scheduled / pending payment)</SelectItem>
+                    <SelectItem value="completed">Completed</SelectItem>
+                    <SelectItem value="cancelled_other">Cancelled / no-show / other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1 min-w-[140px]">
+                <label className="text-xs font-medium text-muted-foreground">Session type</label>
+                <Select value={sessionTypeFilter} onValueChange={setSessionTypeFilter}>
+                  <SelectTrigger className="w-[200px] h-9">
+                    <SelectValue placeholder="All types" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All types</SelectItem>
+                    {sessionTypesForFilter.map((t) => (
+                      <SelectItem key={t} value={t}>
+                        {t}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1 min-w-[160px]">
+                <label className="text-xs font-medium text-muted-foreground">Coach</label>
+                <Select value={sessionCoachFilter} onValueChange={setSessionCoachFilter}>
+                  <SelectTrigger className="w-[min(100%,240px)] h-9">
+                    <SelectValue placeholder="All coaches" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All coaches</SelectItem>
+                    {coachesForFilter.map(([id, name]) => (
+                      <SelectItem key={id} value={id}>
+                        {name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -537,7 +673,7 @@ export function AdminDashboardClient({
                   {filteredSessions.length === 0 ? (
                     <tr>
                       <td colSpan={11} className="py-8 text-center text-muted-foreground">
-                        No sessions match filters. Clear date filters to see all.
+                        No sessions match these filters. Click &quot;Clear filters&quot; or &quot;Refresh list&quot;.
                       </td>
                     </tr>
                   ) : (

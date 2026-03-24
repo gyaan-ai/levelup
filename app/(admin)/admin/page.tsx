@@ -1,5 +1,9 @@
 import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
+
+/** Always show latest sessions after creating/editing (avoid cached RSC missing new rows). */
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
@@ -85,7 +89,8 @@ export default async function AdminPage() {
         facilities(id, name),
         session_participants(amount_paid)
       `)
-      .order('scheduled_datetime', { ascending: false }),
+      .order('scheduled_datetime', { ascending: false })
+      .limit(10000),
     admin
       .from('users')
       .select('id, email, role, created_at, last_login_at')
@@ -170,6 +175,7 @@ export default async function AdminPage() {
     const fo = Array.isArray(f) ? f[0] : f;
     return {
       id: s.id,
+      athlete_id: s.athlete_id ?? '',
       scheduled_datetime: s.scheduled_datetime,
       status: s.status,
       total_price: Number(s.total_price ?? 0),
