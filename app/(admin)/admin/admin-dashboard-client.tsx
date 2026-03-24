@@ -1560,58 +1560,83 @@ export function AdminDashboardClient({
             </div>
           </Card>
 
-          {/* Hero KPIs - Revenue Split: Coach 83.3%, Guild 16.7% */}
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-            <Card className="p-4 bg-gradient-to-br from-[#B89D60]/10 to-transparent border-[#B89D60]/20">
-              <div className="flex items-center gap-2 mb-1">
-                <DollarSign className="h-4 w-4 text-[#B89D60]" />
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Collected</p>
+          {/* Financial Summary */}
+          <Card className="p-6">
+            <h3 className="text-sm font-semibold mb-4 text-muted-foreground uppercase tracking-wider">Revenue Breakdown</h3>
+            <div className="space-y-4">
+              {/* Gross Revenue */}
+              <div className="flex items-center justify-between py-2 border-b border-border">
+                <div className="flex items-center gap-3">
+                  <DollarSign className="h-5 w-5 text-[#B89D60]" />
+                  <div>
+                    <p className="font-medium">Gross Revenue</p>
+                    <p className="text-xs text-muted-foreground">Total collected from parents (Stripe + Cash)</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-xl font-bold">${financeData.grossRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                  <div className="flex gap-2 text-xs text-muted-foreground">
+                    <span>Stripe: ${financeData.stripeRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    {financeData.cashRevenue > 0 && (
+                      <span className="text-emerald-500">Cash: ${financeData.cashRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    )}
+                  </div>
+                </div>
               </div>
-              <p className="text-2xl font-bold">${financeData.grossRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-              <div className="flex gap-2 mt-1">
-                <p className="text-xs text-muted-foreground">Stripe: ${financeData.stripeRevenue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
-                {financeData.cashRevenue > 0 && (
-                  <p className="text-xs text-emerald-500">Cash: ${financeData.cashRevenue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
-                )}
-              </div>
-            </Card>
-            
-            <Card className="p-4">
-              <div className="flex items-center gap-2 mb-1">
-                <Wallet className="h-4 w-4 text-blue-500" />
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Coach Payouts</p>
-              </div>
-              <p className="text-2xl font-bold text-blue-400">${financeData.coachPayouts.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-              <p className="text-xs text-muted-foreground mt-1">From athlete_payment</p>
-            </Card>
-            
-            <Card className="p-4 bg-gradient-to-br from-emerald-500/10 to-transparent border-emerald-500/20">
-              <div className="flex items-center gap-2 mb-1">
-                <TrendingUp className="h-4 w-4 text-emerald-500" />
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Guild Net</p>
-              </div>
-              <p className="text-2xl font-bold text-emerald-500">${financeData.guildNet.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-              <p className="text-xs text-muted-foreground mt-1">Gross - Coach Payouts</p>
-            </Card>
-            
-            <Card className="p-4">
-              <div className="flex items-center gap-2 mb-1">
-                <CreditCard className="h-4 w-4 text-red-400" />
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Stripe Fees</p>
-              </div>
-              <p className="text-2xl font-bold text-red-400">${financeData.stripeFees.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-              <p className="text-xs text-muted-foreground mt-1">~2.9% + $0.30</p>
-            </Card>
 
-            <Card className="p-4 bg-gradient-to-br from-[#B89D60]/5 to-transparent">
-              <div className="flex items-center gap-2 mb-1">
-                <TrendingUp className="h-4 w-4 text-[#B89D60]" />
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Guild Profit</p>
+              {/* Coach Payouts */}
+              <div className="flex items-center justify-between py-2 border-b border-border">
+                <div className="flex items-center gap-3">
+                  <Wallet className="h-5 w-5 text-blue-500" />
+                  <div>
+                    <p className="font-medium">Coach Payouts</p>
+                    <p className="text-xs text-muted-foreground">Recorded payments to coaches (athlete_payment)</p>
+                  </div>
+                </div>
+                <p className="text-xl font-bold text-blue-400">-${financeData.coachPayouts.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
               </div>
-              <p className="text-2xl font-bold text-[#B89D60]">${financeData.guildProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
-              <p className="text-xs text-muted-foreground mt-1">After Stripe fees</p>
-            </Card>
-          </div>
+
+              {/* Guild Net */}
+              <div className="flex items-center justify-between py-2 border-b border-border bg-emerald-500/5 -mx-6 px-6">
+                <div className="flex items-center gap-3">
+                  <TrendingUp className="h-5 w-5 text-emerald-500" />
+                  <div>
+                    <p className="font-medium">Guild Net</p>
+                    <p className="text-xs text-muted-foreground">Gross Revenue - Coach Payouts</p>
+                  </div>
+                </div>
+                <p className={`text-xl font-bold ${financeData.guildNet >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                  ${financeData.guildNet.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+              </div>
+
+              {/* Stripe Fees (Estimated) */}
+              <div className="flex items-center justify-between py-2 border-b border-border">
+                <div className="flex items-center gap-3">
+                  <CreditCard className="h-5 w-5 text-red-400" />
+                  <div>
+                    <p className="font-medium">Stripe Fees <span className="text-xs text-amber-500 ml-1">(estimated)</span></p>
+                    <p className="text-xs text-muted-foreground">~2.9% + $0.30 per transaction on Stripe payments</p>
+                  </div>
+                </div>
+                <p className="text-xl font-bold text-red-400">-${financeData.stripeFees.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+              </div>
+
+              {/* Guild Profit */}
+              <div className="flex items-center justify-between py-3 bg-[#B89D60]/10 -mx-6 px-6 rounded-b-lg">
+                <div className="flex items-center gap-3">
+                  <TrendingUp className="h-5 w-5 text-[#B89D60]" />
+                  <div>
+                    <p className="font-semibold">Guild Profit</p>
+                    <p className="text-xs text-muted-foreground">Guild Net - Stripe Fees (estimated)</p>
+                  </div>
+                </div>
+                <p className={`text-2xl font-bold ${financeData.guildProfit >= 0 ? 'text-[#B89D60]' : 'text-red-500'}`}>
+                  ${financeData.guildProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+              </div>
+            </div>
+          </Card>
 
           {/* Bookings Summary */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
