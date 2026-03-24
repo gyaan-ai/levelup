@@ -257,20 +257,42 @@ export function CreateSessionForm({
             {/* Who Can Join */}
             <div>
               <Label htmlFor="joinPolicy">Who Can Join</Label>
-              <Select value={joinPolicy} onValueChange={(v) => setJoinPolicy(v as typeof joinPolicy)}>
+              <Select value={joinPolicy === 'private' ? 'invite_only' : joinPolicy} onValueChange={(v) => setJoinPolicy(v as typeof joinPolicy)}>
                 <SelectTrigger id="joinPolicy">
                   <SelectValue placeholder="Select who can join" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="public">Anyone — Open registration, visible in Browse Training</SelectItem>
-                  <SelectItem value="invite_only">Invite Only — Visible in Browse Training, need invite link to register</SelectItem>
-                  <SelectItem value="private">Hidden — Not shown publicly, only you can add wrestlers</SelectItem>
+                  <SelectItem value="public">Anyone — Open registration</SelectItem>
+                  <SelectItem value="invite_only">Invite Only — Need invite link to register</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Published Status */}
+            <div>
+              <Label htmlFor="published">Published</Label>
+              <Select value={joinPolicy === 'private' ? 'no' : 'yes'} onValueChange={(v) => {
+                if (v === 'no') {
+                  setJoinPolicy('private');
+                } else {
+                  if (joinPolicy === 'private') setJoinPolicy('public');
+                }
+              }}>
+                <SelectTrigger id="published">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="yes">Yes — Visible in Browse Training</SelectItem>
+                  <SelectItem value="no">No — Hidden, only you can add wrestlers</SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground mt-1">
-                {joinPolicy === 'public' && 'Session shows in Browse Training and anyone can book.'}
-                {joinPolicy === 'invite_only' && 'Session shows but only people with the invite link can register.'}
-                {joinPolicy === 'private' && 'Session hidden from public. Only you can add wrestlers.'}
+                {joinPolicy === 'private' 
+                  ? 'Session hidden from public. Only you can add wrestlers.'
+                  : joinPolicy === 'invite_only'
+                    ? 'Session shows but only people with the invite link can register.'
+                    : 'Session shows in Browse Training and anyone can book.'
+                }
               </p>
             </div>
 

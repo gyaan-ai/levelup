@@ -226,23 +226,46 @@ export function EditSessionForm({
             </div>
           </div>
 
-          {/* Who can join - available for ALL session types */}
+          {/* Who Can Join */}
           <div>
             <Label htmlFor="join">Who Can Join</Label>
-            <Select value={join} onValueChange={(v) => setJoin(v as Props['joinPolicy'])}>
+            <Select value={join === 'private' ? 'invite_only' : join} onValueChange={(v) => setJoin(v as Props['joinPolicy'])}>
               <SelectTrigger id="join">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="public">Anyone — Open registration, visible in Browse Training</SelectItem>
-                <SelectItem value="invite_only">Invite Only — Visible in Browse Training, but need invite link to register</SelectItem>
-                <SelectItem value="private">Hidden — Not shown publicly, only you can add wrestlers</SelectItem>
+                <SelectItem value="public">Anyone — Open registration</SelectItem>
+                <SelectItem value="invite_only">Invite Only — Need invite link to register</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Published Status */}
+          <div>
+            <Label htmlFor="published">Published</Label>
+            <Select value={join === 'private' ? 'no' : 'yes'} onValueChange={(v) => {
+              if (v === 'no') {
+                setJoin('private');
+              } else {
+                // Keep current join policy or default to public
+                if (join === 'private') setJoin('public');
+              }
+            }}>
+              <SelectTrigger id="published">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="yes">Yes — Visible in Browse Training</SelectItem>
+                <SelectItem value="no">No — Hidden, only you can add wrestlers</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground mt-1">
-              {join === 'public' && 'Session shows in Browse Training and anyone can book a spot.'}
-              {join === 'invite_only' && 'Session shows in Browse Training but only people with the invite link can register.'}
-              {join === 'private' && 'Session is hidden from public. Only you can add wrestlers manually.'}
+              {join === 'private' 
+                ? 'Session is hidden from public. Only you can add wrestlers manually.'
+                : join === 'invite_only'
+                  ? 'Session shows in Browse Training but only people with the invite link can register.'
+                  : 'Session shows in Browse Training and anyone can book a spot.'
+              }
             </p>
           </div>
 
