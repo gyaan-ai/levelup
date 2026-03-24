@@ -7,14 +7,8 @@ export function getSessionTypeDisplay(sessionType?: string | null, sessionMode?:
   label: string;
   className: string;
 } {
-  // Partner session (2 wrestlers) - DB value is '2-athlete'
-  if (sessionType === 'partner' || sessionType === '2-athlete' || sessionMode === 'partner-open') {
-    return {
-      label: 'Partner',
-      className:
-        'inline-flex items-center rounded-md px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wider border bg-emerald-500/25 text-emerald-800 dark:text-emerald-200 border-emerald-500/50',
-    };
-  }
+  // Check session_type first (most reliable), then fall back to session_mode
+  
   // Small group (up to 6) - DB value is 'group'
   if (sessionType === 'small_group' || sessionType === 'group') {
     return {
@@ -23,7 +17,31 @@ export function getSessionTypeDisplay(sessionType?: string | null, sessionMode?:
         'inline-flex items-center rounded-md px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wider border bg-violet-500/25 text-violet-800 dark:text-violet-200 border-violet-500/50',
     };
   }
-  // Private / 1-on-1 / default - DB value is '1-on-1'
+  // Partner session (2 wrestlers) - DB value is '2-athlete'
+  if (sessionType === 'partner' || sessionType === '2-athlete') {
+    return {
+      label: 'Partner',
+      className:
+        'inline-flex items-center rounded-md px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wider border bg-emerald-500/25 text-emerald-800 dark:text-emerald-200 border-emerald-500/50',
+    };
+  }
+  // Private / 1-on-1 - DB value is '1-on-1'
+  if (sessionType === 'private' || sessionType === '1-on-1') {
+    return {
+      label: 'Private',
+      className:
+        'inline-flex items-center rounded-md px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wider border bg-blue-500/25 text-blue-800 dark:text-blue-200 border-blue-500/50',
+    };
+  }
+  // Fallback based on session_mode for legacy data
+  if (sessionMode === 'partner-open') {
+    return {
+      label: 'Partner',
+      className:
+        'inline-flex items-center rounded-md px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wider border bg-emerald-500/25 text-emerald-800 dark:text-emerald-200 border-emerald-500/50',
+    };
+  }
+  // Default fallback
   return {
     label: 'Private',
     className:
