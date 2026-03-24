@@ -5,9 +5,10 @@
 @layer base {
   :root {
     --guild-black: #000000;
-    --guild-gold: #B89D60;
-    --guild-gold-dark: #9A8550;
-    --guild-gold-light: #C9B078;
+    /* Bronze/Hall of Fame palette - warmer, more antique gold */
+    --guild-gold: #C9A227;
+    --guild-gold-dark: #A68523;
+    --guild-gold-light: #D4B94E;
 
     --primary: var(--guild-black);
     --accent: var(--guild-gold);

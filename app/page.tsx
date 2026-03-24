@@ -52,27 +52,27 @@ export default async function HomePage() {
         <div className="absolute inset-0 bg-black" />
         <div className="container mx-auto px-4 py-16 sm:py-24 relative z-10">
           <div className="max-w-5xl mx-auto">
-            {/* Centered logo-first layout */}
+            {/* Centered logo-first layout - Hall of Fame aesthetic */}
             <div className="flex flex-col items-center text-center">
               {/* Logo - large and prominent */}
-              <div className="mb-8 sm:mb-12">
+              <div className="mb-4 sm:mb-6">
                 <HomeHeroLogo src={logoSrc} alt="The Guild — gold G lettermark with wrestlers" />
               </div>
               
-              {/* Brand name */}
-              <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-serif font-bold text-accent mb-6 tracking-widest">
-                THE WRESTLING GUILD
+              {/* Brand name - tighter to logo */}
+              <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-serif font-black text-accent mb-3 tracking-[0.15em] uppercase">
+                The Wrestling Guild
               </h1>
               
               {/* Decorative line */}
-              <div className="flex items-center gap-4 mb-8">
-                <div className="h-px w-16 sm:w-24 bg-accent/40" />
-                <div className="h-1.5 w-1.5 bg-accent rounded-full" />
-                <div className="h-px w-16 sm:w-24 bg-accent/40" />
+              <div className="flex items-center gap-3 mb-4">
+                <div className="h-px w-12 sm:w-20 bg-accent/50" />
+                <div className="h-1 w-1 bg-accent rounded-full" />
+                <div className="h-px w-12 sm:w-20 bg-accent/50" />
               </div>
               
               {/* Tagline */}
-              <p className="text-base sm:text-lg md:text-xl text-accent font-light tracking-[0.25em] mb-10 sm:mb-14 uppercase">
+              <p className="text-sm sm:text-base md:text-lg text-accent/90 font-medium tracking-[0.2em] mb-8 sm:mb-10 uppercase">
                 Access The Elite. Master Technique.
               </p>
               
