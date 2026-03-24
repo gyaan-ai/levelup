@@ -45,12 +45,23 @@ CREATE POLICY "Users can view own credits" ON user_credits
 CREATE POLICY "Users can view own credit transactions" ON credit_transactions
   FOR SELECT USING (auth.uid() = user_id);
 
--- Service role can manage all credits (for admin/system operations)
-CREATE POLICY "Service role manages credits" ON user_credits
-  FOR ALL USING (auth.role() = 'service_role');
+-- Admins can manage all credits
+CREATE POLICY "Admins can manage credits" ON user_credits
+  FOR ALL USING (
+    EXISTS (SELECT 1 FROM users WHERE users.id = auth.uid() AND users.role = 'admin')
+  );
 
-CREATE POLICY "Service role manages credit transactions" ON credit_transactions
-  FOR ALL USING (auth.role() = 'service_role');
+CREATE POLICY "Admins can manage credit transactions" ON credit_transactions
+  FOR ALL USING (
+    EXISTS (SELECT 1 FROM users WHERE users.id = auth.uid() AND users.role = 'admin')
+  );
+
+-- Allow inserts for credit granting (system operations via service key bypass RLS)
+CREATE POLICY "Allow credit inserts" ON user_credits
+  FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "Allow credit transaction inserts" ON credit_transactions
+  FOR INSERT WITH CHECK (true);
 
 -- Function to get user's available credit balance
 CREATE OR REPLACE FUNCTION get_user_credit_balance(p_user_id UUID)
