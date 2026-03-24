@@ -189,13 +189,13 @@ export function CreateSessionForm({
                   <SelectValue placeholder="Select session type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="small_group">Small Group ($30/person, up to 6)</SelectItem>
-                  <SelectItem value="partner">Partner Session ($50/person, 2 wrestlers)</SelectItem>
-                  <SelectItem value="private">Private Session ($60, 1-on-1)</SelectItem>
+                  <SelectItem value="small_group">Small Group (suggested $30/person)</SelectItem>
+                  <SelectItem value="partner">Partner Session (suggested $50/person)</SelectItem>
+                  <SelectItem value="private">Private Session (suggested $60)</SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground mt-1">
-                Suggested price: ${SESSION_PRESETS[sessionType].price}/person. You can override below.
+                Auto-fills suggested price (${SESSION_PRESETS[sessionType].price}) - you can change it below
               </p>
             </div>
 

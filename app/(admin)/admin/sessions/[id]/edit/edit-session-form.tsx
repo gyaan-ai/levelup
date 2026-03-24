@@ -79,13 +79,10 @@ export function EditSessionForm({
     private: { label: 'Private Session', price: 60, maxParticipants: 1 },
   } as const;
 
+  // Only change type - don't auto-fill price/max on existing sessions (coach may have customized)
   const handleSessionTypeChange = (newType: string) => {
     setSessionTypeState(newType);
-    const preset = SESSION_PRESETS[newType as keyof typeof SESSION_PRESETS];
-    if (preset) {
-      setPrice(String(preset.price));
-      setMax(String(preset.maxParticipants));
-    }
+    // Don't overwrite price/max - they're editable and coach may have set custom values
   };
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -196,13 +193,13 @@ export function EditSessionForm({
                 <SelectValue placeholder="Select session type" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="small_group">Small Group ($30/person, up to 6)</SelectItem>
-                <SelectItem value="partner">Partner Session ($50/person, 2 wrestlers)</SelectItem>
-                <SelectItem value="private">Private Session ($60, 1-on-1)</SelectItem>
+                <SelectItem value="small_group">Small Group (suggested $30/person)</SelectItem>
+                <SelectItem value="partner">Partner Session (suggested $50/person)</SelectItem>
+                <SelectItem value="private">Private Session (suggested $60)</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground mt-1">
-              Changing type will update suggested price and max participants
+              Suggested: ${SESSION_PRESETS[sessionTypeState as keyof typeof SESSION_PRESETS]?.price ?? 30}/person - adjust price below as needed
             </p>
           </div>
           
