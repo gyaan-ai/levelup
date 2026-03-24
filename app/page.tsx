@@ -17,7 +17,7 @@ export default async function HomePage() {
   const headersList = await headers();
   const host = headersList.get('host') || '';
   const tenant = getTenantByDomain(host);
-  const logoSrc = tenant?.logo ?? '/logos/guild-g.png';
+  const logoSrc = tenant?.logo ?? '/logos/guild-logo-hq.jpg';
 
   let featuredReviews: { id: string; rating: number; comment: string | null; coach_name: string }[] = [];
   if (tenant) {
