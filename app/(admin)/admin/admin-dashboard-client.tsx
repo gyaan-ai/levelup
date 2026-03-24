@@ -674,6 +674,13 @@ export function AdminDashboardClient({
     // Group by coach for breakdown
     const coachBreakdown = new Map<string, { name: string; school: string; revenue: number; payout: number; sessions: number; open: number }>();
 
+    // Debug: log first session's participant_amount_paid_sum
+    if (filteredSess.length > 0) {
+      console.log('[v0] First session participant_amount_paid_sum:', filteredSess[0].participant_amount_paid_sum);
+      console.log('[v0] Total sessions in filter:', filteredSess.length);
+      console.log('[v0] Sum of all participant_amount_paid_sum:', filteredSess.reduce((sum, s) => sum + (Number(s.participant_amount_paid_sum) || 0), 0));
+    }
+
     for (const s of filteredSess) {
       // participant_amount_paid_sum = what parents ACTUALLY paid (from Stripe checkout)
       // athlete_payment = what you RECORDED paying the coach (the "bible" for payouts)

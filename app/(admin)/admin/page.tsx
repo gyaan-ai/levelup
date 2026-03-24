@@ -134,31 +134,7 @@ export default async function AdminPage() {
     console.error('Admin athletes fetch error:', athletesRes.error);
   }
 
-  console.log('[Admin] Sessions fetched:', sessionsRes.data?.length ?? 0, 'rows');
-  console.log('[Admin] Users fetched:', usersRes.data?.length ?? 0, 'rows');
-  console.log('[Admin] Credits fetched:', creditsRes.data?.length ?? 0, 'rows');
   
-  // Debug: Check if session_participants has amount_paid
-  if (sessionsRes.data?.length) {
-    const withParticipants = sessionsRes.data.filter((s: any) => s.session_participants && (Array.isArray(s.session_participants) ? s.session_participants.length > 0 : true));
-    const totalAmountPaid = sessionsRes.data.reduce((sum: number, s: any) => {
-      const parts = s.session_participants;
-      const rows = Array.isArray(parts) ? parts : parts ? [parts] : [];
-      return sum + rows.reduce((pSum: number, p: any) => pSum + Number(p?.amount_paid ?? 0), 0);
-    }, 0);
-    console.log('[v0] Sessions with participants:', withParticipants.length);
-    console.log('[v0] Total amount_paid across all sessions:', totalAmountPaid);
-    // Log first 3 sessions with their participant data
-    sessionsRes.data.slice(0, 3).forEach((s: any, i: number) => {
-      console.log(`[v0] Session ${i + 1}:`, {
-        id: s.id,
-        status: s.status,
-        total_price: s.total_price,
-        athlete_payment: s.athlete_payment,
-        session_participants: s.session_participants,
-      });
-    });
-  }
 
   const sessionsRows = (sessionsRes.data ?? []) as Array<{
     id: string;
