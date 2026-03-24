@@ -77,8 +77,16 @@ export function EditSessionForm({
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [payoutLoading, setPayoutLoading] = useState(false);
   const [completeLoading, setCompleteLoading] = useState(false);
+  const [manualPaymentAmount, setManualPaymentAmount] = useState('');
+  const [manualPaymentMethod, setManualPaymentMethod] = useState<'cash' | 'check' | 'venmo' | 'other'>('cash');
+  const [manualPaymentLoading, setManualPaymentLoading] = useState(false);
 
   function suggestedCoachPayoutAmount(): string {
+    // Coach gets 83.3% of what parents paid (gross revenue)
+    // If no payments recorded, fall back to old calculation
+    if (participantAmountPaidSum > 0) {
+      return (participantAmountPaidSum * 0.833).toFixed(2);
+    }
     return String(
       coachPayoutUsd({
         athlete_payment: athletePayment,
@@ -310,6 +318,135 @@ export function EditSessionForm({
             )}
           </div>
         </form>
+      </CardContent>
+    </Card>
+
+    {/* Financials Section */}
+    <Card>
+      <CardHeader>
+        <CardTitle>Session Financials</CardTitle>
+        <CardDescription>
+          What parents paid (Gross) and what you paid/will pay the coach. The coach payout should be ~83.3% of gross.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label className="text-muted-foreground text-xs uppercase tracking-wider">Parents Paid (Gross)</Label>
+            <p className="text-xl font-semibold mt-1">${participantAmountPaidSum.toFixed(2)}</p>
+            <p className="text-xs text-muted-foreground">From Stripe checkout</p>
+          </div>
+          <div>
+            <Label className="text-muted-foreground text-xs uppercase tracking-wider">Suggested Coach Payout</Label>
+            <p className="text-xl font-semibold mt-1 text-blue-400">${(participantAmountPaidSum * 0.833).toFixed(2)}</p>
+            <p className="text-xs text-muted-foreground">83.3% of gross</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-4 pt-2 border-t border-border">
+          <div>
+            <Label className="text-muted-foreground text-xs uppercase tracking-wider">Guild Net</Label>
+            <p className={`text-xl font-semibold mt-1 ${(participantAmountPaidSum - (athletePayment ?? 0)) >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+              ${(participantAmountPaidSum - (athletePayment ?? 0)).toFixed(2)}
+            </p>
+            <p className="text-xs text-muted-foreground">Gross - Coach Payout</p>
+          </div>
+          <div>
+            <Label className="text-muted-foreground text-xs uppercase tracking-wider">Recorded Payout</Label>
+            <p className="text-xl font-semibold mt-1">
+              {athletePayment != null ? `$${Number(athletePayment).toFixed(2)}` : '—'}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {athletePayoutDate ? `Paid ${formatEST(`${athletePayoutDate}T12:00:00`, 'MMM d, yyyy')}` : 'Not yet paid'}
+            </p>
+          </div>
+        </div>
+        {participantAmountPaidSum === 0 && currentParticipants > 0 && (
+          <div className="p-3 rounded-md bg-amber-500/10 border border-amber-500/20 text-sm">
+            <p className="font-medium text-amber-500">Gross revenue is $0</p>
+            <p className="text-muted-foreground text-xs mt-1">
+              This could be a promo session or the payments weren&apos;t recorded via Stripe. 
+              If parents paid cash, use the form below to add a manual payment record.
+            </p>
+          </div>
+        )}
+
+        {/* Manual Payment Entry */}
+        <div className="pt-4 border-t border-border">
+          <Label className="text-sm font-medium">Add Manual Payment (Cash/Check)</Label>
+          <p className="text-xs text-muted-foreground mb-3">
+            Record a payment that didn&apos;t go through Stripe. This adds to the gross revenue for this session.
+          </p>
+          <form
+            className="flex flex-wrap items-end gap-3"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              const val = parseFloat(manualPaymentAmount);
+              if (Number.isNaN(val) || val <= 0) return;
+              setManualPaymentLoading(true);
+              setError(null);
+              try {
+                const res = await fetch(`/api/admin/sessions/${sessionId}/add-payment`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ 
+                    amount: val, 
+                    paymentMethod: manualPaymentMethod,
+                    notes: `Manual ${manualPaymentMethod} payment`
+                  }),
+                });
+                const data = await res.json();
+                if (res.ok && data.success) {
+                  router.refresh();
+                  setManualPaymentAmount('');
+                } else {
+                  setError(data.error || 'Failed to add payment');
+                }
+              } catch {
+                setError('Failed to add payment');
+              } finally {
+                setManualPaymentLoading(false);
+              }
+            }}
+          >
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="manual-amount" className="text-xs">Amount ($)</Label>
+              <Input
+                id="manual-amount"
+                type="number"
+                min={0}
+                step={1}
+                value={manualPaymentAmount}
+                onChange={(e) => setManualPaymentAmount(e.target.value)}
+                className="w-24"
+                placeholder="30"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="manual-method" className="text-xs">Method</Label>
+              <Select value={manualPaymentMethod} onValueChange={(v) => setManualPaymentMethod(v as typeof manualPaymentMethod)}>
+                <SelectTrigger id="manual-method" className="w-28">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="check">Check</SelectItem>
+                  <SelectItem value="venmo">Venmo</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button type="submit" variant="outline" disabled={manualPaymentLoading || manualPaymentAmount.trim() === ''}>
+              {manualPaymentLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Adding...
+                </>
+              ) : (
+                'Add Payment'
+              )}
+            </Button>
+          </form>
+        </div>
       </CardContent>
     </Card>
 
