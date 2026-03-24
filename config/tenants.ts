@@ -77,8 +77,8 @@ export const tenants: Record<string, TenantConfig> = {
       textSecondary: "#6B7280",
     },
 
-    logo: "/logos/guild-g.png",
-    stateOrgLogo: "/logos/guild-g.png",
+    logo: "/logos/guild-bronze.jpg",
+    stateOrgLogo: "/logos/guild-bronze.jpg",
     favicon: "/favicons/guild.ico",
     tagline: "Mastery. Technique. Access the Elite.",
     secondaryTagline: "Elite wrestling technique instruction",
