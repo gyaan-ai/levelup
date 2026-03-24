@@ -139,7 +139,7 @@ export default async function CartSuccessPage({
       <Card>
         <CardContent className="py-12 text-center">
           <CheckCircle className="h-16 w-16 mx-auto mb-6 text-green-500" />
-          <h1 className="text-2xl font-bold mb-2">You're all set!</h1>
+          <h1 className="text-2xl font-bold mb-2">You&apos;re all set!</h1>
           <p className="text-muted-foreground mb-8">
             {sessionCount > 1
               ? `${sessionCount} sessions have been booked successfully.`

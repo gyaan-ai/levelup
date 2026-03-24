@@ -111,10 +111,10 @@ export async function grantCredit({
 }
 
 /**
- * Use credits for a session purchase
+ * Apply credits for a session purchase
  * Returns the amount of credits actually used
  */
-export async function useCredits({
+export async function applyCredits({
   userId,
   amount,
   sessionId,

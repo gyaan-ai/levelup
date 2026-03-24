@@ -188,7 +188,7 @@ export default function WalletPage() {
             <Wallet className="h-12 w-12 mx-auto text-muted-foreground/50 mb-3" />
             <p className="font-medium">No credits yet</p>
             <p className="text-sm text-muted-foreground mt-1">
-              If a session is cancelled, you'll receive credit to use on future bookings.
+              If a session is cancelled, you&apos;ll receive credit to use on future bookings.
             </p>
           </CardContent>
         </Card>

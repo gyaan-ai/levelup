@@ -7,7 +7,7 @@ import { getStripeInstance } from '@/lib/stripe/webhooks';
 import { formatEST } from '@/lib/format-date';
 import { hasMinPhoneDigits } from '@/lib/phone';
 import { getEffectiveFilledCount } from '@/lib/sessions';
-import { getUserCreditBalance, useCredits } from '@/lib/credits';
+import { getUserCreditBalance, applyCredits } from '@/lib/credits';
 
 /**
  * POST - Multi-session checkout: pay for multiple sessions in one Stripe transaction.
@@ -189,7 +189,7 @@ export async function POST(req: NextRequest) {
     if (amountToPay <= 0) {
       // Use credits for each session
       for (const meta of sessionMetadata) {
-        await useCredits({
+        await applyCredits({
           userId: user.id,
           amount: meta.price,
           sessionId: meta.session_id,
