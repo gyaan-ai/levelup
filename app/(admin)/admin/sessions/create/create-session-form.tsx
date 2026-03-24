@@ -159,13 +159,6 @@ export function CreateSessionForm({
     }
   };
 
-  const copyLink = () => {
-    if (!result?.shareUrl) return;
-    navigator.clipboard.writeText(result.shareUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
   const today = new Date().toISOString().slice(0, 10);
 
   return (
