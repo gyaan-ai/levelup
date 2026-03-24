@@ -316,6 +316,11 @@ export function AdminDashboardClient({
   const [leaderboardTypeFilter, setLeaderboardTypeFilter] = useState<string>('all');
   const [leaderboardSchoolFilter, setLeaderboardSchoolFilter] = useState<string>('all');
   const [leaderboardSort, setLeaderboardSort] = useState<'earnings' | 'sessions' | 'rating' | 'open'>('earnings');
+  
+  // Financial filters
+  const [financeTimeFilter, setFinanceTimeFilter] = useState<'all' | '7d' | '30d' | '90d' | 'ytd'>('all');
+  const [financeTypeFilter, setFinanceTypeFilter] = useState<string>('all');
+  const [financeSchoolFilter, setFinanceSchoolFilter] = useState<string>('all');
   const [editingAthleteId, setEditingAthleteId] = useState<string | null>(null);
   const hasOpenedEditFromUrl = useRef(false);
   
@@ -610,6 +615,107 @@ export function AdminDashboardClient({
     }
     return Array.from(schools).sort();
   }, [athleteReports]);
+
+  // Computed financial data with filters
+  const financeData = useMemo(() => {
+    const now = new Date();
+    const yearStart = new Date(now.getFullYear(), 0, 1);
+    const cutoff = financeTimeFilter === '7d' 
+      ? new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+      : financeTimeFilter === '30d'
+      ? new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+      : financeTimeFilter === '90d'
+      ? new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
+      : financeTimeFilter === 'ytd'
+      ? yearStart
+      : null;
+
+    // Filter sessions by time and type
+    const filteredSess = sessions.filter(s => {
+      if (cutoff && new Date(s.scheduled_datetime) < cutoff) return false;
+      if (financeTypeFilter !== 'all' && s.session_type !== financeTypeFilter) return false;
+      if (financeSchoolFilter !== 'all') {
+        if (financeSchoolFilter === 'non-affiliated') {
+          if (s.athlete_school && s.athlete_school.trim() !== '' && 
+              s.athlete_school.toLowerCase() !== 'non-affiliated' &&
+              s.athlete_school.toLowerCase() !== 'independent' &&
+              s.athlete_school.toLowerCase() !== 'n/a') return false;
+        } else {
+          if (s.athlete_school !== financeSchoolFilter) return false;
+        }
+      }
+      return true;
+    });
+
+    // Calculate aggregates
+    let grossRevenue = 0;
+    let coachPayouts = 0;
+    let stripeFees = 0;
+    let openBookings = 0;
+    let completedSessions = 0;
+    let pendingPayment = 0;
+    let cancelledSessions = 0;
+
+    // Group by coach for breakdown
+    const coachBreakdown = new Map<string, { name: string; school: string; revenue: number; payout: number; sessions: number; open: number }>();
+
+    for (const s of filteredSess) {
+      const totalPrice = Number(s.total_price) || 0;
+      const athletePayment = Number(s.athlete_payment) || 0;
+      // Estimate Stripe fee as ~2.9% + $0.30 per transaction
+      const estimatedStripeFee = totalPrice > 0 ? (totalPrice * 0.029 + 0.30) : 0;
+
+      if (s.status === 'completed' || s.status === 'pending_payment') {
+        grossRevenue += totalPrice;
+        coachPayouts += athletePayment;
+        stripeFees += estimatedStripeFee;
+      }
+
+      if (s.status === 'scheduled') openBookings += 1;
+      if (s.status === 'completed') completedSessions += 1;
+      if (s.status === 'pending_payment') pendingPayment += 1;
+      if (s.status === 'cancelled') cancelledSessions += 1;
+
+      // Coach breakdown
+      const existing = coachBreakdown.get(s.athlete_id) || {
+        name: s.athlete_name,
+        school: s.athlete_school,
+        revenue: 0,
+        payout: 0,
+        sessions: 0,
+        open: 0,
+      };
+      if (s.status === 'completed' || s.status === 'pending_payment') {
+        existing.revenue += totalPrice;
+        existing.payout += athletePayment;
+        existing.sessions += 1;
+      }
+      if (s.status === 'scheduled') existing.open += 1;
+      coachBreakdown.set(s.athlete_id, existing);
+    }
+
+    const netProfit = grossRevenue - coachPayouts - stripeFees;
+    const margin = grossRevenue > 0 ? (netProfit / grossRevenue) * 100 : 0;
+
+    // Sort coach breakdown by revenue
+    const coachBreakdownArray = Array.from(coachBreakdown.entries())
+      .map(([id, data]) => ({ athlete_id: id, ...data }))
+      .sort((a, b) => b.revenue - a.revenue);
+
+    return {
+      grossRevenue,
+      coachPayouts,
+      stripeFees,
+      netProfit,
+      margin,
+      openBookings,
+      completedSessions,
+      pendingPayment,
+      cancelledSessions,
+      totalSessions: filteredSess.length,
+      coachBreakdown: coachBreakdownArray,
+    };
+  }, [sessions, financeTimeFilter, financeTypeFilter, financeSchoolFilter]);
 
   const filteredAthletes = athleteReports.filter((a) => {
     if (!athleteSearch) return true;
@@ -1331,71 +1437,275 @@ export function AdminDashboardClient({
         );
       }
 
-      // Default: Payments overview
+      // Default: Payments overview with filters
       return (
         <div className="space-y-6">
-          <div>
-            <h2 className="text-lg font-semibold">Financial Overview</h2>
-            <p className="text-sm text-muted-foreground">Track revenue and pending payments</p>
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-[#B89D60]/10">
+                <DollarSign className="h-5 w-5 text-[#B89D60]" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold">Financial Overview</h2>
+                <p className="text-sm text-muted-foreground">Guild revenue, coach payouts, and open bookings</p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setSubSection('payouts')}
+              >
+                <Wallet className="h-4 w-4 mr-2" />
+                Process Payouts
+                {totalCoachPayoutsDue > 0 && (
+                  <Badge className="ml-2 bg-[#B89D60]/20 text-[#B89D60]">${totalCoachPayoutsDue.toFixed(0)}</Badge>
+                )}
+              </Button>
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <KpiCard title="Gross Revenue" value={billing.totalRevenue.toFixed(2)} prefix="$" icon={DollarSign} />
-            <KpiCard title="Net Profit" value={billing.totalOrgFees.toFixed(2)} prefix="$" icon={TrendingUp} />
-            <KpiCard title="Coach Payouts" value={billing.totalAthletePayments.toFixed(2)} prefix="$" icon={Wallet} />
-            <KpiCard title="Stripe Fees" value={billing.totalStripeFees.toFixed(2)} prefix="$" icon={CreditCard} />
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-sm font-medium">Sessions by Status</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Completed</span>
-                    <span className="font-medium">{billing.completedCount}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Pending Payment</span>
-                    <span className="font-medium text-amber-500">{billing.pendingPaymentCount}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Total</span>
-                    <span className="font-medium">{billing.sessionCount}</span>
-                  </div>
+          {/* Filters */}
+          <Card className="p-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-muted-foreground uppercase">Time:</span>
+                <div className="flex items-center rounded-lg border border-border bg-muted/30 p-1">
+                  {(['all', '7d', '30d', '90d', 'ytd'] as const).map((period) => (
+                    <button
+                      key={period}
+                      onClick={() => setFinanceTimeFilter(period)}
+                      className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                        financeTimeFilter === period
+                          ? 'bg-[#B89D60] text-black'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      {period === 'all' ? 'All Time' : period === 'ytd' ? 'YTD' : period}
+                    </button>
+                  ))}
                 </div>
-              </CardContent>
-            </Card>
+              </div>
 
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle className="text-sm font-medium">Quick Actions</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start"
-                  onClick={() => setSubSection('payouts')}
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-muted-foreground uppercase">Type:</span>
+                <Select value={financeTypeFilter} onValueChange={setFinanceTypeFilter}>
+                  <SelectTrigger className="w-36 h-9">
+                    <SelectValue placeholder="All types" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Types</SelectItem>
+                    {sessionTypesForFilter.map((t) => (
+                      <SelectItem key={t} value={t}>{t}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-muted-foreground uppercase">School:</span>
+                <Select value={financeSchoolFilter} onValueChange={setFinanceSchoolFilter}>
+                  <SelectTrigger className="w-40 h-9">
+                    <SelectValue placeholder="All schools" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Schools</SelectItem>
+                    <SelectItem value="non-affiliated">Non-Affiliated</SelectItem>
+                    {uniqueSchools.map((school) => (
+                      <SelectItem key={school} value={school}>{school}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {(financeTimeFilter !== 'all' || financeTypeFilter !== 'all' || financeSchoolFilter !== 'all') && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs"
+                  onClick={() => {
+                    setFinanceTimeFilter('all');
+                    setFinanceTypeFilter('all');
+                    setFinanceSchoolFilter('all');
+                  }}
                 >
-                  <Wallet className="h-4 w-4 mr-2" />
-                  Process Payouts
-                  {totalCoachPayoutsDue > 0 && (
-                    <Badge className="ml-auto bg-[#B89D60]/20 text-[#B89D60]">${totalCoachPayoutsDue.toFixed(0)}</Badge>
-                  )}
+                  Clear filters
                 </Button>
-                <Button 
-                  variant="outline" 
-                  className="w-full justify-start"
-                  onClick={() => setSubSection('credits')}
-                >
-                  <CreditCard className="h-4 w-4 mr-2" />
-                  View Credits
-                  <Badge className="ml-auto bg-muted">{credits.filter(c => c.remaining > 0).length}</Badge>
-                </Button>
-              </CardContent>
+              )}
+            </div>
+          </Card>
+
+          {/* Hero KPIs */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <Card className="p-4 bg-gradient-to-br from-[#B89D60]/10 to-transparent border-[#B89D60]/20">
+              <div className="flex items-center gap-2 mb-1">
+                <DollarSign className="h-4 w-4 text-[#B89D60]" />
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Guild Collected</p>
+              </div>
+              <p className="text-2xl font-bold">${financeData.grossRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+              <p className="text-xs text-muted-foreground mt-1">Gross revenue</p>
             </Card>
+            
+            <Card className="p-4 bg-gradient-to-br from-emerald-500/10 to-transparent border-emerald-500/20">
+              <div className="flex items-center gap-2 mb-1">
+                <TrendingUp className="h-4 w-4 text-emerald-500" />
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Guild Net</p>
+              </div>
+              <p className="text-2xl font-bold text-emerald-500">${financeData.netProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+              <p className="text-xs text-muted-foreground mt-1">{financeData.margin.toFixed(1)}% margin</p>
+            </Card>
+            
+            <Card className="p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <Wallet className="h-4 w-4 text-blue-500" />
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Paid to Coaches</p>
+              </div>
+              <p className="text-2xl font-bold">${financeData.coachPayouts.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+              <p className="text-xs text-muted-foreground mt-1">Coach earnings</p>
+            </Card>
+            
+            <Card className="p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <CreditCard className="h-4 w-4 text-red-400" />
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Stripe Fees</p>
+              </div>
+              <p className="text-2xl font-bold text-red-400">${financeData.stripeFees.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+              <p className="text-xs text-muted-foreground mt-1">Processing costs</p>
+            </Card>
+          </div>
+
+          {/* Bookings Summary */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <Card className="p-4">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Open Bookings</p>
+              <p className="text-xl font-semibold mt-1 text-emerald-500">{financeData.openBookings}</p>
+            </Card>
+            <Card className="p-4">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Completed</p>
+              <p className="text-xl font-semibold mt-1">{financeData.completedSessions}</p>
+            </Card>
+            <Card className="p-4">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Pending Payment</p>
+              <p className="text-xl font-semibold mt-1 text-amber-500">{financeData.pendingPayment}</p>
+            </Card>
+            <Card className="p-4">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Cancelled</p>
+              <p className="text-xl font-semibold mt-1 text-muted-foreground">{financeData.cancelledSessions}</p>
+            </Card>
+          </div>
+
+          {/* Revenue Breakdown by Coach */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm font-medium">Revenue by Coach</CardTitle>
+              <CardDescription>Top performers based on current filters</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/50">
+                    <tr>
+                      <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Coach</th>
+                      <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">School</th>
+                      <th className="text-center py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Sessions</th>
+                      <th className="text-center py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Open</th>
+                      <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Revenue</th>
+                      <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Coach Payout</th>
+                      <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Guild Net</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {financeData.coachBreakdown.length === 0 ? (
+                      <tr>
+                        <td colSpan={7} className="py-12 text-center text-muted-foreground">
+                          <DollarSign className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
+                          <p>No financial data for selected filters</p>
+                        </td>
+                      </tr>
+                    ) : (
+                      financeData.coachBreakdown.slice(0, 10).map((coach, idx) => (
+                        <tr key={coach.athlete_id} className="hover:bg-muted/30 transition-colors">
+                          <td className="py-3 px-4">
+                            <div className="flex items-center gap-2">
+                              {idx < 3 && (
+                                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${
+                                  idx === 0 ? 'bg-[#B89D60] text-black' :
+                                  idx === 1 ? 'bg-gray-400 text-black' :
+                                  'bg-amber-700 text-white'
+                                }`}>
+                                  {idx + 1}
+                                </div>
+                              )}
+                              <span className="font-medium">{coach.name}</span>
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 text-muted-foreground">{coach.school}</td>
+                          <td className="py-3 px-4 text-center tabular-nums">{coach.sessions}</td>
+                          <td className="py-3 px-4 text-center">
+                            {coach.open > 0 ? (
+                              <Badge variant="outline" className="border-emerald-600 bg-emerald-600/20 text-emerald-400">{coach.open}</Badge>
+                            ) : (
+                              <span className="text-muted-foreground">0</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-right tabular-nums font-medium">
+                            ${coach.revenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                          <td className="py-3 px-4 text-right tabular-nums text-blue-400">
+                            ${coach.payout.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                          <td className="py-3 px-4 text-right tabular-nums font-semibold text-[#B89D60]">
+                            ${(coach.revenue - coach.payout - (coach.revenue * 0.029 + (coach.sessions * 0.30))).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                  {financeData.coachBreakdown.length > 0 && (
+                    <tfoot className="border-t-2 border-border bg-muted/30">
+                      <tr className="font-semibold">
+                        <td className="py-3 px-4" colSpan={2}>Total ({financeData.coachBreakdown.length} coaches)</td>
+                        <td className="py-3 px-4 text-center tabular-nums">{financeData.completedSessions + financeData.pendingPayment}</td>
+                        <td className="py-3 px-4 text-center tabular-nums">{financeData.openBookings}</td>
+                        <td className="py-3 px-4 text-right tabular-nums">${financeData.grossRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        <td className="py-3 px-4 text-right tabular-nums text-blue-400">${financeData.coachPayouts.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        <td className="py-3 px-4 text-right tabular-nums text-[#B89D60]">${financeData.netProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      </tr>
+                    </tfoot>
+                  )}
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Quick Actions */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Button 
+              variant="outline" 
+              className="h-auto p-4 justify-start"
+              onClick={() => setSubSection('payouts')}
+            >
+              <Wallet className="h-5 w-5 mr-3 text-[#B89D60]" />
+              <div className="text-left">
+                <div className="font-medium">Process Coach Payouts</div>
+                <div className="text-xs text-muted-foreground">{coachPayouts.filter(p => p.amount > 0).length} coaches awaiting payment</div>
+              </div>
+              {totalCoachPayoutsDue > 0 && (
+                <Badge className="ml-auto bg-[#B89D60]/20 text-[#B89D60]">${totalCoachPayoutsDue.toFixed(0)}</Badge>
+              )}
+            </Button>
+            <Button 
+              variant="outline" 
+              className="h-auto p-4 justify-start"
+              onClick={() => setSubSection('credits')}
+            >
+              <CreditCard className="h-5 w-5 mr-3 text-blue-500" />
+              <div className="text-left">
+                <div className="font-medium">Parent Credits</div>
+                <div className="text-xs text-muted-foreground">{credits.filter(c => c.remaining > 0).length} active credits</div>
+              </div>
+            </Button>
           </div>
         </div>
       );
