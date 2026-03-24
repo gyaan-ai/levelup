@@ -6,6 +6,12 @@ import { getTenantByDomain } from '@/config/tenants';
 import { APP_TIMEZONE } from '@/lib/format-date';
 import { Athlete } from '@/types';
 import { TrainingClient } from './training-client';
+import {
+  fetchCoachReviewStatsMap,
+  mergeCoachReviewStatsIntoAthlete,
+  patchSessionsWithCoachReviewStats,
+  sortAthletesForBrowse,
+} from '@/lib/coach-review-stats';
 
 export const metadata = {
   title: 'Training | The Guild',
@@ -74,6 +80,11 @@ export default async function TrainingPage({
   const athletesList = (athletes || []) as Athlete[];
   const athleteIds = athletesList.map((a) => a.id);
 
+  const reviewStatsMap = await fetchCoachReviewStatsMap(supabase, athleteIds);
+  const athletesMerged = sortAthletesForBrowse(
+    athletesList.map((a) => mergeCoachReviewStatsIntoAthlete(a, reviewStatsMap))
+  );
+
   const today = new Date().toISOString().slice(0, 10);
   const { data: slots } = athleteIds.length
     ? await supabase
@@ -114,7 +125,7 @@ export default async function TrainingPage({
     nextByAthlete.set(r.athlete_id, { slot_date: slotDate, start_time: startTime });
   }
 
-  const athletesWithNext = athletesList.map((a) => ({
+  const athletesWithNext = athletesMerged.map((a) => ({
     ...a,
     nextAvailable: nextByAthlete.get(a.id) ?? null,
   }));
@@ -195,6 +206,8 @@ export default async function TrainingPage({
   // Only list publicly discoverable sessions. invite_only / private = share link only (not shown here).
   availabilitySessions = list.filter((s) => (s as { join_policy?: string }).join_policy === 'public');
 
+  availabilitySessions = patchSessionsWithCoachReviewStats(availabilitySessions, reviewStatsMap);
+
   const isAdmin = userData?.role === 'admin';
 
   return (
@@ -214,7 +227,7 @@ export default async function TrainingPage({
         availabilityTime={sp.time ?? 'any'}
         availabilityLocation={sp.location ?? 'all'}
         availabilityCoach={sp.coach ?? 'all'}
-        coaches={athletesList.map((a) => ({ id: a.id, first_name: a.first_name, last_name: a.last_name, school: a.school }))}
+        coaches={athletesMerged.map((a) => ({ id: a.id, first_name: a.first_name, last_name: a.last_name, school: a.school }))}
         preselectedWrestlerId={sp.wrestler ?? ''}
       />
     </div>

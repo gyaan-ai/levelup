@@ -14,6 +14,7 @@ import { StarRating } from '@/components/star-rating';
 import { SchoolLogo } from '@/components/school-logo';
 import { formatEST } from '@/lib/format-date';
 import { getEffectiveFilledCountWithListedNames } from '@/lib/sessions';
+import { fetchCoachReviewStatsMap, mergeCoachReviewStatsIntoAthlete } from '@/lib/coach-review-stats';
 
 /** Roster + badge must match DB; avoid cached 4/6 when SQL shows 5 kids. */
 export const dynamic = 'force-dynamic';
@@ -183,6 +184,21 @@ export default async function SessionDetailPage({
     (isOwner || (!isParticipant && (joinPolicy === 'public' || joinPolicy === 'invite_only')));
 
   const coach = Array.isArray(s.athletes) ? s.athletes[0] : s.athletes;
+  const coachIdForStats =
+    (coach?.id && String(coach.id).trim()) || (s.athlete_id && String(s.athlete_id).trim()) || '';
+  const sessionReviewStatsMap = coachIdForStats
+    ? await fetchCoachReviewStatsMap(supabase, [coachIdForStats])
+    : new Map();
+  const coachForRating = coach
+    ? mergeCoachReviewStatsIntoAthlete(
+        coach as {
+          id: string;
+          average_rating?: number | null;
+          review_count?: number | null;
+        },
+        sessionReviewStatsMap
+      )
+    : null;
   const coachName = coach
     ? `${coach.first_name ?? ''} ${coach.last_name ?? ''}`.trim() || 'Coach'
     : 'Coach';
@@ -308,8 +324,8 @@ export default async function SessionDetailPage({
             )}
           </div>
           <StarRating
-            averageRating={coach?.average_rating ?? null}
-            reviewCount={coach?.review_count ?? null}
+            averageRating={coachForRating?.average_rating ?? null}
+            reviewCount={coachForRating?.review_count ?? null}
             size="sm"
           />
           {coachPhone && (

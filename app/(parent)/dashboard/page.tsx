@@ -16,6 +16,7 @@ import { BookingCard, type BookingSession } from '@/app/(parent)/bookings/bookin
 import { CoachSessionBadge } from '@/components/coach-session-badge';
 import { ProfileImage } from '@/components/profile-image';
 import { formatEST } from '@/lib/format-date';
+import { fetchCoachReviewStatsMap, getCoachReviewStatsForId } from '@/lib/coach-review-stats';
 
 /** Parent sees only their own wrestlers (primary or linked). RLS on youth_wrestlers enforces this. */
 export default async function HomePage() {
@@ -226,6 +227,23 @@ export default async function HomePage() {
     }
   }
 
+  const coachIdsForReviewStats = new Set<string>();
+  for (const s of upcoming) {
+    const a = s.athletes;
+    const c = Array.isArray(a) ? a[0] : a;
+    const cid = (c as { id?: string } | undefined)?.id ?? s.athlete_id;
+    if (cid) coachIdsForReviewStats.add(String(cid));
+  }
+  if (isAdmin && !adminPreviewAsParent) {
+    for (const s of allUpcomingForAdmin) {
+      const a = s.athletes;
+      const c = Array.isArray(a) ? a[0] : a;
+      const cid = (c as { id?: string } | undefined)?.id ?? s.athlete_id;
+      if (cid) coachIdsForReviewStats.add(String(cid));
+    }
+  }
+  const homeReviewStatsMap = await fetchCoachReviewStatsMap(supabase, [...coachIdsForReviewStats]);
+
   const amountPaidForSession = (s: (typeof upcoming)[0]) => {
     const parts = s.session_participants ?? [];
     let sum = 0;
@@ -251,6 +269,7 @@ export default async function HomePage() {
     const totalPrice = s.total_price ?? 0;
     const pricePerParticipant = s.price_per_participant != null ? Number(s.price_per_participant) : null;
     const coachId = (coach?.id && String(coach.id).trim()) || (s.athlete_id && String(s.athlete_id).trim()) || '';
+    const rs = getCoachReviewStatsForId(homeReviewStatsMap, coachId);
     return {
       id: s.id,
       scheduled_datetime: s.scheduled_datetime,
@@ -274,8 +293,8 @@ export default async function HomePage() {
         school: coach?.school ?? '',
         id: coachId,
         photo_url: (coach as { photo_url?: string })?.photo_url,
-        average_rating: (coach as { average_rating?: number | null })?.average_rating ?? null,
-        review_count: (coach as { review_count?: number | null })?.review_count ?? null,
+        average_rating: rs.average_rating,
+        review_count: rs.review_count,
       },
       facility: fac?.name ?? '—',
       facility_id: (fac as { id?: string })?.id ?? null,
@@ -306,6 +325,7 @@ export default async function HomePage() {
     const totalPrice = s.total_price ?? 0;
     const pricePerParticipant = s.price_per_participant != null ? Number(s.price_per_participant) : null;
     const coachId = (coach?.id && String(coach.id).trim()) || (s.athlete_id && String(s.athlete_id).trim()) || '';
+    const rs = getCoachReviewStatsForId(homeReviewStatsMap, coachId);
     return {
       id: s.id,
       scheduled_datetime: s.scheduled_datetime,
@@ -328,8 +348,8 @@ export default async function HomePage() {
         school: coach?.school ?? '',
         id: coachId,
         photo_url: coach?.photo_url ?? null,
-        average_rating: (coach as { average_rating?: number | null })?.average_rating ?? null,
-        review_count: (coach as { review_count?: number | null })?.review_count ?? null,
+        average_rating: rs.average_rating,
+        review_count: rs.review_count,
       },
       facility: fac?.name ?? '—',
       facility_id: fac?.id ?? null,

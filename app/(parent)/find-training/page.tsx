@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
 import { APP_TIMEZONE } from '@/lib/format-date';
 import { FindTrainingClient } from './find-training-client';
+import { fetchCoachReviewStatsMap, patchSessionsWithCoachReviewStats } from '@/lib/coach-review-stats';
 
 export const metadata = {
   title: 'Find training',
@@ -155,6 +156,10 @@ export default async function FindTrainingPage({
     .eq('active', true)
     .order('school', { ascending: true });
 
+  const sessionCoachIds = [...new Set(sessions.map((s) => s.athlete_id).filter(Boolean))];
+  const findTrainingReviewStatsMap = await fetchCoachReviewStatsMap(supabase, sessionCoachIds);
+  const sessionsWithReviewStats = patchSessionsWithCoachReviewStats(sessions, findTrainingReviewStatsMap);
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
@@ -165,7 +170,7 @@ export default async function FindTrainingPage({
       </div>
       <FindTrainingClient
         facilities={facilities ?? []}
-        initialSessions={sessions}
+        initialSessions={sessionsWithReviewStats}
         initialDate={dateParam ?? ''}
         initialTime={sp.time ?? 'any'}
         initialLocation={sp.location ?? 'all'}

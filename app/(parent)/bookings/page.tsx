@@ -6,6 +6,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import { getParentYouthWrestlerIds } from '@/lib/parent-wrestlers';
 import { APP_TIMEZONE } from '@/lib/format-date';
+import { fetchCoachReviewStatsMap, getCoachReviewStatsForId } from '@/lib/coach-review-stats';
 import { BookingCard, type BookingSession } from './booking-card';
 import { BookingsTabsClient } from './bookings-tabs-client';
 
@@ -124,6 +125,9 @@ export default async function MyBookingsPage() {
       s.scheduled_datetime < nowISO
   );
 
+  const coachIdsForReviewStats = [...new Set(all.map((s) => s.athlete_id).filter(Boolean) as string[])];
+  const bookingsReviewStatsMap = await fetchCoachReviewStatsMap(supabase, coachIdsForReviewStats);
+
   const pastSessionIds = past.map((s) => s.id);
   const { data: myReviews } = pastSessionIds.length > 0
     ? await supabase
@@ -157,13 +161,15 @@ export default async function MyBookingsPage() {
     const a = s.athletes;
     const o = a ? (Array.isArray(a) ? a[0] : a) : null;
     const fallbackId = s.athlete_id && String(s.athlete_id).trim() ? s.athlete_id : '';
+    const coachId = (o?.id && String(o.id).trim()) || fallbackId;
+    const rs = getCoachReviewStatsForId(bookingsReviewStatsMap, coachId);
     return {
       name: o ? `${o.first_name ?? ''} ${o.last_name ?? ''}`.trim() || 'Coach' : 'Coach',
       school: o?.school ?? '',
-      id: (o?.id && String(o.id).trim()) || fallbackId,
+      id: coachId,
       photo_url: (o as { photo_url?: string })?.photo_url,
-      average_rating: (o as { average_rating?: number | null })?.average_rating ?? null,
-      review_count: (o as { review_count?: number | null })?.review_count ?? null,
+      average_rating: rs.average_rating,
+      review_count: rs.review_count,
     };
   };
 

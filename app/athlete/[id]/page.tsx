@@ -145,7 +145,6 @@ export default async function AthleteProfilePage({
     : [];
 
   const schoolColor = SCHOOL_COLORS[athlete.school] || { bg: 'bg-gray-500', text: 'text-white' };
-  const rating = (athlete.average_rating ?? 0) > 0 ? (athlete.average_rating ?? 0).toFixed(1) : 'New';
 
   const { data: reviewsRows } = await supabase
     .from('reviews_anonymous')
@@ -154,6 +153,10 @@ export default async function AthleteProfilePage({
     .order('created_at', { ascending: false });
   const reviews = reviewsRows ?? [];
   const reviewCount = reviews.length;
+  /** Hero rating must match listed reviews — derive from rows, not athletes.average_rating (can be stale). */
+  const averageFromReviews =
+    reviewCount > 0 ? reviews.reduce((sum, r) => sum + Number((r as { rating: number }).rating), 0) / reviewCount : 0;
+  const rating = averageFromReviews > 0 ? averageFromReviews.toFixed(1) : 'New';
 
   const { data: { user } } = await supabase.auth.getUser();
   const { data: userData } = user

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
+import { fetchCoachReviewStatsMap, mergeCoachReviewStatsIntoAthlete } from '@/lib/coach-review-stats';
 
 export async function GET(req: NextRequest) {
   try {
@@ -29,12 +30,25 @@ export async function GET(req: NextRequest) {
       created_at: string;
       athletes?: { id: string; first_name: string; last_name: string; school: string; photo_url?: string; average_rating?: number | null; review_count?: number | null } | { id: string; first_name: string; last_name: string; school: string; photo_url?: string; average_rating?: number | null; review_count?: number | null }[];
     }>;
+    const coachIds = rows.map((f) => f.coach_id).filter(Boolean);
+    const reviewStatsMap = await fetchCoachReviewStatsMap(supabase, coachIds);
     const follows = rows.map((f) => {
       const a = Array.isArray(f.athletes) ? f.athletes[0] : f.athletes;
+      const merged = a ? mergeCoachReviewStatsIntoAthlete(a, reviewStatsMap) : null;
       return {
         coachId: f.coach_id,
         followedAt: f.created_at,
-        coach: a ? { id: a.id, firstName: a.first_name, lastName: a.last_name, school: a.school, photoUrl: a.photo_url, averageRating: a.average_rating ?? null, reviewCount: a.review_count ?? null } : null,
+        coach: merged
+          ? {
+              id: merged.id,
+              firstName: merged.first_name,
+              lastName: merged.last_name,
+              school: merged.school,
+              photoUrl: merged.photo_url,
+              averageRating: merged.average_rating ?? null,
+              reviewCount: merged.review_count ?? null,
+            }
+          : null,
       };
     });
     return NextResponse.json({ follows });

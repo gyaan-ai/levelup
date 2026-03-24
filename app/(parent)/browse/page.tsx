@@ -4,6 +4,11 @@ import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
 import { BrowseAthletesClient } from './browse-client';
 import { Athlete } from '@/types';
+import {
+  fetchCoachReviewStatsMap,
+  mergeCoachReviewStatsIntoAthlete,
+  sortAthletesForBrowse,
+} from '@/lib/coach-review-stats';
 
 export const metadata = {
   title: 'Browse Elite Coaches | The Guild',
@@ -62,6 +67,11 @@ export default async function BrowsePage({
   const athletesList = (athletes || []) as Athlete[];
   const athleteIds = athletesList.map((a) => a.id);
 
+  const reviewStatsMap = await fetchCoachReviewStatsMap(supabase, athleteIds);
+  const athletesMerged = sortAthletesForBrowse(
+    athletesList.map((a) => mergeCoachReviewStatsIntoAthlete(a, reviewStatsMap))
+  );
+
   // Fetch next available slot per coach (earliest slot_date >= today)
   const today = new Date().toISOString().slice(0, 10);
   const { data: slots } = athleteIds.length
@@ -82,7 +92,7 @@ export default async function BrowsePage({
     }
   }
 
-  const athletesWithNext = athletesList.map((a) => ({
+  const athletesWithNext = athletesMerged.map((a) => ({
     ...a,
     nextAvailable: nextByAthlete.get(a.id) ?? null,
   }));

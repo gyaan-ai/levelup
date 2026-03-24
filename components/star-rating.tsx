@@ -12,9 +12,12 @@ export function StarRating({
   reviewCount?: number | string | null;
   size?: 'sm' | 'md' | 'lg';
 }) {
-  const rating = Number(averageRating) || 0;
-  const count = Number(reviewCount) || 0;
-  const filled = Math.round(rating);
+  const raw =
+    typeof averageRating === 'string' ? parseFloat(averageRating) : Number(averageRating);
+  const rating = Number.isFinite(raw) && raw > 0 ? Math.min(5, raw) : 0;
+  const countRaw = typeof reviewCount === 'string' ? parseInt(reviewCount, 10) : Number(reviewCount);
+  const count = Number.isFinite(countRaw) && countRaw > 0 ? Math.floor(countRaw) : 0;
+  const filled = Math.min(5, Math.round(rating));
   const displayLabel = rating > 0 ? rating.toFixed(1) : 'New';
   const starSize = size === 'sm' ? 'h-3.5 w-3.5' : size === 'lg' ? 'h-5 w-5' : 'h-4 w-4';
 
