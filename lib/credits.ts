@@ -18,8 +18,8 @@ export type UserCredit = {
 /**
  * Get total available (unused, non-expired) credit balance for a user
  */
-export async function getUserCreditBalance(userId: string): Promise<number> {
-  const admin = createAdminClient();
+export async function getUserCreditBalance(userId: string, tenantSlug = 'the-guild'): Promise<number> {
+  const admin = createAdminClient(tenantSlug);
   
   const { data, error } = await admin
     .from('user_credits')
@@ -39,8 +39,8 @@ export async function getUserCreditBalance(userId: string): Promise<number> {
 /**
  * Get all available credits for a user (for display purposes)
  */
-export async function getUserCredits(userId: string): Promise<UserCredit[]> {
-  const admin = createAdminClient();
+export async function getUserCredits(userId: string, tenantSlug = 'the-guild'): Promise<UserCredit[]> {
+  const admin = createAdminClient(tenantSlug);
   
   const { data, error } = await admin
     .from('user_credits')
@@ -77,7 +77,7 @@ export async function grantCredit({
   tenantSlug?: string;
 }): Promise<{ success: boolean; creditId?: string; error?: string }> {
   // Use admin client to bypass RLS for granting credits
-  const admin = createAdminClient(tenantSlug);
+  const admin = createAdminClient(tenantSlug ?? 'the-guild');
 
   // Create the credit
   const { data: credit, error: creditError } = await admin
@@ -127,7 +127,7 @@ export async function applyCredits({
   tenantSlug?: string;
 }): Promise<{ usedAmount: number; creditIds: string[] }> {
   // Use admin client to bypass RLS for using credits
-  const admin = createAdminClient(tenantSlug);
+  const admin = createAdminClient(tenantSlug ?? 'the-guild');
 
   // Get available credits ordered by expiration (use oldest first)
   const credits = await getUserCredits(userId);
@@ -195,8 +195,8 @@ export async function applyCredits({
 /**
  * Get credit transaction history for a user
  */
-export async function getCreditHistory(userId: string) {
-  const admin = createAdminClient();
+export async function getCreditHistory(userId: string, tenantSlug = 'the-guild') {
+  const admin = createAdminClient(tenantSlug);
 
   const { data, error } = await admin
     .from('credit_transactions')

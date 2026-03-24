@@ -3,7 +3,6 @@ import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
-import { getStripeInstance } from '@/lib/stripe/webhooks';
 import { createNotification } from '@/lib/notifications';
 import { differenceInHours } from 'date-fns';
 import { formatEST } from '@/lib/format-date';
