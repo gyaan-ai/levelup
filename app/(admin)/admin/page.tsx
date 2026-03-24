@@ -189,6 +189,7 @@ export default async function AdminPage() {
       parent_email: emailByUserId.get(s.parent_id) ?? '—',
       athlete_name: o ? `${o.first_name} ${o.last_name}` : '—',
       athlete_school: o?.school ?? '—',
+      facility_id: fo?.id ?? '',
       facility_name: fo?.name ?? '—',
       participant_amount_paid_sum: participantAmountPaidSum(s),
     };

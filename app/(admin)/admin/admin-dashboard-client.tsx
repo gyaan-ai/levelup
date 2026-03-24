@@ -91,6 +91,7 @@ export type AdminSession = {
   parent_email: string;
   athlete_name: string;
   athlete_school: string;
+  facility_id: string;
   facility_name: string;
   /** Sum of session_participants.amount_paid - what parents actually paid (from Stripe) */
   participant_amount_paid_sum: number;
