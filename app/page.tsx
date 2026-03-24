@@ -98,7 +98,7 @@ export default async function HomePage() {
 
       {/* Social Proof - Parents trust us */}
       {featuredReviews.length > 0 && (
-        <section className="py-12 px-6 border-t border-accent/20" className="bg-black">
+        <section className="py-12 px-6 border-t border-accent/20 bg-black">
           <p className="text-center text-xs text-white/40 uppercase tracking-widest mb-6">
             What Parents Say
           </p>
@@ -124,7 +124,7 @@ export default async function HomePage() {
       )}
 
       {/* How It Works - 3 simple steps, training-focused */}
-      <section id="how-it-works" className="py-12 px-6 border-t border-accent/20" className="bg-black">
+      <section id="how-it-works" className="py-12 px-6 border-t border-accent/20 bg-black">
         <p className="text-center text-xs text-white/40 uppercase tracking-widest mb-8">
           How It Works
         </p>
@@ -171,7 +171,7 @@ export default async function HomePage() {
       </section>
 
       {/* For Coaches - minimal footer-style */}
-      <section className="py-10 px-6 border-t border-accent/20" className="bg-black">
+      <section className="py-10 px-6 border-t border-accent/20 bg-black">
         <div className="max-w-sm mx-auto text-center">
           <p className="text-white/60 text-sm mb-3">
             NCAA wrestler or elite coach?
