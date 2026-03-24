@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export type UserCredit = {
   id: string;
@@ -67,17 +68,20 @@ export async function grantCredit({
   reason,
   sourceType,
   sourceId,
+  tenantSlug,
 }: {
   userId: string;
   amount: number;
   reason: string;
   sourceType: 'cancellation' | 'refund' | 'manual' | 'promo';
   sourceId?: string;
+  tenantSlug?: string;
 }): Promise<{ success: boolean; creditId?: string; error?: string }> {
-  const supabase = await createClient();
+  // Use admin client to bypass RLS for granting credits
+  const admin = createAdminClient(tenantSlug);
 
   // Create the credit
-  const { data: credit, error: creditError } = await supabase
+  const { data: credit, error: creditError } = await admin
     .from('user_credits')
     .insert({
       user_id: userId,
@@ -95,7 +99,7 @@ export async function grantCredit({
   }
 
   // Log the transaction
-  await supabase.from('credit_transactions').insert({
+  await admin.from('credit_transactions').insert({
     user_id: userId,
     credit_id: credit.id,
     amount,
@@ -115,13 +119,16 @@ export async function useCredits({
   amount,
   sessionId,
   description,
+  tenantSlug,
 }: {
   userId: string;
   amount: number;
   sessionId: string;
   description: string;
+  tenantSlug?: string;
 }): Promise<{ usedAmount: number; creditIds: string[] }> {
-  const supabase = await createClient();
+  // Use admin client to bypass RLS for using credits
+  const admin = createAdminClient(tenantSlug);
 
   // Get available credits ordered by expiration (use oldest first)
   const credits = await getUserCredits(userId);
@@ -137,7 +144,7 @@ export async function useCredits({
 
     if (amountToUse === creditAmount) {
       // Use entire credit
-      await supabase
+      await admin
         .from('user_credits')
         .update({
           used_at: new Date().toISOString(),
@@ -146,7 +153,7 @@ export async function useCredits({
         .eq('id', credit.id);
     } else {
       // Partial use - mark original as used and create new credit for remainder
-      await supabase
+      await admin
         .from('user_credits')
         .update({
           used_at: new Date().toISOString(),
@@ -156,7 +163,7 @@ export async function useCredits({
         .eq('id', credit.id);
 
       // Create new credit for the remainder
-      await supabase.from('user_credits').insert({
+      await admin.from('user_credits').insert({
         user_id: userId,
         amount: creditAmount - amountToUse,
         reason: `Remainder from partial credit use`,
@@ -167,7 +174,7 @@ export async function useCredits({
     }
 
     // Log the debit transaction
-    await supabase.from('credit_transactions').insert({
+    await admin.from('credit_transactions').insert({
       user_id: userId,
       credit_id: credit.id,
       amount: -amountToUse,

@@ -103,6 +103,7 @@ export async function POST(
             reason: `Cancelled: ${sessionDate} with ${coachName}. ${reason}`,
             sourceType: 'cancellation',
             sourceId: sessionId,
+            tenantSlug: tenant.slug,
           });
           if (result.success) {
             creditsGranted++;
@@ -120,6 +121,7 @@ export async function POST(
           reason: `Self-cancelled: ${sessionDate} with ${coachName}`,
           sourceType: 'cancellation',
           sourceId: sessionId,
+          tenantSlug: tenant.slug,
         });
         if (result.success) {
           creditsGranted = 1;

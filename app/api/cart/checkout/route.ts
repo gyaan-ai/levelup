@@ -194,6 +194,7 @@ export async function POST(req: NextRequest) {
           amount: meta.price,
           sessionId: meta.session_id,
           description: `Session booking paid with credits`,
+          tenantSlug: tenant.slug,
         });
 
         // Register the wrestler for the session

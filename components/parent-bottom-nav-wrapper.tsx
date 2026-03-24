@@ -23,6 +23,7 @@ const PARENT_ROUTES = [
   '/wrestlers',
   '/sessions',
   '/cart',
+  '/wallet',
 ];
 
 const COACH_ROUTES = [

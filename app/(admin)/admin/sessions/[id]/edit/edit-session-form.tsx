@@ -76,7 +76,7 @@ export function EditSessionForm({
   const SESSION_PRESETS = {
     small_group: { label: 'Small Group', price: 30, maxParticipants: 6 },
     partner: { label: 'Partner Session', price: 50, maxParticipants: 2 },
-    private: { label: 'Private Session', price: 60, maxParticipants: 1 },
+    private: { label: 'Private Session', price: 75, maxParticipants: 1 },
   } as const;
 
   // Only change type - don't auto-fill price/max on existing sessions (coach may have customized)
@@ -195,7 +195,7 @@ export function EditSessionForm({
               <SelectContent>
                 <SelectItem value="small_group">Small Group (suggested $30/person)</SelectItem>
                 <SelectItem value="partner">Partner Session (suggested $50/person)</SelectItem>
-                <SelectItem value="private">Private Session (suggested $60)</SelectItem>
+                <SelectItem value="private">Private Session (suggested $75)</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground mt-1">

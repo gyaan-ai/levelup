@@ -6,7 +6,7 @@ import { getParentYouthWrestlerIds } from '@/lib/parent-wrestlers';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { User, CreditCard, Calendar, DollarSign } from 'lucide-react';
+import { User, CreditCard, Calendar, DollarSign, Wallet } from 'lucide-react';
 import { AccountSignOut } from '@/components/account-sign-out';
 import { RedeemCodeCard } from './redeem-code-card';
 import { AccountPhoneCard } from './account-phone-card';
@@ -101,6 +101,24 @@ export default async function AccountPage() {
         <AccountPhoneCard initialPhone={(userData as { phone?: string | null })?.phone ?? null} />
 
         <RedeemCodeCard hasEntitlements={hasEarlyAdopterEntitlements} />
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Wallet className="h-4 w-4" />
+              My Wallet
+            </CardTitle>
+            <CardDescription>View credits and transaction history</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <p className="text-sm text-muted-foreground mb-3">Credits from cancelled sessions are stored here and automatically applied at checkout.</p>
+            <Link href="/wallet">
+              <Button variant="outline" className="w-full min-h-[44px] touch-manipulation">
+                View my wallet
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader className="pb-2">

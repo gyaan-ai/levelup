@@ -91,15 +91,17 @@ export async function POST(req: NextRequest) {
     const max = Math.min(20, Math.max(2, Number(maxParticipants) || 6));
     const duration = Math.min(120, Math.max(30, Number(durationMinutes) || 60));
 
-    // Coach must exist
+    // Coach must exist - also get payout rate
     const { data: athlete, error: athleteErr } = await admin
       .from('athletes')
-      .select('id')
+      .select('id, payout_rate, rate_tier')
       .eq('id', athleteId)
       .single();
     if (athleteErr || !athlete) {
       return NextResponse.json({ error: 'Coach not found' }, { status: 404 });
     }
+    // Default to 80% (0.8000), founding coaches get 83.33% (0.8333)
+    const coachPayoutRate = (athlete as { payout_rate?: number }).payout_rate ?? 0.8000;
 
     // Facility must exist
     const { data: facility, error: facilityErr } = await admin
@@ -151,6 +153,7 @@ export async function POST(req: NextRequest) {
         athlete_paid: false,
         focus_area: focusArea && String(focusArea).trim() ? String(focusArea).trim() : null,
         focus_area_2: focusArea2 && String(focusArea2).trim() ? String(focusArea2).trim() : null,
+        coach_payout_rate: coachPayoutRate,
       })
       .select('id, partner_invite_code, scheduled_datetime, max_participants, price_per_participant')
       .single();
