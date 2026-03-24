@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Copy, Check } from 'lucide-react';
+import { Copy, Check, Plus, X } from 'lucide-react';
 import { formatEST } from '@/lib/format-date';
 import { SESSION_FOCUS_AREAS } from '@/lib/focus-areas';
 
@@ -29,6 +29,8 @@ const SESSION_PRESETS = {
 
 type SessionTypeKey = keyof typeof SESSION_PRESETS;
 
+type DateTimeEntry = { date: string; time: string };
+
 export function CreateSessionForm({
   athletes,
   facilities,
@@ -39,8 +41,8 @@ export function CreateSessionForm({
   const [sessionType, setSessionType] = useState<SessionTypeKey>('small_group');
   const [athleteId, setAthleteId] = useState('');
   const [facilityId, setFacilityId] = useState('');
-  const [scheduledDate, setScheduledDate] = useState('');
-  const [scheduledTime, setScheduledTime] = useState('');
+  // Support multiple dates
+  const [dateTimes, setDateTimes] = useState<DateTimeEntry[]>([{ date: '', time: '' }]);
   const [durationMinutes, setDurationMinutes] = useState(60);
   const [maxParticipants, setMaxParticipants] = useState(6);
   const [pricePerParticipant, setPricePerParticipant] = useState(30);
@@ -57,13 +59,13 @@ export function CreateSessionForm({
   };
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<{
+  const [results, setResults] = useState<Array<{
     shareUrl: string;
     partnerInviteCode: string;
     scheduledDatetime: string;
     maxParticipants: number;
     pricePerParticipant: number;
-  } | null>(null);
+  }>>([]);
   const [copied, setCopied] = useState(false);
   const [focusAreaList, setFocusAreaList] = useState<string[]>([]);
 
@@ -76,44 +78,78 @@ export function CreateSessionForm({
 
   const focusOptions = focusAreaList.length > 0 ? focusAreaList : [...SESSION_FOCUS_AREAS];
 
+  // Add a new date/time entry
+  const addDateTime = () => {
+    // Copy time from first entry if available
+    const lastTime = dateTimes[dateTimes.length - 1]?.time || '';
+    setDateTimes([...dateTimes, { date: '', time: lastTime }]);
+  };
+
+  // Remove a date/time entry
+  const removeDateTime = (index: number) => {
+    if (dateTimes.length > 1) {
+      setDateTimes(dateTimes.filter((_, i) => i !== index));
+    }
+  };
+
+  // Update a specific date/time entry
+  const updateDateTime = (index: number, field: 'date' | 'time', value: string) => {
+    const updated = [...dateTimes];
+    updated[index] = { ...updated[index], [field]: value };
+    setDateTimes(updated);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    setResult(null);
-    if (!athleteId || !facilityId || !scheduledDate || !scheduledTime) {
-      setError('Please select coach, facility, date, and time.');
+    setResults([]);
+    
+    // Validate all date/times are filled
+    const validDateTimes = dateTimes.filter(dt => dt.date && dt.time);
+    if (!athleteId || !facilityId || validDateTimes.length === 0) {
+      setError('Please select coach, facility, and at least one date/time.');
       return;
     }
+    
     setLoading(true);
+    const createdSessions: typeof results = [];
+    
     try {
-      const res = await fetch('/api/admin/sessions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          athleteId,
-          facilityId,
-          scheduledDate,
-          scheduledTime,
-          durationMinutes,
-          maxParticipants,
-          pricePerParticipant,
-          sessionType,
-          focusArea: focusArea || undefined,
-          focusArea2: focusArea2 || undefined,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || 'Failed to create session');
-        return;
+      // Create a session for each date/time
+      for (const dt of validDateTimes) {
+        const res = await fetch('/api/admin/sessions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            athleteId,
+            facilityId,
+            scheduledDate: dt.date,
+            scheduledTime: dt.time,
+            durationMinutes,
+            maxParticipants,
+            pricePerParticipant,
+            sessionType,
+            focusArea: focusArea || undefined,
+            focusArea2: focusArea2 || undefined,
+          }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setError(data.error || `Failed to create session for ${dt.date}`);
+          continue;
+        }
+        createdSessions.push({
+          shareUrl: data.shareUrl,
+          partnerInviteCode: data.partnerInviteCode,
+          scheduledDatetime: data.scheduledDatetime,
+          maxParticipants: data.maxParticipants,
+          pricePerParticipant: data.pricePerParticipant,
+        });
       }
-      setResult({
-        shareUrl: data.shareUrl,
-        partnerInviteCode: data.partnerInviteCode,
-        scheduledDatetime: data.scheduledDatetime,
-        maxParticipants: data.maxParticipants,
-        pricePerParticipant: data.pricePerParticipant,
-      });
+      
+      if (createdSessions.length > 0) {
+        setResults(createdSessions);
+      }
     } catch {
       setError('Something went wrong');
     } finally {
@@ -145,39 +181,56 @@ export function CreateSessionForm({
           </div>
         )}
 
-        {result ? (
+{results.length > 0 ? (
           <div className="space-y-4 rounded-lg border bg-muted/30 p-4">
-            <p className="font-medium text-foreground">Session created</p>
-            <p className="text-sm text-muted-foreground">
-              {formatEST(new Date(result.scheduledDatetime), 'EEEE, MMM d, yyyy h:mm a')}
-              {' · '}
-              Up to {result.maxParticipants} participants · ${Number(result.pricePerParticipant).toFixed(2)}/person
+            <p className="font-medium text-foreground">
+              {results.length} session{results.length > 1 ? 's' : ''} created
             </p>
-            <div className="flex flex-wrap items-center gap-2">
-              <Input
-                readOnly
-                value={result.shareUrl}
-                className="font-mono text-sm"
-              />
-              <Button variant="outline" size="sm" onClick={copyLink} className="gap-2">
-                {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                {copied ? 'Copied' : 'Copy link'}
-              </Button>
+            <div className="space-y-3 max-h-64 overflow-y-auto">
+              {results.map((result, idx) => (
+                <div key={idx} className="border-b border-border/50 pb-3 last:border-0">
+                  <p className="text-sm text-muted-foreground mb-2">
+                    {formatEST(new Date(result.scheduledDatetime), 'EEEE, MMM d, yyyy h:mm a')}
+                    {' · '}
+                    Up to {result.maxParticipants} participants · ${Number(result.pricePerParticipant).toFixed(2)}/person
+                  </p>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Input
+                      readOnly
+                      value={result.shareUrl}
+                      className="font-mono text-xs h-8"
+                    />
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => {
+                        navigator.clipboard.writeText(result.shareUrl);
+                        setCopied(true);
+                        setTimeout(() => setCopied(false), 1500);
+                      }} 
+                      className="gap-1 h-8"
+                    >
+                      <Copy className="h-3 w-3" />
+                      Copy
+                    </Button>
+                  </div>
+                </div>
+              ))}
             </div>
             <p className="text-xs text-muted-foreground">
-              Share this link with parents. They can open it, sign in, choose their wrestler, and join the session.
+              Share these links with parents. They can open it, sign in, choose their wrestler, and join.
             </p>
             <div className="flex flex-wrap gap-2 pt-1">
               <Button asChild variant="default" size="sm">
                 <Link href="/admin?tab=sessions">View in Admin → Sessions</Link>
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => setResult(null)}>
-                Create another session
+              <Button variant="ghost" size="sm" onClick={() => {
+                setResults([]);
+                setDateTimes([{ date: '', time: '' }]);
+              }}>
+                Create more sessions
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground">
-              If the new row doesn’t appear yet, open Sessions and click <strong className="text-foreground">Refresh list</strong>.
-            </p>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -269,28 +322,55 @@ export function CreateSessionForm({
                 </SelectContent>
               </Select>
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="date">Date</Label>
-                <Input
-                  id="date"
-                  type="date"
-                  value={scheduledDate}
-                  onChange={(e) => setScheduledDate(e.target.value)}
-                  min={today}
-                  required
-                />
+            {/* Multi-date support */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label>Date(s) & Time</Label>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={addDateTime}
+                  className="gap-1 h-7 text-xs"
+                >
+                  <Plus className="h-3 w-3" /> Add date
+                </Button>
               </div>
-              <div>
-                <Label htmlFor="time">Time</Label>
-                <Input
-                  id="time"
-                  type="time"
-                  value={scheduledTime}
-                  onChange={(e) => setScheduledTime(e.target.value)}
-                  required
-                />
-              </div>
+              {dateTimes.map((dt, idx) => (
+                <div key={idx} className="flex items-center gap-2">
+                  <Input
+                    type="date"
+                    value={dt.date}
+                    onChange={(e) => updateDateTime(idx, 'date', e.target.value)}
+                    min={today}
+                    className="flex-1"
+                    required={idx === 0}
+                  />
+                  <Input
+                    type="time"
+                    value={dt.time}
+                    onChange={(e) => updateDateTime(idx, 'time', e.target.value)}
+                    className="w-32"
+                    required={idx === 0}
+                  />
+                  {dateTimes.length > 1 && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeDateTime(idx)}
+                      className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  )}
+                </div>
+              ))}
+              {dateTimes.length > 1 && (
+                <p className="text-xs text-muted-foreground">
+                  Creating {dateTimes.filter(dt => dt.date && dt.time).length} sessions with the same settings
+                </p>
+              )}
             </div>
             <div className="grid grid-cols-3 gap-4">
               <div>
@@ -328,8 +408,13 @@ export function CreateSessionForm({
                 />
               </div>
             </div>
-            <Button type="submit" disabled={loading}>
-              {loading ? 'Creating…' : 'Create session & get link'}
+            <Button type="submit" disabled={loading} className="w-full">
+              {loading 
+                ? 'Creating…' 
+                : dateTimes.filter(dt => dt.date && dt.time).length > 1 
+                  ? `Create ${dateTimes.filter(dt => dt.date && dt.time).length} sessions`
+                  : 'Create session & get link'
+              }
             </Button>
           </form>
         )}

@@ -31,6 +31,7 @@ import {
   Wallet,
   CreditCard,
   Copy,
+  CopyPlus,
   Check,
   Pencil,
   Plus,
@@ -308,6 +309,7 @@ export function AdminDashboardClient({
   const [sessionTypeFilter, setSessionTypeFilter] = useState<string>('all');
   const [sessionCoachFilter, setSessionCoachFilter] = useState<string>('all');
   const [copiedSessionId, setCopiedSessionId] = useState<string | null>(null);
+  const [duplicatingSessionId, setDuplicatingSessionId] = useState<string | null>(null);
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
   const [sessionDeleteLoading, setSessionDeleteLoading] = useState(false);
   const [sessionCompletingId, setSessionCompletingId] = useState<string | null>(null);
@@ -858,6 +860,48 @@ export function AdminDashboardClient({
     }
   };
 
+  // Duplicate a session (creates new session with same settings, for next week by default)
+  const handleDuplicateSession = async (session: AdminSession) => {
+    setDuplicatingSessionId(session.id);
+    try {
+      // Calculate next week's date (same day of week)
+      const originalDate = new Date(session.scheduled_datetime);
+      const nextWeek = new Date(originalDate);
+      nextWeek.setDate(nextWeek.getDate() + 7);
+      
+      const scheduledDate = nextWeek.toISOString().split('T')[0];
+      const scheduledTime = originalDate.toTimeString().slice(0, 5);
+      
+      const res = await fetch('/api/admin/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          athleteId: session.athlete_id,
+          facilityId: session.facility_id,
+          scheduledDate,
+          scheduledTime,
+          durationMinutes: session.duration_minutes || 60,
+          maxParticipants: session.max_participants || 6,
+          pricePerParticipant: session.price_per_participant || 30,
+          sessionType: session.session_type === 'group' ? 'small_group' : session.session_type === '2-athlete' ? 'partner' : 'private',
+          focusArea: session.focus_area || undefined,
+        }),
+      });
+      
+      if (res.ok) {
+        router.refresh();
+        alert(`Session duplicated for ${nextWeek.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}`);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || 'Failed to duplicate session');
+      }
+    } catch {
+      alert('Failed to duplicate session');
+    } finally {
+      setDuplicatingSessionId(null);
+    }
+  };
+
   const statusBadge = (status: string) => {
     const isOpen = status === 'scheduled' || status === 'pending_payment';
     const isClosed = status === 'completed' || status === 'cancelled' || status === 'no-show';
@@ -1272,10 +1316,20 @@ export function AdminDashboardClient({
                           <td className="py-3 px-4 text-right">
                             <div className="flex items-center justify-end gap-2">
                               {shareUrl && (
-                                <Button variant="ghost" size="sm" className="h-8" onClick={handleCopy}>
+                                <Button variant="ghost" size="sm" className="h-8" onClick={handleCopy} title="Copy share link">
                                   {copiedSessionId === s.id ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
                                 </Button>
                               )}
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="h-8" 
+                                onClick={() => handleDuplicateSession(s)}
+                                disabled={duplicatingSessionId === s.id}
+                                title="Duplicate session (next week)"
+                              >
+                                {duplicatingSessionId === s.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CopyPlus className="h-3.5 w-3.5" />}
+                              </Button>
                               {showSessionSmsCopyAndTextGroup(s) && (
                                 <Button
                                   variant="ghost"
