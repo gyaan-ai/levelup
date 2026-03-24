@@ -20,6 +20,15 @@ import { SESSION_FOCUS_AREAS } from '@/lib/focus-areas';
 type Athlete = { id: string; name: string; school: string };
 type Facility = { id: string; name: string; school: string; address?: string | null };
 
+// Session type presets
+const SESSION_PRESETS = {
+  small_group: { label: 'Small Group', price: 30, maxParticipants: 6, duration: 60 },
+  partner: { label: 'Partner Session', price: 50, maxParticipants: 2, duration: 60 },
+  private: { label: 'Private Session', price: 60, maxParticipants: 1, duration: 60 },
+} as const;
+
+type SessionTypeKey = keyof typeof SESSION_PRESETS;
+
 export function CreateSessionForm({
   athletes,
   facilities,
@@ -27,6 +36,7 @@ export function CreateSessionForm({
   athletes: Athlete[];
   facilities: Facility[];
 }) {
+  const [sessionType, setSessionType] = useState<SessionTypeKey>('small_group');
   const [athleteId, setAthleteId] = useState('');
   const [facilityId, setFacilityId] = useState('');
   const [scheduledDate, setScheduledDate] = useState('');
@@ -36,6 +46,15 @@ export function CreateSessionForm({
   const [pricePerParticipant, setPricePerParticipant] = useState(30);
   const [focusArea, setFocusArea] = useState('');
   const [focusArea2, setFocusArea2] = useState('');
+
+  // Auto-fill fields when session type changes
+  const handleSessionTypeChange = (type: SessionTypeKey) => {
+    setSessionType(type);
+    const preset = SESSION_PRESETS[type];
+    setPricePerParticipant(preset.price);
+    setMaxParticipants(preset.maxParticipants);
+    setDurationMinutes(preset.duration);
+  };
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{
@@ -78,6 +97,7 @@ export function CreateSessionForm({
           durationMinutes,
           maxParticipants,
           pricePerParticipant,
+          sessionType,
           focusArea: focusArea || undefined,
           focusArea2: focusArea2 || undefined,
         }),
@@ -161,6 +181,24 @@ export function CreateSessionForm({
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Session Type Selector - First */}
+            <div>
+              <Label htmlFor="sessionType">Session Type</Label>
+              <Select value={sessionType} onValueChange={(v) => handleSessionTypeChange(v as SessionTypeKey)}>
+                <SelectTrigger id="sessionType">
+                  <SelectValue placeholder="Select session type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="small_group">Small Group ($30/person, up to 6)</SelectItem>
+                  <SelectItem value="partner">Partner Session ($50/person, 2 wrestlers)</SelectItem>
+                  <SelectItem value="private">Private Session ($60, 1-on-1)</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Suggested price: ${SESSION_PRESETS[sessionType].price}/person. You can override below.
+              </p>
+            </div>
+
             <div>
               <Label htmlFor="coach">Coach</Label>
               <Select value={athleteId} onValueChange={setAthleteId} required>

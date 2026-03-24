@@ -54,6 +54,7 @@ import {
 import Link from 'next/link';
 import { ProfileImage } from '@/components/profile-image';
 import { CapacityBadge } from '@/components/capacity-badge';
+import { SessionTypeBadge } from '@/components/session-type-badge';
 import { formatEST, APP_TIMEZONE } from '@/lib/format-date';
 import { formatInTimeZone, toZonedTime } from 'date-fns-tz';
 import { startOfWeek, endOfWeek, addWeeks } from 'date-fns';
@@ -1218,6 +1219,7 @@ export function AdminDashboardClient({
                 <thead className="bg-muted/50">
                   <tr>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Date / Time</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Type</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Coach</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Facility</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Status</th>
@@ -1253,6 +1255,9 @@ export function AdminDashboardClient({
                           <td className="py-3 px-4">
                             <div className="font-medium">{formatEST(new Date(s.scheduled_datetime), 'MMM d, yyyy')}</div>
                             <div className="text-xs text-muted-foreground">{formatEST(new Date(s.scheduled_datetime), 'h:mm a')}</div>
+                          </td>
+                          <td className="py-3 px-4">
+                            <SessionTypeBadge sessionType={s.session_type} sessionMode={s.session_mode} />
                           </td>
                           <td className="py-3 px-4">
                             <div className="font-medium">{s.athlete_name}</div>
@@ -1681,7 +1686,7 @@ export function AdminDashboardClient({
                   <tbody className="divide-y divide-border">
                     {financeData.coachBreakdown.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="py-12 text-center text-muted-foreground">
+<td colSpan={8} className="py-12 text-center text-muted-foreground">
                           <DollarSign className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
                           <p>No financial data for selected filters</p>
                         </td>

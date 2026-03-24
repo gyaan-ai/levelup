@@ -34,6 +34,7 @@ export async function POST(req: NextRequest) {
       durationMinutes?: number;
       maxParticipants?: number;
       pricePerParticipant?: number;
+      sessionType?: 'small_group' | 'partner' | 'private';
       focusArea?: string;
       focusArea2?: string;
     };
@@ -45,6 +46,7 @@ export async function POST(req: NextRequest) {
       durationMinutes = 60,
       maxParticipants = 8,
       pricePerParticipant: bodyPrice,
+      sessionType = 'small_group',
       focusArea,
       focusArea2,
     } = body;
@@ -127,8 +129,8 @@ export async function POST(req: NextRequest) {
         parent_id: athleteId,
         athlete_id: athleteId,
         facility_id: facilityId,
-        session_type: 'group',
-        session_mode: 'partner-invite',
+        session_type: sessionType === 'small_group' ? 'small_group' : sessionType === 'partner' ? 'partner' : 'private',
+        session_mode: sessionType === 'private' ? 'private' : 'partner-invite',
         join_policy: 'public',
         partner_invite_code: code,
         max_participants: max,
