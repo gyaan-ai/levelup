@@ -683,7 +683,7 @@ export function AdminDashboardClient({
                         <div className="flex flex-col items-center gap-2">
                           <Calendar className="h-8 w-8 text-muted-foreground/50" />
                           <p>No sessions match these filters.</p>
-                          <p className="text-xs">Try adjusting your filters or click "Clear filters".</p>
+                          <p className="text-xs">Try adjusting your filters or click &quot;Clear filters&quot;.</p>
                         </div>
                       </td>
                     </tr>
