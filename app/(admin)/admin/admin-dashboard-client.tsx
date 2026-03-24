@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -519,29 +520,35 @@ export function AdminDashboardClient({
           onSent={() => router.refresh()}
         />
       )}
-      <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-4 border-b border-border pb-4">
-        <div className="flex flex-wrap gap-2">
+      {/* Modern Tab Navigation */}
+      <div className="space-y-4">
+        <div className="flex items-center rounded-lg border border-border bg-card p-1.5 overflow-x-auto">
           {tabs.map((t) => (
-            <Button
+            <button
               key={t.id}
-              variant={tab === t.id ? 'default' : 'outline'}
-              size="sm"
               onClick={() => setTab(t.id)}
-              className="gap-2"
+              className={`flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-md whitespace-nowrap transition-all ${
+                tab === t.id
+                  ? 'bg-[#B89D60] text-black shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+              }`}
             >
               {t.icon}
               {t.label}
-            </Button>
+            </button>
           ))}
         </div>
-        <div className="flex flex-wrap items-center gap-2 border-t border-border pt-4 sm:border-l sm:border-t-0 sm:pt-0 sm:pl-4">
+        
+        {/* Quick Links Bar */}
+        <div className="flex flex-wrap items-center gap-2 px-1">
+          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider mr-2">Quick actions</span>
           {quickLinks.map(({ href, label, icon: Icon }) => (
             <Link
               key={href}
               href={href}
-              className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground border border-border rounded-md hover:bg-muted/50"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground rounded-full border border-border/50 bg-muted/30 hover:bg-muted/50 hover:border-border transition-all"
             >
-              <Icon className="h-4 w-4 shrink-0" />
+              <Icon className="h-3.5 w-3.5 shrink-0" />
               {label}
             </Link>
           ))}
@@ -651,29 +658,33 @@ export function AdminDashboardClient({
               </div>
             </div>
           </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
+          <CardContent className="p-0">
+            <div className="overflow-x-auto rounded-lg border border-border">
               <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-2 font-medium">Date / Time</th>
-                    <th className="text-left py-2 font-medium">Coach</th>
-                    <th className="text-left py-2 font-medium">Parent</th>
-                    <th className="text-left py-2 font-medium">Facility</th>
-                    <th className="text-left py-2 font-medium">Status</th>
-                    <th className="text-right py-2 font-medium">Spots</th>
-                    <th className="text-right py-2 font-medium">Total</th>
-                    <th className="text-right py-2 font-medium">Coach $</th>
-                    <th className="text-right py-2 font-medium">Share link</th>
-                    <th className="text-right py-2 font-medium">Cells / SMS</th>
-                    <th className="text-right py-2 font-medium">Actions</th>
+                <thead className="bg-muted/50 sticky top-0 z-10">
+                  <tr>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Date / Time</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Coach</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Parent</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Facility</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Status</th>
+                    <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Spots</th>
+                    <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Total</th>
+                    <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Coach $</th>
+                    <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Share link</th>
+                    <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Cells / SMS</th>
+                    <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-border">
                   {filteredSessions.length === 0 ? (
                     <tr>
-                      <td colSpan={11} className="py-8 text-center text-muted-foreground">
-                        No sessions match these filters. Click &quot;Clear filters&quot; or &quot;Refresh list&quot;.
+                      <td colSpan={11} className="py-12 text-center text-muted-foreground">
+                        <div className="flex flex-col items-center gap-2">
+                          <Calendar className="h-8 w-8 text-muted-foreground/50" />
+                          <p>No sessions match these filters.</p>
+                          <p className="text-xs">Try adjusting your filters or click "Clear filters".</p>
+                        </div>
                       </td>
                     </tr>
                   ) : (
@@ -688,43 +699,42 @@ export function AdminDashboardClient({
                         setTimeout(() => setCopiedSessionId(null), 2000);
                       };
                       return (
-                      <tr key={s.id} className="border-b last:border-0">
-                        <td className="py-2">
-                          {formatEST(new Date(s.scheduled_datetime), 'MMM d, yyyy')}
-                          <br />
-                          <span className="text-muted-foreground">
+                      <tr key={s.id} className="hover:bg-muted/30 transition-colors">
+                        <td className="py-3 px-4">
+                          <div className="font-medium">{formatEST(new Date(s.scheduled_datetime), 'MMM d, yyyy')}</div>
+                          <div className="text-xs text-muted-foreground">
                             {formatEST(new Date(s.scheduled_datetime), 'h:mm a')}
-                          </span>
+                          </div>
                         </td>
-                        <td className="py-2">
-                          <div>{s.athlete_name}</div>
-                          <div className="text-muted-foreground">{s.athlete_school}</div>
+                        <td className="py-3 px-4">
+                          <div className="font-medium">{s.athlete_name}</div>
+                          <div className="text-xs text-muted-foreground">{s.athlete_school}</div>
                         </td>
-                        <td className="py-2">
+                        <td className="py-3 px-4">
                           <a
                             href={`mailto:${s.parent_email}`}
-                            className="text-accent hover:underline"
+                            className="text-[#B89D60] hover:underline text-sm"
                           >
                             {s.parent_email}
                           </a>
                         </td>
-                        <td className="py-2">{s.facility_name}</td>
-                        <td className="py-2">{statusBadge(s.status)}</td>
-                        <td className="py-2 text-right">
+                        <td className="py-3 px-4 text-sm">{s.facility_name}</td>
+                        <td className="py-3 px-4">{statusBadge(s.status)}</td>
+                        <td className="py-3 px-4 text-right">
                           <CapacityBadge
                             current={s.current_participants}
                             max={s.max_participants ?? 1}
                             label=""
                           />
                         </td>
-                        <td className="py-2 text-right">${Number(s.total_price).toFixed(2)}</td>
-                        <td className="py-2 text-right">${Number(s.athlete_payment).toFixed(2)}</td>
-                        <td className="py-2 text-right">
+                        <td className="py-3 px-4 text-right font-medium tabular-nums">${Number(s.total_price).toFixed(2)}</td>
+                        <td className="py-3 px-4 text-right font-medium tabular-nums text-[#B89D60]">${Number(s.athlete_payment).toFixed(2)}</td>
+                        <td className="py-3 px-4 text-right">
                           {shareUrl ? (
                             <Button
                               variant="ghost"
                               size="sm"
-                              className="h-8 gap-1 text-accent hover:text-accent"
+                              className="h-8 gap-1 text-[#B89D60] hover:text-[#B89D60] hover:bg-[#B89D60]/10"
                               onClick={handleCopy}
                             >
                               {copiedSessionId === s.id ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
@@ -734,7 +744,7 @@ export function AdminDashboardClient({
                             <span className="text-muted-foreground text-xs">—</span>
                           )}
                         </td>
-                        <td className="py-2 text-right align-top">
+                        <td className="py-3 px-4 text-right align-top">
                           {showSessionSmsCopyAndTextGroup(s) ? (
                             <div className="flex flex-col gap-1 items-end">
                               <CopySessionPhonesButton sessionId={s.id} className="h-8 text-xs px-2" />
@@ -742,7 +752,7 @@ export function AdminDashboardClient({
                                 type="button"
                                 variant="outline"
                                 size="sm"
-                                className="h-8 gap-1 text-xs px-2 border-accent/50 text-accent"
+                                className="h-8 gap-1 text-xs px-2 border-[#B89D60]/50 text-[#B89D60] hover:bg-[#B89D60]/10"
                                 onClick={() => setTextGroupAdminSession(s)}
                               >
                                 <Smartphone className="h-3.5 w-3.5" />
@@ -753,9 +763,9 @@ export function AdminDashboardClient({
                             <span className="text-muted-foreground text-xs">—</span>
                           )}
                         </td>
-                        <td className="py-2 text-right">
+                        <td className="py-3 px-4 text-right">
                           <div className="flex items-center justify-end gap-2 flex-wrap">
-                            <Link href={`/admin/sessions/${s.id}/edit`} className="text-accent hover:underline text-sm">
+                            <Link href={`/admin/sessions/${s.id}/edit`} className="text-[#B89D60] hover:underline text-sm font-medium">
                               Edit
                             </Link>
                             {(s.status === 'scheduled' || s.status === 'pending_payment') && (
