@@ -59,7 +59,8 @@ export async function PATCH(
 
     const updates: Record<string, unknown> = {};
     if (body.session_type !== undefined && ['small_group', 'partner', 'private'].includes(body.session_type)) {
-      updates.session_type = body.session_type;
+      // Map UI values to DB constraint values: '1-on-1', '2-athlete', 'group'
+      updates.session_type = body.session_type === 'small_group' ? 'group' : body.session_type === 'partner' ? '2-athlete' : '1-on-1';
       // Also update session_mode based on type
       updates.session_mode = body.session_type === 'private' ? 'private' : 'partner-invite';
     }
