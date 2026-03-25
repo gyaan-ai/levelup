@@ -205,7 +205,7 @@ export function CoachHomeClient({
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-lg font-semibold text-foreground">Reviews</h2>
           {reviewCount > 0 && (
-            <Link href="/profile#reviews" className="text-sm text-accent font-medium">
+            <Link href="/coach-reviews" className="text-sm text-accent font-medium">
               See all {reviewCount} →
             </Link>
           )}

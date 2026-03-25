@@ -86,7 +86,12 @@ export default async function CoachHomePage() {
 
   const coachFirstName = athlete?.first_name ?? null;
   const averageRating = athlete?.average_rating ?? null;
-  const reviewCount = athlete?.review_count ?? 0;
+
+  // Get actual review count from database (not the cached column)
+  const { count: reviewCount } = await supabase
+    .from('reviews')
+    .select('*', { count: 'exact', head: true })
+    .eq('athlete_id', coachId);
 
   // Latest reviews (limit 3 for home)
   const { data: recentReviewsRaw } = await supabase
@@ -113,7 +118,7 @@ export default async function CoachHomePage() {
         thisMonthEarnings={thisMonthEarnings}
         coachFirstName={coachFirstName}
         averageRating={averageRating}
-        reviewCount={reviewCount}
+        reviewCount={reviewCount ?? 0}
         recentReviews={recentReviews}
       />
     </div>
