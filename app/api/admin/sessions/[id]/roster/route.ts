@@ -19,10 +19,10 @@ export async function GET(
     
     const admin = createAdminClient(tenant.slug);
 
-    // Fetch session with participants via JOIN - use exact same columns as page.tsx
+    // Fetch session with participants via JOIN
     const { data: sessionData, error } = await admin
       .from('sessions')
-      .select('id, session_participants(id, amount_paid, youth_wrestler_id)')
+      .select('id, session_participants(id, amount_paid, youth_wrestler_id, roster_first_name, roster_last_name, roster_photo_url)')
       .eq('id', sessionId)
       .maybeSingle();
 
@@ -38,12 +38,15 @@ export async function GET(
     const raw = sessionData.session_participants;
     const participants = Array.isArray(raw) ? raw : raw ? [raw] : [];
 
-    // Build roster - only use columns that exist
+    // Build roster with name data
     const roster = participants.map((p: Record<string, unknown>) => {
+      const firstName = (p.roster_first_name as string) || '';
+      const lastName = (p.roster_last_name as string) || '';
+      const name = `${firstName} ${lastName}`.trim() || (p.youth_wrestler_id ? 'Unknown' : 'Drop-in');
       return {
         id: p.id as string,
-        wrestlerName: p.youth_wrestler_id ? `Wrestler ${(p.id as string).slice(0, 4)}` : 'Drop-in',
-        photoUrl: null,
+        wrestlerName: name,
+        photoUrl: (p.roster_photo_url as string) || null,
         parentEmail: null,
         paid: Number(p.amount_paid ?? 0) > 0,
         amountPaid: Number(p.amount_paid ?? 0),
@@ -52,16 +55,7 @@ export async function GET(
       };
     });
 
-    return NextResponse.json({ 
-      roster,
-      debug: {
-        host,
-        sessionId,
-        tenant: tenant.slug,
-        sessionFound: !!sessionData,
-        rawParticipantsCount: participants.length,
-      }
-    });
+    return NextResponse.json({ roster });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const stack = err instanceof Error ? err.stack : undefined;
