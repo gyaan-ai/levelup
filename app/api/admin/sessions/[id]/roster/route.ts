@@ -33,6 +33,8 @@ export async function GET(
     .eq('session_id', sessionId)
     .order('created_at', { ascending: true });
 
+  console.log('[v0] Roster API - sessionId:', sessionId, 'tenant:', tenant.slug, 'participantCount:', participants?.length, 'error:', error?.message, 'firstParticipant:', participants?.[0]);
+
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
@@ -80,5 +82,5 @@ export async function GET(
     };
   });
 
-  return NextResponse.json({ roster });
+  return NextResponse.json({ roster, _debug: { sessionId, tenant: tenant.slug, rawCount: participants?.length } });
 }
