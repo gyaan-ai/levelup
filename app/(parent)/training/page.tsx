@@ -32,16 +32,8 @@ type SessionRow = {
   price_per_participant: number | null;
   athlete_id: string;
   facility_id: string;
-  athletes?: { id: string; first_name?: string; last_name?: string; school?: string } | null;
+  athletes?: { id: string; first_name?: string; last_name?: string; school?: string; photo_url?: string; average_rating?: number; review_count?: number } | null;
   facilities?: { id: string; name?: string; address?: string } | null;
-  session_participants?: Array<{
-    id?: string;
-    youth_wrestler_id?: string | null;
-    roster_first_name?: string | null;
-    roster_last_name?: string | null;
-    roster_photo_url?: string | null;
-    youth_wrestlers?: { id: string; first_name?: string; last_name?: string; photo_url?: string } | { id: string; first_name?: string; last_name?: string; photo_url?: string }[] | null;
-  } | null>;
 };
 
 export default async function TrainingPage({
@@ -164,12 +156,13 @@ export default async function TrainingPage({
       })();
   const pastDayEnd = dateParam ? dayEnd : now.toISOString();
 
-  // Query sessions using regular client
+  // Query sessions - use simple select first, then join coach/facility data
   const baseSelect = `
     id, scheduled_datetime, status, session_type, session_mode, join_policy, focus_area,
     current_participants, max_participants, total_price, price_per_participant,
-    athlete_id, facility_id, athletes(id, first_name, last_name, school, photo_url, average_rating, review_count), facilities(id, name, address),
-    session_participants(id, youth_wrestler_id, roster_first_name, roster_last_name, roster_photo_url, youth_wrestlers(id, first_name, last_name, photo_url))
+    athlete_id, facility_id,
+    athletes:athlete_id(id, first_name, last_name, school, photo_url, average_rating, review_count),
+    facilities:facility_id(id, name, address)
   `;
   const sessionQuery = (start: string, end: string) =>
     supabase.from('sessions').select(baseSelect).gte('scheduled_datetime', start).lte('scheduled_datetime', end);
@@ -184,6 +177,10 @@ export default async function TrainingPage({
     withOptFilters(sessionQuery(dayStart, dayEnd)).in('status', ['scheduled', 'pending_payment']).order('scheduled_datetime', { ascending: true }),
     withOptFilters(sessionQuery(pastDayStart, pastDayEnd)).in('status', ['completed', 'cancelled', 'no-show']).order('scheduled_datetime', { ascending: true }),
   ]);
+  
+  // Debug: log if there are errors
+  if (groupUpcoming.error) console.error('[v0] groupUpcoming error:', groupUpcoming.error);
+  if (groupPast.error) console.error('[v0] groupPast error:', groupPast.error);
   const seen = new Set<string>();
   let list: SessionRow[] = [];
   for (const row of [...(groupUpcoming.data ?? []), ...(groupPast.data ?? [])]) {
