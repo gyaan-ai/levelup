@@ -4,6 +4,10 @@
  * Coaches store cell on users.phone; we send only when present (with zelle-shaped fallback).
  */
 
+import { logMessage } from './message-log';
+
+export type SupabaseAdmin = import('@supabase/supabase-js').SupabaseClient;
+
 const getConfig = () => {
   const accountSid = process.env.TWILIO_ACCOUNT_SID;
   const authToken = process.env.TWILIO_AUTH_TOKEN;
@@ -22,10 +26,20 @@ export function normalizePhone(value: string | null | undefined): string | null 
   return null;
 }
 
+export type SmsLogContext = {
+  admin?: SupabaseAdmin;
+  messageType?: string;
+  recipientId?: string;
+  recipientLabel?: string;
+  sessionId?: string;
+  coachId?: string;
+};
+
 /**
  * Send an SMS. No-op if Twilio is not configured or to is invalid.
+ * Optionally logs to message_log if admin client is provided.
  */
-export async function sendSms(to: string, body: string): Promise<boolean> {
+export async function sendSms(to: string, body: string, logCtx?: SmsLogContext): Promise<boolean> {
   const config = getConfig();
   if (!config) return false;
   const phone = normalizePhone(to);
@@ -49,7 +63,36 @@ export async function sendSms(to: string, body: string): Promise<boolean> {
     if (!res.ok) {
       const err = await res.text();
       console.warn('Twilio SMS failed', res.status, err);
+      // Log failed SMS
+      if (logCtx?.admin) {
+        void logMessage(logCtx.admin, {
+          channel: 'sms',
+          recipientId: logCtx.recipientId,
+          recipientPhone: phone,
+          recipientLabel: logCtx.recipientLabel,
+          messageType: logCtx.messageType ?? 'sms',
+          body,
+          sessionId: logCtx.sessionId,
+          coachId: logCtx.coachId,
+          status: 'failed',
+          errorDetail: err,
+        });
+      }
       return false;
+    }
+    // Log successful SMS
+    if (logCtx?.admin) {
+      void logMessage(logCtx.admin, {
+        channel: 'sms',
+        recipientId: logCtx.recipientId,
+        recipientPhone: phone,
+        recipientLabel: logCtx.recipientLabel,
+        messageType: logCtx.messageType ?? 'sms',
+        body,
+        sessionId: logCtx.sessionId,
+        coachId: logCtx.coachId,
+        status: 'sent',
+      });
     }
     return true;
   } catch (e) {
@@ -57,8 +100,6 @@ export async function sendSms(to: string, body: string): Promise<boolean> {
     return false;
   }
 }
-
-export type SupabaseAdmin = import('@supabase/supabase-js').SupabaseClient;
 
 /** Prefer users.phone; fall back to athletes.zelle_email if it looks like a phone (coaches often put cell there for Zelle). */
 function pickCoachPhone(row: { phone?: string; zelle_email?: string } | null): string | null {
@@ -77,7 +118,8 @@ function pickCoachPhone(row: { phone?: string; zelle_email?: string } | null): s
 export async function sendCoachNewSignupSms(
   admin: SupabaseAdmin,
   coachUserId: string,
-  dateStr: string
+  dateStr: string,
+  sessionId?: string
 ): Promise<void> {
   const [{ data: userRow }, { data: athleteRow }] = await Promise.all([
     admin.from('users').select('phone').eq('id', coachUserId).maybeSingle(),
@@ -88,10 +130,15 @@ export async function sendCoachNewSignupSms(
     zelle_email: athleteRow?.zelle_email ?? undefined,
   });
   if (!phone) return;
-  await sendSms(
-    phone,
-    `LevelUp: Someone signed up for your session on ${dateStr}. Check My sessions in the app.`
-  );
+  const body = `LevelUp: Someone signed up for your session on ${dateStr}. Check My sessions in the app.`;
+  await sendSms(phone, body, {
+    admin,
+    messageType: 'coach_new_signup',
+    recipientId: coachUserId,
+    recipientLabel: 'Coach',
+    sessionId,
+    coachId: coachUserId,
+  });
 }
 
 /**
@@ -115,8 +162,12 @@ export async function sendCoachNewReviewSms(
   if (!phone) return;
   const r = Math.min(5, Math.max(1, Math.round(rating)));
   const starLabel = r === 1 ? '1-star' : `${r}-star`;
-  await sendSms(
-    phone,
-    `The Guild: You got a new ${starLabel} review. See it now: ${profileUrl}`
-  );
+  const body = `The Guild: You got a new ${starLabel} review. See it now: ${profileUrl}`;
+  await sendSms(phone, body, {
+    admin,
+    messageType: 'coach_new_review',
+    recipientId: coachAthleteId,
+    recipientLabel: 'Coach',
+    coachId: coachAthleteId,
+  });
 }

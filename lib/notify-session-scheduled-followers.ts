@@ -69,7 +69,14 @@ export async function notifySessionScheduledFollowers(
       const phone = normalizePhone(p.phone ?? undefined);
       if (!phone || sentPhones.has(phone)) continue;
       sentPhones.add(phone);
-      void sendSms(phone, smsBody);
+      void sendSms(phone, smsBody, {
+        admin,
+        messageType: 'coach_new_session',
+        recipientId: p.id,
+        recipientLabel: 'Parent (follower)',
+        sessionId: opts.sessionId,
+        coachId,
+      });
     }
   } catch (e) {
     console.warn('notifySessionScheduledFollowers failed:', e);
