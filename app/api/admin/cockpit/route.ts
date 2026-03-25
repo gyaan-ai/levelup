@@ -175,6 +175,38 @@ export async function GET(req: NextRequest) {
       // Table may not exist yet or drain not configured
     }
 
+    // Credits: total outstanding (unused, non-expired) credits owed to parents
+    let outstandingCredits = 0;
+    let creditsIssuedInRange = 0;
+    let creditsUsedInRange = 0;
+    try {
+      // Total outstanding credits (liability)
+      const { data: creditsData } = await admin
+        .from('user_credits')
+        .select('amount')
+        .is('used_at', null)
+        .gt('expires_at', new Date().toISOString());
+      outstandingCredits = (creditsData ?? []).reduce((sum: number, c: { amount: number }) => sum + Number(c.amount), 0);
+      
+      // Credits issued in range
+      const { data: issuedData } = await admin
+        .from('user_credits')
+        .select('amount')
+        .gte('created_at', dayStart)
+        .lte('created_at', dayEnd);
+      creditsIssuedInRange = (issuedData ?? []).reduce((sum: number, c: { amount: number }) => sum + Number(c.amount), 0);
+      
+      // Credits used in range
+      const { data: usedData } = await admin
+        .from('user_credits')
+        .select('amount')
+        .gte('used_at', dayStart)
+        .lte('used_at', dayEnd);
+      creditsUsedInRange = (usedData ?? []).reduce((sum: number, c: { amount: number }) => sum + Number(c.amount), 0);
+    } catch {
+      // user_credits table may not exist
+    }
+
     // Revenue: sum of amount_paid for participants created in range (each signup row).
     // Session-level fees (coach / Stripe / org) are summed once per distinct session.
     const bookingRowsRaw = bookingsRes.data ?? [];
@@ -473,6 +505,10 @@ export async function GET(req: NextRequest) {
       payoutsPaidList,
       revenueThatDay,
       bookingEconomics,
+      // Credits (liability for reschedules/cancellations)
+      outstandingCredits,
+      creditsIssuedInRange,
+      creditsUsedInRange,
       trends,
       trendCumulativeTotals,
       trendDays: trendDaysForResponse,

@@ -101,6 +101,10 @@ export type CockpitData = {
   };
   pageViews?: number;
   visitors?: number;
+  // Credits (liability)
+  outstandingCredits?: number;
+  creditsIssuedInRange?: number;
+  creditsUsedInRange?: number;
   trends: {
     parents: number[];
     coaches: number[];
@@ -1195,6 +1199,39 @@ export function AdminCockpitView() {
               Manage all payouts
               <ArrowUpRight className="h-3 w-3" />
             </Link>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Credits (Liability) */}
+      {(d.outstandingCredits ?? 0) > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CreditCard className="h-4 w-4 text-amber-500" />
+              Outstanding Credits
+            </CardTitle>
+            <CardDescription>
+              Credits owed to parents (from reschedules/cancellations)
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Total outstanding</span>
+              <span className="font-medium tabular-nums text-amber-500">${(d.outstandingCredits ?? 0).toFixed(2)}</span>
+            </div>
+            {(d.creditsIssuedInRange ?? 0) > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Issued this period</span>
+                <span className="font-medium tabular-nums">+${(d.creditsIssuedInRange ?? 0).toFixed(2)}</span>
+              </div>
+            )}
+            {(d.creditsUsedInRange ?? 0) > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Redeemed this period</span>
+                <span className="font-medium tabular-nums text-emerald-500">-${(d.creditsUsedInRange ?? 0).toFixed(2)}</span>
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
