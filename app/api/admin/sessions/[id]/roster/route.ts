@@ -33,6 +33,8 @@ export async function GET(
     .eq('session_id', sessionId)
     .order('created_at', { ascending: true });
 
+  console.log('[v0] Roster query for session:', sessionId, 'tenant:', tenant.slug, 'participants:', participants?.length, 'error:', error?.message);
+
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
