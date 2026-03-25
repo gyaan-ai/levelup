@@ -96,10 +96,21 @@ export function FindTrainingClient({
     setCoach(initialCoach || 'all');
   }, [initialDate, initialTime, initialLocation, initialCoach]);
 
-  // Filter sessions client-side by session type only
+  // Filter sessions client-side
+  // Hide invite-only sessions that are FULL (no value showing something user can't access)
+  // Show invite-only sessions with spots (creates FOMO/social proof)
   const openSessions = initialSessions.filter((s) => {
-    if (sessionType === 'all') return true;
-    return s.session_type === sessionType;
+    const isInviteOnly = (s as { join_policy?: string | null }).join_policy === 'invite_only';
+    const max = s.max_participants ?? 1;
+    const current = getEffectiveFilledCount(s);
+    const isFull = current >= max;
+    
+    // Hide full invite-only sessions
+    if (isInviteOnly && isFull) return false;
+    
+    // Session type filter
+    if (sessionType !== 'all' && s.session_type !== sessionType) return false;
+    return true;
   });
 
   const applyFilters = (overrides?: { type?: string; coachId?: string }) => {
