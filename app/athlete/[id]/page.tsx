@@ -446,7 +446,7 @@ export default async function AthleteProfilePage({
                     <div className="flex items-center gap-4 p-4 rounded-xl bg-zinc-900/50 border border-zinc-800/50 hover:border-zinc-700 transition-all">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <SessionTypeBadge sessionType={s.session_type ?? null} sessionMode={s.session_mode ?? null} size="sm" />
+                          <SessionTypeBadge sessionType={s.session_type ?? null} sessionMode={s.session_mode ?? null} />
                           {s.focus_area && (
                             <span className="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400">
                               {s.focus_area}
