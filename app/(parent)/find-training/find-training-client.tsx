@@ -153,14 +153,24 @@ export function FindTrainingClient({
     const inCart = isInCart(session.id);
     const isInviteOnly = (session as { join_policy?: string | null }).join_policy === 'invite_only';
     const isPartner = session.session_type === 'partner';
+    const isPrivate = session.session_type === 'private';
     const duration = (session as { duration_minutes?: number | null }).duration_minutes;
     
     // Determine spot display color per spec
     const getSpotColor = () => {
-      if (openSlots === 0) return 'text-zinc-500';
-      if (openSlots === 1) return 'text-red-400'; // Last spot - red
+      if (openSlots === 0) return 'text-zinc-500'; // Full - grey
+      if (isPrivate && openSlots > 0) return 'text-emerald-400'; // Private available - green
       if (isPartner && current === 1) return 'text-amber-400'; // Waiting on partner - orange
-      return 'text-zinc-500';
+      if (openSlots === 1) return 'text-red-400'; // Last spot - red
+      return 'text-zinc-400'; // Normal - white/grey
+    };
+    
+    // Get spot display text per spec
+    const getSpotText = () => {
+      if (openSlots === 0) return `Full · ${current}/${max}`;
+      if (isPrivate) return 'Available';
+      if (isPartner && current === 1) return `${current}/${max} · Waiting on partner`;
+      return `${current}/${max} · ${openSlots} spot${openSlots !== 1 ? 's' : ''} left`;
     };
     
     // Session is not bookable if full OR invite-only (without access)
@@ -274,12 +284,7 @@ export function FindTrainingClient({
               )}
               <span className={cn("flex items-center gap-1", getSpotColor())}>
                 <Users className="h-3 w-3" />
-                {current}/{max}
-                {openSlots > 0 ? (
-                  isPartner && current === 1 
-                    ? ' · Waiting on partner'
-                    : ` · ${openSlots} spot${openSlots !== 1 ? 's' : ''} left`
-                ) : ' · Full'}
+                {getSpotText()}
               </span>
             </div>
 
