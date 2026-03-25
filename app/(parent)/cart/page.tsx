@@ -4,18 +4,25 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import useSWR from 'swr';
 import { Button } from '@/components/ui/button';
-import { ShoppingCart, X, Calendar, MapPin, User, ChevronRight, Wallet, Sparkles } from 'lucide-react';
+import { ShoppingCart, X, Calendar, MapPin, User, ChevronRight, Wallet, Sparkles, AlertCircle, ChevronDown } from 'lucide-react';
 import { useCart } from '@/lib/cart-context';
 import { formatEST } from '@/lib/format-date';
 import { SessionTypeBadge } from '@/components/session-type-badge';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 const fetcher = (url: string) => fetch(url).then(r => r.json());
 
+type Wrestler = {
+  id: string;
+  first_name: string;
+  last_name: string;
+};
+
 export default function CartPage() {
   const router = useRouter();
-  const { items, removeItem, total, count } = useCart();
+  const { items, removeItem, setAthleteForItem, total, count, isLoading } = useCart();
   const [useCredits, setUseCredits] = useState(true);
 
   // Fetch credit balance
@@ -23,6 +30,33 @@ export default function CartPage() {
   const creditBalance = creditsData?.balance ?? 0;
   const creditsToApply = useCredits ? Math.min(creditBalance, total) : 0;
   const amountToPay = total - creditsToApply;
+
+  // Fetch parent's wrestlers
+  const { data: wrestlersData } = useSWR<{ wrestlers: Wrestler[] }>('/api/wrestlers', fetcher);
+  const wrestlers = wrestlersData?.wrestlers ?? [];
+
+  // Auto-select single wrestler for all cart items
+  useEffect(() => {
+    if (wrestlers.length === 1) {
+      items.forEach((item) => {
+        if (!item.athlete_id) {
+          setAthleteForItem(item.id, wrestlers[0].id);
+        }
+      });
+    }
+  }, [wrestlers, items, setAthleteForItem]);
+
+  // Check if all items have an athlete assigned
+  const allItemsHaveAthlete = items.every((item) => item.athlete_id);
+  const canCheckout = items.length > 0 && allItemsHaveAthlete;
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-pulse text-zinc-500">Loading cart...</div>
+      </div>
+    );
+  }
 
   if (count === 0) {
     return (
@@ -58,6 +92,9 @@ export default function CartPage() {
       <div className="px-4 space-y-3">
         {items.map((item) => {
           const dt = new Date(item.scheduled_datetime);
+          const selectedWrestler = wrestlers.find((w) => w.id === item.athlete_id);
+          const needsSelection = !item.athlete_id && wrestlers.length > 1;
+
           return (
             <div
               key={item.id}
@@ -100,6 +137,45 @@ export default function CartPage() {
                 <MapPin className="h-3.5 w-3.5" />
                 <span>{item.facility_name}</span>
               </div>
+
+              {/* Athlete Selection */}
+              {wrestlers.length > 0 && (
+                <div className="mt-4 pt-3 border-t border-zinc-800">
+                  <label className="text-sm text-zinc-500 mb-2 block">Booking for</label>
+                  {wrestlers.length === 1 ? (
+                    // Single wrestler - just show name
+                    <div className="flex items-center gap-2 text-foreground">
+                      <div className="w-6 h-6 rounded-full bg-[#D4AF37]/20 flex items-center justify-center text-xs font-medium text-[#D4AF37]">
+                        {wrestlers[0].first_name.charAt(0)}
+                      </div>
+                      <span className="font-medium">{wrestlers[0].first_name} {wrestlers[0].last_name}</span>
+                    </div>
+                  ) : (
+                    // Multiple wrestlers - show dropdown
+                    <Select
+                      value={item.athlete_id || ''}
+                      onValueChange={(value) => setAthleteForItem(item.id, value)}
+                    >
+                      <SelectTrigger className={`w-full ${needsSelection ? 'border-amber-500/50' : ''}`}>
+                        <SelectValue placeholder="Select wrestler" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {wrestlers.map((w) => (
+                          <SelectItem key={w.id} value={w.id}>
+                            {w.first_name} {w.last_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  {needsSelection && (
+                    <div className="flex items-center gap-1.5 mt-2 text-amber-500 text-xs">
+                      <AlertCircle className="h-3 w-3" />
+                      <span>Select which wrestler to book</span>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Price */}
               <div className="mt-4 pt-3 border-t border-zinc-800 flex items-center justify-between">
@@ -148,8 +224,16 @@ export default function CartPage() {
       {/* Fixed Bottom Checkout Bar */}
       <div className="fixed bottom-16 md:bottom-0 left-0 right-0 bg-black/95 backdrop-blur-xl border-t border-zinc-800 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
         <div className="max-w-lg mx-auto">
+          {/* Warning if not all items have athlete */}
+          {!allItemsHaveAthlete && (
+            <div className="flex items-center gap-2 text-amber-500 text-sm mb-3">
+              <AlertCircle className="h-4 w-4" />
+              <span>Please select a wrestler for each session</span>
+            </div>
+          )}
+          
           {/* Totals */}
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-zinc-500">Total</p>
               <div className="flex items-baseline gap-2">
@@ -161,7 +245,8 @@ export default function CartPage() {
             </div>
             <Button 
               onClick={() => router.push('/cart/checkout')}
-              className="bg-[#D4AF37] hover:bg-[#C4A030] text-black font-semibold px-8 h-12 text-base gap-2"
+              disabled={!canCheckout}
+              className="bg-[#D4AF37] hover:bg-[#C4A030] text-black font-semibold px-8 h-12 text-base gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Checkout
               <ChevronRight className="h-5 w-5" />
