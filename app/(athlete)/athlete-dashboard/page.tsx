@@ -63,6 +63,16 @@ export default async function CoachHomePage() {
     .eq('status', 'pending');
 
   const coachFirstName = athlete?.first_name ?? null;
+  const averageRating = athlete?.average_rating ?? null;
+  const reviewCount = athlete?.review_count ?? 0;
+
+  // Latest reviews (limit 3 for home)
+  const { data: recentReviews } = await supabase
+    .from('reviews')
+    .select('id, rating, comment, created_at, users(first_name)')
+    .eq('athlete_id', user.id)
+    .order('created_at', { ascending: false })
+    .limit(3);
 
   return (
     <div className="container mx-auto px-4 py-5 pb-8 md:py-8 max-w-full">
@@ -71,6 +81,9 @@ export default async function CoachHomePage() {
         pendingRequestsCount={pendingRequestsCount ?? 0}
         thisMonthEarnings={thisMonthEarnings}
         coachFirstName={coachFirstName}
+        averageRating={averageRating}
+        reviewCount={reviewCount}
+        recentReviews={(recentReviews ?? []) as { id: string; rating: number; comment: string | null; created_at: string; users: { first_name: string } | null }[]}
       />
     </div>
   );

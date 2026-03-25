@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { MessageCircle, FolderOpen, Check, X, DollarSign, Users, Smartphone, Trash2, Loader2 } from 'lucide-react';
+import { MessageCircle, FolderOpen, Check, X, DollarSign, Users, Smartphone, Trash2, Loader2, Share2 } from 'lucide-react';
 import { CoachTextGroupDialog } from '@/components/coach-text-group-dialog';
 import { CopySessionPhonesButton } from '@/components/copy-session-phones-button';
 import { formatEST } from '@/lib/format-date';
@@ -67,6 +67,14 @@ export function CoachSessionsClient({
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [requests, setRequests] = useState<RequestItem[]>(pendingRequests);
   const [textGroupSession, setTextGroupSession] = useState<CoachSession | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const handleCopyLink = async (sessionId: string) => {
+    const url = `${window.location.origin}/sessions/${sessionId}`;
+    await navigator.clipboard.writeText(url);
+    setCopiedId(sessionId);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
 
   const handleCancelSession = async (sessionId: string) => {
     const confirmed = window.confirm(
@@ -188,6 +196,24 @@ export function CoachSessionsClient({
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="min-h-[44px] touch-manipulation"
+                        onClick={() => handleCopyLink(session.id)}
+                      >
+                        {copiedId === session.id ? (
+                          <>
+                            <Check className="h-4 w-4 mr-1 text-emerald-500" />
+                            Copied
+                          </>
+                        ) : (
+                          <>
+                            <Share2 className="h-4 w-4 mr-1" />
+                            Share
+                          </>
+                        )}
+                      </Button>
                       <AddToCalendarButton
                         sessionId={session.id}
                         title={`Session ${wrestlerNames(session).join(', ') || 'with athlete'}`}

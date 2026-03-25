@@ -30,6 +30,7 @@ const COACH_ROUTES = [
   '/athlete-dashboard',
   '/availability',
   '/coach-sessions',
+  '/coach-earnings',
   '/inbox',
   '/profile',
   '/rate-card',

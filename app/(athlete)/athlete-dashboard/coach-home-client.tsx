@@ -4,7 +4,8 @@ import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, DollarSign, MessageCircle, CalendarPlus, Users, FolderOpen } from 'lucide-react';
+import { Calendar, DollarSign, MessageCircle, CalendarPlus, Users, FolderOpen, Share2, Star, Copy, Check } from 'lucide-react';
+import { useState } from 'react';
 import { formatEST } from '@/lib/format-date';
 import { differenceInHours, differenceInDays } from 'date-fns';
 import { AddToCalendarButton } from '@/components/add-to-calendar-button';
@@ -30,11 +31,22 @@ function wrestlerNames(s: CoachSession): string[] {
     .filter((n): n is string => Boolean(n));
 }
 
+type Review = {
+  id: string;
+  rating: number;
+  comment: string | null;
+  created_at: string;
+  users: { first_name: string } | null;
+};
+
 type Props = {
   upcomingSessions: CoachSession[];
   pendingRequestsCount: number;
   thisMonthEarnings: number;
   coachFirstName?: string | null;
+  averageRating?: number | null;
+  reviewCount?: number;
+  recentReviews?: Review[];
 };
 
 export function CoachHomeClient({
@@ -42,7 +54,18 @@ export function CoachHomeClient({
   pendingRequestsCount,
   thisMonthEarnings,
   coachFirstName,
+  averageRating,
+  reviewCount = 0,
+  recentReviews = [],
 }: Props) {
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const handleCopyLink = async (sessionId: string) => {
+    const url = `${window.location.origin}/sessions/${sessionId}`;
+    await navigator.clipboard.writeText(url);
+    setCopiedId(sessionId);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
   const nextSession = upcomingSessions[0];
   const reminderLabel = nextSession
     ? (() => {
@@ -105,6 +128,24 @@ export function CoachHomeClient({
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2 shrink-0">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="min-h-[44px] touch-manipulation"
+                        onClick={() => handleCopyLink(session.id)}
+                      >
+                        {copiedId === session.id ? (
+                          <>
+                            <Check className="h-4 w-4 mr-1 text-emerald-500" />
+                            Copied
+                          </>
+                        ) : (
+                          <>
+                            <Share2 className="h-4 w-4 mr-1" />
+                            Share
+                          </>
+                        )}
+                      </Button>
                       <AddToCalendarButton
                         sessionId={session.id}
                         title={`Session ${wrestlerNames(session).join(', ') || 'with athlete'}`}
@@ -159,25 +200,87 @@ export function CoachHomeClient({
         </Card>
       )}
 
+      {/* Reviews section */}
+      <section>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-semibold text-foreground">Reviews</h2>
+          {reviewCount > 0 && (
+            <Link href="/profile#reviews" className="text-sm text-accent font-medium">
+              See all {reviewCount} →
+            </Link>
+          )}
+        </div>
+        {reviewCount === 0 ? (
+          <Card className="border-dashed">
+            <CardContent className="py-6 text-center">
+              <Star className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
+              <p className="text-muted-foreground">No reviews yet</p>
+              <p className="text-sm text-muted-foreground">Reviews will appear here after sessions</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="flex items-center gap-1">
+                  <Star className="h-5 w-5 fill-[#D4AF37] text-[#D4AF37]" />
+                  <span className="text-xl font-bold">{averageRating?.toFixed(1) ?? '—'}</span>
+                </div>
+                <span className="text-muted-foreground">({reviewCount} review{reviewCount !== 1 ? 's' : ''})</span>
+              </div>
+              <div className="space-y-3">
+                {recentReviews.slice(0, 3).map((review) => (
+                  <div key={review.id} className="border-t border-border pt-3 first:border-0 first:pt-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="flex">
+                        {Array.from({ length: 5 }).map((_, i) => (
+                          <Star
+                            key={i}
+                            className={`h-3.5 w-3.5 ${i < review.rating ? 'fill-[#D4AF37] text-[#D4AF37]' : 'text-muted-foreground/30'}`}
+                          />
+                        ))}
+                      </div>
+                      <span className="text-xs text-muted-foreground">
+                        {review.users?.first_name ?? 'Parent'}
+                      </span>
+                    </div>
+                    {review.comment && (
+                      <p className="text-sm text-muted-foreground line-clamp-2">{review.comment}</p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </section>
+
       {/* Quick actions — super simple labels */}
       <section>
         <h2 className="text-lg font-semibold text-foreground mb-3">Quick actions</h2>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <Link href="/coach-sessions/create">
+            <Button className="w-full min-h-[56px] touch-manipulation flex flex-col gap-0.5 bg-[#D4AF37] hover:bg-[#B8963C] text-black">
+              <CalendarPlus className="h-5 w-5 shrink-0" />
+              <span>Create Session</span>
+            </Button>
+          </Link>
           <Link href="/availability">
-            <Button variant="outline" className="w-full min-h-[48px] touch-manipulation flex flex-col gap-0.5">
+            <Button variant="outline" className="w-full min-h-[56px] touch-manipulation flex flex-col gap-0.5">
               <Calendar className="h-5 w-5 shrink-0" />
-              <span>Set your schedule</span>
-              <span className="text-xs font-normal text-muted-foreground">When can you coach?</span>
+              <span>Schedule</span>
+              <span className="text-xs font-normal text-muted-foreground">Set availability</span>
             </Button>
           </Link>
-          <Link href="/small-group-sessions">
-            <Button variant="outline" className="w-full min-h-[48px] touch-manipulation flex flex-col gap-0.5">
+          <Link href="/coach-sessions">
+            <Button variant="outline" className="w-full min-h-[56px] touch-manipulation flex flex-col gap-0.5">
               <Users className="h-5 w-5 shrink-0" />
-              <span>Create group session</span>
+              <span>Sessions</span>
+              <span className="text-xs font-normal text-muted-foreground">View all</span>
             </Button>
           </Link>
-          <Link href="/profile">
-            <Button variant="outline" className="w-full min-h-[48px] touch-manipulation flex flex-col gap-0.5">
+          <Link href="/coach-earnings">
+            <Button variant="outline" className="w-full min-h-[56px] touch-manipulation flex flex-col gap-0.5">
               <DollarSign className="h-5 w-5 shrink-0" />
               <span>Earnings</span>
               <span className="text-xs font-normal text-muted-foreground">${thisMonthEarnings.toFixed(0)} this month</span>

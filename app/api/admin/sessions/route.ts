@@ -24,7 +24,9 @@ export async function POST(req: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
-    if (userData?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const isAdmin = userData?.role === 'admin';
+    const isCoach = userData?.role === 'coach';
+    if (!isAdmin && !isCoach) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
     const body = (await req.json()) as {
       athleteId: string;
@@ -59,6 +61,11 @@ export async function POST(req: NextRequest) {
         { error: 'Missing athleteId, facilityId, scheduledDate, or scheduledTime' },
         { status: 400 }
       );
+    }
+
+    // Coaches can only create sessions for themselves
+    if (isCoach && athleteId !== user.id) {
+      return NextResponse.json({ error: 'Coaches can only create sessions for themselves' }, { status: 403 });
     }
 
     const admin = createAdminClient(tenant.slug);
