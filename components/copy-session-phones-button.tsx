@@ -27,10 +27,8 @@ export function CopySessionPhonesButton({ sessionId, className }: Props) {
     setPrefetch({ status: 'loading' });
     void (async () => {
       try {
-        console.log('[v0] Fetching sms-phones for session:', sessionId);
         const r = await fetch(`/api/sessions/${sessionId}/sms-phones`);
         const data = (await r.json()) as { commaAll?: string; error?: string };
-        console.log('[v0] sms-phones response:', r.status, data);
         if (cancelled) return;
         if (!r.ok) {
           setPrefetch({ status: 'error', message: data.error });

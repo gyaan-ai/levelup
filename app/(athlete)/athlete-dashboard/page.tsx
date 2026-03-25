@@ -120,6 +120,7 @@ export default async function CoachHomePage() {
         averageRating={averageRating}
         reviewCount={reviewCount ?? 0}
         recentReviews={recentReviews}
+        payoutRate={athlete?.payout_rate ?? 0.8333}
       />
     </div>
   );

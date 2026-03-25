@@ -99,6 +99,7 @@ export default async function CoachSessionsPage({
           youth_wrestlers?: { id: string; first_name?: string; last_name?: string; age?: number; weight_class?: string; skill_level?: string } | null;
           session?: { id: string; scheduled_datetime: string; session_type?: string; session_mode?: string; facilities?: { name?: string } | null };
         }>}
+        payoutRate={athlete?.payout_rate ?? 0.8333}
       />
     </div>
   );

@@ -84,7 +84,18 @@ export default async function CoachEarningsPage() {
 
   return (
     <div className="container mx-auto px-4 py-5 pb-24 md:py-8 max-w-2xl">
-      <h1 className="text-2xl font-bold text-foreground mb-6">Earnings</h1>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-2xl font-bold text-foreground">Earnings</h1>
+        <div className="text-right">
+          <p className="text-sm text-muted-foreground">Your rate</p>
+          <p className="font-semibold text-foreground">
+            {Math.round(payoutRate * 100)}%
+            {payoutRate >= 0.9 && (
+              <span className="ml-1 text-xs text-[#D4AF37] font-medium">(Founding Coach)</span>
+            )}
+          </p>
+        </div>
+      </div>
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 gap-3 mb-6">

@@ -53,6 +53,7 @@ type Props = {
   upcomingSessions: CoachSession[];
   completedSessions: CoachSession[];
   pendingRequests: RequestItem[];
+  payoutRate?: number;
 };
 
 export function CoachSessionsClient({
@@ -60,6 +61,7 @@ export function CoachSessionsClient({
   upcomingSessions,
   completedSessions,
   pendingRequests,
+  payoutRate = 0.8333,
 }: Props) {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>(initialTab);
@@ -192,7 +194,7 @@ export function CoachSessionsClient({
                       </p>
                       <p className="text-sm font-medium text-accent mt-1 inline-flex items-center gap-1">
                         <DollarSign className="h-4 w-4" />
-                        You make ${coachPayoutUsd(session).toFixed(2)}
+                        You make ${coachPayoutUsd(session, payoutRate).toFixed(2)}
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2">

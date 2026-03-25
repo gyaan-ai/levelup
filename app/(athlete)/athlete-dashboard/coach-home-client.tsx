@@ -48,6 +48,7 @@ type Props = {
   averageRating?: number | null;
   reviewCount?: number;
   recentReviews?: Review[];
+  payoutRate?: number;
 };
 
 export function CoachHomeClient({
@@ -58,6 +59,7 @@ export function CoachHomeClient({
   averageRating,
   reviewCount = 0,
   recentReviews = [],
+  payoutRate = 0.8333,
 }: Props) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -112,13 +114,32 @@ export function CoachHomeClient({
           </Card>
         ) : (
           <div className="space-y-3">
-            {upcomingSessions.slice(0, 5).map((session) => (
+            {upcomingSessions.slice(0, 5).map((session) => {
+              const current = session.current_participants ?? 0;
+              const max = session.max_participants ?? 1;
+              const pricePerParticipant = Number(session.price_per_participant ?? 0);
+              const projectedEarnings = Math.round(current * pricePerParticipant * payoutRate * 100) / 100;
+              const isFull = current >= max;
+              const isGroup = session.session_type === 'group' || max > 2;
+              
+              return (
               <Card key={session.id}>
                 <CardContent className="p-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <div className="min-w-0">
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                    <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2 mb-1">
                         <SessionTypeBadge sessionType={session.session_type} sessionMode={session.session_mode} />
+                        {isGroup && (
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                            isFull 
+                              ? 'bg-emerald-500/20 text-emerald-400' 
+                              : current === 0 
+                                ? 'bg-amber-500/20 text-amber-400'
+                                : 'bg-blue-500/20 text-blue-400'
+                          }`}>
+                            {current}/{max} spots
+                          </span>
+                        )}
                       </div>
                       <p className="font-medium text-foreground">
                         {formatEST(new Date(session.scheduled_datetime), 'EEE, MMM d')} · {formatEST(new Date(session.scheduled_datetime), 'h:mm a')}
@@ -127,6 +148,11 @@ export function CoachHomeClient({
                         {facilityName(session)}
                         {wrestlerNames(session).length > 0 && ` · ${wrestlerNames(session).join(', ')}`}
                       </p>
+                      {current > 0 && (
+                        <p className="text-sm font-medium text-[#D4AF37] mt-1">
+                          Projected: ${projectedEarnings.toFixed(0)}
+                        </p>
+                      )}
                     </div>
                     <div className="flex flex-wrap gap-2 shrink-0">
                       <Button
@@ -163,7 +189,8 @@ export function CoachHomeClient({
                   </div>
                 </CardContent>
               </Card>
-            ))}
+              );
+            })}
           </div>
         )}
         {upcomingSessions.length > 5 && (
