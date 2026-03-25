@@ -347,6 +347,7 @@ export function AdminDashboardClient({
   const [showDropInDialog, setShowDropInDialog] = useState(false);
   const [dropInSession, setDropInSession] = useState<AdminSession | null>(null);
   const [dropInForm, setDropInForm] = useState({
+    youthWrestlerId: '' as string,
     wrestlerName: '',
     parentName: '',
     parentPhone: '',
@@ -354,6 +355,9 @@ export function AdminDashboardClient({
     paymentMethod: 'cash' as 'cash' | 'venmo' | 'zelle' | 'other',
   });
   const [savingDropIn, setSavingDropIn] = useState(false);
+  const [wrestlerSearchResults, setWrestlerSearchResults] = useState<Array<{ id: string; first_name: string; last_name: string; photo_url?: string }>>([]);
+  const [wrestlerSearchQuery, setWrestlerSearchQuery] = useState('');
+  const [searchingWrestlers, setSearchingWrestlers] = useState(false);
   const [editingAthleteId, setEditingAthleteId] = useState<string | null>(null);
   const hasOpenedEditFromUrl = useRef(false);
   
@@ -924,8 +928,8 @@ export function AdminDashboardClient({
 
   // Handle drop-in payment recording
   const handleRecordDropIn = async () => {
-    if (!dropInSession || !dropInForm.wrestlerName || !dropInForm.amountPaid) {
-      alert('Please fill in wrestler name and amount paid');
+    if (!dropInSession || (!dropInForm.wrestlerName && !dropInForm.youthWrestlerId) || !dropInForm.amountPaid) {
+      alert('Please select or enter a wrestler and amount paid');
       return;
     }
     setSavingDropIn(true);
@@ -935,6 +939,7 @@ export function AdminDashboardClient({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sessionId: dropInSession.id,
+          youthWrestlerId: dropInForm.youthWrestlerId || null,
           wrestlerName: dropInForm.wrestlerName,
           parentName: dropInForm.parentName,
           parentPhone: dropInForm.parentPhone,
@@ -947,7 +952,9 @@ export function AdminDashboardClient({
         router.refresh();
         setShowDropInDialog(false);
         setDropInSession(null);
-        setDropInForm({ wrestlerName: '', parentName: '', parentPhone: '', amountPaid: '', paymentMethod: 'cash' });
+        setDropInForm({ youthWrestlerId: '', wrestlerName: '', parentName: '', parentPhone: '', amountPaid: '', paymentMethod: 'cash' });
+        setWrestlerSearchQuery('');
+        setWrestlerSearchResults([]);
         alert('Drop-in recorded successfully!');
       } else {
         const data = await res.json().catch(() => ({}));
@@ -960,15 +967,47 @@ export function AdminDashboardClient({
     }
   };
 
+  // Search for existing wrestlers
+  const searchWrestlers = async (query: string) => {
+    setWrestlerSearchQuery(query);
+    if (query.length < 2) {
+      setWrestlerSearchResults([]);
+      return;
+    }
+    setSearchingWrestlers(true);
+    try {
+      const res = await fetch(`/api/admin/search-wrestlers?q=${encodeURIComponent(query)}&tenant=guild`);
+      const data = await res.json();
+      setWrestlerSearchResults(data.wrestlers || []);
+    } catch {
+      setWrestlerSearchResults([]);
+    } finally {
+      setSearchingWrestlers(false);
+    }
+  };
+
+  const selectWrestler = (wrestler: { id: string; first_name: string; last_name: string }) => {
+    setDropInForm({
+      ...dropInForm,
+      youthWrestlerId: wrestler.id,
+      wrestlerName: `${wrestler.first_name} ${wrestler.last_name}`,
+    });
+    setWrestlerSearchQuery('');
+    setWrestlerSearchResults([]);
+  };
+
   const openDropInDialog = (session: AdminSession) => {
     setDropInSession(session);
     setDropInForm({ 
+      youthWrestlerId: '',
       wrestlerName: '', 
       parentName: '', 
       parentPhone: '', 
       amountPaid: session.price_per_participant?.toString() || '', 
       paymentMethod: 'cash' 
     });
+    setWrestlerSearchQuery('');
+    setWrestlerSearchResults([]);
     setShowDropInDialog(true);
   };
 
@@ -2656,22 +2695,69 @@ export function AdminDashboardClient({
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">
+            {/* Wrestler Search */}
             <div className="grid gap-2">
-              <Label htmlFor="wrestlerName">Wrestler Name *</Label>
+              <Label>Search Existing Wrestler</Label>
+              <div className="relative">
+                <Input
+                  placeholder="Type to search wrestlers..."
+                  value={wrestlerSearchQuery}
+                  onChange={(e) => searchWrestlers(e.target.value)}
+                />
+                {searchingWrestlers && (
+                  <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-zinc-400" />
+                )}
+                {wrestlerSearchResults.length > 0 && (
+                  <div className="absolute z-10 w-full mt-1 bg-zinc-900 border border-zinc-700 rounded-md shadow-lg max-h-48 overflow-auto">
+                    {wrestlerSearchResults.map((w) => (
+                      <button
+                        key={w.id}
+                        type="button"
+                        className="w-full px-3 py-2 text-left hover:bg-zinc-800 flex items-center gap-2"
+                        onClick={() => selectWrestler(w)}
+                      >
+                        {w.photo_url ? (
+                          <img src={w.photo_url} alt="" className="w-6 h-6 rounded-full object-cover" />
+                        ) : (
+                          <div className="w-6 h-6 rounded-full bg-zinc-700 flex items-center justify-center text-xs">
+                            {w.first_name?.[0]}{w.last_name?.[0]}
+                          </div>
+                        )}
+                        <span>{w.first_name} {w.last_name}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {dropInForm.youthWrestlerId && (
+                <p className="text-sm text-emerald-400">Selected: {dropInForm.wrestlerName}</p>
+              )}
+            </div>
+
+            <div className="relative flex items-center gap-2 py-2">
+              <div className="flex-1 border-t border-zinc-700" />
+              <span className="text-xs text-zinc-500">OR enter manually</span>
+              <div className="flex-1 border-t border-zinc-700" />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="wrestlerName">Wrestler Name {!dropInForm.youthWrestlerId && '*'}</Label>
               <Input
                 id="wrestlerName"
                 placeholder="Enter wrestler's name"
                 value={dropInForm.wrestlerName}
-                onChange={(e) => setDropInForm({ ...dropInForm, wrestlerName: e.target.value })}
+                onChange={(e) => setDropInForm({ ...dropInForm, wrestlerName: e.target.value, youthWrestlerId: '' })}
+                disabled={!!dropInForm.youthWrestlerId}
               />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="parentName">Parent Name</Label>
               <Input
                 id="parentName"
-                placeholder="Enter parent's name"
+                placeholder="Enter parent's name (optional for existing wrestlers)"
                 value={dropInForm.parentName}
                 onChange={(e) => setDropInForm({ ...dropInForm, parentName: e.target.value })}
+                disabled={!!dropInForm.youthWrestlerId}
               />
             </div>
             <div className="grid gap-2">
@@ -2681,6 +2767,7 @@ export function AdminDashboardClient({
                 placeholder="(555) 555-5555"
                 value={dropInForm.parentPhone}
                 onChange={(e) => setDropInForm({ ...dropInForm, parentPhone: e.target.value })}
+                disabled={!!dropInForm.youthWrestlerId}
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -2719,7 +2806,7 @@ export function AdminDashboardClient({
               type="button" 
               className="bg-[#B89D60] hover:bg-[#9A8550] text-black" 
               onClick={handleRecordDropIn}
-              disabled={savingDropIn || !dropInForm.wrestlerName || !dropInForm.amountPaid}
+              disabled={savingDropIn || (!dropInForm.wrestlerName && !dropInForm.youthWrestlerId) || !dropInForm.amountPaid}
             >
               {savingDropIn ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Record Payment

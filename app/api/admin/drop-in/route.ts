@@ -6,6 +6,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { 
       sessionId, 
+      youthWrestlerId, // Optional - if selecting existing wrestler
       wrestlerName, 
       parentName,
       parentEmail,
@@ -15,7 +16,7 @@ export async function POST(req: NextRequest) {
       tenantSlug = 'guild' 
     } = body;
 
-    if (!sessionId || !wrestlerName || amountPaid === undefined) {
+    if (!sessionId || (!wrestlerName && !youthWrestlerId) || amountPaid === undefined) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
@@ -35,14 +36,22 @@ export async function POST(req: NextRequest) {
     // Get current count (admins can override capacity for drop-ins)
     const current = session.current_participants ?? 0;
 
-    // For drop-ins without accounts, we insert with null youth_wrestler_id and parent_id
-    // but store the names in a notes/metadata field or we can create placeholder records
+    // If youth wrestler ID provided, get their parent_id
+    let parentId: string | null = null;
+    if (youthWrestlerId) {
+      const { data: wrestler } = await supabase
+        .from('youth_wrestlers')
+        .select('parent_id')
+        .eq('id', youthWrestlerId)
+        .single();
+      parentId = wrestler?.parent_id || null;
+    }
     
-    // Insert the session participant as a drop-in (no youth_wrestler_id or parent_id)
+    // Insert the session participant - link to existing wrestler if provided
     const { error: insertError } = await supabase.from('session_participants').insert({
       session_id: sessionId,
-      youth_wrestler_id: null,
-      parent_id: null,
+      youth_wrestler_id: youthWrestlerId || null,
+      parent_id: parentId,
       paid: true,
       amount_paid: amountPaid,
     });
