@@ -181,7 +181,7 @@ export async function POST(req: NextRequest) {
     const totalPrice = sessionMetadata.reduce((sum, m) => sum + m.price, 0);
 
     // Check user's credit balance
-    const creditBalance = await getUserCreditBalance(user.id);
+    const creditBalance = await getUserCreditBalance(user.id, tenant.slug);
     const creditsToUse = Math.min(creditBalance, totalPrice);
     const amountToPay = totalPrice - creditsToUse;
 
@@ -298,7 +298,8 @@ export async function POST(req: NextRequest) {
       totalAfterCredits: amountToPay,
     });
   } catch (e) {
-    console.error('Cart checkout API error:', e);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    const err = e as Error;
+    console.error('Cart checkout API error:', err.message, err.stack);
+    return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 });
   }
 }

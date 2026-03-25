@@ -3,7 +3,7 @@ import { getTenantConfig } from '@/config/tenants';
 
 export function getStripeInstance(tenantSlug: string): Stripe {
   const config = getTenantConfig(tenantSlug);
-  const secretKey = process.env[`${tenantSlug.toUpperCase().replace('-', '_')}_STRIPE_SECRET_KEY`] ||
+  const secretKey = process.env[`${tenantSlug.toUpperCase().replace(/-/g, '_')}_STRIPE_SECRET_KEY`] ||
                     process.env.GUILD_STRIPE_SECRET_KEY ||
                     process.env.NC_UNITED_STRIPE_SECRET_KEY;
   
@@ -17,7 +17,7 @@ export function getStripeInstance(tenantSlug: string): Stripe {
 }
 
 export function getWebhookSecret(tenantSlug: string): string {
-  const webhookSecret = process.env[`${tenantSlug.toUpperCase().replace('-', '_')}_STRIPE_WEBHOOK_SECRET`] ||
+  const webhookSecret = process.env[`${tenantSlug.toUpperCase().replace(/-/g, '_')}_STRIPE_WEBHOOK_SECRET`] ||
                         process.env.GUILD_STRIPE_WEBHOOK_SECRET ||
                         process.env.NC_UNITED_STRIPE_WEBHOOK_SECRET;
   
