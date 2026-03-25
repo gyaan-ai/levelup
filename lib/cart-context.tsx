@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useState, useCallback, ReactNode, useEffect } from 'react';
 import { createClient } from '@/lib/supabase/client';
+import { useTenant } from '@/components/theme-provider';
 
 export type CartSession = {
   id: string;
@@ -31,6 +32,7 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 const CART_STORAGE_KEY = 'guild_cart';
 
 export function CartProvider({ children }: { children: ReactNode }) {
+  const tenant = useTenant();
   const [items, setItems] = useState<CartSession[]>([]);
   const [hydrated, setHydrated] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -39,7 +41,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   // Load cart on mount - try Supabase first, fallback to sessionStorage
   useEffect(() => {
     async function loadCart() {
-      const supabase = createClient();
+      const supabase = createClient(tenant.slug);
       const { data: { user } } = await supabase.auth.getUser();
       setUserId(user?.id ?? null);
 
@@ -119,11 +121,12 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
 
     loadCart();
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tenant.slug]);
 
   // Sync cart to Supabase (fire and forget)
   const syncToSupabase = async (uid: string, cartItems: CartSession[]) => {
-    const supabase = createClient();
+    const supabase = createClient(tenant.slug);
     try {
       // Clear existing cart items for user
       await supabase.from('cart_items').delete().eq('user_id', uid);
