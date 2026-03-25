@@ -304,7 +304,7 @@ export function FindTrainingClient({
               {duration && (
                 <span className="flex items-center gap-1">
                   <Clock className="h-3 w-3" />
-                  {duration} min
+                  {duration >= 120 ? `${duration / 60} hrs` : `${duration} min`}
                 </span>
               )}
               <span className={cn("flex items-center gap-1", getSpotColor())}>
@@ -313,16 +313,21 @@ export function FindTrainingClient({
               </span>
             </div>
 
-            {/* Who's registered */}
+            {/* Who's registered - parent's wrestlers highlighted in green */}
             {session.session_participants && session.session_participants.length > 0 && (
-              <div className="mt-2 text-xs text-zinc-400">
+              <div className="mt-2 text-xs">
                 <span className="text-zinc-500">Registered: </span>
                 {session.session_participants.map((p, i) => {
                   const yw = p?.youth_wrestlers;
                   const wrestler = Array.isArray(yw) ? yw[0] : yw;
+                  const wrestlerId = p?.youth_wrestler_id || wrestler?.id;
                   const name = wrestler ? `${wrestler.first_name || ''} ${wrestler.last_name || ''}`.trim() : 'Drop-in';
+                  const isParentWrestler = wrestlerId && parentWrestlerIds.includes(wrestlerId);
                   return (
-                    <span key={p?.id || i}>
+                    <span 
+                      key={p?.id || i}
+                      className={isParentWrestler ? 'text-emerald-400' : 'text-zinc-400'}
+                    >
                       {i > 0 && ', '}
                       {name || 'Unknown'}
                     </span>
@@ -345,20 +350,20 @@ export function FindTrainingClient({
                 - Open/Has invite: Add to Cart
             */}
             {allParentWrestlersBooked ? (
-              // All wrestlers booked - grey disabled state
-              <span className="text-xs text-zinc-500 bg-zinc-800 px-3 py-1.5 rounded flex items-center gap-1.5">
+              // All wrestlers booked - grey disabled state (44px min tap target)
+              <span className="text-xs text-zinc-500 bg-zinc-800 px-3 py-2.5 min-h-[44px] rounded flex items-center gap-1.5">
                 <Check className="h-3 w-3" />
                 Booked
               </span>
             ) : openSlots > 0 ? (
               isInviteOnly ? (
-                // Invite-only: show lock icon
-                <span className="text-xs text-zinc-500 bg-zinc-800 px-3 py-1.5 rounded flex items-center gap-1.5">
+                // Invite-only: show lock icon (44px min tap target)
+                <span className="text-xs text-zinc-500 bg-zinc-800 px-3 py-2.5 min-h-[44px] rounded flex items-center gap-1.5">
                   <Lock className="h-3 w-3" />
                   Invite Only
                 </span>
               ) : inCart ? (
-                // In Cart: navigate to cart on click
+                // In Cart: navigate to cart on click (44px min tap target)
                 <Button
                   size="sm"
                   onClick={(e) => {
@@ -366,24 +371,24 @@ export function FindTrainingClient({
                     e.stopPropagation();
                     router.push('/cart');
                   }}
-                  className="min-h-[36px] gap-1.5 transition-all bg-zinc-800 hover:bg-zinc-700 text-[#D4AF37] border border-[#D4AF37]/30"
+                  className="min-h-[44px] min-w-[44px] gap-1.5 transition-all bg-zinc-800 hover:bg-zinc-700 text-[#D4AF37] border border-[#D4AF37]/30"
                 >
                   <Check className="h-4 w-4" />
                   In Cart
                 </Button>
               ) : (
-                // Open session: show Add to Cart button
+                // Open session: show Add to Cart button (44px min tap target)
                 <Button
                   size="sm"
                   onClick={handleAddToCart}
-                  className="min-h-[36px] gap-1.5 transition-all bg-[#D4AF37] hover:bg-[#B8963C] text-black"
+                  className="min-h-[44px] min-w-[44px] gap-1.5 transition-all bg-[#D4AF37] hover:bg-[#B8963C] text-black"
                 >
                   <ShoppingCart className="h-4 w-4" />
                   Add
                 </Button>
               )
             ) : (
-              <span className="text-xs text-zinc-500 bg-zinc-800 px-2 py-1 rounded">Full</span>
+              <span className="text-xs text-zinc-500 bg-zinc-800 px-3 py-2.5 min-h-[44px] rounded flex items-center">Full</span>
             )}
           </div>
         </div>
