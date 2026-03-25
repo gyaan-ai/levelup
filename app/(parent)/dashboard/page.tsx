@@ -161,7 +161,7 @@ export default async function HomePage() {
           />
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
-              <SessionTypeBadge sessionType={session.session_type ?? null} sessionMode={session.session_mode ?? null} size="sm" />
+              <SessionTypeBadge sessionType={session.session_type ?? null} sessionMode={session.session_mode ?? null} />
               {session.focus_area && (
                 <span className="text-xs text-zinc-500 truncate">{session.focus_area}</span>
               )}
