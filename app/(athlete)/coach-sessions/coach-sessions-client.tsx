@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { MessageCircle, FolderOpen, Check, X, DollarSign, Users, Smartphone, Trash2, Loader2, Share2 } from 'lucide-react';
+import { Check, X, DollarSign, Users, Smartphone, Trash2, Loader2, Share2 } from 'lucide-react';
 import { CoachTextGroupDialog } from '@/components/coach-text-group-dialog';
 import { CopySessionPhonesButton } from '@/components/copy-session-phones-button';
 import { formatEST } from '@/lib/format-date';
@@ -222,12 +222,6 @@ export function CoachSessionsClient({
                         size="sm"
                         className="min-h-[44px] touch-manipulation"
                       />
-                      <Link href={`/messages/${session.id}`}>
-                        <Button variant="outline" size="sm" className="min-h-[44px] touch-manipulation">
-                          <MessageCircle className="h-4 w-4 mr-1" />
-                          Message
-                        </Button>
-                      </Link>
                       {showSessionSmsCopyAndTextGroup(session) && (
                         <>
                           <Button

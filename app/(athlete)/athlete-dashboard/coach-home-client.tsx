@@ -4,7 +4,8 @@ import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, DollarSign, MessageCircle, CalendarPlus, Users, FolderOpen, Share2, Star, Copy, Check } from 'lucide-react';
+import { Calendar, DollarSign, CalendarPlus, Users, Share2, Star, Check } from 'lucide-react';
+import { CopySessionPhonesButton } from '@/components/copy-session-phones-button';
 import { useState } from 'react';
 import { formatEST } from '@/lib/format-date';
 import { differenceInHours, differenceInDays } from 'date-fns';
@@ -154,18 +155,10 @@ export function CoachHomeClient({
                         size="sm"
                         className="min-h-[44px] touch-manipulation"
                       />
-                      <Link href={`/messages/${session.id}`}>
-                        <Button variant="outline" size="sm" className="min-h-[44px] touch-manipulation">
-                          <MessageCircle className="h-4 w-4 mr-1" />
-                          Message
-                        </Button>
-                      </Link>
-                      <Link href={`/workspaces/from-session/${session.id}`} className="hidden sm:block">
-                        <Button variant="ghost" size="sm" className="min-h-[44px] touch-manipulation">
-                          <FolderOpen className="h-4 w-4 mr-1" />
-                          Workspace
-                        </Button>
-                      </Link>
+                      <CopySessionPhonesButton
+                        sessionId={session.id}
+                        className="min-h-[44px] touch-manipulation"
+                      />
                     </div>
                   </div>
                 </CardContent>
