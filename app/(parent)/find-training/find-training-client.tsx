@@ -92,9 +92,7 @@ export function FindTrainingClient({
     setCoach(initialCoach || 'all');
   }, [initialDate, initialTime, initialLocation, initialCoach]);
 
-  console.log('[v0] FindTrainingClient received initialSessions:', initialSessions.length, initialSessions.map(s => ({ id: s.id, status: s.status, current: s.current_participants, max: s.max_participants })));
   const openSessions = initialSessions.filter((s) => isSessionOpenForParentBrowse(s));
-  console.log('[v0] After isSessionOpenForParentBrowse filter, openSessions:', openSessions.length);
 
   const applyFilters = () => {
     const params = new URLSearchParams();

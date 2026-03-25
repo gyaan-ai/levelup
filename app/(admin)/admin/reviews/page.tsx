@@ -58,7 +58,6 @@ export default async function AdminReviewsPage() {
   if (error) {
     console.error('Admin reviews fetch error:', error);
   }
-  console.log('[v0] Reviews fetched:', reviews?.length ?? 0, 'error:', error?.message);
 
   // Fetch parent emails
   const parentIds = [...new Set((reviews ?? []).map(r => r.parent_id).filter(Boolean))];

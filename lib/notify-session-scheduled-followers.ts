@@ -41,6 +41,8 @@ export async function notifySessionScheduledFollowers(
 
     const title = `New session: ${coachName}`;
     const body = `${coachName} scheduled a session (${when}). Tap to book!`;
+    // Link directly to the session detail page
+    const sessionLink = `/sessions/${opts.sessionId}`;
 
     await Promise.all(
       follows.map((f) =>
@@ -52,7 +54,7 @@ export async function notifySessionScheduledFollowers(
           data: {
             coach_id: coachId,
             session_id: opts.sessionId,
-            link: path,
+            link: sessionLink,
           },
         })
       )
