@@ -36,13 +36,14 @@ export async function GET(
     .eq('id', sessionId)
     .single();
 
+  if (error) {
+    console.log('[v0] Roster API error:', error.message, 'sessionId:', sessionId);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
   // Extract participants from join result
   const rawParticipants = sessionData?.session_participants;
   const participants = Array.isArray(rawParticipants) ? rawParticipants : rawParticipants ? [rawParticipants] : [];
-
-  if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
-  }
 
   // Get youth wrestler details for those with IDs
   const youthIds = (participants ?? [])
