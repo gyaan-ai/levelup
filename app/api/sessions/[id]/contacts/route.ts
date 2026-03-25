@@ -67,8 +67,7 @@ export async function GET(
         phone
       )
     `)
-    .eq('session_id', sessionId)
-    .in('status', ['confirmed', 'pending', 'booked']);
+    .eq('session_id', sessionId);
 
   if (error) {
     console.log('[v0] contacts API error:', error);
