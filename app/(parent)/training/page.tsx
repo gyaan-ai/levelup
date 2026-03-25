@@ -172,18 +172,16 @@ export default async function TrainingPage({
     return q;
   };
 
-  // Query ALL sessions - no type filter, show everything
-  const [groupUpcoming, groupPast] = await Promise.all([
-    withOptFilters(sessionQuery(dayStart, dayEnd)).in('status', ['scheduled', 'pending_payment']).order('scheduled_datetime', { ascending: true }),
-    withOptFilters(sessionQuery(pastDayStart, pastDayEnd)).in('status', ['completed', 'cancelled', 'no-show']).order('scheduled_datetime', { ascending: true }),
-  ]);
+  // Query only UPCOMING sessions (scheduled or pending_payment)
+  const { data: upcomingData, error: upcomingError } = await withOptFilters(sessionQuery(dayStart, dayEnd))
+    .in('status', ['scheduled', 'pending_payment'])
+    .order('scheduled_datetime', { ascending: true });
   
-  // Debug: log if there are errors
-  if (groupUpcoming.error) console.error('[v0] groupUpcoming error:', groupUpcoming.error);
-  if (groupPast.error) console.error('[v0] groupPast error:', groupPast.error);
+  
+  
   const seen = new Set<string>();
   let list: SessionRow[] = [];
-  for (const row of [...(groupUpcoming.data ?? []), ...(groupPast.data ?? [])]) {
+  for (const row of (upcomingData ?? [])) {
     const r = row as unknown as SessionRow;
     if (seen.has(r.id)) continue;
     seen.add(r.id);
