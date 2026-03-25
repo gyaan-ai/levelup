@@ -162,6 +162,9 @@ export function FindTrainingClient({
       if (isPartner && current === 1) return 'text-amber-400'; // Waiting on partner - orange
       return 'text-zinc-500';
     };
+    
+    // Session is not bookable if full OR invite-only (without access)
+    const isNotBookable = openSlots === 0 || isInviteOnly;
 
     const handleAddToCart = (e: React.MouseEvent) => {
       e.preventDefault();
@@ -182,7 +185,10 @@ export function FindTrainingClient({
     };
 
     return (
-      <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl p-4 hover:border-zinc-700 transition-all">
+      <div className={cn(
+        "bg-zinc-900/50 border border-zinc-800/50 rounded-xl p-4 transition-all",
+        isNotBookable ? "opacity-60" : "hover:border-zinc-700"
+      )}>
         <div className="flex gap-4">
           {/* Coach Photo */}
           <Link href={`/athlete/${coachData?.id ?? session.athlete_id}`} className="shrink-0">
