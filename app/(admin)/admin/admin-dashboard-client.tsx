@@ -342,6 +342,18 @@ export function AdminDashboardClient({
     notes: '',
   });
   const [savingManualPayment, setSavingManualPayment] = useState(false);
+  
+  // Drop-in payment entry
+  const [showDropInDialog, setShowDropInDialog] = useState(false);
+  const [dropInSession, setDropInSession] = useState<AdminSession | null>(null);
+  const [dropInForm, setDropInForm] = useState({
+    wrestlerName: '',
+    parentName: '',
+    parentPhone: '',
+    amountPaid: '',
+    paymentMethod: 'cash' as 'cash' | 'venmo' | 'zelle' | 'other',
+  });
+  const [savingDropIn, setSavingDropIn] = useState(false);
   const [editingAthleteId, setEditingAthleteId] = useState<string | null>(null);
   const hasOpenedEditFromUrl = useRef(false);
   
@@ -910,6 +922,56 @@ export function AdminDashboardClient({
     }
   };
 
+  // Handle drop-in payment recording
+  const handleRecordDropIn = async () => {
+    if (!dropInSession || !dropInForm.wrestlerName || !dropInForm.amountPaid) {
+      alert('Please fill in wrestler name and amount paid');
+      return;
+    }
+    setSavingDropIn(true);
+    try {
+      const res = await fetch('/api/admin/drop-in', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: dropInSession.id,
+          wrestlerName: dropInForm.wrestlerName,
+          parentName: dropInForm.parentName,
+          parentPhone: dropInForm.parentPhone,
+          amountPaid: parseFloat(dropInForm.amountPaid),
+          paymentMethod: dropInForm.paymentMethod,
+          tenantSlug: 'guild',
+        }),
+      });
+      if (res.ok) {
+        router.refresh();
+        setShowDropInDialog(false);
+        setDropInSession(null);
+        setDropInForm({ wrestlerName: '', parentName: '', parentPhone: '', amountPaid: '', paymentMethod: 'cash' });
+        alert('Drop-in recorded successfully!');
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || 'Failed to record drop-in');
+      }
+    } catch {
+      alert('Failed to record drop-in');
+    } finally {
+      setSavingDropIn(false);
+    }
+  };
+
+  const openDropInDialog = (session: AdminSession) => {
+    setDropInSession(session);
+    setDropInForm({ 
+      wrestlerName: '', 
+      parentName: '', 
+      parentPhone: '', 
+      amountPaid: session.price_per_participant?.toString() || '', 
+      paymentMethod: 'cash' 
+    });
+    setShowDropInDialog(true);
+  };
+
   const statusBadge = (status: string) => {
     const isOpen = status === 'scheduled' || status === 'pending_payment';
     const isClosed = status === 'completed' || status === 'cancelled' || status === 'no-show';
@@ -1348,6 +1410,15 @@ export function AdminDashboardClient({
                                   <Smartphone className="h-3.5 w-3.5" />
                                 </Button>
                               )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8"
+                                onClick={() => openDropInDialog(s)}
+                                title="Record drop-in payment"
+                              >
+                                <DollarSign className="h-3.5 w-3.5" />
+                              </Button>
                               <Link href={`/admin/sessions/${s.id}/edit`}>
                                 <Button variant="ghost" size="sm" className="h-8 text-[#B89D60]">
                                   <Pencil className="h-3.5 w-3.5" />
@@ -2570,6 +2641,90 @@ export function AdminDashboardClient({
               </DialogFooter>
             </form>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Drop-In Payment Dialog */}
+      <Dialog open={showDropInDialog} onOpenChange={(open) => !open && setShowDropInDialog(false)}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Record Drop-In Payment</DialogTitle>
+            <DialogDescription>
+              {dropInSession && (
+                <>Record a cash/manual payment for {dropInSession.athlete_name}&apos;s session on {formatEST(new Date(dropInSession.scheduled_datetime), 'MMM d, h:mm a')}</>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid gap-2">
+              <Label htmlFor="wrestlerName">Wrestler Name *</Label>
+              <Input
+                id="wrestlerName"
+                placeholder="Enter wrestler's name"
+                value={dropInForm.wrestlerName}
+                onChange={(e) => setDropInForm({ ...dropInForm, wrestlerName: e.target.value })}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="parentName">Parent Name</Label>
+              <Input
+                id="parentName"
+                placeholder="Enter parent's name"
+                value={dropInForm.parentName}
+                onChange={(e) => setDropInForm({ ...dropInForm, parentName: e.target.value })}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="parentPhone">Parent Phone</Label>
+              <Input
+                id="parentPhone"
+                placeholder="(555) 555-5555"
+                value={dropInForm.parentPhone}
+                onChange={(e) => setDropInForm({ ...dropInForm, parentPhone: e.target.value })}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="amountPaid">Amount Paid *</Label>
+                <Input
+                  id="amountPaid"
+                  type="number"
+                  placeholder="30.00"
+                  value={dropInForm.amountPaid}
+                  onChange={(e) => setDropInForm({ ...dropInForm, amountPaid: e.target.value })}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="paymentMethod">Payment Method</Label>
+                <Select
+                  value={dropInForm.paymentMethod}
+                  onValueChange={(v) => setDropInForm({ ...dropInForm, paymentMethod: v as 'cash' | 'venmo' | 'zelle' | 'other' })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">Cash</SelectItem>
+                    <SelectItem value="venmo">Venmo</SelectItem>
+                    <SelectItem value="zelle">Zelle</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setShowDropInDialog(false)}>Cancel</Button>
+            <Button 
+              type="button" 
+              className="bg-[#B89D60] hover:bg-[#9A8550] text-black" 
+              onClick={handleRecordDropIn}
+              disabled={savingDropIn || !dropInForm.wrestlerName || !dropInForm.amountPaid}
+            >
+              {savingDropIn ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Record Payment
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
