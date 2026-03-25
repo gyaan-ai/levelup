@@ -182,8 +182,8 @@ export default async function AdminReviewsPage() {
                   <ProfileImage
                     src={coach.image}
                     alt={coach.name}
-                    size={56}
-                    className="rounded-full"
+                    className="h-14 w-14"
+                    rounded="full"
                   />
                   <div className="flex-1">
                     <CardTitle className="text-lg flex items-center gap-2">
