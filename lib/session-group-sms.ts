@@ -100,7 +100,12 @@ export async function sendSessionGroupSms(
   const failed: Array<{ to: string; detail: string }> = [];
   let sent = 0;
   for (const phone of phonesToSend) {
-    const ok = await sendSms(phone, fullText);
+    const ok = await sendSms(phone, fullText, {
+      admin,
+      messageType: 'session_group_sms',
+      recipientLabel: audience === 'athletes' ? 'Athlete' : 'Parent',
+      sessionId,
+    });
     if (ok) sent += 1;
     else failed.push({ to: phone, detail: 'Twilio send failed' });
   }
@@ -149,7 +154,13 @@ export async function sendSessionSms(
       (row as { youth_wrestler_id?: string | null }).youth_wrestler_id ?? null
     );
     if (!phone) return { sent: 0, skippedNoPhone: 1, failed: [] };
-    const ok = await sendSms(phone, fullText);
+    const ok = await sendSms(phone, fullText, {
+      admin,
+      messageType: 'session_sms_parent',
+      recipientId: parentId,
+      recipientLabel: 'Parent',
+      sessionId,
+    });
     if (ok) return { sent: 1, skippedNoPhone: 0, failed: [] };
     return { sent: 0, skippedNoPhone: 0, failed: [{ to: phone, detail: 'Twilio send failed' }] };
   }
@@ -166,7 +177,12 @@ export async function sendSessionSms(
     if (!row) return { sent: 0, skippedNoPhone: 1, failed: [] };
     const phone = await resolveAthleteSmsPhone(admin, ywId);
     if (!phone) return { sent: 0, skippedNoPhone: 1, failed: [] };
-    const ok = await sendSms(phone, fullText);
+    const ok = await sendSms(phone, fullText, {
+      admin,
+      messageType: 'session_sms_athlete',
+      recipientLabel: 'Athlete',
+      sessionId,
+    });
     if (ok) return { sent: 1, skippedNoPhone: 0, failed: [] };
     return { sent: 0, skippedNoPhone: 0, failed: [{ to: phone, detail: 'Twilio send failed' }] };
   }
