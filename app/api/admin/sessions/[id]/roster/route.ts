@@ -22,19 +22,7 @@ export async function GET(
     // Fetch session with participants via JOIN
     const { data: sessionData, error } = await admin
       .from('sessions')
-      .select(`
-        id,
-        session_participants (
-          id,
-          paid,
-          amount_paid,
-          created_at,
-          youth_wrestler_id,
-          roster_first_name,
-          roster_last_name,
-          roster_photo_url
-        )
-      `)
+      .select('id, session_participants(id, paid, amount_paid, created_at, youth_wrestler_id, roster_first_name, roster_last_name, roster_photo_url)')
       .eq('id', sessionId)
       .maybeSingle();
 
