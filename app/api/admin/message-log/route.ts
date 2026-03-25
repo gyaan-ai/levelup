@@ -7,6 +7,9 @@ export async function GET(req: Request) {
   const hdrs = await headers();
   const host = hdrs.get('host') ?? '';
   const tenant = getTenantByDomain(host);
+  if (!tenant) {
+    return NextResponse.json({ error: 'Unknown tenant' }, { status: 400 });
+  }
   const admin = createAdminClient(tenant.slug);
 
   const url = new URL(req.url);
