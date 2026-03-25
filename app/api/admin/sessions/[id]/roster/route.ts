@@ -19,10 +19,10 @@ export async function GET(
     
     const admin = createAdminClient(tenant.slug);
 
-    // Fetch session with participants via JOIN
+    // Fetch session with participants via JOIN - use exact same columns as page.tsx
     const { data: sessionData, error } = await admin
       .from('sessions')
-      .select('id, session_participants(id, paid, amount_paid, created_at, youth_wrestler_id, roster_first_name, roster_last_name, roster_photo_url)')
+      .select('id, session_participants(id, amount_paid, youth_wrestler_id)')
       .eq('id', sessionId)
       .maybeSingle();
 
@@ -38,20 +38,17 @@ export async function GET(
     const raw = sessionData.session_participants;
     const participants = Array.isArray(raw) ? raw : raw ? [raw] : [];
 
-    // Build roster using snapshot data only
+    // Build roster - only use columns that exist
     const roster = participants.map((p: Record<string, unknown>) => {
-      const firstName = (p.roster_first_name as string) || 'Drop-in';
-      const lastName = (p.roster_last_name as string) || '';
-      
       return {
         id: p.id as string,
-        wrestlerName: `${firstName} ${lastName}`.trim(),
-        photoUrl: (p.roster_photo_url as string) || null,
+        wrestlerName: p.youth_wrestler_id ? `Wrestler ${(p.id as string).slice(0, 4)}` : 'Drop-in',
+        photoUrl: null,
         parentEmail: null,
-        paid: (p.paid as boolean) ?? false,
+        paid: Number(p.amount_paid ?? 0) > 0,
         amountPaid: Number(p.amount_paid ?? 0),
         isDropIn: p.youth_wrestler_id === null,
-        createdAt: (p.created_at as string) || '',
+        createdAt: '',
       };
     });
 
