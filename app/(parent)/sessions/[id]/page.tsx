@@ -42,7 +42,11 @@ export default async function SessionDetailPage({
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect('/login?redirect=' + encodeURIComponent(`/sessions/${sessionId}`));
+    // Preserve invite token through auth flow
+    const returnUrl = inviteToken 
+      ? `/sessions/${sessionId}?invite=${inviteToken}`
+      : `/sessions/${sessionId}`;
+    redirect('/login?redirect=' + encodeURIComponent(returnUrl));
   }
 
   const { data: userData } = await supabase
