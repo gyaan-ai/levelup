@@ -10,7 +10,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
-import { MapPin, Calendar, Users, Clock, ShoppingCart, Check, ChevronRight, Filter, X } from 'lucide-react';
+import { MapPin, Calendar, Users, Clock, ShoppingCart, Check, ChevronRight, Filter, X, Copy } from 'lucide-react';
 import { useCart } from '@/lib/cart-context';
 import { formatEST } from '@/lib/format-date';
 import { startOfDay } from 'date-fns';
@@ -181,6 +181,18 @@ export function FindTrainingClient({
                   Open
                 </span>
               )}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  const url = `${window.location.origin}/sessions/${session.id}`;
+                  navigator.clipboard.writeText(url);
+                }}
+                className="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700 transition-colors flex items-center gap-1"
+                title="Copy session link"
+              >
+                <Copy className="h-3 w-3" />
+                Share
+              </button>
               {session.focus_area && (
                 <span className="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400">
                   {session.focus_area}
