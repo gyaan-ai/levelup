@@ -44,7 +44,7 @@ type SessionRow = {
 export default async function TrainingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; date?: string; time?: string; location?: string; coach?: string; wrestler?: string }>;
+  searchParams: Promise<{ tab?: string; date?: string; time?: string; location?: string; coach?: string; wrestler?: string; type?: string }>;
 }) {
   const sp = await searchParams;
   const tab = sp.tab ?? 'sessions';
@@ -239,6 +239,7 @@ export default async function TrainingPage({
         coaches={athletesMerged.map((a) => ({ id: a.id, first_name: a.first_name, last_name: a.last_name, school: a.school }))}
         preselectedWrestlerId={sp.wrestler ?? ''}
         parentWrestlerIds={parentWrestlerIds}
+        availabilitySessionType={sp.type ?? 'all'}
       />
       </div>
     </div>

@@ -65,6 +65,7 @@ export function FindTrainingClient({
   defaultRangeLabel,
   preselectedWrestlerId = '',
   parentWrestlerIds = [],
+  initialSessionType = 'all',
 }: {
   facilities: Facility[];
   initialSessions: SessionRow[];
@@ -77,6 +78,7 @@ export function FindTrainingClient({
   defaultRangeLabel?: string;
   preselectedWrestlerId?: string;
   parentWrestlerIds?: string[];
+  initialSessionType?: string;
 }) {
   const router = useRouter();
   const { addItem, removeItem, isInCart } = useCart();
@@ -84,7 +86,7 @@ export function FindTrainingClient({
   const [time, setTime] = useState(initialTime || 'any');
   const [location, setLocation] = useState(initialLocation || 'all');
   const [coach, setCoach] = useState(initialCoach || 'all');
-  const [sessionType, setSessionType] = useState<string>('all');
+  const [sessionType, setSessionType] = useState<string>(initialSessionType || 'all');
   const [dateOpen, setDateOpen] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [coachOpen, setCoachOpen] = useState(false);
@@ -94,7 +96,8 @@ export function FindTrainingClient({
     setTime(initialTime || 'any');
     setLocation(initialLocation || 'all');
     setCoach(initialCoach || 'all');
-  }, [initialDate, initialTime, initialLocation, initialCoach]);
+    setSessionType(initialSessionType || 'all');
+  }, [initialDate, initialTime, initialLocation, initialCoach, initialSessionType]);
 
   // Filter sessions client-side
   // Hide invite-only sessions that are FULL (no value showing something user can't access)
