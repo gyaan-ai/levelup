@@ -99,10 +99,6 @@ export function FindTrainingClient({
     setSessionType(initialSessionType || 'all');
   }, [initialDate, initialTime, initialLocation, initialCoach, initialSessionType]);
 
-  console.log('[v0] sessionType state:', sessionType);
-  console.log('[v0] initialSessionType prop:', initialSessionType);
-  console.log('[v0] initialSessions count:', initialSessions.length);
-  
   // Filter sessions client-side
   // Hide invite-only sessions that are FULL (no value showing something user can't access)
   // Show invite-only sessions with spots (creates FOMO/social proof)
@@ -116,14 +112,9 @@ export function FindTrainingClient({
     if (isInviteOnly && isFull) return false;
     
     // Session type filter
-    if (sessionType !== 'all' && s.session_type !== sessionType) {
-      console.log('[v0] Filtering out session', s.id, 'type:', s.session_type, 'wanted:', sessionType);
-      return false;
-    }
+    if (sessionType !== 'all' && s.session_type !== sessionType) return false;
     return true;
   });
-  
-  console.log('[v0] Filtered sessions count:', openSessions.length);
 
   const applyFilters = (overrides?: { type?: string; coachId?: string }) => {
     const params = new URLSearchParams();
@@ -142,8 +133,8 @@ export function FindTrainingClient({
   
   const sessionTypeOptions = [
     { value: 'all', label: 'All Types' },
-    { value: 'small_group', label: 'Small Group' },
-    { value: 'partner', label: 'Partner' },
+    { value: 'group', label: 'Small Group' },
+    { value: '2-athlete', label: 'Partner' },
     { value: 'private', label: 'Private' },
   ];
 
@@ -177,7 +168,7 @@ export function FindTrainingClient({
     const price = session.price_per_participant;
     const inCart = isInCart(session.id);
     const isInviteOnly = (session as { join_policy?: string | null }).join_policy === 'invite_only';
-    const isPartner = session.session_type === 'partner';
+    const isPartner = session.session_type === '2-athlete' || session.session_type === 'partner';
     const isPrivate = session.session_type === 'private';
     const duration = (session as { duration_minutes?: number | null }).duration_minutes;
     
