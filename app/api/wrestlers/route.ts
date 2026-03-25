@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
-import { getTenantByHost } from '@/lib/tenant';
+import { getTenantByDomain } from '@/config/tenants';
 
 export async function GET() {
   const headersList = await headers();
   const host = headersList.get('host') || '';
-  const tenant = getTenantByHost(host);
+  const tenant = getTenantByDomain(host);
   if (!tenant) return NextResponse.json({ wrestlers: [] });
 
   const supabase = await createClient(tenant.slug);
