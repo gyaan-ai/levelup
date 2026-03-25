@@ -67,12 +67,21 @@ export default async function CoachHomePage() {
   const reviewCount = athlete?.review_count ?? 0;
 
   // Latest reviews (limit 3 for home)
-  const { data: recentReviews } = await supabase
+  const { data: recentReviewsRaw } = await supabase
     .from('reviews')
     .select('id, rating, comment, created_at, users(first_name)')
     .eq('athlete_id', user.id)
     .order('created_at', { ascending: false })
     .limit(3);
+
+  // Transform reviews to flatten the users join (Supabase returns it as array)
+  const recentReviews = (recentReviewsRaw ?? []).map((r) => ({
+    id: r.id as string,
+    rating: r.rating as number,
+    comment: r.comment as string | null,
+    created_at: r.created_at as string,
+    users: Array.isArray(r.users) ? r.users[0] ?? null : r.users,
+  }));
 
   return (
     <div className="container mx-auto px-4 py-5 pb-8 md:py-8 max-w-full">
@@ -83,7 +92,7 @@ export default async function CoachHomePage() {
         coachFirstName={coachFirstName}
         averageRating={averageRating}
         reviewCount={reviewCount}
-        recentReviews={(recentReviews ?? []) as { id: string; rating: number; comment: string | null; created_at: string; users: { first_name: string } | null }[]}
+        recentReviews={recentReviews}
       />
     </div>
   );
