@@ -67,7 +67,16 @@ export async function GET(
       };
     });
 
-    return NextResponse.json({ roster });
+    return NextResponse.json({ 
+      roster,
+      debug: {
+        host,
+        sessionId,
+        tenant: tenant.slug,
+        sessionFound: !!sessionData,
+        rawParticipantsCount: participants.length,
+      }
+    });
   } catch (err) {
     return NextResponse.json({ roster: [], error: String(err) }, { status: 500 });
   }
