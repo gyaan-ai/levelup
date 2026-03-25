@@ -684,12 +684,14 @@ export function AdminDashboardClient({
       return true;
     });
 
-    // Calculate aggregates
-    // athlete_payment is the SOURCE OF TRUTH for what goes to coaches
-    // (already accounts for discounts, family codes, special deals, etc.)
-    let stripeRevenue = 0; // Total collected via Stripe
-    let cashRevenue = 0; // Manual/cash payments
-    let coachPayoutsTotal = 0; // Sum of athlete_payment (the "bible")
+    // Calculate aggregates following GAAP accounting rules:
+    // - Revenue = only from COMPLETED sessions (money EARNED)
+    // - Deposits = collected for future sessions (liability until delivered)
+    // - Coach Payouts = only for COMPLETED sessions (not owed until service delivered)
+    let completedRevenue = 0; // Revenue from completed sessions (earned)
+    let depositsCollected = 0; // Prepaid for future sessions (liability)
+    let coachPayoutsEarned = 0; // Coach payouts for completed sessions only
+    let coachPayoutsPending = 0; // What will be owed when scheduled sessions complete
     let stripeTransactionCount = 0; // For calculating Stripe fees
     let openBookings = 0;
     let completedSessions = 0;
@@ -700,17 +702,20 @@ export function AdminDashboardClient({
     const coachBreakdown = new Map<string, { name: string; school: string; revenue: number; payout: number; sessions: number; open: number }>();
 
     for (const s of filteredSess) {
-      // participant_amount_paid_sum = what parents ACTUALLY paid (from Stripe checkout)
-      // athlete_payment = what you RECORDED paying the coach (the "bible" for payouts)
+      // participant_amount_paid_sum = what parents ACTUALLY paid
+      // athlete_payment = what coach earns for this session
       const parentsPaid = Number(s.participant_amount_paid_sum) || 0;
       const coachPaid = Number(s.athlete_payment) || 0;
       
-      if (s.status === 'completed' || s.status === 'pending_payment' || s.status === 'scheduled') {
-        // Revenue = what parents paid (captured from Stripe)
-        stripeRevenue += parentsPaid;
+      if (s.status === 'completed') {
+        // COMPLETED = Revenue earned, coach payout owed
+        completedRevenue += parentsPaid;
+        coachPayoutsEarned += coachPaid;
         if (parentsPaid > 0) stripeTransactionCount += s.current_participants || 1;
-        // Coach payouts = what you recorded paying them
-        coachPayoutsTotal += coachPaid;
+      } else if (s.status === 'scheduled' || s.status === 'pending_payment') {
+        // FUTURE = Deposits collected (liability), coach payout pending
+        depositsCollected += parentsPaid;
+        coachPayoutsPending += coachPaid;
       }
 
       if (s.status === 'scheduled') openBookings += 1;
@@ -718,7 +723,7 @@ export function AdminDashboardClient({
       if (s.status === 'pending_payment') pendingPayment += 1;
       if (s.status === 'cancelled') cancelledSessions += 1;
 
-      // Coach breakdown
+      // Coach breakdown - only count COMPLETED sessions for earned revenue/payouts
       const existing = coachBreakdown.get(s.athlete_id) || {
         name: s.athlete_name,
         school: s.athlete_school,
@@ -727,7 +732,7 @@ export function AdminDashboardClient({
         sessions: 0,
         open: 0,
       };
-      if (s.status === 'completed' || s.status === 'pending_payment' || s.status === 'scheduled') {
+      if (s.status === 'completed') {
         existing.revenue += parentsPaid;
         existing.payout += coachPaid;
         existing.sessions += 1;
@@ -736,12 +741,13 @@ export function AdminDashboardClient({
       coachBreakdown.set(s.athlete_id, existing);
     }
 
-    const grossRevenue = stripeRevenue + cashRevenue;
-    // Guild Net = what's left after paying coaches (Gross - Coach Payouts)
-    const guildNet = grossRevenue - coachPayoutsTotal;
-    // Stripe fees only apply to Stripe transactions (~2.9% + $0.30 per transaction)
-    const stripeFees = stripeRevenue > 0 ? (stripeRevenue * 0.029) + (stripeTransactionCount * 0.30) : 0;
-    // Guild Profit = Guild Net after paying Stripe fees
+    // Gross Revenue = only COMPLETED sessions (earned revenue per GAAP)
+    const grossRevenue = completedRevenue;
+    // Guild Net = Revenue - Coach Payouts for completed sessions
+    const guildNet = grossRevenue - coachPayoutsEarned;
+    // Stripe fees only apply to completed transactions (~2.9% + $0.30 per transaction)
+    const stripeFees = completedRevenue > 0 ? (completedRevenue * 0.029) + (stripeTransactionCount * 0.30) : 0;
+    // Guild Profit = Guild Net after Stripe fees
     const guildProfit = guildNet - stripeFees;
 
     // Sort coach breakdown by revenue
@@ -750,10 +756,12 @@ export function AdminDashboardClient({
       .sort((a, b) => b.revenue - a.revenue);
 
     return {
-      grossRevenue,
-      stripeRevenue,
-      cashRevenue,
-      coachPayouts: coachPayoutsTotal,
+      grossRevenue, // Earned revenue (completed only)
+      stripeRevenue: completedRevenue, // For backward compat
+      cashRevenue: 0, // Would need separate tracking
+      depositsCollected, // Prepaid for future sessions
+      coachPayouts: coachPayoutsEarned, // Payouts for completed sessions
+      coachPayoutsPending, // What will be owed for scheduled sessions
       guildNet,
       stripeFees,
       guildProfit,
@@ -1092,15 +1100,15 @@ export function AdminDashboardClient({
     if (section === 'overview') {
       return (
         <div className="space-y-6">
-          {/* Hero KPIs */}
+          {/* Hero KPIs - Proper Accounting */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <KpiCard
-              title="Total Revenue"
+              title="Earned Revenue"
               value={financeData.grossRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               prefix="$"
               icon={DollarSign}
               trend="up"
-              change="All time"
+              change={financeData.depositsCollected > 0 ? `+$${financeData.depositsCollected.toFixed(0)} prepaid` : 'Completed sessions'}
               chartData={revenueChartData}
             />
             <KpiCard
@@ -1117,7 +1125,7 @@ export function AdminDashboardClient({
               prefix="$"
               icon={Wallet}
               trend="neutral"
-              change={`${coachPayouts.length} coaches`}
+              change={financeData.coachPayoutsPending > 0 ? `+$${financeData.coachPayoutsPending.toFixed(0)} pending` : `${coachPayouts.length} coaches`}
             />
             <KpiCard
               title="Open Bookings"
