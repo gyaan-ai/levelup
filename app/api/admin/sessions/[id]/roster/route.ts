@@ -34,15 +34,28 @@ export async function GET(
       )
     `)
     .eq('id', sessionId)
-    .single();
+    .maybeSingle();
 
   if (error) {
-    console.log('[v0] Roster API error:', error.message, 'sessionId:', sessionId);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  if (!sessionData) {
+    return NextResponse.json({ roster: [] });
+  }
+
   // Extract participants from join result
-  const rawParticipants = sessionData?.session_participants;
+  const rawParticipants = sessionData.session_participants as Array<{
+    id: string;
+    paid: boolean;
+    amount_paid: number;
+    created_at: string;
+    youth_wrestler_id: string | null;
+    parent_id: string | null;
+    roster_first_name: string | null;
+    roster_last_name: string | null;
+    roster_photo_url: string | null;
+  }> | null;
   const participants = Array.isArray(rawParticipants) ? rawParticipants : rawParticipants ? [rawParticipants] : [];
 
   // Get youth wrestler details for those with IDs
