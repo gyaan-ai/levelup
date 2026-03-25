@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { useRouter, usePathname } from 'next/navigation';
@@ -16,30 +16,81 @@ import {
   SelectTrigger,
   SelectValue,
 } from './ui/select';
-import { Bell, Menu, X, Mail } from 'lucide-react';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from './ui/dialog';
+import { Bell, Menu, X, Mail, User } from 'lucide-react';
 import { AddToHomeScreen } from '@/components/add-to-home-screen';
 import { useTenant } from '@/components/theme-provider';
 import { BrandLogo } from '@/components/brand-logo';
 import { CartDropdown } from '@/components/cart-dropdown';
+import { createClient } from '@/lib/supabase/client';
 
 const navLinkClass = 'block py-3 px-4 text-white hover:text-accent hover:bg-white/10 transition-colors font-medium min-h-[44px] flex items-center';
+
+type Coach = { id: string; first_name: string; last_name: string; school: string | null };
 
 export function Header() {
   const tenant = useTenant();
   const pathname = usePathname();
-  const { user, userRole, viewAsRole, effectiveRole, setViewAsRole, loading, signOut } = useAuth();
+  const { user, userRole, viewAsRole, effectiveRole, viewAsCoachId, setViewAsRole, setViewAsCoachId, loading, signOut } = useAuth();
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [notificationCount, refreshNotifications] = useNotificationCount(!!user);
   const showInboxIcon = effectiveRole === 'parent' || effectiveRole === 'coach' || effectiveRole === 'youth_wrestler';
   const [inboxUnreadCount, refreshInboxUnread] = useInboxUnreadCount(!!user && showInboxIcon);
+  
+  // Coach picker state
+  const [showCoachPicker, setShowCoachPicker] = useState(false);
+  const [coaches, setCoaches] = useState<Coach[]>([]);
+  const [selectedCoachName, setSelectedCoachName] = useState<string | null>(null);
+
+  // Fetch coaches list when admin
+  useEffect(() => {
+    if (userRole === 'admin') {
+      const supabase = createClient(tenant.slug);
+      supabase
+        .from('athletes')
+        .select('id, first_name, last_name, school')
+        .eq('active', true)
+        .order('last_name')
+        .then(({ data }) => {
+          if (data) setCoaches(data);
+        });
+    }
+  }, [userRole, tenant.slug]);
+
+  // Update selected coach name when viewAsCoachId changes
+  useEffect(() => {
+    if (viewAsCoachId && coaches.length > 0) {
+      const coach = coaches.find((c) => c.id === viewAsCoachId);
+      if (coach) setSelectedCoachName(`${coach.first_name} ${coach.last_name}`);
+    } else {
+      setSelectedCoachName(null);
+    }
+  }, [viewAsCoachId, coaches]);
 
   const handleViewAsChange = (value: string) => {
+    if (value === 'coach') {
+      // Show coach picker dialog instead of navigating directly
+      setShowCoachPicker(true);
+      return;
+    }
     setViewAsRole(value === 'admin' ? null : (value as 'coach' | 'parent' | 'youth_wrestler'));
+    setViewAsCoachId(null);
     if (value === 'admin') router.push('/admin');
-    else if (value === 'coach') router.push('/athlete-dashboard');
     else if (value === 'parent') router.push('/dashboard');
     else if (value === 'youth_wrestler') router.push('/youth-dashboard');
+  };
+
+  const handleSelectCoach = (coach: Coach) => {
+    setViewAsRole('coach');
+    setViewAsCoachId(coach.id);
+    setShowCoachPicker(false);
+    router.push('/athlete-dashboard');
   };
 
   const goToAdmin = () => {
@@ -238,20 +289,24 @@ export function Header() {
                   >
                     Admin
                   </button>
-                  <Select
-                    value={viewAsRole ?? 'admin'}
-                    onValueChange={handleViewAsChange}
-                  >
-                    <SelectTrigger className="w-[120px] min-h-[44px] h-9 border-white/30 bg-white/10 text-white hover:bg-white/20 [&>span]:line-clamp-1">
-                      <SelectValue placeholder="Preview as" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="admin">Admin</SelectItem>
-                      <SelectItem value="coach">Coach</SelectItem>
-                      <SelectItem value="parent">Parent</SelectItem>
-                      <SelectItem value="youth_wrestler">Athlete</SelectItem>
-                    </SelectContent>
-                  </Select>
+<Select
+                        value={viewAsRole ?? 'admin'}
+                        onValueChange={handleViewAsChange}
+                      >
+                        <SelectTrigger className="w-[140px] min-h-[44px] h-9 border-white/30 bg-white/10 text-white hover:bg-white/20 [&>span]:line-clamp-1">
+                          {viewAsRole === 'coach' && selectedCoachName ? (
+                            <span className="truncate">{selectedCoachName}</span>
+                          ) : (
+                            <SelectValue placeholder="Preview as" />
+                          )}
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="admin">Admin</SelectItem>
+                          <SelectItem value="coach">{selectedCoachName ? `Coach: ${selectedCoachName}` : 'Select Coach...'}</SelectItem>
+                          <SelectItem value="parent">Parent</SelectItem>
+                          <SelectItem value="youth_wrestler">Athlete</SelectItem>
+                        </SelectContent>
+                      </Select>
                 </>
               )}
               {effectiveRole === 'parent' && (
@@ -413,9 +468,45 @@ export function Header() {
               </nav>
             )}
             </>
-          )}
-        </div>
-      </div>
-    </header>
+)}
+  </div>
+  </div>
+> </header>
+
+      {/* Coach Picker Dialog */}
+      <Dialog open={showCoachPicker} onOpenChange={setShowCoachPicker}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Select a Coach to View As</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+            {coaches.length === 0 ? (
+              <p className="text-muted-foreground text-sm py-4 text-center">No coaches found</p>
+            ) : (
+              coaches.map((coach) => (
+                <button
+                  key={coach.id}
+                  onClick={() => handleSelectCoach(coach)}
+                  className={`w-full text-left p-3 rounded-lg border transition-colors flex items-center gap-3 ${
+                    viewAsCoachId === coach.id
+                      ? 'border-accent bg-accent/10'
+                      : 'border-border hover:border-accent/50 hover:bg-muted/50'
+                  }`}
+                >
+                  <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center">
+                    <User className="h-5 w-5 text-muted-foreground" />
+                  </div>
+                  <div>
+                    <div className="font-medium">{coach.first_name} {coach.last_name}</div>
+                    {coach.school && (
+                      <div className="text-sm text-muted-foreground">{coach.school}</div>
+                    )}
+                  </div>
+                </button>
+              ))
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
   );
-}
+  }

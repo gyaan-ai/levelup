@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { headers } from 'next/headers';
+import { headers, cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
 import { isProfileComplete } from '@/lib/athletes';
@@ -25,14 +25,36 @@ export default async function CoachHomePage() {
     redirect('/login');
   }
 
+  // For admins viewing as a specific coach, use the viewAsCoachId
+  const cookieStore = await cookies();
+  const viewAsCoachId = userData?.role === 'admin' 
+    ? cookieStore.get('levelup_view_as_coach_id')?.value 
+    : null;
+  
+  // The coach ID to use for queries - either the viewed coach or the logged-in user
+  const coachId = viewAsCoachId || user.id;
+  const isViewingAsCoach = !!viewAsCoachId;
+
   const { data: athlete, error: athleteError } = await supabase
     .from('athletes')
     .select('*')
-    .eq('id', user.id)
+    .eq('id', coachId)
     .maybeSingle();
 
-  if (!athlete) redirect('/onboarding');
-  if (!isProfileComplete(athlete)) redirect('/onboarding');
+  // For admins viewing as coach, don't redirect to onboarding - show the coach's dashboard
+  if (!athlete) {
+    if (isViewingAsCoach) {
+      // Coach not found - maybe invalid ID in cookie
+      return (
+        <div className="container mx-auto px-4 py-8 text-center">
+          <h1 className="text-xl font-semibold mb-2">Coach not found</h1>
+          <p className="text-muted-foreground">Select a different coach from the dropdown above.</p>
+        </div>
+      );
+    }
+    redirect('/onboarding');
+  }
+  if (!isViewingAsCoach && !isProfileComplete(athlete)) redirect('/onboarding');
 
   // This month earnings (one number for quick actions)
   const thisMonthStart = new Date();
@@ -41,7 +63,7 @@ export default async function CoachHomePage() {
   const { data: thisMonthSessions } = await supabase
     .from('sessions')
     .select('athlete_payment')
-    .eq('athlete_id', user.id)
+    .eq('athlete_id', coachId)
     .eq('status', 'completed')
     .gte('completed_at', thisMonthStart.toISOString());
   const thisMonthEarnings = thisMonthSessions?.reduce((sum, s) => sum + Number(s.athlete_payment || 0), 0) || 0;
@@ -50,7 +72,7 @@ export default async function CoachHomePage() {
   const { data: upcomingSessions } = await supabase
     .from('sessions')
     .select('*, facilities(name), session_participants(youth_wrestler_id, youth_wrestlers(id, first_name, last_name))')
-    .eq('athlete_id', user.id)
+    .eq('athlete_id', coachId)
     .in('status', ['scheduled', 'pending_payment'])
     .gte('scheduled_datetime', new Date().toISOString())
     .order('scheduled_datetime', { ascending: true })
@@ -70,7 +92,7 @@ export default async function CoachHomePage() {
   const { data: recentReviewsRaw } = await supabase
     .from('reviews')
     .select('id, rating, comment, created_at, users(first_name)')
-    .eq('athlete_id', user.id)
+    .eq('athlete_id', coachId)
     .order('created_at', { ascending: false })
     .limit(3);
 
