@@ -107,7 +107,8 @@ export function Header() {
   };
 
   return (
-    <header className="bg-primary text-white border-b border-accent/20 sticky top-0 z-50 pt-[env(safe-area-inset-top,0px)]">
+    <>
+      <header className="bg-primary text-white border-b border-accent/20 sticky top-0 z-50 pt-[env(safe-area-inset-top,0px)]">
       {/* Mobile logged-out only, and not on / — homepage hero already has Log in + menu has Login (avoids double gold CTAs) */}
       {!user && pathname !== '/' && (
         <div className="md:hidden bg-accent text-black">
@@ -471,7 +472,7 @@ export function Header() {
 )}
   </div>
   </div>
-> </header>
+      </header>
 
       {/* Coach Picker Dialog */}
       <Dialog open={showCoachPicker} onOpenChange={setShowCoachPicker}>
@@ -508,5 +509,6 @@ export function Header() {
           </div>
         </DialogContent>
       </Dialog>
+    </>
   );
-  }
+}
