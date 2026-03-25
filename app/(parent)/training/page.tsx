@@ -164,7 +164,7 @@ export default async function TrainingPage({
   // Query sessions - use simple select first, then join coach/facility data
   const baseSelect = `
     id, scheduled_datetime, status, session_type, session_mode, join_policy, focus_area,
-    current_participants, max_participants, total_price, price_per_participant,
+    current_participants, max_participants, total_price, price_per_participant, duration_minutes,
     athlete_id, facility_id,
     athletes:athlete_id(id, first_name, last_name, school, photo_url, average_rating, review_count),
     facilities:facility_id(id, name, address),

@@ -1625,14 +1625,29 @@ export function AdminDashboardClient({
                     </tr>
                   ) : (
                     filteredSessions.map((s) => {
+                      const isInviteOnly = s.join_policy === 'invite_only';
                       const shareUrl = s.partner_invite_code
                         ? `${typeof window !== 'undefined' ? window.location.origin : ''}/join/${s.partner_invite_code}`
                         : null;
-                      const handleCopy = () => {
-                        if (!shareUrl) return;
-                        navigator.clipboard.writeText(shareUrl);
-                        setCopiedSessionId(s.id);
-                        setTimeout(() => setCopiedSessionId(null), 2000);
+                      const handleCopy = async () => {
+                        try {
+                          if (isInviteOnly) {
+                            // Fetch invite link from API for invite-only sessions
+                            const res = await fetch(`/api/admin/sessions/${s.id}/invite-link`);
+                            const data = await res.json();
+                            if (data.inviteUrl) {
+                              await navigator.clipboard.writeText(data.inviteUrl);
+                              setCopiedSessionId(s.id);
+                              setTimeout(() => setCopiedSessionId(null), 2000);
+                            }
+                          } else if (shareUrl) {
+                            await navigator.clipboard.writeText(shareUrl);
+                            setCopiedSessionId(s.id);
+                            setTimeout(() => setCopiedSessionId(null), 2000);
+                          }
+                        } catch {
+                          // Ignore errors
+                        }
                       };
                       return (
                         <tr key={s.id} className="hover:bg-muted/30 transition-colors">

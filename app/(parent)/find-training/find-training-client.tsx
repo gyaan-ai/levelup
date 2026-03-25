@@ -10,7 +10,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
-import { MapPin, Calendar, Users, Clock, ShoppingCart, Check, ChevronRight, Filter, X, Copy } from 'lucide-react';
+import { MapPin, Calendar, Users, Clock, ShoppingCart, Check, ChevronRight, Filter, X, Copy, Lock } from 'lucide-react';
 import { useCart } from '@/lib/cart-context';
 import { formatEST } from '@/lib/format-date';
 import { startOfDay } from 'date-fns';
@@ -151,6 +151,17 @@ export function FindTrainingClient({
     const openSlots = Math.max(0, max - current);
     const price = session.price_per_participant;
     const inCart = isInCart(session.id);
+    const isInviteOnly = (session as { join_policy?: string | null }).join_policy === 'invite_only';
+    const isPartner = session.session_type === 'partner';
+    const duration = (session as { duration_minutes?: number | null }).duration_minutes;
+    
+    // Determine spot display color per spec
+    const getSpotColor = () => {
+      if (openSlots === 0) return 'text-zinc-500';
+      if (openSlots === 1) return 'text-red-400'; // Last spot - red
+      if (isPartner && current === 1) return 'text-amber-400'; // Waiting on partner - orange
+      return 'text-zinc-500';
+    };
 
     const handleAddToCart = (e: React.MouseEvent) => {
       e.preventDefault();
@@ -241,7 +252,7 @@ export function FindTrainingClient({
               )}
             </div>
 
-            {/* Location & Spots */}
+            {/* Location, Duration & Spots */}
             <div className="flex items-center gap-3 mt-2 text-xs text-zinc-500">
               {facilityData && (
                 <span className="flex items-center gap-1">
@@ -249,9 +260,20 @@ export function FindTrainingClient({
                   {facilityData.name}
                 </span>
               )}
-              <span className="flex items-center gap-1">
+              {duration && (
+                <span className="flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  {duration} min
+                </span>
+              )}
+              <span className={cn("flex items-center gap-1", getSpotColor())}>
                 <Users className="h-3 w-3" />
-                {current}/{max} · {openSlots > 0 ? `${openSlots} spot${openSlots !== 1 ? 's' : ''} left` : 'Full'}
+                {current}/{max}
+                {openSlots > 0 ? (
+                  isPartner && current === 1 
+                    ? ' · Waiting on partner'
+                    : ` · ${openSlots} spot${openSlots !== 1 ? 's' : ''} left`
+                ) : ' · Full'}
               </span>
             </div>
 
@@ -279,29 +301,43 @@ export function FindTrainingClient({
             {price != null && price > 0 && (
               <span className="text-lg font-bold text-foreground">${price}</span>
             )}
+            {/* Button States per spec:
+                - Invite-only without access: Lock icon, no action
+                - Full: "Full" badge, no action  
+                - Open/Has invite: Add to Cart / In Cart toggle
+            */}
             {openSlots > 0 ? (
-              <Button
-                size="sm"
-                onClick={handleAddToCart}
-                className={cn(
-                  "min-h-[36px] gap-1.5 transition-all",
-                  inCart 
-                    ? "bg-zinc-800 hover:bg-zinc-700 text-[#D4AF37] border border-[#D4AF37]/30"
-                    : "bg-[#D4AF37] hover:bg-[#B8963C] text-black"
-                )}
-              >
-                {inCart ? (
-                  <>
-                    <Check className="h-4 w-4" />
-                    Added
-                  </>
-                ) : (
-                  <>
-                    <ShoppingCart className="h-4 w-4" />
-                    Add
-                  </>
-                )}
-              </Button>
+              isInviteOnly ? (
+                // Invite-only: show lock icon (no access check yet - will be added)
+                <span className="text-xs text-zinc-500 bg-zinc-800 px-3 py-1.5 rounded flex items-center gap-1.5">
+                  <Lock className="h-3 w-3" />
+                  Invite Only
+                </span>
+              ) : (
+                // Open session: show Add/In Cart button
+                <Button
+                  size="sm"
+                  onClick={handleAddToCart}
+                  className={cn(
+                    "min-h-[36px] gap-1.5 transition-all",
+                    inCart 
+                      ? "bg-zinc-800 hover:bg-zinc-700 text-[#D4AF37] border border-[#D4AF37]/30"
+                      : "bg-[#D4AF37] hover:bg-[#B8963C] text-black"
+                  )}
+                >
+                  {inCart ? (
+                    <>
+                      <Check className="h-4 w-4" />
+                      In Cart
+                    </>
+                  ) : (
+                    <>
+                      <ShoppingCart className="h-4 w-4" />
+                      Add
+                    </>
+                  )}
+                </Button>
+              )
             ) : (
               <span className="text-xs text-zinc-500 bg-zinc-800 px-2 py-1 rounded">Full</span>
             )}
