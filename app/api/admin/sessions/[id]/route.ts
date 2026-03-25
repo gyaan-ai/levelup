@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import { APP_TIMEZONE } from '@/lib/format-date';
+import { notifySessionScheduledFollowers } from '@/lib/notify-session-scheduled-followers';
 
 /**
  * PATCH - Admin updates a session (focus_area, join_policy, max_participants, price_per_participant).
@@ -37,13 +38,14 @@ export async function PATCH(
       price_per_participant?: number;
       scheduledDate?: string;
       scheduledTime?: string;
+      published?: boolean;
     };
 
     const admin = createAdminClient(tenant.slug);
 
     const { data: session, error: fetchErr } = await admin
       .from('sessions')
-      .select('id, status, session_type')
+      .select('id, status, session_type, published, athlete_id, scheduled_datetime, partner_invite_code')
       .eq('id', sessionId)
       .single();
 
@@ -94,6 +96,12 @@ export async function PATCH(
       const utcDate = fromZonedTime(localIso, APP_TIMEZONE);
       updates.scheduled_datetime = utcDate.toISOString();
     }
+    
+    // Track if we're publishing for the first time
+    const isNewlyPublished = body.published === true && session.published !== true;
+    if (body.published !== undefined) {
+      updates.published = body.published;
+    }
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ ok: true });
@@ -109,6 +117,16 @@ export async function PATCH(
     if (updateErr) {
       return NextResponse.json({ error: updateErr.message }, { status: 500 });
     }
+    
+    // If session was just published, notify followers
+    if (isNewlyPublished && session.athlete_id && session.partner_invite_code) {
+      void notifySessionScheduledFollowers(tenant.slug, session.athlete_id, {
+        sessionId,
+        scheduledDatetime: (updates.scheduled_datetime as string) || session.scheduled_datetime,
+        joinUrlPath: `/join/${session.partner_invite_code}`,
+      });
+    }
+    
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error('Admin session PATCH error:', e);

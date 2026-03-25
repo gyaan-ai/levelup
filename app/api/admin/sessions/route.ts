@@ -127,6 +127,9 @@ export async function POST(req: NextRequest) {
     const athletePayment = 0; // pay-per-person; coach payout = price × COACH_REVENUE_FRACTION × participants (5/6)
 
     // Assign session to the selected coach (parent_id = athlete_id) so they own it and see it on their schedule
+    // Check if published flag is passed (default to true for backward compat)
+    const published = body.published !== false;
+
     const { data: session, error: sessionError } = await admin
       .from('sessions')
       .insert({
@@ -154,8 +157,9 @@ export async function POST(req: NextRequest) {
         focus_area: focusArea && String(focusArea).trim() ? String(focusArea).trim() : null,
         focus_area_2: focusArea2 && String(focusArea2).trim() ? String(focusArea2).trim() : null,
         coach_payout_rate: coachPayoutRate,
+        published,
       })
-      .select('id, partner_invite_code, scheduled_datetime, max_participants, price_per_participant')
+      .select('id, partner_invite_code, scheduled_datetime, max_participants, price_per_participant, published')
       .single();
 
     if (sessionError) {
@@ -168,11 +172,14 @@ export async function POST(req: NextRequest) {
       (host.startsWith('localhost') ? `http://${host}` : `https://${host}`);
     const shareUrl = `${baseUrl}/join/${session.partner_invite_code}`;
 
-    void notifySessionScheduledFollowers(tenant.slug, athleteId, {
-      sessionId: session.id,
-      scheduledDatetime: session.scheduled_datetime,
-      joinUrlPath: `/join/${session.partner_invite_code}`,
-    });
+    // Only notify followers if session is published
+    if (session.published) {
+      void notifySessionScheduledFollowers(tenant.slug, athleteId, {
+        sessionId: session.id,
+        scheduledDatetime: session.scheduled_datetime,
+        joinUrlPath: `/join/${session.partner_invite_code}`,
+      });
+    }
 
     return NextResponse.json({
       success: true,
