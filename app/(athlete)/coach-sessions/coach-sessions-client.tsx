@@ -14,6 +14,7 @@ import { showSessionSmsCopyAndTextGroup } from '@/lib/session-sms-tools';
 import { AddToCalendarButton } from '@/components/add-to-calendar-button';
 import { SessionTypeBadge } from '@/components/session-type-badge';
 import { CapacityBadge } from '@/components/capacity-badge';
+import { SessionContactsPanel } from '@/components/session-contacts-panel';
 import type { CoachSession } from '@/app/(athlete)/athlete-dashboard/coach-schedule-card';
 
 function facilityName(s: CoachSession): string {
@@ -242,12 +243,6 @@ export function CoachSessionsClient({
                           />
                         </>
                       )}
-                      <Link href={`/workspaces/from-session/${session.id}`}>
-                        <Button variant="ghost" size="sm" className="min-h-[44px] touch-manipulation">
-                          <FolderOpen className="h-4 w-4 mr-1" />
-                          Workspace
-                        </Button>
-                      </Link>
                       <Button
                         variant="ghost"
                         size="sm"
@@ -266,6 +261,12 @@ export function CoachSessionsClient({
                       </Button>
                     </div>
                   </div>
+                  
+                  {/* Expandable contact info */}
+                  <SessionContactsPanel
+                    sessionId={session.id}
+                    participantCount={session.current_participants ?? 0}
+                  />
                 </CardContent>
               </Card>
             ))
@@ -351,20 +352,6 @@ export function CoachSessionsClient({
                         {facilityName(session)}
                         {wrestlerNames(session).length > 0 && ` · ${wrestlerNames(session).join(', ')}`}
                       </p>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      <Link href={`/messages/${session.id}`}>
-                        <Button variant="outline" size="sm" className="min-h-[44px] touch-manipulation">
-                          <MessageCircle className="h-4 w-4 mr-1" />
-                          Message
-                        </Button>
-                      </Link>
-                      <Link href={`/workspaces/from-session/${session.id}`}>
-                        <Button variant="ghost" size="sm" className="min-h-[44px] touch-manipulation">
-                          <FolderOpen className="h-4 w-4 mr-1" />
-                          Workspace
-                        </Button>
-                      </Link>
                     </div>
                   </div>
                 </CardContent>

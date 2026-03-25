@@ -11,6 +11,8 @@ import { formatEST } from '@/lib/format-date';
 import { differenceInHours, differenceInDays } from 'date-fns';
 import { AddToCalendarButton } from '@/components/add-to-calendar-button';
 import { SessionTypeBadge } from '@/components/session-type-badge';
+import { SessionContactsPanel } from '@/components/session-contacts-panel';
+import { CoachPlaybook } from '@/components/coach-playbook';
 import type { CoachSession } from './coach-schedule-card';
 
 function facilityName(s: CoachSession): string {
@@ -89,13 +91,16 @@ export function CoachHomeClient({
         {coachFirstName ? `Hey ${coachFirstName}, here’s what’s up.` : 'Your schedule and quick actions.'}
       </p>
 
-      {/* Next session reminder — prominent so college kids do not forget */}
+{/* Next session reminder — prominent so college kids do not forget */}
       {reminderLabel && (
         <div className="rounded-lg border-2 border-accent/50 bg-accent/15 px-4 py-4">
           <p className="font-medium text-foreground">{reminderLabel}</p>
-          <p className="text-sm text-muted-foreground mt-1.5">We’ll remind you the day before and 1 hour before so you do not forget.</p>
+          <p className="text-sm text-muted-foreground mt-1.5">We'll remind you the day before and 1 hour before so you do not forget.</p>
         </div>
       )}
+
+      {/* Coach Playbook - actionable outreach items */}
+      <CoachPlaybook />
 
       {/* Upcoming sessions */}
       <section>
@@ -187,6 +192,12 @@ export function CoachHomeClient({
                       />
                     </div>
                   </div>
+                  
+                  {/* Expandable contact info */}
+                  <SessionContactsPanel
+                    sessionId={session.id}
+                    participantCount={current}
+                  />
                 </CardContent>
               </Card>
               );
