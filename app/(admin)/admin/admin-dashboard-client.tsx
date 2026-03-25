@@ -109,17 +109,6 @@ export type AdminSession = {
   drop_in_count?: number;
   /** Sum of actual Stripe fees from session_participants.stripe_fee */
   stripe_fee_sum?: number;
-  /** Participants data from session_participants */
-  participants?: Array<{
-    id: string;
-    wrestlerName: string;
-    photoUrl: string | null;
-    parentId: string | null;
-    paid: boolean;
-    amountPaid: number;
-    isDropIn: boolean;
-    createdAt: string | null;
-  }>;
 };
 
 export type AdminUser = {
@@ -550,18 +539,19 @@ export function AdminDashboardClient({
   const [financeTypeFilter, setFinanceTypeFilter] = useState<string>('all');
   const [financeSchoolFilter, setFinanceSchoolFilter] = useState<string>('all');
   
-  // Open roster for a session - use local data passed from server
-  const openRoster = (sessionId: string) => {
+  // Fetch roster for a session via API
+  const [rosterLoading, setRosterLoading] = useState(false);
+  const openRoster = async (sessionId: string) => {
     setRosterSessionId(sessionId);
-    const sess = sessions.find(s => s.id === sessionId);
-    if (sess?.participants) {
-      setRosterData(sess.participants.map(p => ({
-        ...p,
-        parentEmail: null, // Not available in local data
-        createdAt: p.createdAt || '',
-      })));
-    } else {
+    setRosterLoading(true);
+    try {
+      const res = await fetch(`/api/admin/sessions/${sessionId}/roster`);
+      const data = await res.json();
+      setRosterData(data.roster || []);
+    } catch {
       setRosterData([]);
+    } finally {
+      setRosterLoading(false);
     }
   };
 
@@ -3112,7 +3102,11 @@ export function AdminDashboardClient({
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            {rosterData.length === 0 ? (
+            {rosterLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : rosterData.length === 0 ? (
               <p className="text-center text-muted-foreground py-8">No participants registered</p>
             ) : (
               <div className="space-y-3">

@@ -91,7 +91,7 @@ export default async function AdminPage() {
         price_per_participant,
         athletes(id, first_name, last_name, school, venmo_handle, zelle_email),
         facilities(id, name),
-        session_participants(id, amount_paid, youth_wrestler_id, stripe_fee, paid, parent_id, roster_first_name, roster_last_name, roster_photo_url, created_at)
+        session_participants(id, amount_paid, youth_wrestler_id, stripe_fee)
       `)
       .order('scheduled_datetime', { ascending: false })
       .limit(10000),
@@ -164,23 +164,11 @@ export default async function AdminPage() {
       amount_paid?: number | null;
       youth_wrestler_id?: string | null;
       stripe_fee?: number | null;
-      paid?: boolean;
-      parent_id?: string | null;
-      roster_first_name?: string | null;
-      roster_last_name?: string | null;
-      roster_photo_url?: string | null;
-      created_at?: string | null;
     }> | {
       id?: string;
       amount_paid?: number | null;
       youth_wrestler_id?: string | null;
       stripe_fee?: number | null;
-      paid?: boolean;
-      parent_id?: string | null;
-      roster_first_name?: string | null;
-      roster_last_name?: string | null;
-      roster_photo_url?: string | null;
-      created_at?: string | null;
     };
   }>;
 
@@ -191,12 +179,6 @@ export default async function AdminPage() {
     amount_paid?: number | null; 
     youth_wrestler_id?: string | null; 
     stripe_fee?: number | null;
-    paid?: boolean;
-    parent_id?: string | null;
-    roster_first_name?: string | null;
-    roster_last_name?: string | null;
-    roster_photo_url?: string | null;
-    created_at?: string | null;
   };
   
   function participantAmountPaidSum(s: (typeof sessionsRows)[0]): number {
@@ -270,25 +252,6 @@ export default async function AdminPage() {
       drop_in_amount: dropInAmount(s),
       drop_in_count: dropInCount(s),
       stripe_fee_sum: stripeFeeSum(s),
-      participants: (() => {
-        const raw = s.session_participants;
-        const rows = Array.isArray(raw) ? raw : raw ? [raw] : [];
-        return rows.map((p) => {
-          const pr = p as ParticipantRow;
-          const firstName = pr.roster_first_name || 'Unknown';
-          const lastName = pr.roster_last_name || '';
-          return {
-            id: pr.id || '',
-            wrestlerName: `${firstName} ${lastName}`.trim(),
-            photoUrl: pr.roster_photo_url || null,
-            parentId: pr.parent_id || null,
-            paid: pr.paid ?? false,
-            amountPaid: Number(pr.amount_paid ?? 0),
-            isDropIn: pr.youth_wrestler_id === null,
-            createdAt: pr.created_at || null,
-          };
-        });
-      })(),
     };
   });
 
