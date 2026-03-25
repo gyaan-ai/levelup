@@ -82,8 +82,10 @@ export function FindTrainingClient({
   const [time, setTime] = useState(initialTime || 'any');
   const [location, setLocation] = useState(initialLocation || 'all');
   const [coach, setCoach] = useState(initialCoach || 'all');
+  const [sessionType, setSessionType] = useState<string>('all');
   const [dateOpen, setDateOpen] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [coachOpen, setCoachOpen] = useState(false);
 
   useEffect(() => {
     setDate(initialDate || '');
@@ -92,31 +94,45 @@ export function FindTrainingClient({
     setCoach(initialCoach || 'all');
   }, [initialDate, initialTime, initialLocation, initialCoach]);
 
-  // Show all sessions - don't filter by open status, let users see full sessions too
-  const openSessions = initialSessions;
+  // Filter sessions client-side by session type
+  const openSessions = initialSessions.filter((s) => {
+    if (sessionType === 'all') return true;
+    return s.session_type === sessionType;
+  });
 
-  const applyFilters = () => {
+  const applyFilters = (overrides?: { type?: string; coachId?: string }) => {
     const params = new URLSearchParams();
     if (searchBasePath === '/dashboard') params.set('tab', 'find-training');
     if (searchBasePath === '/training') params.set('tab', 'sessions');
     if (date) params.set('date', date);
     if (time && time !== 'any') params.set('time', time);
     if (location && location !== 'all') params.set('location', location);
-    if (coach && coach !== 'all') params.set('coach', coach);
+    const c = overrides?.coachId ?? coach;
+    if (c && c !== 'all') params.set('coach', c);
+    const t = overrides?.type ?? sessionType;
+    if (t && t !== 'all') params.set('type', t);
     router.push(`${searchBasePath}?${params.toString()}`);
     setShowFilters(false);
   };
+  
+  const sessionTypeOptions = [
+    { value: 'all', label: 'All Types' },
+    { value: 'small_group', label: 'Small Group' },
+    { value: 'partner', label: 'Partner' },
+    { value: 'private', label: 'Private' },
+  ];
 
   const clearFilters = () => {
     setDate('');
     setTime('any');
     setLocation('all');
     setCoach('all');
+    setSessionType('all');
     router.push(searchBasePath);
   };
 
-  const hasActiveFilters = date || time !== 'any' || location !== 'all' || coach !== 'all';
-  const activeFilterCount = [date, time !== 'any', location !== 'all', coach !== 'all'].filter(Boolean).length;
+  const hasActiveFilters = date || time !== 'any' || location !== 'all' || coach !== 'all' || sessionType !== 'all';
+  const activeFilterCount = [date, time !== 'any', location !== 'all', coach !== 'all', sessionType !== 'all'].filter(Boolean).length;
 
   // Filter pills data
   const timeOptions = [
@@ -366,23 +382,89 @@ export function FindTrainingClient({
           </button>
         ))}
 
-        {/* More Filters Button */}
+        {/* Session Type Pills */}
+        {sessionTypeOptions.map((opt) => (
+          <button
+            key={opt.value}
+            onClick={() => {
+              setSessionType(opt.value);
+              applyFilters({ type: opt.value });
+            }}
+            className={cn(
+              "px-3 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all border",
+              sessionType === opt.value
+                ? "bg-[#D4AF37]/20 text-[#D4AF37] border-[#D4AF37]/30"
+                : "bg-zinc-900 text-zinc-300 border-zinc-800 hover:border-zinc-700"
+            )}
+          >
+            {opt.label}
+          </button>
+        ))}
+
+        {/* Coach Dropdown */}
+        {coaches.length > 0 && (
+          <Popover open={coachOpen} onOpenChange={setCoachOpen}>
+            <PopoverTrigger asChild>
+              <button
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all border",
+                  coach !== 'all'
+                    ? "bg-[#D4AF37]/20 text-[#D4AF37] border-[#D4AF37]/30"
+                    : "bg-zinc-900 text-zinc-300 border-zinc-800 hover:border-zinc-700"
+                )}
+              >
+                {coach !== 'all' 
+                  ? coaches.find(c => c.id === coach)?.first_name || 'Coach'
+                  : 'Coach'}
+                <ChevronRight className="h-3 w-3 rotate-90" />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-48 p-1" align="start">
+              <button
+                onClick={() => {
+                  setCoach('all');
+                  setCoachOpen(false);
+                  applyFilters({ coachId: 'all' });
+                }}
+                className={cn(
+                  "w-full text-left px-3 py-2 rounded text-sm hover:bg-zinc-800",
+                  coach === 'all' && "bg-zinc-800 text-[#D4AF37]"
+                )}
+              >
+                All Coaches
+              </button>
+              {coaches.map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => {
+                    setCoach(c.id);
+                    setCoachOpen(false);
+                    applyFilters({ coachId: c.id });
+                  }}
+                  className={cn(
+                    "w-full text-left px-3 py-2 rounded text-sm hover:bg-zinc-800",
+                    coach === c.id && "bg-zinc-800 text-[#D4AF37]"
+                  )}
+                >
+                  {c.first_name} {c.last_name}
+                </button>
+              ))}
+            </PopoverContent>
+          </Popover>
+        )}
+
+        {/* More Filters Button (Location only now) */}
         <button
           onClick={() => setShowFilters(true)}
           className={cn(
             "flex items-center gap-1.5 px-3 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all border",
-            (location !== 'all' || coach !== 'all')
+            location !== 'all'
               ? "bg-[#D4AF37]/20 text-[#D4AF37] border-[#D4AF37]/30"
               : "bg-zinc-900 text-zinc-300 border-zinc-800 hover:border-zinc-700"
           )}
         >
           <Filter className="h-4 w-4" />
-          Filters
-          {activeFilterCount > 0 && (
-            <span className="bg-[#D4AF37] text-black text-xs px-1.5 py-0.5 rounded-full min-w-[18px] text-center">
-              {activeFilterCount}
-            </span>
-          )}
+          Location
         </button>
 
         {/* Clear Filters */}
