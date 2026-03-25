@@ -62,6 +62,13 @@ export default async function TrainingPage({
   if (userData?.role === 'coach') redirect('/athlete-dashboard');
   if (userData?.role !== 'parent' && userData?.role !== 'admin' && userData?.role !== 'youth_wrestler') redirect('/dashboard');
 
+  // Fetch parent's wrestlers for "Booked" state check
+  const { data: parentWrestlers } = await supabase
+    .from('youth_wrestlers')
+    .select('id')
+    .eq('parent_id', user.id);
+  const parentWrestlerIds = (parentWrestlers || []).map((w) => w.id);
+
   const { data: facilities } = await supabase
     .from('facilities')
     .select('id, name, school, address')
@@ -231,6 +238,7 @@ export default async function TrainingPage({
         availabilityCoach={sp.coach ?? 'all'}
         coaches={athletesMerged.map((a) => ({ id: a.id, first_name: a.first_name, last_name: a.last_name, school: a.school }))}
         preselectedWrestlerId={sp.wrestler ?? ''}
+        parentWrestlerIds={parentWrestlerIds}
       />
       </div>
     </div>

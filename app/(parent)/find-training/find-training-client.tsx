@@ -64,6 +64,7 @@ export function FindTrainingClient({
   searchBasePath = '/find-training',
   defaultRangeLabel,
   preselectedWrestlerId = '',
+  parentWrestlerIds = [],
 }: {
   facilities: Facility[];
   initialSessions: SessionRow[];
@@ -75,6 +76,7 @@ export function FindTrainingClient({
   searchBasePath?: string;
   defaultRangeLabel?: string;
   preselectedWrestlerId?: string;
+  parentWrestlerIds?: string[];
 }) {
   const router = useRouter();
   const { addItem, removeItem, isInCart } = useCart();
@@ -156,6 +158,18 @@ export function FindTrainingClient({
     const isPrivate = session.session_type === 'private';
     const duration = (session as { duration_minutes?: number | null }).duration_minutes;
     
+    // Check how many of parent's wrestlers are already booked for this session
+    const bookedWrestlerIds = (session.session_participants || [])
+      .map((p) => {
+        const yw = p?.youth_wrestlers;
+        const wrestler = Array.isArray(yw) ? yw[0] : yw;
+        return p?.youth_wrestler_id || wrestler?.id;
+      })
+      .filter(Boolean) as string[];
+    const parentBookedCount = parentWrestlerIds.filter((id) => bookedWrestlerIds.includes(id)).length;
+    const allParentWrestlersBooked = parentWrestlerIds.length > 0 && parentBookedCount >= parentWrestlerIds.length;
+    const someParentWrestlersBooked = parentBookedCount > 0;
+    
     // Determine spot display color per spec
     const getSpotColor = () => {
       if (openSlots === 0) return 'text-zinc-500'; // Full - grey
@@ -173,8 +187,8 @@ export function FindTrainingClient({
       return `${current}/${max} · ${openSlots} spot${openSlots !== 1 ? 's' : ''} left`;
     };
     
-    // Session is not bookable if full OR invite-only (without access)
-    const isNotBookable = openSlots === 0 || isInviteOnly;
+    // Session is not bookable if full OR invite-only (without access) OR all wrestlers already booked
+    const isNotBookable = openSlots === 0 || isInviteOnly || allParentWrestlersBooked;
 
     const handleAddToCart = (e: React.MouseEvent) => {
       e.preventDefault();
@@ -313,40 +327,48 @@ export function FindTrainingClient({
               <span className="text-lg font-bold text-foreground">${price}</span>
             )}
             {/* Button States per spec:
+                - All parent's wrestlers booked: "Booked" (grey, disabled)
                 - Invite-only without access: Lock icon, no action
                 - Full: "Full" badge, no action  
-                - Open/Has invite: Add to Cart / In Cart toggle
+                - In Cart: Navigate to cart
+                - Open/Has invite: Add to Cart
             */}
-            {openSlots > 0 ? (
+            {allParentWrestlersBooked ? (
+              // All wrestlers booked - grey disabled state
+              <span className="text-xs text-zinc-500 bg-zinc-800 px-3 py-1.5 rounded flex items-center gap-1.5">
+                <Check className="h-3 w-3" />
+                Booked
+              </span>
+            ) : openSlots > 0 ? (
               isInviteOnly ? (
-                // Invite-only: show lock icon (no access check yet - will be added)
+                // Invite-only: show lock icon
                 <span className="text-xs text-zinc-500 bg-zinc-800 px-3 py-1.5 rounded flex items-center gap-1.5">
                   <Lock className="h-3 w-3" />
                   Invite Only
                 </span>
+              ) : inCart ? (
+                // In Cart: navigate to cart on click
+                <Button
+                  size="sm"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    router.push('/cart');
+                  }}
+                  className="min-h-[36px] gap-1.5 transition-all bg-zinc-800 hover:bg-zinc-700 text-[#D4AF37] border border-[#D4AF37]/30"
+                >
+                  <Check className="h-4 w-4" />
+                  In Cart
+                </Button>
               ) : (
-                // Open session: show Add/In Cart button
+                // Open session: show Add to Cart button
                 <Button
                   size="sm"
                   onClick={handleAddToCart}
-                  className={cn(
-                    "min-h-[36px] gap-1.5 transition-all",
-                    inCart 
-                      ? "bg-zinc-800 hover:bg-zinc-700 text-[#D4AF37] border border-[#D4AF37]/30"
-                      : "bg-[#D4AF37] hover:bg-[#B8963C] text-black"
-                  )}
+                  className="min-h-[36px] gap-1.5 transition-all bg-[#D4AF37] hover:bg-[#B8963C] text-black"
                 >
-                  {inCart ? (
-                    <>
-                      <Check className="h-4 w-4" />
-                      In Cart
-                    </>
-                  ) : (
-                    <>
-                      <ShoppingCart className="h-4 w-4" />
-                      Add
-                    </>
-                  )}
+                  <ShoppingCart className="h-4 w-4" />
+                  Add
                 </Button>
               )
             ) : (
