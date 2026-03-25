@@ -50,7 +50,7 @@ export default async function AdminReviewsPage() {
       comment,
       tags,
       created_at,
-      athletes(id, first_name, last_name, school, profile_image_url),
+      athletes(id, first_name, last_name, school, photo_url),
       sessions(scheduled_datetime)
     `)
     .order('created_at', { ascending: false });
@@ -58,6 +58,7 @@ export default async function AdminReviewsPage() {
   if (error) {
     console.error('Admin reviews fetch error:', error);
   }
+  console.log('[v0] Reviews fetched:', reviews?.length ?? 0, 'error:', error?.message);
 
   // Fetch parent emails
   const parentIds = [...new Set((reviews ?? []).map(r => r.parent_id).filter(Boolean))];
@@ -95,7 +96,7 @@ export default async function AdminReviewsPage() {
           id: coachId,
           name: coachName,
           school: athlete.school ?? '',
-          image: athlete.profile_image_url ?? null,
+          image: athlete.photo_url ?? null,
         },
         reviews: [],
       });
