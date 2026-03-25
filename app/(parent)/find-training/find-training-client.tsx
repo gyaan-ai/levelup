@@ -198,7 +198,7 @@ export function FindTrainingClient({
                 <StarRating
                   averageRating={coachData.average_rating}
                   reviewCount={coachData.review_count}
-                  size="xs"
+                  size="sm"
                 />
               )}
             </div>
