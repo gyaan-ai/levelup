@@ -250,20 +250,19 @@ export default async function MyBookingsPage() {
   const pastSessions = past.map(transformSession);
 
   return (
-    <div className="container mx-auto px-4 py-5 pb-8 md:py-8 max-w-full" data-page="my-bookings-full" data-bookings-version="full-with-reviews">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-foreground md:text-3xl mb-1">My bookings</h1>
-        <p className="text-muted-foreground text-sm md:text-base">
-          Upcoming and past. Use the <strong>Past</strong> tab to see completed sessions and leave feedback.
-        </p>
+    <div className="min-h-screen pb-24">
+      <div className="px-4 pt-6 pb-4">
+        <h1 className="text-2xl font-bold text-foreground">My Bookings</h1>
+        <p className="text-zinc-400 text-sm mt-0.5">Upcoming sessions and past training</p>
       </div>
-
+      <div className="px-4">
       <BookingsTabsClient
         thisWeek={thisWeekSessions}
         thisMonth={thisMonthSessions}
         later={laterSessions}
         closed={pastSessions}
       />
+      </div>
     </div>
   );
 }

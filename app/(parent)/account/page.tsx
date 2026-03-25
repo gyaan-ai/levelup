@@ -5,7 +5,7 @@ import { getTenantByDomain } from '@/config/tenants';
 import { getParentYouthWrestlerIds } from '@/lib/parent-wrestlers';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { User, Wallet, Bell, Settings, ChevronRight, Users, Phone, Gift, LogOut, DollarSign } from 'lucide-react';
+import { User, Wallet, Bell, ChevronRight, Users, DollarSign } from 'lucide-react';
 import { AccountSignOut } from '@/components/account-sign-out';
 import { RedeemCodeCard } from './redeem-code-card';
 import { AccountPhoneCard } from './account-phone-card';
