@@ -323,6 +323,8 @@ export default function OnboardingPage() {
         skipLabel="Skip for now"
         wizardTitle="Coach profile"
         wizardDescription="A few steps to get you set up"
+        exitHref="/"
+        exitLabel="Exit setup"
       >
         {error && (
           <div className="mb-4 p-3 bg-destructive/10 border border-destructive rounded-md">
