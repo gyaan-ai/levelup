@@ -8,7 +8,7 @@ import { ageFromDob, formatBirthdayWithCountdown, isBirthdaySoon } from '@/lib/a
 import { cn } from '@/lib/utils';
 
 interface Contact {
-  registrationId: string;
+  participantId: string;
   athlete: {
     id: string;
     firstName: string;
@@ -43,6 +43,7 @@ export function SessionContactsPanel({ sessionId, participantCount = 0, classNam
       fetch(`/api/sessions/${sessionId}/contacts`)
         .then((res) => res.json())
         .then((data) => {
+          console.log('[v0] contacts data:', data);
           setContacts(data.contacts ?? []);
           setFetched(true);
         })
@@ -90,7 +91,7 @@ export function SessionContactsPanel({ sessionId, participantCount = 0, classNam
               const birthdaySoon = athlete?.dateOfBirth ? isBirthdaySoon(athlete.dateOfBirth, 7) : false;
 
               return (
-                <div key={contact.registrationId} className="bg-muted/50 rounded-lg p-3 space-y-1">
+                <div key={contact.participantId} className="bg-muted/50 rounded-lg p-3 space-y-1">
                   {/* Athlete info */}
                   {athlete && (
                     <>

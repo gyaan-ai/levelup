@@ -45,9 +45,9 @@ export async function GET(
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
-  // Get all registrations for this session with athlete and parent info
-  const { data: registrations, error } = await supabase
-    .from('session_registrations')
+  // Get all participants for this session with athlete and parent info
+  const { data: participants, error } = await supabase
+    .from('session_participants')
     .select(`
       id,
       youth_wrestler_id,
@@ -68,19 +68,22 @@ export async function GET(
       )
     `)
     .eq('session_id', sessionId)
-    .in('status', ['confirmed', 'pending']);
+    .in('status', ['confirmed', 'pending', 'booked']);
 
   if (error) {
+    console.log('[v0] contacts API error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  console.log('[v0] participants found:', participants?.length, participants);
+
   // Format the contacts
-  const contacts = (registrations ?? []).map((reg) => {
+  const contacts = (participants ?? []).map((reg) => {
     const athlete = Array.isArray(reg.youth_wrestlers) ? reg.youth_wrestlers[0] : reg.youth_wrestlers;
     const parent = Array.isArray(reg.users) ? reg.users[0] : reg.users;
 
     return {
-      registrationId: reg.id,
+      participantId: reg.id,
       athlete: athlete ? {
         id: athlete.id,
         firstName: athlete.first_name,

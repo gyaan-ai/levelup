@@ -125,7 +125,7 @@ export function CoachHomeClient({
               const pricePerParticipant = Number(session.price_per_participant ?? 0);
               const projectedEarnings = Math.round(current * pricePerParticipant * payoutRate * 100) / 100;
               const isFull = current >= max;
-              const isGroup = session.session_type === 'group' || max > 2;
+              const showSpotsCount = session.session_type === 'group' || session.session_type === 'partner' || max > 1;
               
               return (
               <Card key={session.id}>
@@ -134,7 +134,7 @@ export function CoachHomeClient({
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2 mb-1">
                         <SessionTypeBadge sessionType={session.session_type} sessionMode={session.session_mode} />
-                        {isGroup && (
+                        {showSpotsCount && (
                           <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
                             isFull 
                               ? 'bg-emerald-500/20 text-emerald-400' 
