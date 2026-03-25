@@ -937,7 +937,9 @@ export function AdminDashboardClient({
     const grossRevenue = completedRevenue;
     // Guild Net = Revenue - Coach Payouts for completed sessions
     const guildNet = grossRevenue - coachPayoutsEarned;
-    // Stripe fees only apply to completed transactions (~2.9% + $0.30 per transaction)
+    // Stripe fees only apply to INBOUND payments (collected from parents via Stripe)
+    // We don't use Stripe for payouts - payouts are manual (Zelle/Venmo)
+    // Stripe takes ~2.9% + $0.30 per charge
     const stripeFees = completedRevenue > 0 ? (completedRevenue * 0.029) + (stripeTransactionCount * 0.30) : 0;
     // Guild Profit = Guild Net after Stripe fees
     const guildProfit = guildNet - stripeFees;
@@ -1850,6 +1852,11 @@ export function AdminDashboardClient({
         );
       }
 
+      // Messages sub-section
+      if (subSection === 'messages') {
+        return <MessageLogSection />;
+      }
+
       // Default: Payments overview with filters
       return (
         <div className="space-y-6">
@@ -2172,11 +2179,6 @@ export function AdminDashboardClient({
           </div>
         </div>
       );
-    }
-
-    // Messages Log sub-section
-    if (subSection === 'messages') {
-      return <MessageLogSection />;
     }
 
     // PEOPLE SECTION
