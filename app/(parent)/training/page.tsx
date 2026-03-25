@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import { toZonedTime } from 'date-fns-tz';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import { APP_TIMEZONE } from '@/lib/format-date';
 import { Athlete } from '@/types';
@@ -164,6 +165,8 @@ export default async function TrainingPage({
       })();
   const pastDayEnd = dateParam ? dayEnd : now.toISOString();
 
+  // Use admin client to bypass RLS for fetching public sessions
+  const adminClient = createAdminClient(tenant.slug);
   const baseSelect = `
     id, scheduled_datetime, status, session_type, session_mode, join_policy, focus_area,
     current_participants, max_participants, total_price, price_per_participant,
@@ -171,7 +174,7 @@ export default async function TrainingPage({
     session_participants(id, youth_wrestler_id, roster_first_name, roster_last_name, roster_photo_url, youth_wrestlers(id, first_name, last_name, photo_url))
   `;
   const sessions = (start: string, end: string) =>
-    supabase.from('sessions').select(baseSelect).gte('scheduled_datetime', start).lte('scheduled_datetime', end);
+    adminClient.from('sessions').select(baseSelect).gte('scheduled_datetime', start).lte('scheduled_datetime', end);
   const withOptFilters = (q: ReturnType<typeof sessions>) => {
     if (sp.location && sp.location !== 'all') q = q.eq('facility_id', sp.location);
     if (sp.coach && sp.coach !== 'all') q = q.eq('athlete_id', sp.coach);
@@ -179,10 +182,16 @@ export default async function TrainingPage({
   };
 
   // Query ALL sessions - no type filter, show everything
+  console.log('[v0] Training query params:', { dayStart, dayEnd, pastDayStart, pastDayEnd });
   const [groupUpcoming, groupPast] = await Promise.all([
     withOptFilters(sessions(dayStart, dayEnd)).in('status', ['scheduled', 'pending_payment']).order('scheduled_datetime', { ascending: true }),
     withOptFilters(sessions(pastDayStart, pastDayEnd)).in('status', ['completed', 'cancelled', 'no-show']).order('scheduled_datetime', { ascending: true }),
   ]);
+  console.log('[v0] groupUpcoming result:', groupUpcoming.data?.length ?? 0, 'error:', groupUpcoming.error?.message);
+  console.log('[v0] groupPast result:', groupPast.data?.length ?? 0, 'error:', groupPast.error?.message);
+  if (groupUpcoming.data?.length) {
+    console.log('[v0] First session:', JSON.stringify(groupUpcoming.data[0], null, 2));
+  }
   const seen = new Set<string>();
   let list: SessionRow[] = [];
   for (const row of [...(groupUpcoming.data ?? []), ...(groupPast.data ?? [])]) {
