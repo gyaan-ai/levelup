@@ -34,6 +34,11 @@ type SessionRow = {
   facility_id: string;
   athletes?: { id: string; first_name?: string; last_name?: string; school?: string; photo_url?: string; average_rating?: number; review_count?: number } | null;
   facilities?: { id: string; name?: string; address?: string } | null;
+  session_participants?: Array<{
+    id: string;
+    youth_wrestler_id: string | null;
+    youth_wrestlers?: { id: string; first_name?: string; last_name?: string } | null;
+  }>;
 };
 
 export default async function TrainingPage({
@@ -163,7 +168,7 @@ export default async function TrainingPage({
     athlete_id, facility_id,
     athletes:athlete_id(id, first_name, last_name, school, photo_url, average_rating, review_count),
     facilities:facility_id(id, name, address),
-    session_participants(id, youth_wrestler_id)
+    session_participants(id, youth_wrestler_id, youth_wrestlers:youth_wrestler_id(id, first_name, last_name))
   `;
   const sessionQuery = (start: string, end: string) =>
     supabase.from('sessions').select(baseSelect).gte('scheduled_datetime', start).lte('scheduled_datetime', end);

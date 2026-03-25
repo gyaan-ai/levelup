@@ -223,9 +223,27 @@ export function FindTrainingClient({
               )}
               <span className="flex items-center gap-1">
                 <Users className="h-3 w-3" />
-                {openSlots > 0 ? `${openSlots} spot${openSlots !== 1 ? 's' : ''} left` : 'Full'}
+                {current}/{max} · {openSlots > 0 ? `${openSlots} spot${openSlots !== 1 ? 's' : ''} left` : 'Full'}
               </span>
             </div>
+
+            {/* Who's registered */}
+            {session.session_participants && session.session_participants.length > 0 && (
+              <div className="mt-2 text-xs text-zinc-400">
+                <span className="text-zinc-500">Registered: </span>
+                {session.session_participants.map((p, i) => {
+                  const yw = p?.youth_wrestlers;
+                  const wrestler = Array.isArray(yw) ? yw[0] : yw;
+                  const name = wrestler ? `${wrestler.first_name || ''} ${wrestler.last_name || ''}`.trim() : 'Drop-in';
+                  return (
+                    <span key={p?.id || i}>
+                      {i > 0 && ', '}
+                      {name || 'Unknown'}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
           </div>
 
           {/* Price & Action */}
