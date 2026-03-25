@@ -99,6 +99,10 @@ export function FindTrainingClient({
     setSessionType(initialSessionType || 'all');
   }, [initialDate, initialTime, initialLocation, initialCoach, initialSessionType]);
 
+  console.log('[v0] sessionType state:', sessionType);
+  console.log('[v0] initialSessionType prop:', initialSessionType);
+  console.log('[v0] initialSessions count:', initialSessions.length);
+  
   // Filter sessions client-side
   // Hide invite-only sessions that are FULL (no value showing something user can't access)
   // Show invite-only sessions with spots (creates FOMO/social proof)
@@ -112,9 +116,14 @@ export function FindTrainingClient({
     if (isInviteOnly && isFull) return false;
     
     // Session type filter
-    if (sessionType !== 'all' && s.session_type !== sessionType) return false;
+    if (sessionType !== 'all' && s.session_type !== sessionType) {
+      console.log('[v0] Filtering out session', s.id, 'type:', s.session_type, 'wanted:', sessionType);
+      return false;
+    }
     return true;
   });
+  
+  console.log('[v0] Filtered sessions count:', openSessions.length);
 
   const applyFilters = (overrides?: { type?: string; coachId?: string }) => {
     const params = new URLSearchParams();
