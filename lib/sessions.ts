@@ -116,6 +116,15 @@ export function getEffectiveFilledCount(
   },
   participantRowCountOverride?: number
 ): number {
+  // Prefer actual session_participants rows if available (most accurate source of truth)
+  const rows = participantRowCount(session, participantRowCountOverride);
+  if (rows > 0 || Array.isArray(session.session_participants)) {
+    // We have roster data - use it as source of truth
+    const max = session.max_participants;
+    if (max == null || max <= 0) return rows;
+    return Math.min(rows, max);
+  }
+  // Fallback to current_participants column if no roster data fetched
   const fromColRaw = session.current_participants;
   const fromCol =
     typeof fromColRaw === 'number' && Number.isFinite(fromColRaw)
@@ -124,11 +133,9 @@ export function getEffectiveFilledCount(
         ? parseInt(fromColRaw, 10)
         : 0;
   const fromColSafe = Number.isFinite(fromCol) ? fromCol : 0;
-  const rows = participantRowCount(session, participantRowCountOverride);
-  const raw = Math.max(fromColSafe, rows);
   const max = session.max_participants;
-  if (max == null || max <= 0) return raw;
-  return Math.min(raw, max);
+  if (max == null || max <= 0) return fromColSafe;
+  return Math.min(fromColSafe, max);
 }
 
 /** Use when UI lists names from session_participants so the badge cannot stay behind the roster (stale current_participants column). */
