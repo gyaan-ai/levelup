@@ -105,7 +105,7 @@ export default async function AdminPage() {
       .order('created_at', { ascending: false }),
     admin
       .from('athletes')
-      .select('id, first_name, last_name, school, average_rating, review_count')
+      .select('id, first_name, last_name, school, average_rating, review_count, active')
       .order('last_name'),
   ]);
 
@@ -281,6 +281,7 @@ export default async function AdminPage() {
     school: string | null;
     average_rating?: number | null;
     review_count?: number | null;
+    active?: boolean | null;
   }>;
   const athleteMap = new Map<string, AthleteReport>();
   for (const o of athletesRows) {
@@ -293,6 +294,7 @@ export default async function AdminPage() {
       completed_count: 0,
       average_rating: o.average_rating != null ? Number(o.average_rating) : null,
       review_count: o.review_count != null ? Number(o.review_count) : 0,
+      active: o.active ?? false,
     });
   }
   for (const s of sessionsRows) {

@@ -135,6 +135,7 @@ export type AthleteReport = {
   school: string;
   session_count: number;
   total_earnings: number;
+  active: boolean;
   completed_count: number;
   average_rating?: number | null;
   review_count?: number;
@@ -611,6 +612,7 @@ export function AdminDashboardClient({
   const [athleteEditSaving, setAthleteEditSaving] = useState(false);
   const [athletePhotoUploading, setAthletePhotoUploading] = useState(false);
   const [deactivatingId, setDeactivatingId] = useState<string | null>(null);
+  const [approvingId, setApprovingId] = useState<string | null>(null);
   const [deletingAthleteId, setDeletingAthleteId] = useState<string | null>(null);
   const athletePhotoInputRef = useRef<HTMLInputElement>(null);
   const [facilityRequests, setFacilityRequests] = useState<Array<{
@@ -773,6 +775,7 @@ export function AdminDashboardClient({
       pending_payment_count: number;
       average_rating: number | null;
       review_count: number;
+      active: boolean;
     }>();
 
     for (const s of filteredSess) {
@@ -787,6 +790,7 @@ export function AdminDashboardClient({
         pending_payment_count: 0,
         average_rating: null,
         review_count: 0,
+        active: false,
       };
       
       existing.session_count += 1;
@@ -799,12 +803,13 @@ export function AdminDashboardClient({
       coachMap.set(s.athlete_id, existing);
     }
 
-    // Merge with athlete reports for ratings
+    // Merge with athlete reports for ratings and active status
     for (const report of athleteReports) {
       const existing = coachMap.get(report.athlete_id);
       if (existing) {
         existing.average_rating = report.average_rating ?? null;
         existing.review_count = report.review_count ?? 0;
+        existing.active = report.active ?? false;
       } else if (leaderboardTimeFilter === 'all') {
         // Include coaches with no sessions in this period only for 'all'
         coachMap.set(report.athlete_id, {
@@ -818,6 +823,7 @@ export function AdminDashboardClient({
           pending_payment_count: 0,
           average_rating: report.average_rating ?? null,
           review_count: report.review_count ?? 0,
+          active: report.active ?? false,
         });
       }
     }
@@ -1082,17 +1088,33 @@ export function AdminDashboardClient({
     }
   };
 
-  const handleDeactivateAthlete = async (athleteId: string) => {
-    if (!confirm('Deactivate this coach? They will be hidden from Browse and cannot receive new bookings.')) return;
-    setDeactivatingId(athleteId);
+const handleToggleApproval = async (athleteId: string, currentActive: boolean) => {
+    const action = currentActive ? 'unapprove' : 'approve';
+    if (!confirm(`${currentActive ? 'Unapprove' : 'Approve'} this coach? ${currentActive ? 'They will be hidden from Browse.' : 'They will be visible on Browse.'}`)) return;
+    setApprovingId(athleteId);
     try {
       const res = await fetch(`/api/admin/athletes/${athleteId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ active: false }),
+        body: JSON.stringify({ active: !currentActive }),
       });
       if (res.ok) router.refresh();
     } finally {
+      setApprovingId(null);
+    }
+  };
+
+  const handleDeactivateAthlete = async (athleteId: string) => {
+  if (!confirm('Deactivate this coach? They will be hidden from Browse and cannot receive new bookings.')) return;
+  setDeactivatingId(athleteId);
+  try {
+  const res = await fetch(`/api/admin/athletes/${athleteId}`, {
+  method: 'PATCH',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ active: false }),
+  });
+  if (res.ok) router.refresh();
+  } finally {
       setDeactivatingId(null);
     }
   };
@@ -2362,6 +2384,7 @@ export function AdminDashboardClient({
                     <tr>
                       <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider w-10">#</th>
                       <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Coach</th>
+                      <th className="text-center py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Status</th>
                       <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">School</th>
                       <th className="text-center py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Rating</th>
                       <th className="text-center py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Open</th>
@@ -2374,7 +2397,7 @@ export function AdminDashboardClient({
                   <tbody className="divide-y divide-border">
                     {leaderboardData.length === 0 ? (
                       <tr>
-                        <td colSpan={9} className="py-12 text-center text-muted-foreground">
+                        <td colSpan={10} className="py-12 text-center text-muted-foreground">
                           <Trophy className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
                           <p>No coaches found</p>
                         </td>
@@ -2396,6 +2419,23 @@ export function AdminDashboardClient({
                             )}
                           </td>
                           <td className="py-3 px-4 font-medium">{a.athlete_name}</td>
+                          <td className="py-3 px-4 text-center">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className={`h-7 px-2 text-xs font-medium ${a.active ? 'text-emerald-500 hover:text-emerald-400' : 'text-amber-500 hover:text-amber-400'}`}
+                              disabled={approvingId === a.athlete_id}
+                              onClick={() => handleToggleApproval(a.athlete_id, a.active)}
+                            >
+                              {approvingId === a.athlete_id ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Badge variant={a.active ? 'default' : 'outline'} className={a.active ? 'bg-emerald-600 hover:bg-emerald-500' : 'border-amber-500 text-amber-500'}>
+                                  {a.active ? 'Approved' : 'Pending'}
+                                </Badge>
+                              )}
+                            </Button>
+                          </td>
                           <td className="py-3 px-4 text-muted-foreground">{a.school}</td>
                           <td className="py-3 px-4 text-center">
                             {a.average_rating ? (
