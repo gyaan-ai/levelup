@@ -19,10 +19,10 @@ export async function GET(
     
     const admin = createAdminClient(tenant.slug);
 
-    // Fetch session with participants via JOIN
+    // Fetch session with participants via JOIN - only columns that exist
     const { data: sessionData, error } = await admin
       .from('sessions')
-      .select('id, session_participants(id, amount_paid, youth_wrestler_id, roster_first_name, roster_last_name, roster_photo_url)')
+      .select('id, session_participants(id, amount_paid, youth_wrestler_id)')
       .eq('id', sessionId)
       .maybeSingle();
 
@@ -38,19 +38,39 @@ export async function GET(
     const raw = sessionData.session_participants;
     const participants = Array.isArray(raw) ? raw : raw ? [raw] : [];
 
-    // Build roster with name data
+    // Get youth wrestler IDs to look up names
+    const youthIds = participants
+      .map((p: Record<string, unknown>) => p.youth_wrestler_id as string)
+      .filter(Boolean);
+    
+    // Fetch wrestler names
+    const wrestlerNames: Record<string, { first_name: string; last_name: string; photo_url: string | null }> = {};
+    if (youthIds.length > 0) {
+      const { data: wrestlers } = await admin
+        .from('youth_wrestlers')
+        .select('id, first_name, last_name, photo_url')
+        .in('id', youthIds);
+      
+      if (wrestlers) {
+        for (const w of wrestlers) {
+          wrestlerNames[w.id] = { first_name: w.first_name, last_name: w.last_name, photo_url: w.photo_url };
+        }
+      }
+    }
+
+    // Build roster
     const roster = participants.map((p: Record<string, unknown>) => {
-      const firstName = (p.roster_first_name as string) || '';
-      const lastName = (p.roster_last_name as string) || '';
-      const name = `${firstName} ${lastName}`.trim() || (p.youth_wrestler_id ? 'Unknown' : 'Drop-in');
+      const youthId = p.youth_wrestler_id as string | null;
+      const wrestler = youthId ? wrestlerNames[youthId] : null;
+      const name = wrestler ? `${wrestler.first_name} ${wrestler.last_name}`.trim() : 'Drop-in';
       return {
         id: p.id as string,
         wrestlerName: name,
-        photoUrl: (p.roster_photo_url as string) || null,
+        photoUrl: wrestler?.photo_url || null,
         parentEmail: null,
         paid: Number(p.amount_paid ?? 0) > 0,
         amountPaid: Number(p.amount_paid ?? 0),
-        isDropIn: p.youth_wrestler_id === null,
+        isDropIn: youthId === null,
         createdAt: '',
       };
     });
