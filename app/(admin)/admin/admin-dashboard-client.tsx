@@ -1421,7 +1421,7 @@ export function AdminDashboardClient({
                           <td className="py-3 px-4 text-right">
                             <CapacityBadge current={s.current_participants} max={s.max_participants ?? 1} label="" />
                           </td>
-                          <td className="py-3 px-4 text-right font-medium tabular-nums">${s.total_price.toFixed(2)}</td>
+<td className="py-3 px-4 text-right font-medium tabular-nums">${s.participant_amount_paid_sum.toFixed(2)}</td>
                           <td className="py-3 px-4 text-right">
                             <div className="flex items-center justify-end gap-2">
                               {shareUrl && (
