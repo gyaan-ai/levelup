@@ -91,7 +91,7 @@ export default async function AdminPage() {
         price_per_participant,
         athletes(id, first_name, last_name, school, venmo_handle, zelle_email),
         facilities(id, name),
-        session_participants(amount_paid, youth_wrestler_id, stripe_fee)
+        session_participants(id, amount_paid, youth_wrestler_id, stripe_fee, paid, parent_id, roster_first_name, roster_last_name, roster_photo_url, created_at)
       `)
       .order('scheduled_datetime', { ascending: false })
       .limit(10000),
@@ -159,12 +159,23 @@ export default async function AdminPage() {
     price_per_participant?: number | null;
     athletes?: { id: string; first_name: string; last_name: string; school: string; venmo_handle?: string | null; zelle_email?: string | null } | { id: string; first_name: string; last_name: string; school: string; venmo_handle?: string | null; zelle_email?: string | null }[];
     facilities?: { id: string; name: string } | { id: string; name: string }[];
-    session_participants?: { amount_paid?: number | null; youth_wrestler_id?: string | null; stripe_fee?: number | null }[] | { amount_paid?: number | null; youth_wrestler_id?: string | null; stripe_fee?: number | null };
+    session_participants?: ParticipantRow[] | ParticipantRow;
   }>;
 
   const emailByUserId = new Map(usersRows.map((u) => [u.id, u.email]));
 
-  type ParticipantRow = { amount_paid?: number | null; youth_wrestler_id?: string | null; stripe_fee?: number | null };
+  type ParticipantRow = { 
+    id?: string;
+    amount_paid?: number | null; 
+    youth_wrestler_id?: string | null; 
+    stripe_fee?: number | null;
+    paid?: boolean;
+    parent_id?: string | null;
+    roster_first_name?: string | null;
+    roster_last_name?: string | null;
+    roster_photo_url?: string | null;
+    created_at?: string | null;
+  };
   
   function participantAmountPaidSum(s: (typeof sessionsRows)[0]): number {
     const raw = s.session_participants;
@@ -193,6 +204,13 @@ export default async function AdminPage() {
     const rows = Array.isArray(raw) ? raw : raw ? [raw] : [];
     return rows.reduce((sum, p) => sum + Number((p as ParticipantRow).stripe_fee ?? 0), 0);
   }
+  
+  // Count actual participants from session_participants table (not stale counter)
+  function actualParticipantCount(s: (typeof sessionsRows)[0]): number {
+    const raw = s.session_participants;
+    const rows = Array.isArray(raw) ? raw : raw ? [raw] : [];
+    return rows.length;
+  }
 
   const sessions: AdminSession[] = sessionsRows.map((s) => {
     const a = s.athletes;
@@ -217,7 +235,7 @@ export default async function AdminPage() {
       focus_area: row.focus_area ?? null,
       focus_area_2: row.focus_area_2 ?? null,
       partner_invite_code: s.partner_invite_code ?? null,
-      current_participants: s.current_participants ?? 0,
+      current_participants: actualParticipantCount(s),
       max_participants: s.max_participants ?? 1,
       price_per_participant: row.price_per_participant ?? 30,
       parent_id: s.parent_id,
@@ -230,6 +248,25 @@ export default async function AdminPage() {
       drop_in_amount: dropInAmount(s),
       drop_in_count: dropInCount(s),
       stripe_fee_sum: stripeFeeSum(s),
+      participants: (() => {
+        const raw = s.session_participants;
+        const rows = Array.isArray(raw) ? raw : raw ? [raw] : [];
+        return rows.map((p) => {
+          const pr = p as ParticipantRow;
+          const firstName = pr.roster_first_name || 'Unknown';
+          const lastName = pr.roster_last_name || '';
+          return {
+            id: pr.id || '',
+            wrestlerName: `${firstName} ${lastName}`.trim(),
+            photoUrl: pr.roster_photo_url || null,
+            parentId: pr.parent_id || null,
+            paid: pr.paid ?? false,
+            amountPaid: Number(pr.amount_paid ?? 0),
+            isDropIn: pr.youth_wrestler_id === null,
+            createdAt: pr.created_at || null,
+          };
+        });
+      })(),
     };
   });
 

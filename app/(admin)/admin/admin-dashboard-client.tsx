@@ -109,6 +109,17 @@ export type AdminSession = {
   drop_in_count?: number;
   /** Sum of actual Stripe fees from session_participants.stripe_fee */
   stripe_fee_sum?: number;
+  /** Participants data from session_participants */
+  participants?: Array<{
+    id: string;
+    wrestlerName: string;
+    photoUrl: string | null;
+    parentId: string | null;
+    paid: boolean;
+    amountPaid: number;
+    isDropIn: boolean;
+    createdAt: string | null;
+  }>;
 };
 
 export type AdminUser = {
@@ -524,7 +535,6 @@ export function AdminDashboardClient({
     isDropIn: boolean;
     createdAt: string;
   }>>([]);
-  const [rosterLoading, setRosterLoading] = useState(false);
   const [sessionCompletingId, setSessionCompletingId] = useState<string | null>(null);
   const [textGroupAdminSession, setTextGroupAdminSession] = useState<AdminSession | null>(null);
   const [userRoleFilter, setUserRoleFilter] = useState<string>('all');
@@ -540,18 +550,18 @@ export function AdminDashboardClient({
   const [financeTypeFilter, setFinanceTypeFilter] = useState<string>('all');
   const [financeSchoolFilter, setFinanceSchoolFilter] = useState<string>('all');
   
-  // Fetch roster for a session
-  const openRoster = async (sessionId: string) => {
+  // Open roster for a session - use local data passed from server
+  const openRoster = (sessionId: string) => {
     setRosterSessionId(sessionId);
-    setRosterLoading(true);
-    try {
-      const res = await fetch(`/api/admin/sessions/${sessionId}/roster`);
-      const data = await res.json();
-      setRosterData(data.roster || []);
-    } catch {
+    const sess = sessions.find(s => s.id === sessionId);
+    if (sess?.participants) {
+      setRosterData(sess.participants.map(p => ({
+        ...p,
+        parentEmail: null, // Not available in local data
+        createdAt: p.createdAt || '',
+      })));
+    } else {
       setRosterData([]);
-    } finally {
-      setRosterLoading(false);
     }
   };
 
@@ -3102,11 +3112,7 @@ export function AdminDashboardClient({
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
-            {rosterLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              </div>
-            ) : rosterData.length === 0 ? (
+            {rosterData.length === 0 ? (
               <p className="text-center text-muted-foreground py-8">No participants registered</p>
             ) : (
               <div className="space-y-3">
