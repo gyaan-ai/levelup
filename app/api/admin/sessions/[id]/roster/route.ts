@@ -16,24 +16,29 @@ export async function GET(
   }
   const admin = createAdminClient(tenant.slug);
 
-  // Fetch session participants with youth wrestler and parent info
-  const { data: participants, error } = await admin
-    .from('session_participants')
+  // Fetch session with participants via JOIN (same approach as page.tsx which works)
+  const { data: sessionData, error } = await admin
+    .from('sessions')
     .select(`
       id,
-      paid,
-      amount_paid,
-      created_at,
-      youth_wrestler_id,
-      parent_id,
-      roster_first_name,
-      roster_last_name,
-      roster_photo_url
+      session_participants(
+        id,
+        paid,
+        amount_paid,
+        created_at,
+        youth_wrestler_id,
+        parent_id,
+        roster_first_name,
+        roster_last_name,
+        roster_photo_url
+      )
     `)
-    .eq('session_id', sessionId)
-    .order('created_at', { ascending: true });
+    .eq('id', sessionId)
+    .single();
 
-  console.log('[v0] Roster API - sessionId:', sessionId, 'tenant:', tenant.slug, 'participantCount:', participants?.length, 'error:', error?.message, 'firstParticipant:', participants?.[0]);
+  // Extract participants from join result
+  const rawParticipants = sessionData?.session_participants;
+  const participants = Array.isArray(rawParticipants) ? rawParticipants : rawParticipants ? [rawParticipants] : [];
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -82,5 +87,5 @@ export async function GET(
     };
   });
 
-  return NextResponse.json({ roster, _debug: { sessionId, tenant: tenant.slug, rawCount: participants?.length } });
+  return NextResponse.json({ roster });
 }
