@@ -512,6 +512,19 @@ export function AdminDashboardClient({
   const [duplicatingSessionId, setDuplicatingSessionId] = useState<string | null>(null);
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
   const [sessionDeleteLoading, setSessionDeleteLoading] = useState(false);
+  // Roster modal state
+  const [rosterSessionId, setRosterSessionId] = useState<string | null>(null);
+  const [rosterData, setRosterData] = useState<Array<{
+    id: string;
+    wrestlerName: string;
+    photoUrl: string | null;
+    parentEmail: string | null;
+    paid: boolean;
+    amountPaid: number;
+    isDropIn: boolean;
+    createdAt: string;
+  }>>([]);
+  const [rosterLoading, setRosterLoading] = useState(false);
   const [sessionCompletingId, setSessionCompletingId] = useState<string | null>(null);
   const [textGroupAdminSession, setTextGroupAdminSession] = useState<AdminSession | null>(null);
   const [userRoleFilter, setUserRoleFilter] = useState<string>('all');
@@ -527,6 +540,21 @@ export function AdminDashboardClient({
   const [financeTypeFilter, setFinanceTypeFilter] = useState<string>('all');
   const [financeSchoolFilter, setFinanceSchoolFilter] = useState<string>('all');
   
+  // Fetch roster for a session
+  const openRoster = async (sessionId: string) => {
+    setRosterSessionId(sessionId);
+    setRosterLoading(true);
+    try {
+      const res = await fetch(`/api/admin/sessions/${sessionId}/roster`);
+      const data = await res.json();
+      setRosterData(data.roster || []);
+    } catch {
+      setRosterData([]);
+    } finally {
+      setRosterLoading(false);
+    }
+  };
+
   // Manual payment entry
   const [showManualPaymentDialog, setShowManualPaymentDialog] = useState(false);
   const [manualPaymentForm, setManualPaymentForm] = useState({
@@ -1622,7 +1650,13 @@ export function AdminDashboardClient({
                           <td className="py-3 px-4 text-sm">{s.facility_name}</td>
                           <td className="py-3 px-4">{statusBadge(s.status)}</td>
                           <td className="py-3 px-4 text-right">
-                            <CapacityBadge current={s.current_participants} max={s.max_participants ?? 1} label="" />
+                            <button
+                              onClick={() => openRoster(s.id)}
+                              className="hover:opacity-80 transition-opacity cursor-pointer"
+                              title="View roster"
+                            >
+                              <CapacityBadge current={s.current_participants} max={s.max_participants ?? 1} label="" />
+                            </button>
                           </td>
 <td className="py-3 px-4 text-right font-medium tabular-nums">
                                 <div className="flex items-center justify-end gap-1.5">
@@ -3048,6 +3082,70 @@ export function AdminDashboardClient({
               {savingDropIn ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Record Payment
             </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Session Roster Modal */}
+      <Dialog open={!!rosterSessionId} onOpenChange={(open) => !open && setRosterSessionId(null)}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Session Roster
+            </DialogTitle>
+            <DialogDescription>
+              {rosterSessionId && (() => {
+                const sess = sessions.find(s => s.id === rosterSessionId);
+                return sess ? `${sess.athlete_name} - ${formatEST(new Date(sess.scheduled_datetime), 'MMM d, yyyy h:mm a')}` : '';
+              })()}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            {rosterLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : rosterData.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">No participants registered</p>
+            ) : (
+              <div className="space-y-3">
+                {rosterData.map((p, idx) => (
+                  <div key={p.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                    <div className="font-medium text-muted-foreground w-6">{idx + 1}.</div>
+                    {p.photoUrl ? (
+                      <img src={p.photoUrl} alt="" className="w-10 h-10 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-zinc-700 flex items-center justify-center text-sm font-medium">
+                        {p.wrestlerName.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium flex items-center gap-2">
+                        {p.wrestlerName}
+                        {p.isDropIn && (
+                          <Badge variant="outline" className="text-xs border-amber-600 text-amber-400">Drop-in</Badge>
+                        )}
+                      </div>
+                      {p.parentEmail && (
+                        <div className="text-sm text-muted-foreground truncate">{p.parentEmail}</div>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <div className="font-medium tabular-nums">${Number(p.amountPaid || 0).toFixed(2)}</div>
+                      {p.paid ? (
+                        <Badge variant="outline" className="text-xs border-emerald-600 bg-emerald-600/20 text-emerald-400">Paid</Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-xs border-amber-600 bg-amber-600/20 text-amber-400">Pending</Badge>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setRosterSessionId(null)}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
