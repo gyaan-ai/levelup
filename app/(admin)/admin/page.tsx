@@ -159,7 +159,29 @@ export default async function AdminPage() {
     price_per_participant?: number | null;
     athletes?: { id: string; first_name: string; last_name: string; school: string; venmo_handle?: string | null; zelle_email?: string | null } | { id: string; first_name: string; last_name: string; school: string; venmo_handle?: string | null; zelle_email?: string | null }[];
     facilities?: { id: string; name: string } | { id: string; name: string }[];
-    session_participants?: ParticipantRow[] | ParticipantRow;
+    session_participants?: Array<{
+      id?: string;
+      amount_paid?: number | null;
+      youth_wrestler_id?: string | null;
+      stripe_fee?: number | null;
+      paid?: boolean;
+      parent_id?: string | null;
+      roster_first_name?: string | null;
+      roster_last_name?: string | null;
+      roster_photo_url?: string | null;
+      created_at?: string | null;
+    }> | {
+      id?: string;
+      amount_paid?: number | null;
+      youth_wrestler_id?: string | null;
+      stripe_fee?: number | null;
+      paid?: boolean;
+      parent_id?: string | null;
+      roster_first_name?: string | null;
+      roster_last_name?: string | null;
+      roster_photo_url?: string | null;
+      created_at?: string | null;
+    };
   }>;
 
   const emailByUserId = new Map(usersRows.map((u) => [u.id, u.email]));
