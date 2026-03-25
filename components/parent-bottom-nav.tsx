@@ -10,12 +10,12 @@ import { useCart } from '@/lib/cart-context';
  * Parent mobile bottom nav - 4 core items with gold active states.
  * Modern app-style navigation: Home, Training, Cart, Account
  */
-const ITEMS = [
+const ITEMS: readonly { href: string; label: string; icon: typeof Home; showBadge?: boolean }[] = [
   { href: '/dashboard', label: 'Home', icon: Home },
   { href: '/training', label: 'Training', icon: Dumbbell },
   { href: '/cart', label: 'Cart', icon: ShoppingCart, showBadge: true },
   { href: '/account', label: 'Account', icon: User },
-] as const;
+];
 
 export function ParentBottomNav() {
   const pathname = usePathname();
