@@ -59,13 +59,6 @@ export async function POST(req: NextRequest) {
         const tenantSlug = rawMetaTenant && rawMetaTenant in tenants ? rawMetaTenant : 'guild';
         const supabase = createAdminClient(tenantSlug);
         
-        // Get youth wrestler snapshot for roster
-        const { data: ywSnap } = await supabase
-          .from('youth_wrestlers')
-          .select('first_name, last_name, photo_url')
-          .eq('id', youthWrestlerId)
-          .maybeSingle();
-        
         // Process each session in the cart
         for (const sid of sessionIds) {
           // Parse price for this session
@@ -89,16 +82,13 @@ export async function POST(req: NextRequest) {
               .single();
             const current = (sess as { current_participants?: number } | null)?.current_participants ?? 0;
             
-            // Insert participant
+            // Insert participant (only columns that exist in the table)
             const { error: insertErr } = await supabase.from('session_participants').insert({
               session_id: sid,
               youth_wrestler_id: youthWrestlerId,
               parent_id: parentId,
               paid: true,
               amount_paid: amountPaid,
-              payment_method: 'stripe',
-              status: 'confirmed',
-              ...rosterSnapshotFromYouthRow((ywSnap ?? {}) as { first_name?: string; last_name?: string; photo_url?: string }),
             });
             
             if (insertErr) {
