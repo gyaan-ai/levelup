@@ -178,10 +178,10 @@ export default async function TrainingPage({
     return q;
   };
 
-  // Query all bookable sessions: group/small_group/2-athlete types OR partner-open/partner-invite modes
+  // Query ALL sessions - no type filter, show everything
   const [groupUpcoming, groupPast] = await Promise.all([
-    withOptFilters(sessions(dayStart, dayEnd)).in('status', ['scheduled', 'pending_payment']).in('session_type', ['group', '2-athlete', '1-on-1']).order('scheduled_datetime', { ascending: true }),
-    withOptFilters(sessions(pastDayStart, pastDayEnd)).in('status', ['completed', 'cancelled', 'no-show']).in('session_type', ['group', '2-athlete', '1-on-1']).order('scheduled_datetime', { ascending: true }),
+    withOptFilters(sessions(dayStart, dayEnd)).in('status', ['scheduled', 'pending_payment']).order('scheduled_datetime', { ascending: true }),
+    withOptFilters(sessions(pastDayStart, pastDayEnd)).in('status', ['completed', 'cancelled', 'no-show']).order('scheduled_datetime', { ascending: true }),
   ]);
   const seen = new Set<string>();
   let list: SessionRow[] = [];
@@ -202,12 +202,8 @@ export default async function TrainingPage({
       return h >= startHour && h < endHour;
     });
   }
-  // Only list publicly discoverable sessions. invite_only / private = share link only (not shown here).
-  // Treat NULL/undefined join_policy as 'public' (the default)
-  availabilitySessions = list.filter((s) => {
-    const jp = (s as { join_policy?: string | null }).join_policy;
-    return jp === 'public' || jp === null || jp === undefined;
-  });
+  // Show ALL sessions - we'll display badges to indicate public vs invite-only
+  availabilitySessions = list;
 
   availabilitySessions = patchSessionsWithCoachReviewStats(availabilitySessions, reviewStatsMap);
 

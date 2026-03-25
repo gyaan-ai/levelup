@@ -168,9 +168,18 @@ export function FindTrainingClient({
 
           {/* Session Info */}
           <div className="flex-1 min-w-0">
-            {/* Type & Focus */}
+            {/* Type & Focus & Join Policy */}
             <div className="flex items-center gap-2 mb-1.5 flex-wrap">
               <SessionTypeBadge sessionType={session.session_type} sessionMode={session.session_mode} />
+              {(session as { join_policy?: string | null }).join_policy === 'invite_only' ? (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-amber-900/50 text-amber-400 border border-amber-700/50">
+                  Invite Only
+                </span>
+              ) : (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-900/50 text-emerald-400 border border-emerald-700/50">
+                  Open
+                </span>
+              )}
               {session.focus_area && (
                 <span className="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400">
                   {session.focus_area}
