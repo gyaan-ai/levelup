@@ -92,7 +92,8 @@ export function FindTrainingClient({
     setCoach(initialCoach || 'all');
   }, [initialDate, initialTime, initialLocation, initialCoach]);
 
-  const openSessions = initialSessions.filter((s) => isSessionOpenForParentBrowse(s));
+  // Show all sessions - don't filter by open status, let users see full sessions too
+  const openSessions = initialSessions;
 
   const applyFilters = () => {
     const params = new URLSearchParams();
@@ -465,12 +466,13 @@ export function FindTrainingClient({
           ))}
         </div>
       ) : (
-        <div className="py-16 text-center">
-          <Calendar className="h-12 w-12 mx-auto mb-4 text-zinc-700" />
-          <p className="text-zinc-400 mb-2">No sessions available</p>
-          <p className="text-sm text-zinc-500">
-            {hasActiveFilters ? 'Try adjusting your filters' : 'Check back later for new sessions'}
-          </p>
+<div className="py-16 text-center">
+  <Calendar className="h-12 w-12 mx-auto mb-4 text-zinc-700" />
+  <p className="text-zinc-400 mb-2">No sessions available</p>
+  <p className="text-sm text-zinc-500">
+  {hasActiveFilters ? 'Try adjusting your filters' : 'Check back later for new sessions'}
+  </p>
+  <p className="text-xs text-zinc-600 mt-4">Debug: received {initialSessions.length} sessions from server</p>
         </div>
       )}
     </div>

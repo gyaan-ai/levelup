@@ -182,16 +182,10 @@ export default async function TrainingPage({
   };
 
   // Query ALL sessions - no type filter, show everything
-  console.log('[v0] Training query params:', { dayStart, dayEnd, pastDayStart, pastDayEnd });
   const [groupUpcoming, groupPast] = await Promise.all([
     withOptFilters(sessions(dayStart, dayEnd)).in('status', ['scheduled', 'pending_payment']).order('scheduled_datetime', { ascending: true }),
     withOptFilters(sessions(pastDayStart, pastDayEnd)).in('status', ['completed', 'cancelled', 'no-show']).order('scheduled_datetime', { ascending: true }),
   ]);
-  console.log('[v0] groupUpcoming result:', groupUpcoming.data?.length ?? 0, 'error:', groupUpcoming.error?.message);
-  console.log('[v0] groupPast result:', groupPast.data?.length ?? 0, 'error:', groupPast.error?.message);
-  if (groupUpcoming.data?.length) {
-    console.log('[v0] First session:', JSON.stringify(groupUpcoming.data[0], null, 2));
-  }
   const seen = new Set<string>();
   let list: SessionRow[] = [];
   for (const row of [...(groupUpcoming.data ?? []), ...(groupPast.data ?? [])]) {
