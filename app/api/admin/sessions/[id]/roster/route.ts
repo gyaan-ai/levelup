@@ -66,6 +66,8 @@ export async function GET(
       }
     });
   } catch (err) {
-    return NextResponse.json({ roster: [], error: String(err) }, { status: 500 });
+    const message = err instanceof Error ? err.message : String(err);
+    const stack = err instanceof Error ? err.stack : undefined;
+    return NextResponse.json({ roster: [], error: message, stack }, { status: 500 });
   }
 }
