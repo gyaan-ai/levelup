@@ -178,12 +178,19 @@ export default async function TrainingPage({
     return q;
   };
 
+  console.log('[v0] Training page query params:', { dayStart, dayEnd, pastDayStart, pastDayEnd });
   const [groupUpcoming, partnerUpcoming, groupPast, partnerPast] = await Promise.all([
     withOptFilters(sessions(dayStart, dayEnd)).in('status', ['scheduled', 'pending_payment']).in('session_type', ['group', 'small_group', '2-athlete']).order('scheduled_datetime', { ascending: true }),
     withOptFilters(sessions(dayStart, dayEnd)).in('status', ['scheduled', 'pending_payment']).eq('session_mode', 'partner-open').order('scheduled_datetime', { ascending: true }),
     withOptFilters(sessions(pastDayStart, pastDayEnd)).in('status', ['completed', 'cancelled', 'no-show']).in('session_type', ['group', 'small_group', '2-athlete']).order('scheduled_datetime', { ascending: true }),
     withOptFilters(sessions(pastDayStart, pastDayEnd)).in('status', ['completed', 'cancelled', 'no-show']).eq('session_mode', 'partner-open').order('scheduled_datetime', { ascending: true }),
   ]);
+  console.log('[v0] Query results:', { 
+    groupUpcoming: groupUpcoming.data?.length ?? 0, 
+    groupUpcomingError: groupUpcoming.error?.message,
+    partnerUpcoming: partnerUpcoming.data?.length ?? 0,
+    partnerUpcomingError: partnerUpcoming.error?.message
+  });
   const seen = new Set<string>();
   let list: SessionRow[] = [];
   for (const row of [...(groupUpcoming.data ?? []), ...(partnerUpcoming.data ?? []), ...(groupPast.data ?? []), ...(partnerPast.data ?? [])]) {
@@ -203,12 +210,14 @@ export default async function TrainingPage({
       return h >= startHour && h < endHour;
     });
   }
+  console.log('[v0] Pre-filter list count:', list.length, list.map(s => ({ id: s.id, join_policy: (s as { join_policy?: string | null }).join_policy, status: s.status })));
   // Only list publicly discoverable sessions. invite_only / private = share link only (not shown here).
   // Treat NULL/undefined join_policy as 'public' (the default)
   availabilitySessions = list.filter((s) => {
     const jp = (s as { join_policy?: string | null }).join_policy;
     return jp === 'public' || jp === null || jp === undefined;
   });
+  console.log('[v0] Post-filter availabilitySessions count:', availabilitySessions.length);
 
   availabilitySessions = patchSessionsWithCoachReviewStats(availabilitySessions, reviewStatsMap);
 
