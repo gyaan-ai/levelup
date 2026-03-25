@@ -36,6 +36,7 @@ export async function POST(req: NextRequest) {
       pricePerParticipant?: number;
       sessionType?: 'small_group' | 'partner' | 'private';
       joinPolicy?: 'public' | 'invite_only' | 'private';
+      published?: boolean;
       focusArea?: string;
       focusArea2?: string;
     };
