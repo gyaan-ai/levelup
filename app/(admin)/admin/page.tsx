@@ -91,7 +91,7 @@ export default async function AdminPage() {
         price_per_participant,
         athletes(id, first_name, last_name, school, venmo_handle, zelle_email),
         facilities(id, name),
-        session_participants(amount_paid, youth_wrestler_id)
+        session_participants(amount_paid, youth_wrestler_id, stripe_fee)
       `)
       .order('scheduled_datetime', { ascending: false })
       .limit(10000),
@@ -159,12 +159,12 @@ export default async function AdminPage() {
     price_per_participant?: number | null;
     athletes?: { id: string; first_name: string; last_name: string; school: string; venmo_handle?: string | null; zelle_email?: string | null } | { id: string; first_name: string; last_name: string; school: string; venmo_handle?: string | null; zelle_email?: string | null }[];
     facilities?: { id: string; name: string } | { id: string; name: string }[];
-    session_participants?: { amount_paid?: number | null; youth_wrestler_id?: string | null }[] | { amount_paid?: number | null; youth_wrestler_id?: string | null };
+    session_participants?: { amount_paid?: number | null; youth_wrestler_id?: string | null; stripe_fee?: number | null }[] | { amount_paid?: number | null; youth_wrestler_id?: string | null; stripe_fee?: number | null };
   }>;
 
   const emailByUserId = new Map(usersRows.map((u) => [u.id, u.email]));
 
-  type ParticipantRow = { amount_paid?: number | null; youth_wrestler_id?: string | null };
+  type ParticipantRow = { amount_paid?: number | null; youth_wrestler_id?: string | null; stripe_fee?: number | null };
   
   function participantAmountPaidSum(s: (typeof sessionsRows)[0]): number {
     const raw = s.session_participants;
@@ -185,6 +185,13 @@ export default async function AdminPage() {
     const raw = s.session_participants;
     const rows = Array.isArray(raw) ? raw : raw ? [raw] : [];
     return rows.filter((p) => (p as ParticipantRow).youth_wrestler_id === null).length;
+  }
+  
+  // Sum of actual Stripe fees from session_participants
+  function stripeFeeSum(s: (typeof sessionsRows)[0]): number {
+    const raw = s.session_participants;
+    const rows = Array.isArray(raw) ? raw : raw ? [raw] : [];
+    return rows.reduce((sum, p) => sum + Number((p as ParticipantRow).stripe_fee ?? 0), 0);
   }
 
   const sessions: AdminSession[] = sessionsRows.map((s) => {
@@ -222,6 +229,7 @@ export default async function AdminPage() {
       participant_amount_paid_sum: participantAmountPaidSum(s),
       drop_in_amount: dropInAmount(s),
       drop_in_count: dropInCount(s),
+      stripe_fee_sum: stripeFeeSum(s),
     };
   });
 

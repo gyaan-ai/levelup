@@ -107,6 +107,8 @@ export type AdminSession = {
   drop_in_amount?: number;
   /** Number of drop-ins */
   drop_in_count?: number;
+  /** Sum of actual Stripe fees from session_participants.stripe_fee */
+  stripe_fee_sum?: number;
 };
 
 export type AdminUser = {
@@ -884,7 +886,7 @@ export function AdminDashboardClient({
     let depositsCollected = 0; // Prepaid for future sessions (liability)
     let coachPayoutsEarned = 0; // Coach payouts for completed sessions only
     let coachPayoutsPending = 0; // What will be owed when scheduled sessions complete
-    let stripeTransactionCount = 0; // For calculating Stripe fees
+    let actualStripeFees = 0; // Sum of actual Stripe fees from payments
     let openBookings = 0;
     let completedSessions = 0;
     let pendingPayment = 0;
@@ -903,7 +905,7 @@ export function AdminDashboardClient({
         // COMPLETED = Revenue earned, coach payout owed
         completedRevenue += parentsPaid;
         coachPayoutsEarned += coachPaid;
-        if (parentsPaid > 0) stripeTransactionCount += s.current_participants || 1;
+        actualStripeFees += Number(s.stripe_fee_sum ?? 0);
       } else if (s.status === 'scheduled' || s.status === 'pending_payment') {
         // FUTURE = Deposits collected (liability), coach payout pending
         depositsCollected += parentsPaid;
@@ -937,10 +939,9 @@ export function AdminDashboardClient({
     const grossRevenue = completedRevenue;
     // Guild Net = Revenue - Coach Payouts for completed sessions
     const guildNet = grossRevenue - coachPayoutsEarned;
-    // Stripe fees only apply to INBOUND payments (collected from parents via Stripe)
+    // Stripe fees are stored from actual balance transactions (fetched at checkout time)
     // We don't use Stripe for payouts - payouts are manual (Zelle/Venmo)
-    // Stripe takes ~2.9% + $0.30 per charge
-    const stripeFees = completedRevenue > 0 ? (completedRevenue * 0.029) + (stripeTransactionCount * 0.30) : 0;
+    const stripeFees = actualStripeFees;
     // Guild Profit = Guild Net after Stripe fees
     const guildProfit = guildNet - stripeFees;
 

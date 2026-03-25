@@ -9,6 +9,26 @@ import { formatEST } from '@/lib/format-date';
 import { headers } from 'next/headers';
 import { rosterSnapshotFromYouthRow } from '@/lib/session-roster-snapshot';
 
+/**
+ * Fetch the actual Stripe fee from a PaymentIntent's balance transaction.
+ * Returns fee in dollars (not cents).
+ */
+async function getStripeFee(stripe: Stripe, paymentIntentId: string): Promise<number> {
+  try {
+    const pi = await stripe.paymentIntents.retrieve(paymentIntentId, {
+      expand: ['latest_charge.balance_transaction'],
+    });
+    const charge = pi.latest_charge as Stripe.Charge | null;
+    const bt = charge?.balance_transaction as Stripe.BalanceTransaction | null;
+    if (bt?.fee) {
+      return bt.fee / 100; // Convert cents to dollars
+    }
+  } catch (e) {
+    console.warn('Failed to fetch Stripe fee:', e);
+  }
+  return 0;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.text();
@@ -59,11 +79,19 @@ export async function POST(req: NextRequest) {
         const tenantSlug = rawMetaTenant && rawMetaTenant in tenants ? rawMetaTenant : 'guild';
         const supabase = createAdminClient(tenantSlug);
         
+        // Get actual Stripe fee for this checkout
+        const paymentIntentId = typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id;
+        const totalStripeFee = paymentIntentId ? await getStripeFee(stripe, paymentIntentId) : 0;
+        // Distribute fee proportionally across sessions based on price
+        const totalPrice = sessionPrices.reduce((sum, p) => sum + parseFloat(p.split(':')[1] || '0'), 0);
+        
         // Process each session in the cart
         for (const sid of sessionIds) {
           // Parse price for this session
           const priceEntry = sessionPrices.find(p => p.startsWith(`${sid}:`));
           const amountPaid = priceEntry ? parseFloat(priceEntry.split(':')[1]) : 0;
+          // Proportional Stripe fee for this session
+          const sessionStripeFee = totalPrice > 0 ? (amountPaid / totalPrice) * totalStripeFee : 0;
           
           // Check if already registered
           const { data: existing } = await supabase
@@ -82,24 +110,26 @@ export async function POST(req: NextRequest) {
               .single();
             const current = (sess as { current_participants?: number } | null)?.current_participants ?? 0;
             
-            // Insert participant (only columns that exist in the table)
+            // Insert participant with Stripe tracking
             const { error: insertErr } = await supabase.from('session_participants').insert({
               session_id: sid,
               youth_wrestler_id: youthWrestlerId,
               parent_id: parentId,
               paid: true,
               amount_paid: amountPaid,
+              stripe_payment_intent_id: paymentIntentId,
+              stripe_fee: sessionStripeFee,
             });
             
-            if (insertErr) {
-              if (insertErr.code === '23505') {
-                // Duplicate - just update
-                await supabase
-                  .from('session_participants')
-                  .update({ paid: true, amount_paid: amountPaid })
-                  .eq('session_id', sid)
-                  .eq('youth_wrestler_id', youthWrestlerId);
-              } else {
+if (insertErr) {
+            if (insertErr.code === '23505') {
+              // Duplicate - just update with Stripe data
+              await supabase
+                .from('session_participants')
+                .update({ paid: true, amount_paid: amountPaid, stripe_payment_intent_id: paymentIntentId, stripe_fee: sessionStripeFee })
+                .eq('session_id', sid)
+                .eq('youth_wrestler_id', youthWrestlerId);
+            } else {
                 console.error('Cart webhook: failed to insert participant', insertErr, { sid, youthWrestlerId });
               }
             } else {
@@ -125,10 +155,10 @@ export async function POST(req: NextRequest) {
               await sendCoachNewSignupSms(supabase, coachId, dateStr).catch(() => {});
             }
           } else {
-            // Update existing
+            // Update existing with Stripe data
             await supabase
               .from('session_participants')
-              .update({ paid: true, amount_paid: amountPaid })
+              .update({ paid: true, amount_paid: amountPaid, stripe_payment_intent_id: paymentIntentId, stripe_fee: sessionStripeFee })
               .eq('session_id', sid)
               .eq('youth_wrestler_id', youthWrestlerId);
           }
@@ -184,6 +214,9 @@ export async function POST(req: NextRequest) {
           );
         }
         const amountPaid = amountTotal / 100;
+        // Fetch actual Stripe fee
+        const stripeFee = paymentIntentId ? await getStripeFee(stripe, paymentIntentId) : 0;
+        
         const { data: existing } = await supabase
           .from('session_participants')
           .select('id')
@@ -208,6 +241,8 @@ export async function POST(req: NextRequest) {
             parent_id: parentId,
             paid: true,
             amount_paid: amountPaid,
+            stripe_payment_intent_id: paymentIntentId,
+            stripe_fee: stripeFee,
             ...rosterSnapshotFromYouthRow((ywSnap ?? {}) as { first_name?: string; last_name?: string; photo_url?: string }),
           });
           if (insertErr) {
@@ -215,7 +250,7 @@ export async function POST(req: NextRequest) {
             if (insertErr.code === '23505') {
               await supabase
                 .from('session_participants')
-                .update({ paid: true, amount_paid: amountPaid })
+                .update({ paid: true, amount_paid: amountPaid, stripe_payment_intent_id: paymentIntentId, stripe_fee: stripeFee })
                 .eq('session_id', sessionId)
                 .eq('youth_wrestler_id', youthWrestlerId);
             } else {
@@ -245,7 +280,7 @@ export async function POST(req: NextRequest) {
         } else {
           await supabase
             .from('session_participants')
-            .update({ paid: true, amount_paid: amountPaid })
+            .update({ paid: true, amount_paid: amountPaid, stripe_payment_intent_id: paymentIntentId, stripe_fee: stripeFee })
             .eq('session_id', sessionId)
             .eq('youth_wrestler_id', youthWrestlerId);
         }
