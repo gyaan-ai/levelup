@@ -34,9 +34,134 @@ export async function POST(req: NextRequest) {
 
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object as Stripe.Checkout.Session;
-      const sessionId = session.metadata?.session_id;
       const app = session.metadata?.app;
-      if (app !== 'the-guild' || !sessionId) {
+      const isCartCheckout = session.metadata?.cart_checkout === 'true';
+      const sessionId = session.metadata?.session_id;
+      const sessionIds = session.metadata?.session_ids?.split(',').filter(Boolean) || [];
+      
+      if (app !== 'the-guild') {
+        return NextResponse.json({ received: true });
+      }
+      
+      // Handle cart checkout (multiple sessions)
+      if (isCartCheckout && sessionIds.length > 0) {
+        const youthWrestlerId = session.metadata?.youth_wrestler_id;
+        const parentId = session.metadata?.parent_id;
+        const sessionPrices = session.metadata?.session_prices?.split(',') || [];
+        const creditsUsed = parseFloat(session.metadata?.credits_to_use || '0');
+        
+        if (!youthWrestlerId || !parentId) {
+          console.error('Cart checkout webhook: missing youth_wrestler_id or parent_id', session.metadata);
+          return NextResponse.json({ error: 'Missing wrestler/parent metadata' }, { status: 500 });
+        }
+        
+        const rawMetaTenant = (session.metadata?.tenant_slug as string | undefined)?.trim().toLowerCase();
+        const tenantSlug = rawMetaTenant && rawMetaTenant in tenants ? rawMetaTenant : 'guild';
+        const supabase = createAdminClient(tenantSlug);
+        
+        // Get youth wrestler snapshot for roster
+        const { data: ywSnap } = await supabase
+          .from('youth_wrestlers')
+          .select('first_name, last_name, photo_url')
+          .eq('id', youthWrestlerId)
+          .maybeSingle();
+        
+        // Process each session in the cart
+        for (const sid of sessionIds) {
+          // Parse price for this session
+          const priceEntry = sessionPrices.find(p => p.startsWith(`${sid}:`));
+          const amountPaid = priceEntry ? parseFloat(priceEntry.split(':')[1]) : 0;
+          
+          // Check if already registered
+          const { data: existing } = await supabase
+            .from('session_participants')
+            .select('id')
+            .eq('session_id', sid)
+            .eq('youth_wrestler_id', youthWrestlerId)
+            .maybeSingle();
+          
+          if (!existing) {
+            // Get current participant count
+            const { data: sess } = await supabase
+              .from('sessions')
+              .select('current_participants, athlete_id, scheduled_datetime')
+              .eq('id', sid)
+              .single();
+            const current = (sess as { current_participants?: number } | null)?.current_participants ?? 0;
+            
+            // Insert participant
+            const { error: insertErr } = await supabase.from('session_participants').insert({
+              session_id: sid,
+              youth_wrestler_id: youthWrestlerId,
+              parent_id: parentId,
+              paid: true,
+              amount_paid: amountPaid,
+              payment_method: 'stripe',
+              status: 'confirmed',
+              ...rosterSnapshotFromYouthRow((ywSnap ?? {}) as { first_name?: string; last_name?: string; photo_url?: string }),
+            });
+            
+            if (insertErr) {
+              if (insertErr.code === '23505') {
+                // Duplicate - just update
+                await supabase
+                  .from('session_participants')
+                  .update({ paid: true, amount_paid: amountPaid })
+                  .eq('session_id', sid)
+                  .eq('youth_wrestler_id', youthWrestlerId);
+              } else {
+                console.error('Cart webhook: failed to insert participant', insertErr, { sid, youthWrestlerId });
+              }
+            } else {
+              // Update participant count
+              await supabase
+                .from('sessions')
+                .update({ current_participants: current + 1, updated_at: new Date().toISOString() })
+                .eq('id', sid);
+            }
+            
+            // Notify coach
+            const coachId = (sess as { athlete_id?: string } | null)?.athlete_id;
+            const dt = (sess as { scheduled_datetime?: string } | null)?.scheduled_datetime;
+            if (coachId) {
+              const dateStr = dt ? formatEST(new Date(dt), 'EEE MMM d, h:mm a') : 'your session';
+              await createNotification(supabase, {
+                user_id: coachId,
+                type: 'session_booked',
+                title: 'Someone just booked your session',
+                body: `New booking for ${dateStr}. Check My sessions.`,
+                data: { session_id: sid },
+              }).catch((e) => console.warn('Cart webhook: coach notification failed', e));
+              await sendCoachNewSignupSms(supabase, coachId, dateStr).catch(() => {});
+            }
+          } else {
+            // Update existing
+            await supabase
+              .from('session_participants')
+              .update({ paid: true, amount_paid: amountPaid })
+              .eq('session_id', sid)
+              .eq('youth_wrestler_id', youthWrestlerId);
+          }
+        }
+        
+        // Deduct credits if used
+        if (creditsUsed > 0) {
+          const { applyCredits } = await import('@/lib/credits');
+          await applyCredits({
+            userId: parentId,
+            amount: creditsUsed,
+            sessionId: sessionIds[0], // Use first session as reference
+            description: `Cart checkout for ${sessionIds.length} sessions`,
+            tenantSlug,
+          });
+        }
+        
+        console.log('Cart checkout webhook completed:', { sessionIds, youthWrestlerId, parentId, creditsUsed });
+        return NextResponse.json({ received: true });
+      }
+      
+      // Single session checkout (original flow)
+      if (!sessionId) {
         return NextResponse.json({ received: true });
       }
 
