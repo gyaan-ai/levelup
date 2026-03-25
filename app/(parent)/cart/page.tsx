@@ -78,7 +78,6 @@ export default function CartPage() {
                 <SessionTypeBadge 
                   sessionType={item.session_type} 
                   sessionMode={null} 
-                  size="sm" 
                 />
               </div>
 
