@@ -2444,6 +2444,9 @@ export function AdminDashboardClient({
             <Link href="/admin/focus-areas" className="block px-3 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
               Session Topics
             </Link>
+            <Link href="/admin/reviews" className="block px-3 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+              Reviews
+            </Link>
           </div>
         </div>
       </aside>
