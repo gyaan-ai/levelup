@@ -1,8 +1,15 @@
 import { NextResponse } from 'next/server';
+import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
+import { getTenantByHost } from '@/lib/tenant';
 
 export async function GET() {
-  const supabase = await createClient();
+  const headersList = await headers();
+  const host = headersList.get('host') || '';
+  const tenant = getTenantByHost(host);
+  if (!tenant) return NextResponse.json({ wrestlers: [] });
+
+  const supabase = await createClient(tenant.slug);
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {
