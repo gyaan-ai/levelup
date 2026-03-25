@@ -100,6 +100,10 @@ export type AdminSession = {
   facility_name: string;
   /** Sum of session_participants.amount_paid - what parents actually paid (from Stripe) */
   participant_amount_paid_sum: number;
+  /** Drop-in amount (participants with null youth_wrestler_id) */
+  drop_in_amount?: number;
+  /** Number of drop-ins */
+  drop_in_count?: number;
 };
 
 export type AdminUser = {
@@ -1429,7 +1433,19 @@ export function AdminDashboardClient({
                           <td className="py-3 px-4 text-right">
                             <CapacityBadge current={s.current_participants} max={s.max_participants ?? 1} label="" />
                           </td>
-<td className="py-3 px-4 text-right font-medium tabular-nums">${s.participant_amount_paid_sum.toFixed(2)}</td>
+<td className="py-3 px-4 text-right font-medium tabular-nums">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <span>${s.participant_amount_paid_sum.toFixed(2)}</span>
+                                  {(s.drop_in_count ?? 0) > 0 && (
+                                    <span 
+                                      className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-bold cursor-help"
+                                      title={`${s.drop_in_count} drop-in${(s.drop_in_count ?? 0) > 1 ? 's' : ''}: $${(s.drop_in_amount ?? 0).toFixed(2)}`}
+                                    >
+                                      $
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
                           <td className="py-3 px-4 text-right">
                             <div className="flex items-center justify-end gap-2">
                               {shareUrl && (

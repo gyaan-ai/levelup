@@ -64,6 +64,13 @@ export default async function AdminEditSessionPage({
     ? partRows.reduce((sum, p) => sum + Number(p.amount_paid ?? 0), 0)
     : 0;
 
+  // Map DB session_type to UI values
+  const dbSessionType = (session as { session_type?: string }).session_type;
+  const uiSessionType = dbSessionType === 'group' ? 'small_group' 
+    : dbSessionType === '2-athlete' ? 'partner'
+    : dbSessionType === '1-on-1' ? 'private'
+    : dbSessionType || 'small_group';
+
   return (
     <div className="container mx-auto px-4 py-8 max-w-lg">
       <Link href="/admin">
@@ -80,7 +87,7 @@ export default async function AdminEditSessionPage({
       <EditSessionForm
         sessionId={sessionId}
         sessionStatus={(session as { status?: string }).status}
-        sessionType={(session as { session_type?: string }).session_type}
+        sessionType={uiSessionType}
         focusArea={(session as { focus_area?: string | null }).focus_area ?? ''}
         focusArea2={(session as { focus_area_2?: string | null }).focus_area_2 ?? ''}
         joinPolicy={((session as { join_policy?: string }).join_policy as 'public' | 'private' | 'invite_only') ?? 'private'}
