@@ -32,12 +32,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
 
-    // Check capacity
+    // Get current count (admins can override capacity for drop-ins)
     const current = session.current_participants ?? 0;
-    const max = session.max_participants ?? 10;
-    if (current >= max) {
-      return NextResponse.json({ error: 'Session is full' }, { status: 400 });
-    }
 
     // For drop-ins without accounts, we insert with null youth_wrestler_id and parent_id
     // but store the names in a notes/metadata field or we can create placeholder records
