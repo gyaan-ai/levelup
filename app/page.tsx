@@ -62,7 +62,7 @@ export default async function HomePage() {
         
         {/* Tagline */}
         <p className="text-sm sm:text-base text-accent/90 font-semibold tracking-[0.15em] uppercase mb-10">
-          Mastery &bull; Technique &bull; Access The Elite
+          Access Elite Master Technique
         </p>
         
         {/* Single Primary CTA */}
