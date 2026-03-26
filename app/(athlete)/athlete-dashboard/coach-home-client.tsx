@@ -91,7 +91,7 @@ export function CoachHomeClient({
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-foreground md:text-3xl">Home</h1>
 <p className="text-muted-foreground text-sm md:text-base">
-        {coachFirstName ? `Hey ${coachFirstName}, here&apos;s what&apos;s up.` : 'Your schedule and quick actions.'}
+        {coachFirstName ? `Hey ${coachFirstName}, here's what's up.` : 'Your schedule and quick actions.'}
       </p>
 
       {/* Coach Leaderboard Rank */}
