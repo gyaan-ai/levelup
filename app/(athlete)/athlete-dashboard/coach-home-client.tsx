@@ -311,29 +311,29 @@ export function CoachHomeClient({
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <Link href="/coach-sessions/create">
             <Button className="w-full min-h-[56px] touch-manipulation flex flex-col gap-0.5 bg-[#D4AF37] hover:bg-[#B8963C] text-black">
-              <CalendarPlus className="h-5 w-5 shrink-0" />
-              <span>Create Session</span>
+              <CalendarPlus className="h-4 w-4 shrink-0" />
+              <span className="text-xs">Create Session</span>
             </Button>
           </Link>
           <Link href="/availability">
             <Button variant="outline" className="w-full min-h-[56px] touch-manipulation flex flex-col gap-0.5">
-              <Calendar className="h-5 w-5 shrink-0" />
-              <span>Schedule</span>
-              <span className="text-xs font-normal text-muted-foreground">Set availability</span>
+              <Calendar className="h-4 w-4 shrink-0" />
+              <span className="text-xs">Schedule</span>
+              <span className="text-[10px] font-normal text-muted-foreground">Set availability</span>
             </Button>
           </Link>
           <Link href="/coach-sessions">
             <Button variant="outline" className="w-full min-h-[56px] touch-manipulation flex flex-col gap-0.5">
-              <Users className="h-5 w-5 shrink-0" />
-              <span>Sessions</span>
-              <span className="text-xs font-normal text-muted-foreground">View all</span>
+              <Users className="h-4 w-4 shrink-0" />
+              <span className="text-xs">Sessions</span>
+              <span className="text-[10px] font-normal text-muted-foreground">View all</span>
             </Button>
           </Link>
           <Link href="/coach-earnings">
             <Button variant="outline" className="w-full min-h-[56px] touch-manipulation flex flex-col gap-0.5">
-              <DollarSign className="h-5 w-5 shrink-0" />
-              <span>Earnings</span>
-              <span className="text-xs font-normal text-muted-foreground">${thisMonthEarnings.toFixed(0)} this month</span>
+              <DollarSign className="h-4 w-4 shrink-0" />
+              <span className="text-xs">Earnings</span>
+              <span className="text-[10px] font-normal text-muted-foreground">${thisMonthEarnings.toFixed(0)} this month</span>
             </Button>
           </Link>
         </div>
