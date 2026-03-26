@@ -135,6 +135,7 @@ export function CoachHomeClient({
               const pricePerParticipant = Number(session.price_per_participant ?? 0);
               const projectedEarnings = Math.round(current * pricePerParticipant * payoutRate * 100) / 100;
               const maxEarnings = Math.round(max * pricePerParticipant * payoutRate * 100) / 100;
+              console.log('[v0] earnings calc:', { max, pricePerParticipant, payoutRate, maxEarnings });
               const isFull = current >= max;
               const showSpotsCount = session.session_type === 'group' || session.session_type === 'partner' || max > 1;
               
