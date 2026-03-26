@@ -7,9 +7,9 @@ import { Star, ChevronDown } from 'lucide-react';
 import { HomeHeroLogo } from '@/app/home-hero-logo';
 
 export const metadata = {
-  title: 'The Wrestling Guild | Access The Elite. Master Technique.',
+  title: 'The Wrestling Guild | Access Elite Master Technique',
   description:
-    'Train with NCAA wrestlers and elite coaches for private technique instruction. Access the elite. Master the details that separate good from great.',
+    'Train with NCAA wrestlers and elite coaches for private technique instruction. Access elite master technique that separates good from great.',
 };
 
 export default async function HomePage() {
