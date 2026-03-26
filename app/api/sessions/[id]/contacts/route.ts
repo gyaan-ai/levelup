@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 
 export async function GET(
@@ -45,8 +46,11 @@ export async function GET(
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
+  // Use admin client to bypass RLS (same as sms-phones API)
+  const admin = createAdminClient(tenant.slug);
+
   // Get all participants for this session with athlete and parent info
-  const { data: participants, error } = await supabase
+  const { data: participants, error } = await admin
     .from('session_participants')
     .select(`
       id,
@@ -59,15 +63,15 @@ export async function GET(
         phone,
         date_of_birth,
         weight_class
-      ),
-      users (
-        id,
-        first_name,
-        last_name,
-        phone
       )
     `)
     .eq('session_id', sessionId);
+
+  // Get parent info separately (users table join might have issues)
+  const parentIds = [...new Set((participants ?? []).map(p => p.parent_id).filter(Boolean))];
+  const { data: parents } = parentIds.length > 0
+    ? await admin.from('users').select('id, first_name, last_name, phone').in('id', parentIds)
+    : { data: [] };
 
   if (error) {
     console.log('[v0] contacts API error:', error);
@@ -79,7 +83,7 @@ export async function GET(
   // Format the contacts
   const contacts = (participants ?? []).map((reg) => {
     const athlete = Array.isArray(reg.youth_wrestlers) ? reg.youth_wrestlers[0] : reg.youth_wrestlers;
-    const parent = Array.isArray(reg.users) ? reg.users[0] : reg.users;
+    const parent = parents?.find(p => p.id === reg.parent_id);
 
     return {
       participantId: reg.id,
