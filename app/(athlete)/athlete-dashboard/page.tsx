@@ -54,6 +54,17 @@ export default async function CoachHomePage() {
     }
     redirect('/onboarding');
   }
+  
+  // Check if coach is pending approval (only for actual coaches, not admin viewing)
+  if (!isViewingAsCoach && athlete.status === 'pending') {
+    redirect('/coach-pending');
+  }
+  
+  // Check if coach was rejected
+  if (!isViewingAsCoach && athlete.status === 'rejected') {
+    redirect('/coach-pending');
+  }
+  
   if (!isViewingAsCoach && !isProfileComplete(athlete)) redirect('/onboarding');
 
   // This month earnings (one number for quick actions)

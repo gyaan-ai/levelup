@@ -2868,6 +2868,9 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
           {/* Quick Links */}
           <div className="space-y-1 pt-4 border-t border-border">
             <p className="px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Quick Links</p>
+            <Link href="/admin/coach-applications" className="block px-3 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+              Coach Applications
+            </Link>
             <Link href="/admin/facilities" className="block px-3 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
               Facilities
             </Link>

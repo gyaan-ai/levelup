@@ -19,46 +19,18 @@ import {
   FormMessage,
   FormDescription,
 } from '@/components/ui/form';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import Link from 'next/link';
 
+// Simplified parent signup schema
 const signupSchema = z.object({
   email: z.string().email('Invalid email address'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
   confirmPassword: z.string(),
-  role: z.enum(['parent', 'coach', 'youth_wrestler']),
-  coachType: z.enum(['ncaa_athlete', 'club_hs_coach']).optional(),
-  firstName: z.string().optional(),
-  lastName: z.string().optional(),
-  school: z.string().optional(),
   discountCode: z.string().optional(),
-  /** Required when role is youth_wrestler (athlete account) */
-  athletePhone: z.string().optional(),
 }).refine((data) => data.password === data.confirmPassword, {
-  message: "Passwords don&apos;t match",
+  message: "Passwords don't match",
   path: ['confirmPassword'],
-}).refine((data) => {
-  if (data.role === 'coach') {
-    return data.firstName && data.lastName && data.coachType && data.school?.trim();
-  }
-  return true;
-}, {
-  message: 'First name, last name, coach type, and school/club are required for coaches',
-  path: ['firstName'],
-}).refine(
-  (data) => {
-    if (data.role !== 'youth_wrestler') return true;
-    const d = (data.athletePhone ?? '').replace(/\D/g, '');
-    return d.length >= 10;
-  },
-  { message: 'Enter a valid 10-digit cell number for the athlete', path: ['athletePhone'] }
-);
+});
 
 type SignupFormValues = z.infer<typeof signupSchema>;
 
@@ -75,11 +47,17 @@ export default function SignupPage() {
     !redirectTo.includes(':')
       ? redirectTo
       : null;
-  const defaultRole = inviteToken ? 'parent' : (roleParam === 'coach' ? 'coach' : 'parent');
   const tenant = useTenant();
   const supabase = createClient(tenant.slug);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // If role=coach, redirect to coach application
+  useEffect(() => {
+    if (roleParam === 'coach') {
+      router.replace('/signup/coach');
+    }
+  }, [roleParam, router]);
 
   const form = useForm<SignupFormValues>({
     resolver: zodResolver(signupSchema),
@@ -87,23 +65,9 @@ export default function SignupPage() {
       email: '',
       password: '',
       confirmPassword: '',
-      role: defaultRole,
-      coachType: undefined,
-      firstName: '',
-      lastName: '',
-      school: '',
       discountCode: '',
-      athletePhone: '',
     },
   });
-
-  useEffect(() => {
-    if (inviteToken) form.setValue('role', 'parent');
-    else if (roleParam === 'coach') form.setValue('role', 'coach');
-  }, [inviteToken, roleParam, form]);
-
-  const selectedRole = form.watch('role');
-  const selectedCoachType = form.watch('coachType');
 
   const onSubmit = async (values: SignupFormValues) => {
     setLoading(true);
@@ -118,14 +82,9 @@ export default function SignupPage() {
         body: JSON.stringify({
           email: values.email,
           password: values.password,
-          role: values.role,
-          coachType: values.coachType,
-          firstName: values.firstName,
-          lastName: values.lastName,
-          school: values.school?.trim(),
+          role: 'parent',
           discountCode: values.discountCode?.trim() || undefined,
           inviteToken: inviteToken || undefined,
-          athletePhone: values.role === 'youth_wrestler' ? values.athletePhone?.trim() : undefined,
         }),
       });
 
@@ -144,37 +103,19 @@ export default function SignupPage() {
       });
 
       if (authError || !authData.user) {
-        // Signup succeeded but login failed - redirect to login page
         router.push('/login?message=signup_success');
         return;
       }
 
-      // Get user role
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('role')
-        .eq('id', authData.user.id)
-        .single();
-
       // If they came from a redirect (e.g. join link), send them back after signup
-      const role = userData?.role || values.role;
-      if (safeRedirect && (role === 'parent' || role === 'admin')) {
+      if (safeRedirect) {
         router.push(safeRedirect);
         router.refresh();
         return;
       }
 
-      // Redirect based on role (coaches go to onboarding first to complete profile)
-      if (role === 'coach') {
-        router.push('/onboarding');
-      } else if (role === 'youth_wrestler') {
-        router.push('/youth-dashboard');
-      } else if (role === 'admin') {
-        router.push('/dashboard');
-      } else {
-        router.push('/dashboard');
-      }
-
+      // Parents go to dashboard and get prompted to add wrestler
+      router.push('/dashboard');
       router.refresh();
     } catch (err) {
       setError('An unexpected error occurred');
@@ -182,13 +123,22 @@ export default function SignupPage() {
     }
   };
 
+  // If role=coach, show loading while redirecting
+  if (roleParam === 'coach') {
+    return (
+      <div className="container mx-auto px-4 py-16 flex items-center justify-center min-h-screen">
+        <p className="text-muted-foreground">Redirecting to coach application...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto px-4 py-16 flex items-center justify-center min-h-screen">
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle className="text-foreground font-serif">Join The Guild</CardTitle>
+          <CardTitle className="text-foreground font-serif">Parent Sign Up</CardTitle>
           <CardDescription>
-            Create your account for elite technique instruction
+            Create your account to book training sessions for your wrestler
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -200,158 +150,6 @@ export default function SignupPage() {
 
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <FormField
-                control={form.control}
-                name="role"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>I am a...</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select your role" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="parent">Parent</SelectItem>
-                        <SelectItem value="coach">Coach</SelectItem>
-                        <SelectItem value="youth_wrestler">Athlete</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormDescription>
-                      Choose how you&apos;ll use The Guild
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-
-              {selectedRole === 'parent' && (
-                <FormField
-                  control={form.control}
-                  name="discountCode"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Discount code (optional)</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g. FAMILY10" {...field} />
-                      </FormControl>
-                      <FormDescription>
-                        Early adopters: enter your code for 1 free private + 1 free small group session
-                      </FormDescription>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              )}
-
-              {(selectedRole === 'coach' || selectedRole === 'youth_wrestler') && (
-                <>
-                  <FormField
-                    control={form.control}
-                    name="firstName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>First Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Eric" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="lastName"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Last Name</FormLabel>
-                        <FormControl>
-                          <Input placeholder="Aponte" {...field} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  {selectedRole === 'youth_wrestler' && (
-                    <FormField
-                      control={form.control}
-                      name="athletePhone"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Your cell phone</FormLabel>
-                          <FormControl>
-                            <Input type="tel" inputMode="tel" autoComplete="tel" placeholder="10-digit number" {...field} />
-                          </FormControl>
-                          <FormDescription>
-                            Coaches use this to reach you about sessions (texts).
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  )}
-
-                  {selectedRole === 'coach' && (
-                    <>
-                      <FormField
-                        control={form.control}
-                        name="coachType"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>I am an...</FormLabel>
-                            <Select onValueChange={field.onChange} value={field.value || undefined}>
-                              <FormControl>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select one" />
-                                </SelectTrigger>
-                              </FormControl>
-                              <SelectContent>
-                                <SelectItem value="ncaa_athlete">Active NCAA Athlete</SelectItem>
-                                <SelectItem value="club_hs_coach">Club / HS Coach</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      {selectedCoachType === 'ncaa_athlete' && (
-                        <FormField
-                          control={form.control}
-                          name="school"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>School</FormLabel>
-                              <FormControl>
-                                <Input placeholder="UNC" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      )}
-                      {selectedCoachType === 'club_hs_coach' && (
-                        <FormField
-                          control={form.control}
-                          name="school"
-                          render={({ field }) => (
-                            <FormItem>
-                              <FormLabel>Club or high school</FormLabel>
-                              <FormControl>
-                                <Input placeholder="e.g. Triangle Wrestling Club" {...field} />
-                              </FormControl>
-                              <FormMessage />
-                            </FormItem>
-                          )}
-                        />
-                      )}
-                    </>
-                  )}
-                </>
-              )}
-
               <FormField
                 control={form.control}
                 name="email"
@@ -394,17 +192,40 @@ export default function SignupPage() {
                 )}
               />
 
-              <Button type="submit" className="w-full" disabled={loading}>
+              <FormField
+                control={form.control}
+                name="discountCode"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Discount Code (optional)</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g. FAMILY10" {...field} />
+                    </FormControl>
+                    <FormDescription>
+                      Have a referral or promo code? Enter it here.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <Button type="submit" className="w-full bg-[#D4AF37] hover:bg-[#B8963C] text-black" disabled={loading}>
                 {loading ? 'Creating account...' : 'Create Account'}
               </Button>
             </form>
           </Form>
 
-          <div className="mt-4 text-center text-sm">
+          <div className="mt-6 text-center text-sm space-y-2">
             <p className="text-muted-foreground">
               Already have an account?{' '}
-              <Link href="/login" className="text-accent hover:underline">
+              <Link href="/login" className="text-[#D4AF37] hover:underline">
                 Sign in
+              </Link>
+            </p>
+            <p className="text-muted-foreground">
+              Want to coach?{' '}
+              <Link href="/signup/coach" className="text-[#D4AF37] hover:underline">
+                Apply as a coach
               </Link>
             </p>
           </div>
