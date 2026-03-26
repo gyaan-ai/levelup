@@ -2,8 +2,7 @@ import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
-import { isProfileComplete } from '@/lib/athletes';
-import { Athlete } from '@/types';
+
 import { CoachSessionsClient } from './coach-sessions-client';
 import type { CoachSession } from '@/app/(athlete)/athlete-dashboard/coach-schedule-card';
 
@@ -30,7 +29,6 @@ export default async function CoachSessionsPage({
   if (userData?.role !== 'coach' && userData?.role !== 'admin') redirect('/athlete-dashboard');
 
   const { data: athlete } = await supabase.from('athletes').select('*').eq('id', user.id).maybeSingle();
-  if (!athlete || !isProfileComplete(athlete as Athlete)) redirect('/onboarding');
 
   const now = new Date().toISOString();
 
