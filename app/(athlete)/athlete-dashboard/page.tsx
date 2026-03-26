@@ -113,6 +113,7 @@ export default async function CoachHomePage() {
   return (
     <div className="container mx-auto px-4 py-5 pb-8 md:py-8 max-w-full">
       <CoachHomeClient
+        coachId={coachId}
         upcomingSessions={(upcomingSessions ?? []) as CoachSession[]}
         pendingRequestsCount={pendingRequestsCount ?? 0}
         thisMonthEarnings={thisMonthEarnings}

@@ -13,6 +13,7 @@ import { AddToCalendarButton } from '@/components/add-to-calendar-button';
 import { SessionTypeBadge } from '@/components/session-type-badge';
 import { SessionContactsPanel } from '@/components/session-contacts-panel';
 import { CoachPlaybook } from '@/components/coach-playbook';
+import { CoachRankCard } from '@/components/coach-rank-card';
 import type { CoachSession } from './coach-schedule-card';
 
 function facilityName(s: CoachSession): string {
@@ -43,6 +44,7 @@ type Review = {
 };
 
 type Props = {
+  coachId: string;
   upcomingSessions: CoachSession[];
   pendingRequestsCount: number;
   thisMonthEarnings: number;
@@ -54,6 +56,7 @@ type Props = {
 };
 
 export function CoachHomeClient({
+  coachId,
   upcomingSessions,
   pendingRequestsCount,
   thisMonthEarnings,
@@ -87,9 +90,12 @@ export function CoachHomeClient({
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-foreground md:text-3xl">Home</h1>
-      <p className="text-muted-foreground text-sm md:text-base">
-        {coachFirstName ? `Hey ${coachFirstName}, here’s what’s up.` : 'Your schedule and quick actions.'}
+<p className="text-muted-foreground text-sm md:text-base">
+        {coachFirstName ? `Hey ${coachFirstName}, here&apos;s what&apos;s up.` : 'Your schedule and quick actions.'}
       </p>
+
+      {/* Coach Leaderboard Rank */}
+      <CoachRankCard coachId={coachId} />
 
 {/* Next session reminder — prominent so college kids do not forget */}
       {reminderLabel && (
