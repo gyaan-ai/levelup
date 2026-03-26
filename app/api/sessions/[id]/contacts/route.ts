@@ -67,18 +67,18 @@ export async function GET(
     `)
     .eq('session_id', sessionId);
 
-  // Get parent info separately (users table join might have issues)
-  const parentIds = [...new Set((participants ?? []).map(p => p.parent_id).filter(Boolean))];
-  const { data: parents } = parentIds.length > 0
-    ? await admin.from('users').select('id, first_name, last_name, phone').in('id', parentIds)
-    : { data: [] };
-
   if (error) {
     console.log('[v0] contacts API error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  console.log('[v0] participants found:', participants?.length, participants);
+  console.log('[v0] participants found:', participants?.length);
+
+  // Get parent info separately (users table join might have issues)
+  const parentIds = [...new Set((participants ?? []).map(p => p.parent_id).filter(Boolean))];
+  const { data: parents } = parentIds.length > 0
+    ? await admin.from('users').select('id, first_name, last_name, phone').in('id', parentIds)
+    : { data: [] };
 
   // Format the contacts
   const contacts = (participants ?? []).map((reg) => {
