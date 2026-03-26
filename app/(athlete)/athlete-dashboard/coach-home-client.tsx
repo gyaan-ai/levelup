@@ -120,7 +120,11 @@ export function CoachHomeClient({
         ) : (
           <div className="space-y-3">
             {upcomingSessions.slice(0, 5).map((session) => {
-              const current = session.current_participants ?? 0;
+              // Count actual participants from joined data instead of potentially stale column
+              const actualParticipants = Array.isArray(session.session_participants) 
+                ? session.session_participants.length 
+                : 0;
+              const current = actualParticipants || session.current_participants || 0;
               const max = session.max_participants ?? 1;
               const pricePerParticipant = Number(session.price_per_participant ?? 0);
               const projectedEarnings = Math.round(current * pricePerParticipant * payoutRate * 100) / 100;

@@ -68,11 +68,8 @@ export async function GET(
     .eq('session_id', sessionId);
 
   if (error) {
-    console.log('[v0] contacts API error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
-
-  console.log('[v0] participants found:', participants?.length);
 
   // Get parent info separately (users table join might have issues)
   const parentIds = [...new Set((participants ?? []).map(p => p.parent_id).filter(Boolean))];

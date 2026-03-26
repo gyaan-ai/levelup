@@ -43,7 +43,6 @@ export function SessionContactsPanel({ sessionId, participantCount = 0, classNam
       fetch(`/api/sessions/${sessionId}/contacts`)
         .then((res) => res.json())
         .then((data) => {
-          console.log('[v0] contacts data:', data);
           setContacts(data.contacts ?? []);
           setFetched(true);
         })
