@@ -128,6 +128,7 @@ export function CoachHomeClient({
               const max = session.max_participants ?? 1;
               const pricePerParticipant = Number(session.price_per_participant ?? 0);
               const projectedEarnings = Math.round(current * pricePerParticipant * payoutRate * 100) / 100;
+              const maxEarnings = Math.round(max * pricePerParticipant * payoutRate * 100) / 100;
               const isFull = current >= max;
               const showSpotsCount = session.session_type === 'group' || session.session_type === 'partner' || max > 1;
               
@@ -157,9 +158,16 @@ export function CoachHomeClient({
                         {facilityName(session)}
                         {wrestlerNames(session).length > 0 && ` · ${wrestlerNames(session).join(', ')}`}
                       </p>
-                      {current > 0 && (
+                      {max > 1 ? (
                         <p className="text-sm font-medium text-[#D4AF37] mt-1">
-                          Projected: ${projectedEarnings.toFixed(0)}
+                          {current > 0 
+                            ? `Earning: $${projectedEarnings.toFixed(0)}${!isFull ? ` (of $${maxEarnings.toFixed(0)} if full)` : ''}`
+                            : `$${maxEarnings.toFixed(0)} if full`
+                          }
+                        </p>
+                      ) : current > 0 && (
+                        <p className="text-sm font-medium text-[#D4AF37] mt-1">
+                          Earning: ${projectedEarnings.toFixed(0)}
                         </p>
                       )}
                     </div>
