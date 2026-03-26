@@ -1,7 +1,9 @@
 import { redirect } from 'next/navigation';
-import { headers } from 'next/headers';
+import { headers, cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
+import { isProfileComplete } from '@/lib/athletes';
+import type { Athlete } from '@/types';
 
 import { CoachSessionsClient } from './coach-sessions-client';
 import type { CoachSession } from '@/app/(athlete)/athlete-dashboard/coach-schedule-card';
@@ -28,14 +30,28 @@ export default async function CoachSessionsPage({
   const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
   if (userData?.role !== 'coach' && userData?.role !== 'admin') redirect('/athlete-dashboard');
 
-  const { data: athlete } = await supabase.from('athletes').select('*').eq('id', user.id).maybeSingle();
+  // For admins viewing as a specific coach, use the viewAsCoachId
+  const cookieStore = await cookies();
+  const viewAsCoachId = userData?.role === 'admin' 
+    ? cookieStore.get('levelup_view_as_coach_id')?.value 
+    : null;
+  
+  // The coach ID to use for queries - either the viewed coach or the logged-in user
+  const coachId = viewAsCoachId || user.id;
+
+  const { data: athlete } = await supabase.from('athletes').select('*').eq('id', coachId).maybeSingle();
+  
+  // Only redirect to onboarding for actual coaches, not admins viewing as coach
+  if (!viewAsCoachId && (!athlete || !isProfileComplete(athlete as Athlete))) {
+    redirect('/onboarding');
+  }
 
   const now = new Date().toISOString();
 
   const { data: upcoming } = await supabase
     .from('sessions')
     .select('*, facilities(name), session_participants(youth_wrestler_id, youth_wrestlers(id, first_name, last_name))')
-    .eq('athlete_id', user.id)
+    .eq('athlete_id', coachId)
     .in('status', ['scheduled', 'pending_payment'])
     .gte('scheduled_datetime', now)
     .order('scheduled_datetime', { ascending: true });
@@ -43,7 +59,7 @@ export default async function CoachSessionsPage({
   const { data: completed } = await supabase
     .from('sessions')
     .select('*, facilities(name), session_participants(youth_wrestler_id, youth_wrestlers(id, first_name, last_name))')
-    .eq('athlete_id', user.id)
+    .eq('athlete_id', coachId)
     .or('status.eq.completed,status.eq.cancelled,status.eq.no-show,scheduled_datetime.lt.' + now)
     .order('scheduled_datetime', { ascending: false })
     .limit(30);
