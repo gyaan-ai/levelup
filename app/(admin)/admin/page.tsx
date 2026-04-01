@@ -97,7 +97,7 @@ export default async function AdminPage() {
       .limit(10000),
     admin
       .from('users')
-      .select('id, email, role, created_at, last_login_at')
+      .select('id, email, role, created_at')
       .order('created_at', { ascending: false }),
     admin
       .from('credits')
@@ -112,21 +112,11 @@ export default async function AdminPage() {
   if (usersRes.error) {
     console.error('Admin users fetch error:', usersRes.error);
   }
-  // If users fetch failed due to missing last_login_at column, refetch without it (migration 20240111000000 not run)
-  let usersRows = (usersRes.data ?? []) as Array<{
-    id: string;
-    email: string;
-    role: string;
-    created_at: string;
-    last_login_at?: string | null;
-  }>;
-  if (usersRes.error && usersRes.error.message?.includes('last_login_at')) {
-    const { data: fallback } = await admin
-      .from('users')
-      .select('id, email, role, created_at')
-      .order('created_at', { ascending: false });
-    usersRows = (fallback ?? []).map((u) => ({ ...u, last_login_at: null }));
-  }
+  // Map users with last_login_at as null (column may not exist)
+  const usersRows = (usersRes.data ?? []).map((u) => ({
+    ...u,
+    last_login_at: null as string | null,
+  }));
   if (sessionsRes.error) {
     console.error('Admin sessions fetch error:', sessionsRes.error);
     console.error('Admin sessions error details:', JSON.stringify(sessionsRes.error, null, 2));

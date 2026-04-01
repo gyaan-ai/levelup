@@ -22,41 +22,19 @@ export default async function AdminUsersPage() {
   const admin = createAdminClient(tenant.slug);
   const { data: rows, error } = await admin
     .from('users')
-    .select('id, email, role, created_at, last_login_at, archived_at')
+    .select('id, email, role, created_at, archived_at')
     .order('created_at', { ascending: false });
 
-  let userRows: Array<{
-    id: string;
-    email: string;
-    role: string;
-    created_at: string;
-    last_login_at: string | null;
-    archived_at: string | null;
-  }>;
-  if (error && (error.message?.includes('last_login_at') || error.message?.includes('archived_at'))) {
-    const { data: fallbackRows } = await admin
-      .from('users')
-      .select('id, email, role, created_at')
-      .order('created_at', { ascending: false });
-    userRows = (fallbackRows ?? []).map((u) => ({
-      id: u.id,
-      email: u.email,
-      role: u.role,
-      created_at: u.created_at,
-      last_login_at: null,
-      archived_at: null,
-    }));
-  } else {
-    if (error) console.error('Admin users fetch error:', error);
-    userRows = (rows ?? []).map((u) => ({
-      id: u.id,
-      email: u.email,
-      role: u.role,
-      created_at: u.created_at,
-      last_login_at: (u as { last_login_at?: string | null }).last_login_at ?? null,
-      archived_at: (u as { archived_at?: string | null }).archived_at ?? null,
-    }));
-  }
+  if (error) console.error('Admin users fetch error:', error);
+  
+  const userRows = (rows ?? []).map((u) => ({
+    id: u.id,
+    email: u.email,
+    role: u.role,
+    created_at: u.created_at,
+    last_login_at: null as string | null,
+    archived_at: (u as { archived_at?: string | null }).archived_at ?? null,
+  }));
 
   const athleteIds = userRows.filter((u) => u.role === 'coach').map((u) => u.id);
   const athleteMap = new Map<string, { first_name: string; last_name: string; school: string; active: boolean }>();

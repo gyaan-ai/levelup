@@ -22,10 +22,16 @@ export async function POST(req: NextRequest) {
     const admin = createAdminClient(tenant.slug);
 
     // Fetch all participants for these sessions
-    const { data: participants } = await admin
+    const { data: participants, error: participantsError } = await admin
       .from('session_participants')
       .select('session_id, youth_wrestler_id, roster_first_name, roster_last_name')
       .in('session_id', sessionIds);
+
+    console.log('[v0] participant-names API - sessionIds count:', sessionIds.length);
+    console.log('[v0] participant-names API - participants:', participants?.length ?? 0, 'error:', participantsError);
+    if (participants && participants.length > 0) {
+      console.log('[v0] participant-names API - first participant:', JSON.stringify(participants[0]));
+    }
 
     if (!participants || participants.length === 0) {
       return NextResponse.json({ names: {} });
@@ -77,6 +83,7 @@ export async function POST(req: NextRequest) {
       names[sessionId] = nameList.join(', ');
     }
 
+    console.log('[v0] participant-names API - final names:', JSON.stringify(names));
     return NextResponse.json({ names });
   } catch (err) {
     console.error('Error fetching participant names:', err);
