@@ -221,8 +221,8 @@ export default function CartPage() {
         </div>
       )}
 
-      {/* Fixed Bottom Checkout Bar */}
-      <div className="fixed bottom-16 md:bottom-0 left-0 right-0 bg-black/95 backdrop-blur-xl border-t border-zinc-800 p-4 pb-[calc(1rem+env(safe-area-inset-bottom))]">
+      {/* Fixed Bottom Checkout Bar - above bottom nav on mobile */}
+      <div className="fixed bottom-20 md:bottom-0 left-0 right-0 bg-black/95 backdrop-blur-xl border-t border-zinc-800 p-4 z-40">
         <div className="max-w-lg mx-auto">
           {/* Warning if not all items have athlete */}
           {!allItemsHaveAthlete && (
