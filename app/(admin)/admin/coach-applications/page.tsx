@@ -23,7 +23,7 @@ export default async function CoachApplicationsPage() {
   // Use admin client to fetch all coach applications
   const admin = createAdminClient(tenant.slug);
   
-  const { data: applications } = await admin
+  const { data: rawApplications } = await admin
     .from('athletes')
     .select(`
       id,
@@ -54,6 +54,12 @@ export default async function CoachApplicationsPage() {
       users!inner(email, phone)
     `)
     .order('created_at', { ascending: false });
+
+  // Transform the data - Supabase returns users as array, we need a single object
+  const applications = (rawApplications || []).map((app) => ({
+    ...app,
+    users: Array.isArray(app.users) ? app.users[0] : app.users,
+  }));
 
   return (
     <div className="container mx-auto px-4 py-8">
