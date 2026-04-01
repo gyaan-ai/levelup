@@ -70,7 +70,18 @@ export async function POST(req: NextRequest) {
         .eq('parent_id', user.id)
         .maybeSingle();
       if (existingPct) {
-        return NextResponse.json({ success: true, alreadyUsed: true, message: 'You already have a discount.' }, { status: 200 });
+        // Already has discount - fetch and return the existing percent_off
+        const { data: existingDiscount } = await admin
+          .from('parent_percentage_discounts')
+          .select('percent_off')
+          .eq('parent_id', user.id)
+          .single();
+        return NextResponse.json({ 
+          success: true, 
+          alreadyUsed: true, 
+          percent_off: existingDiscount?.percent_off ?? percentOff,
+          message: 'You already have a discount.' 
+        }, { status: 200 });
       }
       const { error: insErr } = await admin.from('parent_percentage_discounts').insert({
         parent_id: user.id,
@@ -79,7 +90,7 @@ export async function POST(req: NextRequest) {
       });
       if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 });
       await admin.from('discount_codes').update({ redemptions: current + 1, updated_at: new Date().toISOString() }).eq('id', codeRow.id);
-      return NextResponse.json({ success: true, message: `Code applied. You get ${percentOff}% off all sessions.` });
+      return NextResponse.json({ success: true, percent_off: percentOff, message: `Code applied. You get ${percentOff}% off all sessions.` });
     }
 
     return NextResponse.json(

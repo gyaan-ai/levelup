@@ -50,6 +50,10 @@ export function CartCheckoutClient({
   const [promoError, setPromoError] = useState<string | null>(null);
   const [appliedDiscount, setAppliedDiscount] = useState<number>(existingDiscount ?? 0);
   const [promoApplied, setPromoApplied] = useState(!!existingDiscount);
+  
+  console.log("[v0] existingDiscount from server:", existingDiscount);
+  console.log("[v0] appliedDiscount state:", appliedDiscount);
+  console.log("[v0] promoApplied state:", promoApplied);
 
   // Fetch credit balance
   const { data: creditsData } = useSWR('/api/credits', fetcher);
