@@ -75,13 +75,15 @@ export default async function HomePage() {
           <Link href="/browse">Find Training</Link>
         </Button>
         
-        {/* Secondary link */}
-        <Link 
-          href="/login" 
-          className="mt-5 text-sm text-accent/60 hover:text-accent transition-colors"
+        {/* Secondary CTA */}
+        <Button
+          size="lg"
+          variant="secondary"
+          asChild
+          className="mt-4 w-full max-w-[280px] border border-white/20 bg-white/10 text-white hover:bg-white/15"
         >
-          Already have an account? Log in
-        </Link>
+          <Link href="/login">Log in</Link>
+        </Button>
         
         {/* Scroll indicator */}
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
