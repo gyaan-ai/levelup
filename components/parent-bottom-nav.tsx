@@ -35,8 +35,14 @@ export function ParentBottomNav() {
           <Link
             key={href}
             href={href}
+            prefetch={true}
+            onClick={(e) => {
+              // Force navigation on mobile to prevent tap delays
+              e.stopPropagation();
+            }}
             className={cn(
-              'relative flex flex-col items-center justify-center min-h-[56px] min-w-0 flex-1 py-2 px-3 touch-manipulation text-[11px] font-medium transition-all duration-200 whitespace-nowrap',
+              'relative flex flex-col items-center justify-center min-h-[56px] min-w-0 flex-1 py-2 px-3 touch-manipulation select-none text-[11px] font-medium transition-colors duration-100 whitespace-nowrap',
+              '-webkit-tap-highlight-color: transparent',
               isActive 
                 ? 'text-[#D4AF37]' 
                 : 'text-zinc-500 active:text-zinc-400'
