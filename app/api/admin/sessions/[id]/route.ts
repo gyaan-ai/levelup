@@ -41,6 +41,7 @@ export async function PATCH(
       published?: boolean;
     };
 
+    console.log('[v0] Session PATCH - tenant:', tenant.slug, 'sessionId:', sessionId);
     const admin = createAdminClient(tenant.slug);
 
     const { data: session, error: fetchErr } = await admin
@@ -49,8 +50,10 @@ export async function PATCH(
       .eq('id', sessionId)
       .single();
 
+    console.log('[v0] Session PATCH - query result:', { session: !!session, fetchErr });
+    
     if (fetchErr || !session) {
-      console.error('[v0] Session PATCH - session not found:', { sessionId, fetchErr });
+      console.error('[v0] Session PATCH - session not found:', { sessionId, fetchErr, tenant: tenant.slug });
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
     // Allow admin to edit any session that isn't cancelled
