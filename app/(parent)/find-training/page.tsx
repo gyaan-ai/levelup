@@ -164,7 +164,7 @@ export default async function FindTrainingPage({
   // Fetch session_participants with admin client to bypass RLS (so we can show all registered kids)
   const sessionIds = sessions.map((s) => s.id);
   if (sessionIds.length > 0) {
-    const admin = createAdminClient();
+    const admin = createAdminClient(tenant.slug);
     const { data: allParticipants } = await admin
       .from('session_participants')
       .select('id, session_id, youth_wrestler_id, roster_first_name, roster_last_name, roster_photo_url, youth_wrestlers(id, first_name, last_name, photo_url)')
