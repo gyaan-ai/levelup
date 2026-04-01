@@ -317,25 +317,36 @@ export function FindTrainingClient({
             </div>
 
             {/* Who's registered - parent's wrestlers highlighted in green */}
-            {session.session_participants && session.session_participants.length > 0 && (
+            {current > 0 && (
               <div className="mt-2 text-xs">
                 <span className="text-zinc-500">Registered: </span>
-                {session.session_participants.map((p, i) => {
-                  const yw = p?.youth_wrestlers;
-                  const wrestler = Array.isArray(yw) ? yw[0] : yw;
-                  const wrestlerId = p?.youth_wrestler_id || wrestler?.id;
-                  const name = wrestler ? `${wrestler.first_name || ''} ${wrestler.last_name || ''}`.trim() : 'Drop-in';
-                  const isParentWrestler = wrestlerId && parentWrestlerIds.includes(wrestlerId);
-                  return (
-                    <span 
-                      key={p?.id || i}
-                      className={isParentWrestler ? 'text-emerald-400' : 'text-zinc-400'}
-                    >
-                      {i > 0 && ', '}
-                      {name || 'Unknown'}
-                    </span>
-                  );
-                })}
+                {session.session_participants && session.session_participants.length > 0 ? (
+                  session.session_participants.map((p, i) => {
+                    const yw = p?.youth_wrestlers;
+                    const wrestler = Array.isArray(yw) ? yw[0] : yw;
+                    const wrestlerId = p?.youth_wrestler_id || wrestler?.id;
+                    // Try roster_first_name/roster_last_name first, then youth_wrestlers
+                    const rosterFirst = (p as { roster_first_name?: string })?.roster_first_name;
+                    const rosterLast = (p as { roster_last_name?: string })?.roster_last_name;
+                    const name = (rosterFirst || rosterLast) 
+                      ? `${rosterFirst || ''} ${rosterLast || ''}`.trim()
+                      : wrestler 
+                        ? `${wrestler.first_name || ''} ${wrestler.last_name || ''}`.trim() 
+                        : 'Wrestler';
+                    const isParentWrestler = wrestlerId && parentWrestlerIds.includes(wrestlerId);
+                    return (
+                      <span 
+                        key={p?.id || i}
+                        className={isParentWrestler ? 'text-emerald-400' : 'text-zinc-400'}
+                      >
+                        {i > 0 && ', '}
+                        {name || 'Wrestler'}
+                      </span>
+                    );
+                  })
+                ) : (
+                  <span className="text-zinc-400">{current} registered</span>
+                )}
               </div>
             )}
           </div>
