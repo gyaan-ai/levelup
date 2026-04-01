@@ -165,10 +165,17 @@ export default async function FindTrainingPage({
     const admin = createAdminClient(tenant.slug);
     
     // Fetch participants with wrestler info
-    const { data: allParticipants } = await admin
+    const { data: allParticipants, error: participantsError } = await admin
       .from('session_participants')
       .select('id, session_id, youth_wrestler_id, roster_first_name, roster_last_name')
       .in('session_id', sessionIds);
+    
+    console.log('[v0] find-training ADMIN QUERY - sessionIds:', sessionIds.length);
+    console.log('[v0] find-training ADMIN QUERY - allParticipants:', allParticipants?.length ?? 0);
+    console.log('[v0] find-training ADMIN QUERY - error:', participantsError);
+    if (allParticipants && allParticipants.length > 0) {
+      console.log('[v0] find-training ADMIN QUERY - first:', JSON.stringify(allParticipants[0]));
+    }
     
     // Get unique youth_wrestler_ids to fetch their names
     const wrestlerIds = [...new Set((allParticipants ?? []).map(p => p.youth_wrestler_id).filter(Boolean))] as string[];
@@ -213,10 +220,20 @@ export default async function FindTrainingPage({
     ...s,
     participant_names: namesBySession.get(s.id) || '',
   }));
+  
+  console.log('[v0] find-training - namesBySession size:', namesBySession.size);
+  if (namesBySession.size > 0) {
+    const firstEntry = [...namesBySession.entries()][0];
+    console.log('[v0] find-training - first entry:', firstEntry);
+  }
 
   const sessionCoachIds = [...new Set(sessionsWithParticipants.map((s) => s.athlete_id).filter(Boolean))];
   const findTrainingReviewStatsMap = await fetchCoachReviewStatsMap(supabase, sessionCoachIds);
   const sessionsWithReviewStats = patchSessionsWithCoachReviewStats(sessionsWithParticipants, findTrainingReviewStatsMap);
+  
+  // Verify participant_names survived the transformation
+  const withNames = sessionsWithReviewStats.filter((s: Record<string, unknown>) => s.participant_names && (s.participant_names as string).length > 0);
+  console.log('[v0] find-training - sessions with participant_names after patch:', withNames.length);
 
   return (
     <div className="container mx-auto px-4 py-8">
