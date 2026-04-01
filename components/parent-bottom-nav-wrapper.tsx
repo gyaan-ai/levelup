@@ -9,7 +9,9 @@ import { AdminBottomNav } from './admin-bottom-nav';
 import { FloatingCartButton } from './floating-cart-button';
 
 const PARENT_ROUTES = [
+  '/',
   '/dashboard',
+  '/home',
   '/training',
   '/find-training',
   '/browse',
@@ -24,6 +26,7 @@ const PARENT_ROUTES = [
   '/sessions',
   '/cart',
   '/wallet',
+  '/checkout',
 ];
 
 const COACH_ROUTES = [

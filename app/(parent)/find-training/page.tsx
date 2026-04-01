@@ -157,12 +157,16 @@ export default async function FindTrainingPage({
     .eq('active', true)
     .order('school', { ascending: true });
 
-  const sessionCoachIds = [...new Set(sessions.map((s) => s.athlete_id).filter(Boolean))];
-  const findTrainingReviewStatsMap = await fetchCoachReviewStatsMap(supabase, sessionCoachIds);
-  let sessionsWithReviewStats = patchSessionsWithCoachReviewStats(sessions, findTrainingReviewStatsMap);
-
   // Fetch session_participants with admin client to bypass RLS (so we can show all registered kids)
   const sessionIds = sessions.map((s) => s.id);
+  const participantsBySession = new Map<string, Array<{
+    id?: string;
+    youth_wrestler_id?: string;
+    roster_first_name?: string;
+    roster_last_name?: string;
+    youth_wrestlers?: { id: string; first_name?: string; last_name?: string } | null;
+  }>>();
+  
   if (sessionIds.length > 0) {
     const admin = createAdminClient(tenant.slug);
     
@@ -187,17 +191,9 @@ export default async function FindTrainingPage({
     }
     
     // Group participants by session with wrestler names
-    type ParticipantWithName = {
-      id?: string;
-      youth_wrestler_id?: string;
-      roster_first_name?: string;
-      roster_last_name?: string;
-      youth_wrestlers?: { id: string; first_name?: string; last_name?: string } | null;
-    };
-    const participantsBySession = new Map<string, ParticipantWithName[]>();
     for (const p of allParticipants ?? []) {
       const wrestler = p.youth_wrestler_id ? wrestlerMap.get(p.youth_wrestler_id) : null;
-      const transformed: ParticipantWithName = {
+      const transformed = {
         id: p.id,
         youth_wrestler_id: p.youth_wrestler_id,
         roster_first_name: p.roster_first_name,
@@ -208,13 +204,17 @@ export default async function FindTrainingPage({
       list.push(transformed);
       participantsBySession.set(p.session_id, list);
     }
-    
-    // Merge into sessions
-    sessionsWithReviewStats = sessionsWithReviewStats.map((s) => ({
-      ...s,
-      session_participants: participantsBySession.get(s.id) ?? [],
-    }));
   }
+  
+  // Add participants to sessions BEFORE other transformations
+  const sessionsWithParticipants = sessions.map((s) => ({
+    ...s,
+    session_participants: participantsBySession.get(s.id) ?? s.session_participants ?? [],
+  }));
+
+  const sessionCoachIds = [...new Set(sessionsWithParticipants.map((s) => s.athlete_id).filter(Boolean))];
+  const findTrainingReviewStatsMap = await fetchCoachReviewStatsMap(supabase, sessionCoachIds);
+  const sessionsWithReviewStats = patchSessionsWithCoachReviewStats(sessionsWithParticipants, findTrainingReviewStatsMap);
 
   return (
     <div className="container mx-auto px-4 py-8">
