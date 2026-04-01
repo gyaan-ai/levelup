@@ -173,7 +173,37 @@ export async function POST(req: NextRequest) {
     }
 
     // Calculate total price
-    const totalPrice = sessionMetadata.reduce((sum, m) => sum + m.price, 0);
+    let totalPrice = sessionMetadata.reduce((sum, m) => sum + m.price, 0);
+
+    // Check for parent percentage discount (from promo code like FAMILY10)
+    const { data: discountData, error: discountError } = await admin
+      .from('parent_percentage_discounts')
+      .select('percent_off')
+      .eq('parent_id', user.id)
+      .maybeSingle();
+    
+    console.log('[v0] Cart checkout - user.id:', user.id);
+    console.log('[v0] Cart checkout - discountData:', discountData);
+    console.log('[v0] Cart checkout - discountError:', discountError);
+    
+    const percentOff = discountData?.percent_off ?? 0;
+    console.log('[v0] Cart checkout - percentOff:', percentOff);
+    const discountAmount = percentOff > 0 ? totalPrice * (percentOff / 100) : 0;
+    totalPrice = totalPrice - discountAmount;
+
+    // Also apply discount to line items for Stripe
+    if (percentOff > 0) {
+      for (const item of lineItems) {
+        const originalAmount = item.price_data.unit_amount;
+        const discountedAmount = Math.round(originalAmount * (1 - percentOff / 100));
+        item.price_data.unit_amount = discountedAmount;
+        item.price_data.product_data.description = `${item.price_data.product_data.description} (${percentOff}% off)`;
+      }
+      // Update sessionMetadata prices too
+      for (const meta of sessionMetadata) {
+        meta.price = meta.price * (1 - percentOff / 100);
+      }
+    }
 
     // Check user's credit balance
     const creditBalance = await getUserCreditBalance(user.id, tenant.slug);
