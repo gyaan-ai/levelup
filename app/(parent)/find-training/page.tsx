@@ -159,7 +159,7 @@ export default async function FindTrainingPage({
 
   const sessionCoachIds = [...new Set(sessions.map((s) => s.athlete_id).filter(Boolean))];
   const findTrainingReviewStatsMap = await fetchCoachReviewStatsMap(supabase, sessionCoachIds);
-  const sessionsWithReviewStats = patchSessionsWithCoachReviewStats(sessions, findTrainingReviewStatsMap);
+  let sessionsWithReviewStats = patchSessionsWithCoachReviewStats(sessions, findTrainingReviewStatsMap);
 
   // Fetch session_participants with admin client to bypass RLS (so we can show all registered kids)
   const sessionIds = sessions.map((s) => s.id);
@@ -196,10 +196,11 @@ export default async function FindTrainingPage({
       participantsBySession.set(p.session_id, list);
     }
     
-    // Merge into sessions
-    for (const s of sessionsWithReviewStats) {
-      s.session_participants = participantsBySession.get(s.id) ?? [];
-    }
+    // Merge into sessions - create new array with participants
+    sessionsWithReviewStats = sessionsWithReviewStats.map((s) => ({
+      ...s,
+      session_participants: participantsBySession.get(s.id) ?? [],
+    }));
   }
 
   return (
