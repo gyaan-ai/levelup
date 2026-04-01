@@ -43,6 +43,7 @@ import {
   ExternalLink,
   Smartphone,
   LayoutDashboard,
+  Gauge,
   TrendingUp,
   TrendingDown,
   Star,
@@ -65,6 +66,7 @@ import { startOfWeek, endOfWeek, addWeeks } from 'date-fns';
 import { CopySessionPhonesButton } from '@/components/copy-session-phones-button';
 import { CoachTextGroupDialog } from '@/components/coach-text-group-dialog';
 import { showSessionSmsCopyAndTextGroup } from '@/lib/session-sms-tools';
+import { AdminCockpitView } from './admin-cockpit-view';
 import {
   Area,
   AreaChart,
@@ -165,6 +167,7 @@ export type CreditRecord = {
 type SectionId = 'overview' | 'bookings' | 'money' | 'people';
 type SubSectionId = 
   | 'dashboard' 
+  | 'cockpit'
   | 'sessions' 
   | 'payments' 
   | 'payouts' 
@@ -1383,6 +1386,11 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
   const renderContent = () => {
     // OVERVIEW SECTION
     if (section === 'overview') {
+      // Show Cockpit (trends view) if subSection is cockpit
+      if (subSection === 'cockpit') {
+        return <AdminCockpitView />;
+      }
+      
       return (
         <div className="space-y-6">
           {/* Hero KPIs - Proper Accounting */}
@@ -2828,8 +2836,14 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
             <NavItem
               icon={LayoutDashboard}
               label="Dashboard"
-              active={section === 'overview'}
-              onClick={() => handleNavChange('overview')}
+              active={section === 'overview' && subSection !== 'cockpit'}
+              onClick={() => handleNavChange('overview', 'dashboard')}
+            />
+            <NavItem
+              icon={Gauge}
+              label="Cockpit"
+              active={section === 'overview' && subSection === 'cockpit'}
+              onClick={() => handleNavChange('overview', 'cockpit')}
             />
           </div>
 
