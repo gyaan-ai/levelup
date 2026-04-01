@@ -67,12 +67,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    if (!hasMinPhoneDigits((yw as { phone?: string | null }).phone)) {
-      return NextResponse.json(
-        { error: 'Add this athlete\'s cell number on their profile before registering.' },
-        { status: 400 }
-      );
-    }
+    // Phone validation removed - allow checkout without wrestler phone number
 
     const admin = createAdminClient(tenant.slug);
 
