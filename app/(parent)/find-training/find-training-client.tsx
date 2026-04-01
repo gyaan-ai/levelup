@@ -227,19 +227,49 @@ export function FindTrainingClient({
         "bg-zinc-900/50 border border-zinc-800/50 rounded-xl p-4 transition-all",
         isNotBookable ? "opacity-60" : "hover:border-zinc-700"
       )}>
-        <div className="flex gap-4">
-          {/* Coach Photo */}
-          <Link href={`/athlete/${coachData?.id ?? session.athlete_id}`} className="shrink-0">
-            <ProfileImage
-              src={coachData?.photo_url}
-              alt={coachData ? `${coachData.first_name} ${coachData.last_name}` : 'Coach'}
-              className="w-14 h-14 rounded-full"
-              fallbackIconClassName="h-6 w-6 text-muted-foreground"
-            />
-          </Link>
+        {/* Mobile: Stack layout, Desktop: Row layout */}
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+          {/* Top row on mobile: Photo + Session Type + Price */}
+          <div className="flex items-start gap-3 sm:contents">
+            {/* Coach Photo */}
+            <Link href={`/athlete/${coachData?.id ?? session.athlete_id}`} className="shrink-0">
+              <ProfileImage
+                src={coachData?.photo_url}
+                alt={coachData ? `${coachData.first_name} ${coachData.last_name}` : 'Coach'}
+                className="w-12 h-12 sm:w-14 sm:h-14 rounded-full"
+                fallbackIconClassName="h-5 w-5 sm:h-6 sm:w-6 text-muted-foreground"
+              />
+            </Link>
 
-          {/* Session Info */}
-          <div className="flex-1 min-w-0">
+            {/* Mobile: Session type + date inline with photo */}
+            <div className="flex-1 min-w-0 sm:hidden">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <SessionTypeBadge sessionType={session.session_type} sessionMode={session.session_mode} />
+                {(session as { join_policy?: string | null }).join_policy === 'invite_only' ? (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-900/50 text-amber-400 border border-amber-700/50">
+                    Invite
+                  </span>
+                ) : (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-900/50 text-emerald-400 border border-emerald-700/50">
+                    Open
+                  </span>
+                )}
+              </div>
+              <p className="font-semibold text-foreground text-sm mt-1">
+                {formatEST(dt, 'EEE, MMM d · h:mm a')}
+              </p>
+            </div>
+
+            {/* Mobile: Price in top right */}
+            <div className="sm:hidden shrink-0">
+              {price != null && price > 0 && (
+                <span className="text-base font-bold text-foreground">${price}</span>
+              )}
+            </div>
+          </div>
+
+          {/* Session Info - Desktop version */}
+          <div className="flex-1 min-w-0 hidden sm:block">
             {/* Type & Focus & Join Policy */}
             <div className="flex items-center gap-2 mb-1.5 flex-wrap">
               <SessionTypeBadge sessionType={session.session_type} sessionMode={session.session_mode} />
@@ -315,6 +345,47 @@ export function FindTrainingClient({
                 {getSpotText()}
               </span>
             </div>
+          </div>
+
+          {/* Mobile: Coach + Details row */}
+          <div className="sm:hidden">
+            <div className="flex items-center gap-2">
+              <Link 
+                href={`/athlete/${coachData?.id ?? session.athlete_id}`}
+                className="text-sm text-zinc-300 hover:text-foreground transition-colors"
+              >
+                {coachData ? `${coachData.first_name} ${coachData.last_name}` : 'Coach'}
+              </Link>
+              {coachData?.school && (
+                <SchoolLogo school={coachData.school} size="sm" />
+              )}
+              {coachData && (
+                <StarRating
+                  averageRating={coachData.average_rating}
+                  reviewCount={coachData.review_count}
+                  size="sm"
+                />
+              )}
+            </div>
+            <div className="flex items-center gap-3 mt-1.5 text-xs text-zinc-500 flex-wrap">
+              {facilityData && (
+                <span className="flex items-center gap-1">
+                  <MapPin className="h-3 w-3" />
+                  {facilityData.name}
+                </span>
+              )}
+              {duration && (
+                <span className="flex items-center gap-1">
+                  <Clock className="h-3 w-3" />
+                  {duration >= 120 ? `${duration / 60} hrs` : `${duration} min`}
+                </span>
+              )}
+              <span className={cn("flex items-center gap-1", getSpotColor())}>
+                <Users className="h-3 w-3" />
+                {getSpotText()}
+              </span>
+            </div>
+          </div>
 
             {/* Who's registered - parent's wrestlers highlighted in green */}
             {current > 0 && (
@@ -351,8 +422,8 @@ export function FindTrainingClient({
             )}
           </div>
 
-          {/* Price & Action */}
-          <div className="flex flex-col items-end justify-between shrink-0">
+          {/* Price & Action - Desktop only (mobile shows price in top row) */}
+          <div className="hidden sm:flex flex-col items-end justify-between shrink-0">
             {price != null && price > 0 && (
               <span className="text-lg font-bold text-foreground">${price}</span>
             )}
@@ -364,20 +435,17 @@ export function FindTrainingClient({
                 - Open/Has invite: Add to Cart
             */}
             {allParentWrestlersBooked ? (
-              // All wrestlers booked - grey disabled state (44px min tap target)
               <span className="text-xs text-zinc-500 bg-zinc-800 px-3 py-2.5 min-h-[44px] rounded flex items-center gap-1.5">
                 <Check className="h-3 w-3" />
                 Booked
               </span>
             ) : openSlots > 0 ? (
               isInviteOnly ? (
-                // Invite-only: show lock icon (44px min tap target)
                 <span className="text-xs text-zinc-500 bg-zinc-800 px-3 py-2.5 min-h-[44px] rounded flex items-center gap-1.5">
                   <Lock className="h-3 w-3" />
                   Invite Only
                 </span>
               ) : inCart ? (
-                // In Cart: navigate to cart on click (44px min tap target)
                 <Button
                   size="sm"
                   onClick={(e) => {
@@ -391,7 +459,6 @@ export function FindTrainingClient({
                   In Cart
                 </Button>
               ) : (
-                // Open session: show Add to Cart button (44px min tap target)
                 <Button
                   size="sm"
                   onClick={handleAddToCart}
@@ -403,6 +470,47 @@ export function FindTrainingClient({
               )
             ) : (
               <span className="text-xs text-zinc-500 bg-zinc-800 px-3 py-2.5 min-h-[44px] rounded flex items-center">Full</span>
+            )}
+          </div>
+
+          {/* Mobile Action Button - Full width at bottom */}
+          <div className="sm:hidden mt-3 pt-3 border-t border-zinc-800">
+            {allParentWrestlersBooked ? (
+              <span className="w-full text-xs text-zinc-500 bg-zinc-800 px-3 py-2.5 min-h-[44px] rounded flex items-center justify-center gap-1.5">
+                <Check className="h-3 w-3" />
+                Booked
+              </span>
+            ) : openSlots > 0 ? (
+              isInviteOnly ? (
+                <span className="w-full text-xs text-zinc-500 bg-zinc-800 px-3 py-2.5 min-h-[44px] rounded flex items-center justify-center gap-1.5">
+                  <Lock className="h-3 w-3" />
+                  Invite Only
+                </span>
+              ) : inCart ? (
+                <Button
+                  size="sm"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    router.push('/cart');
+                  }}
+                  className="w-full min-h-[44px] gap-1.5 transition-all bg-zinc-800 hover:bg-zinc-700 text-[#D4AF37] border border-[#D4AF37]/30"
+                >
+                  <Check className="h-4 w-4" />
+                  In Cart
+                </Button>
+              ) : (
+                <Button
+                  size="sm"
+                  onClick={handleAddToCart}
+                  className="w-full min-h-[44px] gap-1.5 transition-all bg-[#D4AF37] hover:bg-[#B8963C] text-black"
+                >
+                  <ShoppingCart className="h-4 w-4" />
+                  Add to Cart
+                </Button>
+              )
+            ) : (
+              <span className="w-full text-xs text-zinc-500 bg-zinc-800 px-3 py-2.5 min-h-[44px] rounded flex items-center justify-center">Full</span>
             )}
           </div>
         </div>
