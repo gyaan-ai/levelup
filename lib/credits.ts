@@ -18,11 +18,11 @@ export type UserCredit = {
 /**
  * Get total available (unused, non-expired) credit balance for a user
  */
-export async function getUserCreditBalance(userId: string, tenantSlug = 'the-guild'): Promise<number> {
+export async function getUserCreditBalance(userId: string, tenantSlug = 'guild'): Promise<number> {
   const admin = createAdminClient(tenantSlug);
   
   const { data, error } = await admin
-    .from('user_credits')
+    .from('credits')
     .select('amount')
     .eq('user_id', userId)
     .is('used_at', null)
@@ -39,11 +39,11 @@ export async function getUserCreditBalance(userId: string, tenantSlug = 'the-gui
 /**
  * Get all available credits for a user (for display purposes)
  */
-export async function getUserCredits(userId: string, tenantSlug = 'the-guild'): Promise<UserCredit[]> {
+export async function getUserCredits(userId: string, tenantSlug = 'guild'): Promise<UserCredit[]> {
   const admin = createAdminClient(tenantSlug);
   
   const { data, error } = await admin
-    .from('user_credits')
+    .from('credits')
     .select('*')
     .eq('user_id', userId)
     .is('used_at', null)
@@ -77,11 +77,11 @@ export async function grantCredit({
   tenantSlug?: string;
 }): Promise<{ success: boolean; creditId?: string; error?: string }> {
   // Use admin client to bypass RLS for granting credits
-  const admin = createAdminClient(tenantSlug ?? 'the-guild');
+  const admin = createAdminClient(tenantSlug ?? 'guild');
 
   // Create the credit
   const { data: credit, error: creditError } = await admin
-    .from('user_credits')
+    .from('credits')
     .insert({
       user_id: userId,
       amount,
@@ -127,7 +127,7 @@ export async function applyCredits({
   tenantSlug?: string;
 }): Promise<{ usedAmount: number; creditIds: string[] }> {
   // Use admin client to bypass RLS for using credits
-  const admin = createAdminClient(tenantSlug ?? 'the-guild');
+  const admin = createAdminClient(tenantSlug ?? 'guild');
 
   // Get available credits ordered by expiration (use oldest first)
   const credits = await getUserCredits(userId);
@@ -144,7 +144,7 @@ export async function applyCredits({
     if (amountToUse === creditAmount) {
       // Use entire credit
       await admin
-        .from('user_credits')
+        .from('credits')
         .update({
           used_at: new Date().toISOString(),
           used_for_session_id: sessionId,
@@ -153,7 +153,7 @@ export async function applyCredits({
     } else {
       // Partial use - mark original as used and create new credit for remainder
       await admin
-        .from('user_credits')
+        .from('credits')
         .update({
           used_at: new Date().toISOString(),
           used_for_session_id: sessionId,
@@ -162,7 +162,7 @@ export async function applyCredits({
         .eq('id', credit.id);
 
       // Create new credit for the remainder
-      await admin.from('user_credits').insert({
+      await admin.from('credits').insert({
         user_id: userId,
         amount: creditAmount - amountToUse,
         reason: `Remainder from partial credit use`,
@@ -195,7 +195,7 @@ export async function applyCredits({
 /**
  * Get credit transaction history for a user
  */
-export async function getCreditHistory(userId: string, tenantSlug = 'the-guild') {
+export async function getCreditHistory(userId: string, tenantSlug = 'guild') {
   const admin = createAdminClient(tenantSlug);
 
   const { data, error } = await admin

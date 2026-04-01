@@ -165,10 +165,16 @@ export default async function FindTrainingPage({
   const sessionIds = sessions.map((s) => s.id);
   if (sessionIds.length > 0) {
     const admin = createAdminClient(tenant.slug);
-    const { data: allParticipants } = await admin
+    const { data: allParticipants, error: participantsError } = await admin
       .from('session_participants')
       .select('id, session_id, youth_wrestler_id, roster_first_name, roster_last_name, roster_photo_url, youth_wrestlers(id, first_name, last_name, photo_url)')
       .in('session_id', sessionIds);
+    
+    console.log('[v0] find-training allParticipants count:', allParticipants?.length ?? 0);
+    console.log('[v0] find-training participantsError:', participantsError);
+    if (allParticipants && allParticipants.length > 0) {
+      console.log('[v0] find-training first participant:', JSON.stringify(allParticipants[0]));
+    }
     
     // Transform and map participants to sessions
     // Supabase returns youth_wrestlers as array, we need single object
