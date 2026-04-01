@@ -208,9 +208,14 @@ export default async function AdminPage() {
     totalOrgFees: sessions.reduce((sum, s) => sum + s.org_fee, 0),
     totalStripeFees: sessions.reduce((sum, s) => sum + s.stripe_fee, 0),
     totalAthletePayments: sessions.reduce((sum, s) => sum + s.athlete_payment, 0),
+    upcomingOpenRevenue: sessions.filter((s) => ['scheduled', 'pending_payment'].includes(s.status) && new Date(s.scheduled_datetime) >= new Date()).reduce((sum, s) => sum + s.total_price, 0),
+    upcomingOpenOrgFees: sessions.filter((s) => ['scheduled', 'pending_payment'].includes(s.status) && new Date(s.scheduled_datetime) >= new Date()).reduce((sum, s) => sum + s.org_fee, 0),
+    upcomingOpenStripeFees: sessions.filter((s) => ['scheduled', 'pending_payment'].includes(s.status) && new Date(s.scheduled_datetime) >= new Date()).reduce((sum, s) => sum + s.stripe_fee, 0),
+    upcomingOpenAthletePayments: sessions.filter((s) => ['scheduled', 'pending_payment'].includes(s.status) && new Date(s.scheduled_datetime) >= new Date()).reduce((sum, s) => sum + s.athlete_payment, 0),
     sessionCount: sessions.length,
     completedCount: sessions.filter((s) => s.status === 'completed').length,
     pendingPaymentCount: sessions.filter((s) => s.status === 'pending_payment').length,
+    upcomingOpenCount: sessions.filter((s) => ['scheduled', 'pending_payment'].includes(s.status) && new Date(s.scheduled_datetime) >= new Date()).length,
   };
 
   // Build coach list from all athletes so coaches with no sessions (e.g. Cam) still appear

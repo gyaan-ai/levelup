@@ -93,9 +93,14 @@ export type BillingSummary = {
   totalOrgFees: number;
   totalStripeFees: number;
   totalAthletePayments: number;
+  upcomingOpenRevenue: number;
+  upcomingOpenOrgFees: number;
+  upcomingOpenStripeFees: number;
+  upcomingOpenAthletePayments: number;
   sessionCount: number;
   completedCount: number;
   pendingPaymentCount: number;
+  upcomingOpenCount: number;
 };
 
 export type AthleteReport = {
@@ -996,7 +1001,7 @@ export function AdminDashboardClient({
       {tab === 'billing' && (
         <div className="space-y-4">
           <p className="text-sm text-muted-foreground">
-            All-time totals. For today / this week / this month (revenue booked, new users, bookings), use <strong>Cockpit</strong>.
+            All-time totals plus upcoming/open scheduled dollars. For today / this week / this month (revenue booked, new users, bookings), use <strong>Cockpit</strong>.
           </p>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Card>
@@ -1031,12 +1036,53 @@ export function AdminDashboardClient({
                 </CardTitle>
               </CardHeader>
             </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardDescription>Upcoming/open revenue</CardDescription>
+                <CardTitle className="text-2xl">
+                  ${billing.upcomingOpenRevenue.toFixed(2)}
+                </CardTitle>
+              </CardHeader>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardDescription>Upcoming/open coach payouts</CardDescription>
+                <CardTitle className="text-2xl">
+                  ${billing.upcomingOpenAthletePayments.toFixed(2)}
+                </CardTitle>
+              </CardHeader>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardDescription>Upcoming/open org fees</CardDescription>
+                <CardTitle className="text-2xl">
+                  ${billing.upcomingOpenOrgFees.toFixed(2)}
+                </CardTitle>
+              </CardHeader>
+            </Card>
+            <Card>
+              <CardHeader className="pb-2">
+                <CardDescription>Upcoming/open Stripe fees</CardDescription>
+                <CardTitle className="text-2xl">
+                  ${billing.upcomingOpenStripeFees.toFixed(2)}
+                </CardTitle>
+              </CardHeader>
+            </Card>
             <Card className="md:col-span-2">
               <CardHeader className="pb-2">
                 <CardDescription>Sessions (all time)</CardDescription>
                 <CardTitle className="text-2xl">{billing.sessionCount} total</CardTitle>
                 <p className="text-sm text-muted-foreground pt-1">
                   {billing.completedCount} completed · {billing.pendingPaymentCount} pending payment
+                </p>
+              </CardHeader>
+            </Card>
+            <Card className="md:col-span-2">
+              <CardHeader className="pb-2">
+                <CardDescription>Upcoming/open sessions</CardDescription>
+                <CardTitle className="text-2xl">{billing.upcomingOpenCount} total</CardTitle>
+                <p className="text-sm text-muted-foreground pt-1">
+                  Scheduled or pending-payment sessions with a future date/time.
                 </p>
               </CardHeader>
             </Card>

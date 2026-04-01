@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Calendar } from '@/components/ui/calendar';
+import { Input } from '@/components/ui/input';
 import Link from 'next/link';
 import { ArrowLeft, User, Clock, CheckCircle, Link2, Users, UserCircle } from 'lucide-react';
 import { SchoolLogo } from '@/components/school-logo';
@@ -98,6 +99,9 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
   const [availability, setAvailability] = useState<AvailabilityByDay | null>(null);
   const [availabilityDates, setAvailabilityDates] = useState<Set<string>>(new Set());
   const [slots, setSlots] = useState<string[]>([]);
+  const [promoCode, setPromoCode] = useState('');
+  const [applyingPromo, setApplyingPromo] = useState(false);
+  const [promoMessage, setPromoMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [percentOff, setPercentOff] = useState<number | null>(null);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -290,6 +294,40 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
     (currentStep === 1 && numSelected > 0) ||
     (currentStep === 2 && sessionChoice && (!isPartner || partnerOption)) ||
     (currentStep === 3 && !!selectedDate && !!selectedTime);
+
+  const refreshPercentDiscount = async () => {
+    const pctRes = await fetch('/api/account/percentage-discount');
+    if (!pctRes.ok) return;
+    const p = await pctRes.json();
+    const n = p.percent_off != null ? Number(p.percent_off) : null;
+    setPercentOff(n != null && n >= 1 && n <= 100 ? n : null);
+  };
+
+  const handleApplyPromo = async () => {
+    const trimmed = promoCode.trim();
+    if (!trimmed) return;
+    setApplyingPromo(true);
+    setPromoMessage(null);
+    try {
+      const res = await fetch('/api/redeem-discount-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: trimmed }),
+      });
+      const data = await res.json();
+      if (!res.ok && !data.alreadyUsed) {
+        setPromoMessage({ type: 'error', text: data.error || 'Could not apply code' });
+        return;
+      }
+      await refreshPercentDiscount();
+      setPromoMessage({ type: 'success', text: data.message || 'Code applied.' });
+      setPromoCode('');
+    } catch {
+      setPromoMessage({ type: 'error', text: 'Could not apply code. Try again.' });
+    } finally {
+      setApplyingPromo(false);
+    }
+  };
 
   const handlePay = async () => {
     if (!sessionMode || !selectedDate || !selectedTime || totalPrice <= 0) {
@@ -721,6 +759,39 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
                   <p className="text-sm text-muted-foreground">
                     Your {percentOff}% family discount is applied. You&apos;ll pay ${displayPrice.toFixed(2)}.
                   </p>
+                )}
+                {!willUseFreeSession && !hasPercentDiscount && (
+                  <div className="space-y-2 rounded-lg border p-4">
+                    <p className="text-sm font-medium">Promo code</p>
+                    <p className="text-sm text-muted-foreground">
+                      Apply your code here before checkout. Stripe won&apos;t show a promo code field.
+                    </p>
+                    <div className="flex gap-2">
+                      <Input
+                        value={promoCode}
+                        onChange={(e) => {
+                          setPromoCode(e.target.value.toUpperCase());
+                          setPromoMessage(null);
+                        }}
+                        placeholder="e.g. FAMILY10"
+                        autoComplete="off"
+                        className="uppercase"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleApplyPromo}
+                        disabled={!promoCode.trim() || applyingPromo}
+                      >
+                        {applyingPromo ? 'Applying…' : 'Apply'}
+                      </Button>
+                    </div>
+                    {promoMessage && (
+                      <p className={promoMessage.type === 'success' ? 'text-sm text-green-600 dark:text-green-400' : 'text-sm text-destructive'}>
+                        {promoMessage.text}
+                      </p>
+                    )}
+                  </div>
                 )}
                 {(sessionMode === 'partner-invite' || sessionMode === 'partner-open') && !willUseFreeSession && (
                   <p className="text-sm text-muted-foreground">
