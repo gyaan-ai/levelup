@@ -50,11 +50,13 @@ export async function PATCH(
       .single();
 
     if (fetchErr || !session) {
+      console.error('[v0] Session PATCH - session not found:', { sessionId, fetchErr });
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
-    if (session.status !== 'scheduled' && session.status !== 'pending_payment') {
+    // Allow admin to edit any session that isn't cancelled
+    if (session.status === 'cancelled') {
       return NextResponse.json(
-        { error: 'Only scheduled or pending-payment sessions can be edited' },
+        { error: 'Cancelled sessions cannot be edited' },
         { status: 400 }
       );
     }
