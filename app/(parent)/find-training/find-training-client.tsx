@@ -317,6 +317,7 @@ export function FindTrainingClient({
             </div>
 
             {/* Who's registered - parent's wrestlers highlighted in green */}
+            {current > 0 && console.log('[v0] Session', session.id, 'participants:', session.session_participants)}
             {current > 0 && (
               <div className="mt-2 text-xs">
                 <span className="text-zinc-500">Registered: </span>
