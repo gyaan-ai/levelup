@@ -173,7 +173,7 @@ export default async function TrainingPage({
     id, scheduled_datetime, status, session_type, session_mode, join_policy, focus_area,
     current_participants, max_participants, total_price, price_per_participant,
     athlete_id, facility_id, athletes(id, first_name, last_name, school, photo_url, average_rating, review_count), facilities(id, name, address),
-    session_participants(id, youth_wrestler_id, roster_first_name, roster_last_name, roster_photo_url, youth_wrestlers(id, first_name, last_name, photo_url))
+    session_participants(id, youth_wrestler_id, youth_wrestlers(id, first_name, last_name, photo_url))
   `;
   const sessions = (start: string, end: string) =>
     admin.from('sessions').select(baseSelect).gte('scheduled_datetime', start).lte('scheduled_datetime', end);
