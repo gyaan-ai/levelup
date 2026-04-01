@@ -159,18 +159,12 @@ export default async function FindTrainingPage({
 
   // Fetch session_participants with admin client to bypass RLS (so we can show all registered kids)
   const sessionIds = sessions.map((s) => s.id);
-  const participantsBySession = new Map<string, Array<{
-    id?: string;
-    youth_wrestler_id?: string;
-    roster_first_name?: string;
-    roster_last_name?: string;
-    youth_wrestlers?: { id: string; first_name?: string; last_name?: string } | null;
-  }>>();
+  const namesBySession = new Map<string, string>();
   
   if (sessionIds.length > 0) {
     const admin = createAdminClient(tenant.slug);
     
-    // Fetch participants
+    // Fetch participants with wrestler info
     const { data: allParticipants } = await admin
       .from('session_participants')
       .select('id, session_id, youth_wrestler_id, roster_first_name, roster_last_name')
@@ -185,47 +179,40 @@ export default async function FindTrainingPage({
       : { data: [] };
     
     // Create wrestler lookup map
-    const wrestlerMap = new Map<string, { id: string; first_name?: string; last_name?: string }>();
+    const wrestlerMap = new Map<string, { first_name?: string; last_name?: string }>();
     for (const w of wrestlers ?? []) {
-      wrestlerMap.set(w.id, w);
+      wrestlerMap.set(w.id, { first_name: w.first_name, last_name: w.last_name });
     }
     
-    // Group participants by session with wrestler names
-    for (const p of allParticipants ?? []) {
-      const wrestler = p.youth_wrestler_id ? wrestlerMap.get(p.youth_wrestler_id) : null;
-      const transformed = {
-        id: p.id,
-        youth_wrestler_id: p.youth_wrestler_id,
-        roster_first_name: p.roster_first_name,
-        roster_last_name: p.roster_last_name,
-        youth_wrestlers: wrestler ?? null,
-      };
-      const list = participantsBySession.get(p.session_id) ?? [];
-      list.push(transformed);
-      participantsBySession.set(p.session_id, list);
+    // Build names string for each session
+    for (const sessionId of sessionIds) {
+      const sessionParticipants = (allParticipants ?? []).filter(p => p.session_id === sessionId);
+      const names = sessionParticipants.map(p => {
+        // Try roster name first
+        if (p.roster_first_name || p.roster_last_name) {
+          return `${p.roster_first_name || ''} ${p.roster_last_name || ''}`.trim();
+        }
+        // Then try youth_wrestler name
+        if (p.youth_wrestler_id) {
+          const w = wrestlerMap.get(p.youth_wrestler_id);
+          if (w) {
+            return `${w.first_name || ''} ${w.last_name || ''}`.trim();
+          }
+        }
+        return '';
+      }).filter(Boolean);
+      
+      if (names.length > 0) {
+        namesBySession.set(sessionId, names.join(', '));
+      }
     }
   }
   
-  // Add participants to sessions BEFORE other transformations
-  // Also add a simple participant_names string that WILL display
-  const sessionsWithParticipants = sessions.map((s) => {
-    const participants = participantsBySession.get(s.id) ?? [];
-    const names = participants.map(p => {
-      if (p.roster_first_name || p.roster_last_name) {
-        return `${p.roster_first_name || ''} ${p.roster_last_name || ''}`.trim();
-      }
-      if (p.youth_wrestlers) {
-        return `${p.youth_wrestlers.first_name || ''} ${p.youth_wrestlers.last_name || ''}`.trim();
-      }
-      return '';
-    }).filter(Boolean);
-    
-    return {
-      ...s,
-      session_participants: participants.length > 0 ? participants : (s.session_participants ?? []),
-      participant_names: names.join(', '), // Simple string with all names
-    };
-  });
+  // Add participant_names to sessions - this is what displays in the UI
+  const sessionsWithParticipants = sessions.map((s) => ({
+    ...s,
+    participant_names: namesBySession.get(s.id) || '',
+  }));
 
   const sessionCoachIds = [...new Set(sessionsWithParticipants.map((s) => s.athlete_id).filter(Boolean))];
   const findTrainingReviewStatsMap = await fetchCoachReviewStatsMap(supabase, sessionCoachIds);
