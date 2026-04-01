@@ -157,67 +157,10 @@ export default async function FindTrainingPage({
     .eq('active', true)
     .order('school', { ascending: true });
 
-  // Fetch participant names using admin client (same pattern as admin roster API)
-  const sessionIds = sessions.map((s) => s.id);
-  const namesBySession = new Map<string, string>();
-  
-  if (sessionIds.length > 0) {
-    const admin = createAdminClient(tenant.slug);
-    
-    // Use the SAME pattern as /api/admin/sessions/[id]/roster - fetch via JOIN
-    for (const sessionId of sessionIds) {
-      const { data: sessionData } = await admin
-        .from('sessions')
-        .select('id, session_participants(id, youth_wrestler_id)')
-        .eq('id', sessionId)
-        .maybeSingle();
-      
-      if (!sessionData) continue;
-      
-      const raw = sessionData.session_participants;
-      const participants = Array.isArray(raw) ? raw : raw ? [raw] : [];
-      if (participants.length === 0) continue;
-      
-      const youthIds = participants
-        .map((p: Record<string, unknown>) => p.youth_wrestler_id as string)
-        .filter(Boolean);
-      
-      if (youthIds.length === 0) continue;
-      
-      const { data: wrestlers } = await admin
-        .from('youth_wrestlers')
-        .select('id, first_name, last_name')
-        .in('id', youthIds);
-      
-      if (!wrestlers || wrestlers.length === 0) continue;
-      
-      const wrestlerMap: Record<string, string> = {};
-      for (const w of wrestlers) {
-        wrestlerMap[w.id] = `${w.first_name || ''} ${w.last_name || ''}`.trim();
-      }
-      
-      const names = participants
-        .map((p: Record<string, unknown>) => {
-          const youthId = p.youth_wrestler_id as string | null;
-          return youthId ? wrestlerMap[youthId] : null;
-        })
-        .filter(Boolean) as string[];
-      
-      if (names.length > 0) {
-        namesBySession.set(sessionId, names.join(', '));
-      }
-    }
-  }
-  
-  // Add participant_names to sessions
-  const sessionsWithParticipants = sessions.map((s) => ({
-    ...s,
-    participant_names: namesBySession.get(s.id) || '',
-  }));
-
-  const sessionCoachIds = [...new Set(sessionsWithParticipants.map((s) => s.athlete_id).filter(Boolean))];
+  // Participant names are fetched client-side via /api/sessions/participant-names
+  const sessionCoachIds = [...new Set(sessions.map((s) => s.athlete_id).filter(Boolean))];
   const findTrainingReviewStatsMap = await fetchCoachReviewStatsMap(supabase, sessionCoachIds);
-  const sessionsWithReviewStats = patchSessionsWithCoachReviewStats(sessionsWithParticipants, findTrainingReviewStatsMap);
+  const sessionsWithReviewStats = patchSessionsWithCoachReviewStats(sessions, findTrainingReviewStatsMap);
 
   return (
     <div className="container mx-auto px-4 py-8">
