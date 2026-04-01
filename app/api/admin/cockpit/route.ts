@@ -182,7 +182,7 @@ export async function GET(req: NextRequest) {
     try {
       // Total outstanding credits (liability)
       const { data: creditsData } = await admin
-        .from('user_credits')
+        .from('credits')
         .select('amount')
         .is('used_at', null)
         .gt('expires_at', new Date().toISOString());
@@ -190,7 +190,7 @@ export async function GET(req: NextRequest) {
       
       // Credits issued in range
       const { data: issuedData } = await admin
-        .from('user_credits')
+        .from('credits')
         .select('amount')
         .gte('created_at', dayStart)
         .lte('created_at', dayEnd);
@@ -198,7 +198,7 @@ export async function GET(req: NextRequest) {
       
       // Credits used in range
       const { data: usedData } = await admin
-        .from('user_credits')
+        .from('credits')
         .select('amount')
         .gte('used_at', dayStart)
         .lte('used_at', dayEnd);
