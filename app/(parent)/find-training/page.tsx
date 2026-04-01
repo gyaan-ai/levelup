@@ -157,57 +157,51 @@ export default async function FindTrainingPage({
     .eq('active', true)
     .order('school', { ascending: true });
 
-  // Fetch session_participants with admin client to bypass RLS (so we can show all registered kids)
+  // Fetch participant names using admin client (same pattern as admin roster API)
   const sessionIds = sessions.map((s) => s.id);
   const namesBySession = new Map<string, string>();
   
   if (sessionIds.length > 0) {
     const admin = createAdminClient(tenant.slug);
     
-    // Fetch participants with wrestler info
-    const { data: allParticipants, error: participantsError } = await admin
-      .from('session_participants')
-      .select('id, session_id, youth_wrestler_id, roster_first_name, roster_last_name')
-      .in('session_id', sessionIds);
-    
-    console.log('[v0] find-training ADMIN QUERY - sessionIds:', sessionIds.length);
-    console.log('[v0] find-training ADMIN QUERY - allParticipants:', allParticipants?.length ?? 0);
-    console.log('[v0] find-training ADMIN QUERY - error:', participantsError);
-    if (allParticipants && allParticipants.length > 0) {
-      console.log('[v0] find-training ADMIN QUERY - first:', JSON.stringify(allParticipants[0]));
-    }
-    
-    // Get unique youth_wrestler_ids to fetch their names
-    const wrestlerIds = [...new Set((allParticipants ?? []).map(p => p.youth_wrestler_id).filter(Boolean))] as string[];
-    
-    // Fetch wrestler names separately
-    const { data: wrestlers } = wrestlerIds.length > 0 
-      ? await admin.from('youth_wrestlers').select('id, first_name, last_name').in('id', wrestlerIds)
-      : { data: [] };
-    
-    // Create wrestler lookup map
-    const wrestlerMap = new Map<string, { first_name?: string; last_name?: string }>();
-    for (const w of wrestlers ?? []) {
-      wrestlerMap.set(w.id, { first_name: w.first_name, last_name: w.last_name });
-    }
-    
-    // Build names string for each session
+    // Use the SAME pattern as /api/admin/sessions/[id]/roster - fetch via JOIN
     for (const sessionId of sessionIds) {
-      const sessionParticipants = (allParticipants ?? []).filter(p => p.session_id === sessionId);
-      const names = sessionParticipants.map(p => {
-        // Try roster name first
-        if (p.roster_first_name || p.roster_last_name) {
-          return `${p.roster_first_name || ''} ${p.roster_last_name || ''}`.trim();
-        }
-        // Then try youth_wrestler name
-        if (p.youth_wrestler_id) {
-          const w = wrestlerMap.get(p.youth_wrestler_id);
-          if (w) {
-            return `${w.first_name || ''} ${w.last_name || ''}`.trim();
-          }
-        }
-        return '';
-      }).filter(Boolean);
+      const { data: sessionData } = await admin
+        .from('sessions')
+        .select('id, session_participants(id, youth_wrestler_id)')
+        .eq('id', sessionId)
+        .maybeSingle();
+      
+      if (!sessionData) continue;
+      
+      const raw = sessionData.session_participants;
+      const participants = Array.isArray(raw) ? raw : raw ? [raw] : [];
+      if (participants.length === 0) continue;
+      
+      const youthIds = participants
+        .map((p: Record<string, unknown>) => p.youth_wrestler_id as string)
+        .filter(Boolean);
+      
+      if (youthIds.length === 0) continue;
+      
+      const { data: wrestlers } = await admin
+        .from('youth_wrestlers')
+        .select('id, first_name, last_name')
+        .in('id', youthIds);
+      
+      if (!wrestlers || wrestlers.length === 0) continue;
+      
+      const wrestlerMap: Record<string, string> = {};
+      for (const w of wrestlers) {
+        wrestlerMap[w.id] = `${w.first_name || ''} ${w.last_name || ''}`.trim();
+      }
+      
+      const names = participants
+        .map((p: Record<string, unknown>) => {
+          const youthId = p.youth_wrestler_id as string | null;
+          return youthId ? wrestlerMap[youthId] : null;
+        })
+        .filter(Boolean) as string[];
       
       if (names.length > 0) {
         namesBySession.set(sessionId, names.join(', '));
@@ -215,25 +209,15 @@ export default async function FindTrainingPage({
     }
   }
   
-  // Add participant_names to sessions - this is what displays in the UI
+  // Add participant_names to sessions
   const sessionsWithParticipants = sessions.map((s) => ({
     ...s,
     participant_names: namesBySession.get(s.id) || '',
   }));
-  
-  console.log('[v0] find-training - namesBySession size:', namesBySession.size);
-  if (namesBySession.size > 0) {
-    const firstEntry = [...namesBySession.entries()][0];
-    console.log('[v0] find-training - first entry:', firstEntry);
-  }
 
   const sessionCoachIds = [...new Set(sessionsWithParticipants.map((s) => s.athlete_id).filter(Boolean))];
   const findTrainingReviewStatsMap = await fetchCoachReviewStatsMap(supabase, sessionCoachIds);
   const sessionsWithReviewStats = patchSessionsWithCoachReviewStats(sessionsWithParticipants, findTrainingReviewStatsMap);
-  
-  // Verify participant_names survived the transformation
-  const withNames = sessionsWithReviewStats.filter((s: Record<string, unknown>) => s.participant_names && (s.participant_names as string).length > 0);
-  console.log('[v0] find-training - sessions with participant_names after patch:', withNames.length);
 
   return (
     <div className="container mx-auto px-4 py-8">
