@@ -170,11 +170,29 @@ export default async function FindTrainingPage({
       .select('id, session_id, youth_wrestler_id, roster_first_name, roster_last_name, roster_photo_url, youth_wrestlers(id, first_name, last_name, photo_url)')
       .in('session_id', sessionIds);
     
-    // Map participants to sessions
-    const participantsBySession = new Map<string, typeof allParticipants>();
+    // Transform and map participants to sessions
+    // Supabase returns youth_wrestlers as array, we need single object
+    type TransformedParticipant = {
+      id?: string;
+      youth_wrestler_id?: string;
+      roster_first_name?: string;
+      roster_last_name?: string;
+      roster_photo_url?: string;
+      youth_wrestlers?: { id: string; first_name?: string; last_name?: string; photo_url?: string } | null;
+    };
+    const participantsBySession = new Map<string, TransformedParticipant[]>();
     for (const p of allParticipants ?? []) {
+      const yw = Array.isArray(p.youth_wrestlers) ? p.youth_wrestlers[0] : p.youth_wrestlers;
+      const transformed: TransformedParticipant = {
+        id: p.id,
+        youth_wrestler_id: p.youth_wrestler_id,
+        roster_first_name: p.roster_first_name,
+        roster_last_name: p.roster_last_name,
+        roster_photo_url: p.roster_photo_url,
+        youth_wrestlers: yw ?? null,
+      };
       const list = participantsBySession.get(p.session_id) ?? [];
-      list.push(p);
+      list.push(transformed);
       participantsBySession.set(p.session_id, list);
     }
     
