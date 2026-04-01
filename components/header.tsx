@@ -105,15 +105,17 @@ export function Header() {
   return (
     <>
       <header className="bg-primary text-white border-b border-accent/20 sticky top-0 z-50 pt-[env(safe-area-inset-top,0px)]">
-      {/* Mobile logged-out only, and not on / — homepage hero already has Log in + menu has Login (avoids double gold CTAs) */}
+      {/* Mobile logged-out quick actions */}
       {!user && pathname !== '/' && (
-        <div className="md:hidden bg-accent text-black">
-          <Link
-            href="/login"
-            className="block text-center font-bold text-base py-3 px-4 min-h-[48px] flex items-center justify-center"
-          >
-            Log in
-          </Link>
+        <div className="md:hidden bg-accent px-4 py-2">
+          <div className="flex items-center gap-2">
+            <Button asChild variant="secondary" size="sm" className="flex-1 bg-black text-white hover:bg-black/90">
+              <Link href="/login">Log in</Link>
+            </Button>
+            <Button asChild variant="premium" size="sm" className="flex-1">
+              <Link href="/signup">Book Training</Link>
+            </Button>
+          </div>
         </div>
       )}
       <div className="container mx-auto px-4">
@@ -426,12 +428,8 @@ export function Header() {
               </Button>
             </nav>
 
-            {/* Mobile logged-out: explicit CTA only, no hamburger */}
-            <div className="md:hidden">
-              <Button asChild variant="premium" size="sm">
-                <Link href="/signup">Book Training</Link>
-              </Button>
-            </div>
+            {/* Mobile logged-out actions live in the gold bar above */}
+            <div className="md:hidden" />
             </>
 )}
   </div>
