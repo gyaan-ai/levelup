@@ -2,32 +2,28 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Dumbbell, ShoppingCart, User } from 'lucide-react';
+import { Home, Dumbbell, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useCart } from '@/lib/cart-context';
 
 /**
- * Parent mobile bottom nav - 4 core items with gold active states.
- * Modern app-style navigation: Home, Training, Cart, Account
+ * Parent mobile bottom nav - 3 core items with gold active states.
+ * Cart is handled by the floating cart button on mobile.
  */
-const ITEMS: readonly { href: string; label: string; icon: typeof Home; showBadge?: boolean }[] = [
+const ITEMS: readonly { href: string; label: string; icon: typeof Home }[] = [
   { href: '/dashboard', label: 'Home', icon: Home },
   { href: '/training', label: 'Training', icon: Dumbbell },
-  { href: '/cart', label: 'Cart', icon: ShoppingCart, showBadge: true },
   { href: '/account', label: 'Account', icon: User },
 ];
 
 export function ParentBottomNav() {
   const pathname = usePathname();
-  const { items: cartItems } = useCart();
-  const cartCount = cartItems.length;
 
   return (
     <nav
       className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around border-t border-border/50 bg-black/95 backdrop-blur-xl supports-[backdrop-filter]:bg-black/90 pb-[env(safe-area-inset-bottom)] md:hidden"
       aria-label="Main navigation"
     >
-      {ITEMS.map(({ href, label, icon: Icon, showBadge }) => {
+      {ITEMS.map(({ href, label, icon: Icon }) => {
         const isActive =
           pathname === href ||
           (href !== '/dashboard' && pathname.startsWith(href));
@@ -58,11 +54,6 @@ export function ParentBottomNav() {
                 strokeWidth={isActive ? 2.5 : 2}
                 aria-hidden 
               />
-              {showBadge && cartCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-[#D4AF37] text-black text-[10px] font-bold px-1">
-                  {cartCount > 9 ? '9+' : cartCount}
-                </span>
-              )}
             </div>
             <span className={cn(
               "mt-1 transition-all duration-200",

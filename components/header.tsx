@@ -22,14 +22,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from './ui/dialog';
-import { Bell, Menu, X, Mail, User } from 'lucide-react';
+import { Bell, Mail, User } from 'lucide-react';
 import { AddToHomeScreen } from '@/components/add-to-home-screen';
 import { useTenant } from '@/components/theme-provider';
 import { BrandLogo } from '@/components/brand-logo';
 import { CartDropdown } from '@/components/cart-dropdown';
 import { createClient } from '@/lib/supabase/client';
-
-const navLinkClass = 'block py-3 px-4 text-white hover:text-accent hover:bg-white/10 transition-colors font-medium min-h-[44px] flex items-center';
 
 type Coach = { id: string; first_name: string; last_name: string; school: string | null };
 
@@ -38,7 +36,6 @@ export function Header() {
   const pathname = usePathname();
   const { user, userRole, viewAsRole, effectiveRole, viewAsCoachId, setViewAsRole, setViewAsCoachId, loading, signOut } = useAuth();
   const router = useRouter();
-  const [mobileOpen, setMobileOpen] = useState(false);
   const [notificationCount, refreshNotifications] = useNotificationCount(!!user);
   const showInboxIcon = effectiveRole === 'parent' || effectiveRole === 'coach' || effectiveRole === 'youth_wrestler';
   const [inboxUnreadCount, refreshInboxUnread] = useInboxUnreadCount(!!user && showInboxIcon);
@@ -95,7 +92,6 @@ export function Header() {
 
   const goToAdmin = () => {
     setViewAsRole(null);
-    setMobileOpen(false);
     router.push('/admin');
   };
 
@@ -115,7 +111,6 @@ export function Header() {
           <Link
             href="/login"
             className="block text-center font-bold text-base py-3 px-4 min-h-[48px] flex items-center justify-center"
-            onClick={() => setMobileOpen(false)}
           >
             Log in
           </Link>
@@ -124,7 +119,7 @@ export function Header() {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-14 sm:h-16">
           <div className="flex items-center gap-2 min-w-0">
-            <Link href="/" className="flex items-center group shrink-0" onClick={() => setMobileOpen(false)}>
+            <Link href="/" className="flex items-center group shrink-0">
               <BrandLogo
                 src={tenant.logo}
                 alt={tenant.productName}
@@ -378,7 +373,6 @@ export function Header() {
                   value={viewAsRole ?? 'admin'}
                   onValueChange={(value) => {
                     handleViewAsChange(value);
-                    setMobileOpen(false);
                   }}
                 >
                   <SelectTrigger
@@ -432,42 +426,12 @@ export function Header() {
               </Button>
             </nav>
 
-            {/* Mobile logged-out: gold bar above has Log in; avoid duplicating Login next to the menu */}
-            <div className="md:hidden flex items-center gap-2">
-              <button
-                type="button"
-                className="p-2 -mr-2 min-h-[44px] min-w-[44px] flex items-center justify-center text-white hover:bg-white/10 rounded"
-                aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
-                aria-expanded={mobileOpen}
-                onClick={() => setMobileOpen(!mobileOpen)}
-              >
-                {mobileOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-              </button>
+            {/* Mobile logged-out: explicit CTA only, no hamburger */}
+            <div className="md:hidden">
+              <Button asChild variant="premium" size="sm">
+                <Link href="/signup">Book Training</Link>
+              </Button>
             </div>
-            {mobileOpen && (
-              <nav className="absolute left-0 right-0 top-full bg-primary border-b border-accent/20 shadow-lg md:hidden" aria-label="Mobile navigation">
-                <div className="container mx-auto px-0 py-2">
-                  <Link
-                    href="/login"
-                    className="flex items-center min-h-[48px] px-4 py-3 font-semibold text-accent bg-accent/15 hover:bg-accent/25 text-base"
-                    onClick={() => setMobileOpen(false)}
-                  >
-                    Login
-                  </Link>
-                  <Link
-                    href="/signup"
-                    className="flex items-center min-h-[48px] px-4 py-3 font-semibold text-accent hover:bg-white/10 text-base"
-                    onClick={() => setMobileOpen(false)}
-                  >
-                    Sign up / Book Training
-                  </Link>
-                  <div className="border-t border-white/20 my-1" />
-                  <Link href="/browse" className={navLinkClass} onClick={() => setMobileOpen(false)}>Browse Coaches</Link>
-                  <Link href="/signup?role=coach" className={navLinkClass} onClick={() => setMobileOpen(false)}>For Coaches</Link>
-                  <Link href="/how-it-works" className={navLinkClass} onClick={() => setMobileOpen(false)}>How It Works</Link>
-                </div>
-              </nav>
-            )}
             </>
 )}
   </div>
