@@ -182,12 +182,7 @@ export async function POST(req: NextRequest) {
       .eq('parent_id', user.id)
       .maybeSingle();
     
-    console.log('[v0] Cart checkout - user.id:', user.id);
-    console.log('[v0] Cart checkout - discountData:', discountData);
-    console.log('[v0] Cart checkout - discountError:', discountError);
-    
     const percentOff = discountData?.percent_off ?? 0;
-    console.log('[v0] Cart checkout - percentOff:', percentOff);
     const discountAmount = percentOff > 0 ? totalPrice * (percentOff / 100) : 0;
     totalPrice = totalPrice - discountAmount;
 
