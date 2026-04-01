@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import { toZonedTime } from 'date-fns-tz';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import { APP_TIMEZONE } from '@/lib/format-date';
 import { FindTrainingClient } from './find-training-client';
@@ -159,6 +160,29 @@ export default async function FindTrainingPage({
   const sessionCoachIds = [...new Set(sessions.map((s) => s.athlete_id).filter(Boolean))];
   const findTrainingReviewStatsMap = await fetchCoachReviewStatsMap(supabase, sessionCoachIds);
   const sessionsWithReviewStats = patchSessionsWithCoachReviewStats(sessions, findTrainingReviewStatsMap);
+
+  // Fetch session_participants with admin client to bypass RLS (so we can show all registered kids)
+  const sessionIds = sessions.map((s) => s.id);
+  if (sessionIds.length > 0) {
+    const admin = createAdminClient();
+    const { data: allParticipants } = await admin
+      .from('session_participants')
+      .select('id, session_id, youth_wrestler_id, roster_first_name, roster_last_name, roster_photo_url, youth_wrestlers(id, first_name, last_name, photo_url)')
+      .in('session_id', sessionIds);
+    
+    // Map participants to sessions
+    const participantsBySession = new Map<string, typeof allParticipants>();
+    for (const p of allParticipants ?? []) {
+      const list = participantsBySession.get(p.session_id) ?? [];
+      list.push(p);
+      participantsBySession.set(p.session_id, list);
+    }
+    
+    // Merge into sessions
+    for (const s of sessionsWithReviewStats) {
+      s.session_participants = participantsBySession.get(s.id) ?? [];
+    }
+  }
 
   return (
     <div className="container mx-auto px-4 py-8">
