@@ -90,26 +90,6 @@ export function FindTrainingClient({
   const [dateOpen, setDateOpen] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [coachOpen, setCoachOpen] = useState(false);
-  const [participantNames, setParticipantNames] = useState<Record<string, string>>({});
-
-  // Fetch participant names from API (bypasses RLS)
-  useEffect(() => {
-    const sessionIds = initialSessions.map(s => s.id);
-    if (sessionIds.length === 0) return;
-    
-    fetch('/api/sessions/participant-names', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionIds }),
-    })
-      .then(r => r.json())
-      .then(data => {
-        if (data.names) {
-          setParticipantNames(data.names);
-        }
-      })
-      .catch(() => {});
-  }, [initialSessions]);
 
   useEffect(() => {
     setDate(initialDate || '');
@@ -366,12 +346,12 @@ export function FindTrainingClient({
               </span>
             </div>
 
-            {/* Desktop: Registered section - uses API-fetched names */}
+            {/* Desktop: Registered section - uses server-passed participant_names */}
             {current > 0 && (
               <div className="mt-2 text-xs">
                 <span className="text-zinc-500">Registered: </span>
                 <span className="text-zinc-400">
-                  {participantNames[session.id] || `${current} registered`}
+                  {(session as { participant_names?: string }).participant_names || `${current} registered`}
                 </span>
               </div>
             )}
@@ -416,12 +396,12 @@ export function FindTrainingClient({
               </span>
             </div>
 
-            {/* Mobile: Registered section - uses API-fetched names */}
+            {/* Mobile: Registered section - uses server-passed participant_names */}
             {current > 0 && (
               <div className="mt-2 text-xs">
                 <span className="text-zinc-500">Registered: </span>
                 <span className="text-zinc-400">
-                  {participantNames[session.id] || `${current} registered`}
+                  {(session as { participant_names?: string }).participant_names || `${current} registered`}
                 </span>
               </div>
             )}
