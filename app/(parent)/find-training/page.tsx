@@ -165,44 +165,51 @@ export default async function FindTrainingPage({
   const sessionIds = sessions.map((s) => s.id);
   if (sessionIds.length > 0) {
     const admin = createAdminClient(tenant.slug);
-    const { data: allParticipants, error: participantsError } = await admin
+    
+    // Fetch participants
+    const { data: allParticipants } = await admin
       .from('session_participants')
-      .select('id, session_id, youth_wrestler_id, roster_first_name, roster_last_name, roster_photo_url, youth_wrestlers(id, first_name, last_name, photo_url)')
+      .select('id, session_id, youth_wrestler_id, roster_first_name, roster_last_name')
       .in('session_id', sessionIds);
     
-    console.log('[v0] find-training allParticipants count:', allParticipants?.length ?? 0);
-    console.log('[v0] find-training participantsError:', participantsError);
-    if (allParticipants && allParticipants.length > 0) {
-      console.log('[v0] find-training first participant:', JSON.stringify(allParticipants[0]));
+    // Get unique youth_wrestler_ids to fetch their names
+    const wrestlerIds = [...new Set((allParticipants ?? []).map(p => p.youth_wrestler_id).filter(Boolean))] as string[];
+    
+    // Fetch wrestler names separately
+    const { data: wrestlers } = wrestlerIds.length > 0 
+      ? await admin.from('youth_wrestlers').select('id, first_name, last_name').in('id', wrestlerIds)
+      : { data: [] };
+    
+    // Create wrestler lookup map
+    const wrestlerMap = new Map<string, { id: string; first_name?: string; last_name?: string }>();
+    for (const w of wrestlers ?? []) {
+      wrestlerMap.set(w.id, w);
     }
     
-    // Transform and map participants to sessions
-    // Supabase returns youth_wrestlers as array, we need single object
-    type TransformedParticipant = {
+    // Group participants by session with wrestler names
+    type ParticipantWithName = {
       id?: string;
       youth_wrestler_id?: string;
       roster_first_name?: string;
       roster_last_name?: string;
-      roster_photo_url?: string;
-      youth_wrestlers?: { id: string; first_name?: string; last_name?: string; photo_url?: string } | null;
+      youth_wrestlers?: { id: string; first_name?: string; last_name?: string } | null;
     };
-    const participantsBySession = new Map<string, TransformedParticipant[]>();
+    const participantsBySession = new Map<string, ParticipantWithName[]>();
     for (const p of allParticipants ?? []) {
-      const yw = Array.isArray(p.youth_wrestlers) ? p.youth_wrestlers[0] : p.youth_wrestlers;
-      const transformed: TransformedParticipant = {
+      const wrestler = p.youth_wrestler_id ? wrestlerMap.get(p.youth_wrestler_id) : null;
+      const transformed: ParticipantWithName = {
         id: p.id,
         youth_wrestler_id: p.youth_wrestler_id,
         roster_first_name: p.roster_first_name,
         roster_last_name: p.roster_last_name,
-        roster_photo_url: p.roster_photo_url,
-        youth_wrestlers: yw ?? null,
+        youth_wrestlers: wrestler ?? null,
       };
       const list = participantsBySession.get(p.session_id) ?? [];
       list.push(transformed);
       participantsBySession.set(p.session_id, list);
     }
     
-    // Merge into sessions - create new array with participants
+    // Merge into sessions
     sessionsWithReviewStats = sessionsWithReviewStats.map((s) => ({
       ...s,
       session_participants: participantsBySession.get(s.id) ?? [],
