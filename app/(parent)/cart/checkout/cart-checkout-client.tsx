@@ -14,7 +14,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ShoppingCart, X, ArrowLeft, CreditCard, Loader2, Wallet } from 'lucide-react';
+import { ShoppingCart, X, ArrowLeft, CreditCard, Loader2, Wallet, Tag, Check } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import { useCart } from '@/lib/cart-context';
 import { formatEST } from '@/lib/format-date';
 import { getSessionTypeDisplay } from '@/components/session-type-badge';
@@ -31,21 +32,64 @@ type Wrestler = {
 export function CartCheckoutClient({
   wrestlers,
   userEmail,
+  existingDiscount,
 }: {
   wrestlers: Wrestler[];
   userEmail: string;
+  existingDiscount?: number;
 }) {
   const router = useRouter();
   const { items, removeItem, clearCart, total, count } = useCart();
   const [selectedWrestler, setSelectedWrestler] = useState(wrestlers[0]?.id ?? '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Promo code state
+  const [promoCode, setPromoCode] = useState('');
+  const [promoLoading, setPromoLoading] = useState(false);
+  const [promoError, setPromoError] = useState<string | null>(null);
+  const [appliedDiscount, setAppliedDiscount] = useState<number>(existingDiscount ?? 0);
+  const [promoApplied, setPromoApplied] = useState(!!existingDiscount);
 
   // Fetch credit balance
   const { data: creditsData } = useSWR('/api/credits', fetcher);
   const creditBalance = creditsData?.balance ?? 0;
-  const creditsToApply = Math.min(creditBalance, total);
-  const amountToPay = total - creditsToApply;
+  
+  // Calculate totals with discount
+  const discountAmount = appliedDiscount > 0 ? total * (appliedDiscount / 100) : 0;
+  const subtotalAfterDiscount = total - discountAmount;
+  const creditsToApply = Math.min(creditBalance, subtotalAfterDiscount);
+  const amountToPay = subtotalAfterDiscount - creditsToApply;
+  
+  const handleApplyPromo = async () => {
+    if (!promoCode.trim()) return;
+    
+    setPromoLoading(true);
+    setPromoError(null);
+    
+    try {
+      const res = await fetch('/api/redeem-discount-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: promoCode.trim().toUpperCase() }),
+      });
+      
+      const data = await res.json();
+      
+      if (!res.ok) {
+        setPromoError(data.error || 'Invalid promo code');
+        return;
+      }
+      
+      setAppliedDiscount(data.percent_off);
+      setPromoApplied(true);
+      setPromoError(null);
+    } catch {
+      setPromoError('Failed to apply promo code');
+    } finally {
+      setPromoLoading(false);
+    }
+  };
 
   const handleCheckout = async () => {
     if (!selectedWrestler) {
@@ -198,12 +242,62 @@ export function CartCheckoutClient({
             </div>
           </div>
 
+          {/* Promo Code */}
+          <div className="space-y-2">
+            <Label htmlFor="promo">Promo Code</Label>
+            {promoApplied ? (
+              <div className="flex items-center gap-2 p-3 bg-accent/10 border border-accent/20 rounded-lg">
+                <Check className="h-4 w-4 text-accent" />
+                <span className="text-sm font-medium text-accent">
+                  {appliedDiscount}% discount applied
+                </span>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <Input
+                  id="promo"
+                  placeholder="Enter code"
+                  value={promoCode}
+                  onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                  className="flex-1"
+                />
+                <Button
+                  variant="outline"
+                  onClick={handleApplyPromo}
+                  disabled={promoLoading || !promoCode.trim()}
+                >
+                  {promoLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <>
+                      <Tag className="h-4 w-4 mr-1" />
+                      Apply
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
+            {promoError && (
+              <p className="text-xs text-destructive">{promoError}</p>
+            )}
+          </div>
+
           {/* Totals */}
           <div className="space-y-2 pt-4 border-t border-border">
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Subtotal</span>
               <span>${total.toFixed(2)}</span>
             </div>
+            
+            {appliedDiscount > 0 && (
+              <div className="flex items-center justify-between text-accent">
+                <span className="flex items-center gap-1.5">
+                  <Tag className="h-4 w-4" />
+                  Promo ({appliedDiscount}% off)
+                </span>
+                <span>-${discountAmount.toFixed(2)}</span>
+              </div>
+            )}
             
             {creditBalance > 0 && (
               <div className="flex items-center justify-between text-accent">
@@ -223,6 +317,12 @@ export function CartCheckoutClient({
             {creditBalance > 0 && creditsToApply < creditBalance && (
               <p className="text-xs text-muted-foreground">
                 Remaining credit balance after purchase: ${(creditBalance - creditsToApply).toFixed(2)}
+              </p>
+            )}
+            
+            {appliedDiscount > 0 && creditBalance === 0 && (
+              <p className="text-xs text-muted-foreground">
+                You saved ${discountAmount.toFixed(2)} with your promo code!
               </p>
             )}
           </div>

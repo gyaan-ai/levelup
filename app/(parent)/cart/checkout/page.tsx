@@ -32,11 +32,19 @@ export default async function CartCheckoutPage() {
     .eq('parent_id', user.id)
     .order('first_name');
 
+  // Check if user has an existing percentage discount from signup
+  const { data: existingDiscountData } = await supabase
+    .from('parent_percentage_discounts')
+    .select('percent_off')
+    .eq('parent_id', user.id)
+    .maybeSingle();
+
   return (
     <div className="container max-w-3xl py-8 px-4">
       <CartCheckoutClient 
         wrestlers={wrestlers ?? []} 
         userEmail={user.email ?? ''} 
+        existingDiscount={existingDiscountData?.percent_off}
       />
     </div>
   );
