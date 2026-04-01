@@ -56,12 +56,14 @@ export default async function CoachHomePage() {
   }
   
   // Check if coach is pending approval (only for actual coaches, not admin viewing)
-  if (!isViewingAsCoach && athlete.status === 'pending') {
+  // Treat undefined/null status as 'active' for backwards compatibility with existing coaches
+  const coachStatus = athlete.status || 'active';
+  if (!isViewingAsCoach && coachStatus === 'pending') {
     redirect('/coach-pending');
   }
   
   // Check if coach was rejected
-  if (!isViewingAsCoach && athlete.status === 'rejected') {
+  if (!isViewingAsCoach && coachStatus === 'rejected') {
     redirect('/coach-pending');
   }
   

@@ -33,13 +33,16 @@ export default async function CoachPendingPage() {
     .eq('id', user.id)
     .single();
 
-  // If approved, redirect to dashboard
-  if (athlete?.status === 'active') {
+  // Treat undefined/null status as 'active' for backwards compatibility
+  const coachStatus = athlete?.status || 'active';
+  
+  // If approved (or no status column yet), redirect to dashboard
+  if (coachStatus === 'active') {
     redirect('/athlete-dashboard');
   }
 
   // If rejected, show rejection message
-  if (athlete?.status === 'rejected') {
+  if (coachStatus === 'rejected') {
     return (
       <div className="container mx-auto px-4 py-16 flex items-center justify-center min-h-screen">
         <Card className="w-full max-w-md text-center">
