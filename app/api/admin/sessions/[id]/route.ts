@@ -29,7 +29,7 @@ export async function PATCH(
     const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
     if (userData?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-    const body = (await req.json()) as {
+    let body: {
       session_type?: 'small_group' | 'partner' | 'private';
       focus_area?: string | null;
       focus_area_2?: string | null;
@@ -40,8 +40,14 @@ export async function PATCH(
       scheduledTime?: string;
       published?: boolean;
     };
+    try {
+      body = await req.json();
+    } catch (parseErr) {
+      console.error('[v0] Session PATCH - body parse error:', parseErr);
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+    }
 
-    console.log('[v0] Session PATCH - tenant:', tenant.slug, 'sessionId:', sessionId);
+    console.log('[v0] Session PATCH - tenant:', tenant.slug, 'sessionId:', sessionId, 'body:', JSON.stringify(body));
     const admin = createAdminClient(tenant.slug);
 
     const { data: session, error: fetchErr } = await admin
