@@ -42,24 +42,19 @@ export async function PATCH(
     };
     try {
       body = await req.json();
-    } catch (parseErr) {
-      console.error('[v0] Session PATCH - body parse error:', parseErr);
+    } catch {
       return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
     }
 
-    console.log('[v0] Session PATCH - tenant:', tenant.slug, 'sessionId:', sessionId, 'body:', JSON.stringify(body));
     const admin = createAdminClient(tenant.slug);
 
     const { data: session, error: fetchErr } = await admin
       .from('sessions')
-      .select('id, status, session_type, published, athlete_id, scheduled_datetime, partner_invite_code')
+      .select('id, status, session_type, athlete_id, scheduled_datetime, partner_invite_code')
       .eq('id', sessionId)
       .single();
-
-    console.log('[v0] Session PATCH - query result:', { session: !!session, fetchErr });
     
     if (fetchErr || !session) {
-      console.error('[v0] Session PATCH - session not found:', { sessionId, fetchErr, tenant: tenant.slug });
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
     // Allow admin to edit any session that isn't cancelled
@@ -108,11 +103,8 @@ export async function PATCH(
       updates.scheduled_datetime = utcDate.toISOString();
     }
     
-    // Track if we're publishing for the first time
-    const isNewlyPublished = body.published === true && session.published !== true;
-    if (body.published !== undefined) {
-      updates.published = body.published;
-    }
+    // published column doesn't exist in DB - skip this logic
+    const isNewlyPublished = false;
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ ok: true });
