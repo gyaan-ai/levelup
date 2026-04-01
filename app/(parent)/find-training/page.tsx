@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import { toZonedTime } from 'date-fns-tz';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import { APP_TIMEZONE } from '@/lib/format-date';
 import { FindTrainingClient } from './find-training-client';
@@ -11,6 +12,9 @@ export const metadata = {
   title: 'Find training',
   description: 'Search open sessions by date, time, and location.',
 };
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export default async function FindTrainingPage({
   searchParams,
@@ -24,6 +28,7 @@ export default async function FindTrainingPage({
   if (!tenant) redirect('/404');
 
   const supabase = await createClient(tenant.slug);
+  const admin = createAdminClient(tenant.slug);
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/login?redirect=/find-training');
 
@@ -62,7 +67,7 @@ export default async function FindTrainingPage({
       const dayEnd = `${dateOnly}T23:59:59.999Z`;
 
       const baseQuery = () => {
-        let q = supabase
+        let q = admin
           .from('sessions')
           .select(`
             id,
@@ -130,7 +135,7 @@ export default async function FindTrainingPage({
     twoWeeks.setDate(twoWeeks.getDate() + 14);
     const dayEnd = twoWeeks.toISOString();
     const baseQ = () => {
-      let q = supabase.from('sessions').select('id, scheduled_datetime, session_type, session_mode, join_policy, focus_area, current_participants, max_participants, total_price, price_per_participant, athlete_id, facility_id, athletes(id, first_name, last_name, school, photo_url, average_rating, review_count), facilities(id, name, address), session_participants(id, youth_wrestler_id, roster_first_name, roster_last_name, roster_photo_url, youth_wrestlers(id, first_name, last_name, photo_url))').in('status', ['scheduled', 'pending_payment']).eq('facility_id', sp.location).gte('scheduled_datetime', dayStart).lte('scheduled_datetime', dayEnd);
+      let q = admin.from('sessions').select('id, scheduled_datetime, session_type, session_mode, join_policy, focus_area, current_participants, max_participants, total_price, price_per_participant, athlete_id, facility_id, athletes(id, first_name, last_name, school, photo_url, average_rating, review_count), facilities(id, name, address), session_participants(id, youth_wrestler_id, roster_first_name, roster_last_name, roster_photo_url, youth_wrestlers(id, first_name, last_name, photo_url))').in('status', ['scheduled', 'pending_payment']).eq('facility_id', sp.location).gte('scheduled_datetime', dayStart).lte('scheduled_datetime', dayEnd);
       if (sp.coach && sp.coach !== 'all') q = q.eq('athlete_id', sp.coach);
       return q;
     };

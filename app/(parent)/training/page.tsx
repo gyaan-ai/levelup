@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import { toZonedTime } from 'date-fns-tz';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import { APP_TIMEZONE } from '@/lib/format-date';
 import { Athlete } from '@/types';
@@ -17,6 +18,9 @@ export const metadata = {
   title: 'Training | The Guild',
   description: 'Find and book sessions. Filter by day, time, facility, and coach.',
 };
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 type SessionRow = {
   id: string;
@@ -58,6 +62,7 @@ export default async function TrainingPage({
   if (!tenant) redirect('/404');
 
   const supabase = await createClient(tenant.slug);
+  const admin = createAdminClient(tenant.slug);
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/login');
 
@@ -171,7 +176,7 @@ export default async function TrainingPage({
     session_participants(id, youth_wrestler_id, roster_first_name, roster_last_name, roster_photo_url, youth_wrestlers(id, first_name, last_name, photo_url))
   `;
   const sessions = (start: string, end: string) =>
-    supabase.from('sessions').select(baseSelect).gte('scheduled_datetime', start).lte('scheduled_datetime', end);
+    admin.from('sessions').select(baseSelect).gte('scheduled_datetime', start).lte('scheduled_datetime', end);
   const withOptFilters = (q: ReturnType<typeof sessions>) => {
     if (sp.location && sp.location !== 'all') q = q.eq('facility_id', sp.location);
     if (sp.coach && sp.coach !== 'all') q = q.eq('athlete_id', sp.coach);
