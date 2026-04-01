@@ -99,6 +99,14 @@ export function FindTrainingClient({
     setSessionType(initialSessionType || 'all');
   }, [initialDate, initialTime, initialLocation, initialCoach, initialSessionType]);
 
+  // Debug: log session_participants for first few sessions
+  if (typeof window !== 'undefined' && initialSessions.length > 0) {
+    console.log('[v0] Client initialSessions count:', initialSessions.length);
+    console.log('[v0] First session participants:', initialSessions[0]?.session_participants);
+    const withParticipants = initialSessions.filter(s => s.session_participants && s.session_participants.length > 0);
+    console.log('[v0] Sessions with participants:', withParticipants.length);
+  }
+
   // Filter sessions client-side
   // Hide invite-only sessions that are FULL (no value showing something user can't access)
   // Show invite-only sessions with spots (creates FOMO/social proof)
