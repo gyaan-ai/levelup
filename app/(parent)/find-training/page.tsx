@@ -207,10 +207,25 @@ export default async function FindTrainingPage({
   }
   
   // Add participants to sessions BEFORE other transformations
-  const sessionsWithParticipants = sessions.map((s) => ({
-    ...s,
-    session_participants: participantsBySession.get(s.id) ?? s.session_participants ?? [],
-  }));
+  // Also add a simple participant_names string that WILL display
+  const sessionsWithParticipants = sessions.map((s) => {
+    const participants = participantsBySession.get(s.id) ?? [];
+    const names = participants.map(p => {
+      if (p.roster_first_name || p.roster_last_name) {
+        return `${p.roster_first_name || ''} ${p.roster_last_name || ''}`.trim();
+      }
+      if (p.youth_wrestlers) {
+        return `${p.youth_wrestlers.first_name || ''} ${p.youth_wrestlers.last_name || ''}`.trim();
+      }
+      return '';
+    }).filter(Boolean);
+    
+    return {
+      ...s,
+      session_participants: participants.length > 0 ? participants : (s.session_participants ?? []),
+      participant_names: names.join(', '), // Simple string with all names
+    };
+  });
 
   const sessionCoachIds = [...new Set(sessionsWithParticipants.map((s) => s.athlete_id).filter(Boolean))];
   const findTrainingReviewStatsMap = await fetchCoachReviewStatsMap(supabase, sessionCoachIds);
