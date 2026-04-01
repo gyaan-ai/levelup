@@ -555,6 +555,46 @@ export function AdminDashboardClient({
       setRosterLoading(false);
     }
   };
+  
+  // Transfer registration state
+  const [transferringParticipant, setTransferringParticipant] = useState<{
+    id: string;
+    wrestlerName: string;
+    amountPaid: number;
+  } | null>(null);
+  const [transferTargetSessionId, setTransferTargetSessionId] = useState<string>('');
+  const [transferLoading, setTransferLoading] = useState(false);
+  
+  const handleTransferRegistration = async () => {
+    if (!transferringParticipant || !rosterSessionId || !transferTargetSessionId) return;
+    
+    setTransferLoading(true);
+    try {
+      const res = await fetch('/api/admin/sessions/transfer-registration', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          participantId: transferringParticipant.id,
+          fromSessionId: rosterSessionId,
+          toSessionId: transferTargetSessionId,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || 'Transfer failed');
+        return;
+      }
+      alert(`Successfully transferred ${transferringParticipant.wrestlerName} with $${transferringParticipant.amountPaid} payment preserved`);
+      setTransferringParticipant(null);
+      setTransferTargetSessionId('');
+      // Refresh roster
+      openRoster(rosterSessionId);
+    } catch (err) {
+      alert('Transfer failed: ' + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setTransferLoading(false);
+    }
+  };
 
   // Manual payment entry
   const [showManualPaymentDialog, setShowManualPaymentDialog] = useState(false);
@@ -3189,21 +3229,78 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
                         <div className="text-sm text-muted-foreground truncate">{p.parentEmail}</div>
                       )}
                     </div>
-                    <div className="text-right">
-                      <div className="font-medium tabular-nums">${Number(p.amountPaid || 0).toFixed(2)}</div>
-                      {p.paid ? (
-                        <Badge variant="outline" className="text-xs border-emerald-600 bg-emerald-600/20 text-emerald-400">Paid</Badge>
-                      ) : (
-                        <Badge variant="outline" className="text-xs border-amber-600 bg-amber-600/20 text-amber-400">Pending</Badge>
-                      )}
+                    <div className="flex items-center gap-2">
+                      <div className="text-right">
+                        <div className="font-medium tabular-nums">${Number(p.amountPaid || 0).toFixed(2)}</div>
+                        {p.paid ? (
+                          <Badge variant="outline" className="text-xs border-emerald-600 bg-emerald-600/20 text-emerald-400">Paid</Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-xs border-amber-600 bg-amber-600/20 text-amber-400">Pending</Badge>
+                        )}
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-xs text-blue-400 hover:text-blue-300"
+                        onClick={() => setTransferringParticipant({ id: p.id, wrestlerName: p.wrestlerName, amountPaid: p.amountPaid })}
+                      >
+                        Transfer
+                      </Button>
                     </div>
                   </div>
                 ))}
               </div>
             )}
+            
+            {/* Transfer participant form */}
+            {transferringParticipant && (
+              <div className="mt-4 p-4 rounded-lg border border-blue-600/50 bg-blue-600/10">
+                <div className="font-medium text-blue-400 mb-2">
+                  Transfer {transferringParticipant.wrestlerName} (${transferringParticipant.amountPaid} paid)
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="transferTarget">Move to Session</Label>
+                  <select
+                    id="transferTarget"
+                    className="w-full rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm"
+                    value={transferTargetSessionId}
+                    onChange={(e) => setTransferTargetSessionId(e.target.value)}
+                  >
+                    <option value="">Select a session...</option>
+                    {sessions
+                      .filter(s => s.id !== rosterSessionId && new Date(s.scheduled_datetime) > new Date())
+                      .sort((a, b) => new Date(a.scheduled_datetime).getTime() - new Date(b.scheduled_datetime).getTime())
+                      .slice(0, 20)
+                      .map(s => (
+                        <option key={s.id} value={s.id}>
+                          {s.athlete_name} - {formatEST(new Date(s.scheduled_datetime), 'MMM d h:mm a')} ({s.current_participants}/{s.max_participants})
+                        </option>
+                      ))
+                    }
+                  </select>
+                </div>
+                <div className="flex gap-2 mt-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => { setTransferringParticipant(null); setTransferTargetSessionId(''); }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    disabled={!transferTargetSessionId || transferLoading}
+                    onClick={handleTransferRegistration}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    {transferLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Confirm Transfer'}
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setRosterSessionId(null)}>Close</Button>
+            <Button variant="outline" onClick={() => { setRosterSessionId(null); setTransferringParticipant(null); }}>Close</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
