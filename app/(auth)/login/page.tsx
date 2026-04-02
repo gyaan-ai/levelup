@@ -35,6 +35,7 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const errorParam = searchParams.get('error');
+  const messageParam = searchParams.get('message');
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginSchema),
@@ -116,6 +117,14 @@ export default function LoginPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {messageParam === 'password_reset' && (
+            <div className="mb-4 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-md">
+              <p className="text-sm text-emerald-700 dark:text-emerald-400">
+                Password updated. Sign in with your new password.
+              </p>
+            </div>
+          )}
+
           {(error || errorParam) && (
             <div className="mb-4 p-3 bg-destructive/10 border border-destructive rounded-md">
               <p className="text-sm text-destructive">
@@ -150,7 +159,15 @@ export default function LoginPage() {
                 name="password"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Password</FormLabel>
+                    <div className="flex items-center justify-between gap-2">
+                      <FormLabel className="mb-0">Password</FormLabel>
+                      <Link
+                        href="/forgot-password"
+                        className="text-xs text-accent hover:underline"
+                      >
+                        Forgot password?
+                      </Link>
+                    </div>
                     <FormControl>
                       <Input
                         type="password"
