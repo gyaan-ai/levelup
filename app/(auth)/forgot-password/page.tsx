@@ -16,6 +16,9 @@ import {
   FormLabel,
   FormMessage,
 } from '@/components/ui/form';
+import { createClient } from '@/lib/supabase/client';
+import { useTenant } from '@/components/theme-provider';
+import { getPasswordRecoveryRedirectTo } from '@/lib/password-recovery-redirect';
 
 const schema = z.object({
   email: z.string().email('Invalid email address'),
@@ -24,8 +27,10 @@ const schema = z.object({
 type ForgotPasswordValues = z.infer<typeof schema>;
 
 export default function ForgotPasswordPage() {
+  const tenant = useTenant();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [rateLimited, setRateLimited] = useState(false);
   const [sent, setSent] = useState(false);
 
   const form = useForm<ForgotPasswordValues>({
@@ -36,15 +41,25 @@ export default function ForgotPasswordPage() {
   const onSubmit = async (values: ForgotPasswordValues) => {
     setLoading(true);
     setError(null);
+    setRateLimited(false);
     try {
-      const res = await fetch('/api/auth/forgot-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: values.email.trim() }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setError(typeof data.error === 'string' ? data.error : 'Could not send reset email');
+      // Must use browser Supabase client so PKCE code_verifier is stored here; server API breaks recovery.
+      const supabase = createClient(tenant.slug);
+      const redirectTo = getPasswordRecoveryRedirectTo();
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+        values.email.trim(),
+        { redirectTo }
+      );
+      if (resetError) {
+        const msg = resetError.message || 'Could not send reset email';
+        const rl =
+          /rate limit|too many|email rate/i.test(msg) || msg.toLowerCase().includes('exceeded');
+        setRateLimited(rl);
+        setError(
+          rl
+            ? 'Too many reset emails were sent recently. Please wait about an hour and try again, or contact info@WrestlingGuild.com if you need help sooner.'
+            : msg
+        );
         setLoading(false);
         return;
       }
@@ -79,8 +94,14 @@ export default function ForgotPasswordPage() {
           ) : (
             <>
               {error && (
-                <div className="mb-4 p-3 bg-destructive/10 border border-destructive rounded-md">
-                  <p className="text-sm text-destructive">{error}</p>
+                <div
+                  className={
+                    rateLimited
+                      ? 'mb-4 p-3 rounded-md border border-amber-500/40 bg-amber-500/10 text-amber-950 dark:text-amber-100'
+                      : 'mb-4 p-3 bg-destructive/10 border border-destructive rounded-md'
+                  }
+                >
+                  <p className={`text-sm ${rateLimited ? '' : 'text-destructive'}`}>{error}</p>
                 </div>
               )}
               <Form {...form}>

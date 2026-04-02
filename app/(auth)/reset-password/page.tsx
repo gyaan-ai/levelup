@@ -54,18 +54,40 @@ function ResetPasswordForm() {
       const code = searchParams.get('code');
       try {
         if (code) {
-          const { error: exchangeErr } = await client.auth.exchangeCodeForSession(code);
+          const { data: exchanged, error: exchangeErr } =
+            await client.auth.exchangeCodeForSession(code);
           if (exchangeErr) {
-            if (!cancelled) setInitError(exchangeErr.message || 'Invalid or expired link');
+            if (!cancelled) {
+              setInitError(
+                exchangeErr.message?.includes('code verifier')
+                  ? 'This reset link must be opened on the same browser where you requested it, or the link expired. Request a new link from Forgot password.'
+                  : exchangeErr.message || 'Invalid or expired link'
+              );
+            }
             if (!cancelled) setReady(true);
             return;
           }
+          if (exchanged?.session?.user) {
+            if (typeof window !== 'undefined') {
+              window.history.replaceState(null, '', '/reset-password');
+            }
+            if (!cancelled) {
+              setSessionOk(true);
+              setReady(true);
+            }
+            return;
+          }
         }
+        // Hash-based recovery or session already present — give detectSessionInUrl a tick
+        await new Promise((r) => setTimeout(r, 0));
         const {
           data: { session },
         } = await client.auth.getSession();
         if (!cancelled) {
           if (session?.user) {
+            if (typeof window !== 'undefined' && window.location.search) {
+              window.history.replaceState(null, '', '/reset-password');
+            }
             setSessionOk(true);
           } else {
             setInitError(
