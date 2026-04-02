@@ -4,8 +4,8 @@ import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Calendar, DollarSign, CalendarPlus, Users, Star, BookUser } from 'lucide-react';
-import { formatEST } from '@/lib/format-date';
-import { differenceInHours, differenceInDays } from 'date-fns';
+import { easternCalendarDaysBetween, formatEST } from '@/lib/format-date';
+import { differenceInHours } from 'date-fns';
 import { CoachPlaybook } from '@/components/coach-playbook';
 import { CoachRankCard } from '@/components/coach-rank-card';
 import { BookingCard, type BookingSession } from '@/app/(parent)/bookings/booking-card';
@@ -161,11 +161,12 @@ export function CoachHomeClient({
   const reminderLabel = nextSession
     ? (() => {
         const d = new Date(nextSession.scheduled_datetime);
-        const hours = differenceInHours(d, new Date());
-        const days = differenceInDays(d, new Date());
+        const now = new Date();
+        const hours = differenceInHours(d, now);
+        const calendarDaysUntil = easternCalendarDaysBetween(now, d);
         if (hours <= 0) return null;
         if (hours < 24) return `Next session in ${hours}h · ${wrestlerNames(nextSession).join(', ') || 'Session'}`;
-        if (days === 1) return `Tomorrow ${formatEST(d, 'h:mm a')} · ${wrestlerNames(nextSession).join(', ') || 'Session'}`;
+        if (calendarDaysUntil === 1) return `Tomorrow ${formatEST(d, 'h:mm a')} · ${wrestlerNames(nextSession).join(', ') || 'Session'}`;
         return `Next: ${formatEST(d, 'EEE MMM d, h:mm a')} · ${wrestlerNames(nextSession).join(', ') || 'Session'}`;
       })()
     : null;

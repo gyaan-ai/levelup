@@ -3,6 +3,7 @@ import { headers, cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
 import { isProfileComplete } from '@/lib/athletes';
+import { coachPayoutUsd } from '@/lib/coach-session-payout';
 import { CoachHomeClient } from './coach-home-client';
 import type { CoachSession } from './coach-schedule-card';
 
@@ -69,17 +70,49 @@ export default async function CoachHomePage() {
   
   const needsOnboarding = !isViewingAsCoach && !isProfileComplete(athlete);
 
-  // This month earnings (one number for quick actions)
+  // This month earnings — same rules as coach-earnings / coachPayoutUsd (not raw athlete_payment alone).
   const thisMonthStart = new Date();
   thisMonthStart.setDate(1);
   thisMonthStart.setHours(0, 0, 0, 0);
-  const { data: thisMonthSessions } = await supabase
+  const payoutRateHome = Number(athlete?.payout_rate) || 0.8333;
+
+  const { data: completedForMonth } = await supabase
     .from('sessions')
-    .select('athlete_payment')
+    .select(
+      'athlete_payment, price_per_participant, current_participants, completed_at, scheduled_datetime, session_participants(amount_paid)'
+    )
     .eq('athlete_id', coachId)
-    .eq('status', 'completed')
-    .gte('completed_at', thisMonthStart.toISOString());
-  const thisMonthEarnings = thisMonthSessions?.reduce((sum, s) => sum + Number(s.athlete_payment || 0), 0) || 0;
+    .eq('status', 'completed');
+
+  function sessionFallsInThisMonth(completedAt: string | null, scheduledAt: string | null): boolean {
+    const raw = completedAt || scheduledAt;
+    if (!raw) return false;
+    const d = new Date(raw);
+    return d.getFullYear() === thisMonthStart.getFullYear() && d.getMonth() === thisMonthStart.getMonth();
+  }
+
+  const thisMonthEarnings =
+    (completedForMonth ?? []).reduce((sum, s) => {
+      if (!sessionFallsInThisMonth(s.completed_at as string | null, s.scheduled_datetime as string | null)) {
+        return sum;
+      }
+      const parts = s.session_participants;
+      const participantAmountPaidSum = Array.isArray(parts)
+        ? parts.reduce((acc, p) => acc + Number((p as { amount_paid?: number | null }).amount_paid || 0), 0)
+        : 0;
+      return (
+        sum +
+        coachPayoutUsd(
+          {
+            athlete_payment: s.athlete_payment as number | null | undefined,
+            price_per_participant: s.price_per_participant as number | null | undefined,
+            current_participants: s.current_participants as number | null | undefined,
+            participant_amount_paid_sum: participantAmountPaidSum > 0 ? participantAmountPaidSum : null,
+          },
+          payoutRateHome
+        )
+      );
+    }, 0) || 0;
 
   // Upcoming (limit 5 for home)
   const nowIso = new Date().toISOString();

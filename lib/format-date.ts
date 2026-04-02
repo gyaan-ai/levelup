@@ -15,3 +15,22 @@ function toDate(d: Date | string | number): Date {
 export function formatEST(d: Date | string | number, formatStr: string): string {
   return formatInTimeZone(toDate(d), APP_TIMEZONE, formatStr);
 }
+
+/**
+ * Calendar days from `from` to `to` in Eastern (same wall clock as the rest of the app).
+ * Use this for "Tomorrow" / "In N days" — not `differenceInDays` from date-fns, which counts
+ * full local-day periods and can be off by one (e.g. Thu evening → Sat morning reads as 1).
+ * Compares `yyyy-MM-dd` strings from `formatEST` so server vs browser timezone does not matter.
+ */
+export function easternCalendarDaysBetween(
+  from: Date | string | number,
+  to: Date | string | number
+): number {
+  const a = formatEST(from, 'yyyy-MM-dd');
+  const b = formatEST(to, 'yyyy-MM-dd');
+  const [y0, m0, d0] = a.split('-').map(Number);
+  const [y1, m1, d1] = b.split('-').map(Number);
+  const u0 = Date.UTC(y0, m0 - 1, d0);
+  const u1 = Date.UTC(y1, m1 - 1, d1);
+  return (u1 - u0) / 86400000;
+}

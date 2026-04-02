@@ -1,14 +1,26 @@
 import { redirect } from 'next/navigation';
-import { headers } from 'next/headers';
+import { headers, cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { DollarSign, TrendingUp, Calendar, Clock } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { DollarSign, TrendingUp, Clock } from 'lucide-react';
 import { formatEST } from '@/lib/format-date';
 import { coachPayoutUsd } from '@/lib/coach-session-payout';
 
 export const dynamic = 'force-dynamic';
+
+function isEarningsEligible(
+  s: { status: string | null; scheduled_datetime: string | null },
+  nowIso: string
+): boolean {
+  const st = s.status ?? '';
+  if (st === 'cancelled' || st === 'no-show') return false;
+  if (st === 'completed') return true;
+  const t = s.scheduled_datetime ? new Date(s.scheduled_datetime).getTime() : NaN;
+  if (Number.isNaN(t)) return false;
+  return t < new Date(nowIso).getTime() && (st === 'scheduled' || st === 'pending_payment');
+}
 
 export default async function CoachEarningsPage() {
   const headersList = await headers();
@@ -18,7 +30,9 @@ export default async function CoachEarningsPage() {
   if (!tenant) redirect('/404');
 
   const supabase = await createClient(tenant.slug);
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) redirect('/login');
 
   const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
@@ -26,90 +40,86 @@ export default async function CoachEarningsPage() {
     redirect('/login');
   }
 
-  // Get coach's payout rate (defaults to 83.33% if not set)
-  const { data: athlete } = await supabase
-    .from('athletes')
-    .select('first_name, payout_rate')
-    .eq('id', user.id)
-    .maybeSingle();
+  const cookieStore = await cookies();
+  const viewAsCoachId =
+    userData?.role === 'admin' ? cookieStore.get('levelup_view_as_coach_id')?.value : null;
+  const coachId = viewAsCoachId || user.id;
+
+  const { data: athlete } = await supabase.from('athletes').select('first_name, payout_rate').eq('id', coachId).maybeSingle();
 
   const payoutRate = athlete?.payout_rate ?? 0.8333;
 
-  // This month
-  const thisMonthStart = new Date();
-  thisMonthStart.setDate(1);
-  thisMonthStart.setHours(0, 0, 0, 0);
+  const nowIso = new Date().toISOString();
 
-  // Last month
-  const lastMonthStart = new Date(thisMonthStart);
-  lastMonthStart.setMonth(lastMonthStart.getMonth() - 1);
-  const lastMonthEnd = new Date(thisMonthStart);
-  lastMonthEnd.setMilliseconds(-1);
-
-  // Use admin client to bypass RLS
+  // Service role so admins "viewing as coach" still read that coach's sessions (RLS is auth.uid()-scoped).
   const admin = createAdminClient(tenant.slug);
 
-  // All time completed sessions with earnings
-  const { data: completedSessions } = await admin
+  const { data: pastSessionsRaw, error: pastError } = await admin
     .from('sessions')
-    .select(`
-      id, 
-      scheduled_datetime, 
-      completed_at, 
-      athlete_payment, 
-      total_price, 
-      session_type, 
+    .select(
+      `
+      id,
+      scheduled_datetime,
+      completed_at,
+      athlete_payment,
+      total_price,
+      session_type,
       current_participants,
       price_per_participant,
+      session_payout_rate,
+      status,
       session_participants(id, amount_paid)
-    `)
-    .eq('athlete_id', user.id)
-    .in('status', ['completed', 'scheduled', 'pending_payment'])
+    `
+    )
+    .eq('athlete_id', coachId)
+    .or(`status.eq.completed,status.eq.cancelled,status.eq.no-show,scheduled_datetime.lt.${nowIso}`)
     .not('scheduled_datetime', 'is', null)
-    .lt('scheduled_datetime', new Date().toISOString())
     .order('scheduled_datetime', { ascending: false });
 
-  // Helper to calculate session payout using coachPayoutUsd
-  const getSessionPayout = (s: typeof completedSessions extends (infer T)[] | null ? T : never) => {
+  if (pastError) {
+    console.error('coach-earnings sessions:', pastError.message);
+  }
+
+  const earningsSessions = (pastSessionsRaw ?? []).filter((s) => isEarningsEligible(s, nowIso));
+
+  const thisMonthKey = formatEST(new Date(), 'yyyy-MM');
+  const thisMonthSessions = earningsSessions.filter(
+    (s) => s.scheduled_datetime && formatEST(s.scheduled_datetime, 'yyyy-MM') === thisMonthKey
+  );
+
+  const getSessionPayout = (s: (typeof earningsSessions)[0]) => {
     const participantAmountPaidSum = Array.isArray(s.session_participants)
       ? s.session_participants.reduce((sum, p) => sum + Number(p.amount_paid || 0), 0)
       : 0;
-    return coachPayoutUsd({
-      athlete_payment: s.athlete_payment,
-      price_per_participant: s.price_per_participant,
-      current_participants: s.current_participants,
-      participant_amount_paid_sum: participantAmountPaidSum > 0 ? participantAmountPaidSum : null,
-    }, Number(payoutRate));
+    const rate = s.session_payout_rate != null ? Number(s.session_payout_rate) : Number(payoutRate);
+    return coachPayoutUsd(
+      {
+        athlete_payment: s.athlete_payment,
+        price_per_participant: s.price_per_participant,
+        current_participants: s.current_participants,
+        participant_amount_paid_sum: participantAmountPaidSum > 0 ? participantAmountPaidSum : null,
+      },
+      rate
+    );
   };
 
-  // Filter sessions by date (use scheduled_datetime since completed_at might not be set)
-  const thisMonthSessions = (completedSessions ?? []).filter(
-    (s) => new Date(s.scheduled_datetime) >= thisMonthStart
-  );
-  const lastMonthSessions = (completedSessions ?? []).filter(
-    (s) => new Date(s.scheduled_datetime) >= lastMonthStart && new Date(s.scheduled_datetime) <= lastMonthEnd
-  );
-
   const thisMonthEarnings = thisMonthSessions.reduce((sum, s) => sum + getSessionPayout(s), 0);
-  const lastMonthEarnings = lastMonthSessions.reduce((sum, s) => sum + getSessionPayout(s), 0);
-  const allTimeEarnings = (completedSessions ?? []).reduce((sum, s) => sum + getSessionPayout(s), 0);
-  const totalSessions = completedSessions?.length ?? 0;
+  const allTimeEarnings = earningsSessions.reduce((sum, s) => sum + getSessionPayout(s), 0);
+  const totalSessions = earningsSessions.length;
 
-  // Upcoming sessions with projected earnings
-  const { data: upcomingSessions } = await supabase
+  const { data: upcomingSessions } = await admin
     .from('sessions')
     .select('id, scheduled_datetime, total_price, session_type, current_participants, max_participants, session_payout_rate')
-    .eq('athlete_id', user.id)
+    .eq('athlete_id', coachId)
     .in('status', ['scheduled', 'pending_payment'])
-    .gte('scheduled_datetime', new Date().toISOString())
+    .gte('scheduled_datetime', nowIso)
     .order('scheduled_datetime', { ascending: true })
     .limit(10);
 
-  // Calculate projected earnings for upcoming sessions
   const projectedEarnings = (upcomingSessions ?? []).reduce((sum, s) => {
     const rate = s.session_payout_rate ?? payoutRate;
     const totalPrice = Number(s.total_price || 0);
-    return sum + (totalPrice * Number(rate));
+    return sum + totalPrice * Number(rate);
   }, 0);
 
   return (
@@ -127,7 +137,12 @@ export default async function CoachEarningsPage() {
         </div>
       </div>
 
-      {/* Summary cards */}
+      {userData?.role === 'admin' && !viewAsCoachId && (
+        <p className="text-sm text-muted-foreground mb-4 rounded-md border border-border bg-muted/30 px-3 py-2">
+          Choose a coach in the header to see that coach&apos;s earnings. You&apos;re signed in as admin.
+        </p>
+      )}
+
       <div className="grid grid-cols-2 gap-3 mb-6">
         <Card>
           <CardContent className="p-4">
@@ -136,7 +151,9 @@ export default async function CoachEarningsPage() {
               <span className="text-sm">This Month</span>
             </div>
             <p className="text-2xl font-bold text-foreground">${thisMonthEarnings.toFixed(0)}</p>
-            <p className="text-xs text-muted-foreground">{thisMonthSessions.length} session{thisMonthSessions.length !== 1 ? 's' : ''}</p>
+            <p className="text-xs text-muted-foreground">
+              {thisMonthSessions.length} session{thisMonthSessions.length !== 1 ? 's' : ''}
+            </p>
           </CardContent>
         </Card>
         <Card>
@@ -146,12 +163,13 @@ export default async function CoachEarningsPage() {
               <span className="text-sm">All Time</span>
             </div>
             <p className="text-2xl font-bold text-foreground">${allTimeEarnings.toFixed(0)}</p>
-            <p className="text-xs text-muted-foreground">{totalSessions} session{totalSessions !== 1 ? 's' : ''}</p>
+            <p className="text-xs text-muted-foreground">
+              {totalSessions} session{totalSessions !== 1 ? 's' : ''}
+            </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Projected earnings */}
       {projectedEarnings > 0 && (
         <Card className="mb-6 border-[#D4AF37]/30 bg-[#D4AF37]/5">
           <CardContent className="p-4">
@@ -160,12 +178,13 @@ export default async function CoachEarningsPage() {
               <span className="text-sm font-medium">Projected from upcoming sessions</span>
             </div>
             <p className="text-2xl font-bold text-foreground">${projectedEarnings.toFixed(0)}</p>
-            <p className="text-xs text-muted-foreground">{upcomingSessions?.length ?? 0} upcoming session{(upcomingSessions?.length ?? 0) !== 1 ? 's' : ''}</p>
+            <p className="text-xs text-muted-foreground">
+              {upcomingSessions?.length ?? 0} upcoming session{(upcomingSessions?.length ?? 0) !== 1 ? 's' : ''}
+            </p>
           </CardContent>
         </Card>
       )}
 
-      {/* Payout rate info */}
       <Card className="mb-6">
         <CardContent className="p-4">
           <p className="text-sm text-muted-foreground">
@@ -177,31 +196,32 @@ export default async function CoachEarningsPage() {
         </CardContent>
       </Card>
 
-      {/* Recent completed sessions */}
       <section>
         <h2 className="text-lg font-semibold text-foreground mb-3">Recent Sessions</h2>
-        {(completedSessions ?? []).length === 0 ? (
+        {earningsSessions.length === 0 ? (
           <Card className="border-dashed">
             <CardContent className="py-8 text-center">
-              <p className="text-muted-foreground">No completed sessions yet</p>
+              <p className="text-muted-foreground">
+                No past sessions with earnings yet. Completed sessions and past bookings you haven&apos;t closed out appear
+                here.
+              </p>
             </CardContent>
           </Card>
         ) : (
           <div className="space-y-2">
-            {(completedSessions ?? []).slice(0, 10).map((session) => (
+            {earningsSessions.slice(0, 10).map((session) => (
               <Card key={session.id}>
                 <CardContent className="p-3 flex items-center justify-between">
                   <div>
                     <p className="text-sm font-medium text-foreground">
-                      {formatEST(new Date(session.scheduled_datetime), 'MMM d, yyyy')}
+                      {formatEST(new Date(session.scheduled_datetime!), 'MMM d, yyyy')}
                     </p>
                     <p className="text-xs text-muted-foreground capitalize">
-                      {session.session_type?.replace('_', ' ') ?? 'Session'} · {session.current_participants ?? 1} athlete{(session.current_participants ?? 1) !== 1 ? 's' : ''}
+                      {session.session_type?.replace('_', ' ') ?? 'Session'} · {session.current_participants ?? 1} athlete
+                      {(session.current_participants ?? 1) !== 1 ? 's' : ''}
                     </p>
                   </div>
-                  <p className="text-lg font-bold text-emerald-500">
-                    +${getSessionPayout(session).toFixed(0)}
-                  </p>
+                  <p className="text-lg font-bold text-emerald-500">+${getSessionPayout(session).toFixed(0)}</p>
                 </CardContent>
               </Card>
             ))}

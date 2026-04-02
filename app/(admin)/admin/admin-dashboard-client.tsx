@@ -2322,6 +2322,13 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
                   <p className="text-sm text-muted-foreground">{leaderboardData.length} coaches</p>
                 </div>
               </div>
+              <Link
+                href="/admin/program-report"
+                className="text-sm font-medium text-[#B89D60] hover:underline inline-flex items-center gap-1 shrink-0"
+              >
+                Program report (print / PDF)
+                <ExternalLink className="h-3.5 w-3.5" />
+              </Link>
             </div>
 
             {/* Summary Cards */}
