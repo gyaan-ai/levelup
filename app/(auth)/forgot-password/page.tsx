@@ -5,8 +5,6 @@ import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { createClient } from '@/lib/supabase/client';
-import { useTenant } from '@/components/theme-provider';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,8 +24,6 @@ const schema = z.object({
 type ForgotPasswordValues = z.infer<typeof schema>;
 
 export default function ForgotPasswordPage() {
-  const tenant = useTenant();
-  const supabase = createClient(tenant.slug);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
@@ -41,13 +37,14 @@ export default function ForgotPasswordPage() {
     setLoading(true);
     setError(null);
     try {
-      const origin = typeof window !== 'undefined' ? window.location.origin : '';
-      const redirectTo = `${origin}/reset-password`;
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(values.email.trim(), {
-        redirectTo,
+      const res = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: values.email.trim() }),
       });
-      if (resetError) {
-        setError(resetError.message || 'Could not send reset email');
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(typeof data.error === 'string' ? data.error : 'Could not send reset email');
         setLoading(false);
         return;
       }
