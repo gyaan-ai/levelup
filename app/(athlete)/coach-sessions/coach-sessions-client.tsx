@@ -2,10 +2,10 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Check, X, DollarSign, Users, Smartphone, Trash2, Loader2, Share2 } from 'lucide-react';
+import { Check, X, DollarSign, Smartphone, Trash2, Loader2, Share2, ExternalLink } from 'lucide-react';
 import { CoachTextGroupDialog } from '@/components/coach-text-group-dialog';
 import { CopySessionPhonesButton } from '@/components/copy-session-phones-button';
 import { formatEST } from '@/lib/format-date';
@@ -36,7 +36,7 @@ function wrestlerNames(s: CoachSession): string[] {
     .filter((n): n is string => Boolean(n));
 }
 
-type Tab = 'upcoming' | 'requests' | 'completed';
+type Tab = 'mine' | 'requests' | 'completed' | 'all';
 
 type RequestItem = {
   id: string;
@@ -49,11 +49,51 @@ type RequestItem = {
   session?: { id: string; scheduled_datetime: string; session_type?: string; session_mode?: string; facilities?: { name?: string } | null };
 };
 
+export type CommunitySession = {
+  id: string;
+  scheduled_datetime: string;
+  session_type?: string | null;
+  session_mode?: string | null;
+  current_participants?: number | null;
+  max_participants?: number | null;
+  price_per_participant?: number | null;
+  athletes?:
+    | { id: string; first_name?: string; last_name?: string; school?: string; photo_url?: string | null }
+    | Array<{ id: string; first_name?: string; last_name?: string; school?: string; photo_url?: string | null }>
+    | null;
+  facilities?:
+    | { id?: string; name?: string }
+    | Array<{ id?: string; name?: string }>
+    | null;
+};
+
+function communityFacilityName(s: CommunitySession): string {
+  const f = s.facilities;
+  if (!f || typeof f !== 'object') return '—';
+  const arr = Array.isArray(f) ? f : [f];
+  return (arr[0] as { name?: string })?.name ?? '—';
+}
+
+function communityCoachName(s: CommunitySession): string {
+  const a = s.athletes;
+  const o = a ? (Array.isArray(a) ? a[0] : a) : null;
+  return o ? [o.first_name, o.last_name].filter(Boolean).join(' ').trim() || 'Coach' : 'Coach';
+}
+
+function communityCoachSchool(s: CommunitySession): string | null {
+  const a = s.athletes;
+  const o = a ? (Array.isArray(a) ? a[0] : a) : null;
+  const sch = o?.school;
+  return sch && String(sch).trim() ? String(sch).trim() : null;
+}
+
 type Props = {
   initialTab: Tab;
   upcomingSessions: CoachSession[];
   completedSessions: CoachSession[];
   pendingRequests: RequestItem[];
+  /** Other coaches’ public / invite-only upcoming sessions */
+  communitySessions: CommunitySession[];
   payoutRate?: number;
 };
 
@@ -62,10 +102,25 @@ export function CoachSessionsClient({
   upcomingSessions,
   completedSessions,
   pendingRequests,
+  communitySessions,
   payoutRate = 0.8333,
 }: Props) {
   const router = useRouter();
+  const pathname = usePathname();
   const [tab, setTab] = useState<Tab>(initialTab);
+
+  const goTab = (id: Tab) => {
+    setTab(id);
+    if (id === 'mine') {
+      router.replace(pathname, { scroll: false });
+      return;
+    }
+    const params = new URLSearchParams();
+    if (id === 'requests') params.set('tab', 'requests');
+    else if (id === 'completed') params.set('tab', 'past');
+    else if (id === 'all') params.set('tab', 'all');
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  };
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [requests, setRequests] = useState<RequestItem[]>(pendingRequests);
@@ -123,9 +178,10 @@ export function CoachSessionsClient({
   };
 
   const tabs: { id: Tab; label: string }[] = [
-    { id: 'upcoming', label: 'Open' },
+    { id: 'mine', label: 'Mine' },
     { id: 'requests', label: `Requests${requests.length > 0 ? ` (${requests.length})` : ''}` },
     { id: 'completed', label: 'Past' },
+    { id: 'all', label: 'All' },
   ];
 
   return (
@@ -146,7 +202,7 @@ export function CoachSessionsClient({
           <button
             key={t.id}
             type="button"
-            onClick={() => setTab(t.id)}
+            onClick={() => goTab(t.id)}
             className={`min-h-[44px] px-4 py-2 text-sm font-medium border-b-2 shrink-0 touch-manipulation ${
               tab === t.id
                 ? 'border-accent text-accent'
@@ -158,7 +214,7 @@ export function CoachSessionsClient({
         ))}
       </div>
 
-      {tab === 'upcoming' && (
+      {tab === 'mine' && (
         <div className="space-y-3">
           {upcomingSessions.length === 0 ? (
             <Card>
@@ -353,6 +409,61 @@ export function CoachSessionsClient({
                         {wrestlerNames(session).length > 0 && ` · ${wrestlerNames(session).join(', ')}`}
                       </p>
                     </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </div>
+      )}
+
+      {tab === 'all' && (
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Open sessions other coaches are hosting (public or invite link). Yours are under <span className="font-medium text-foreground">Mine</span>.
+          </p>
+          {communitySessions.length === 0 ? (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground text-sm">
+                No other open sessions listed right now.
+              </CardContent>
+            </Card>
+          ) : (
+            communitySessions.map((session) => (
+              <Card key={session.id} className="border-border/80">
+                <CardContent className="p-4">
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                    <div className="min-w-0 space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <SessionTypeBadge sessionType={session.session_type} sessionMode={session.session_mode} />
+                      </div>
+                      <p className="font-medium text-foreground">
+                        {communityCoachName(session)}
+                        {communityCoachSchool(session) ? (
+                          <span className="text-muted-foreground font-normal"> · {communityCoachSchool(session)}</span>
+                        ) : null}
+                      </p>
+                      <p className="text-sm">
+                        {formatEST(new Date(session.scheduled_datetime), 'EEE, MMM d')} · {formatEST(new Date(session.scheduled_datetime), 'h:mm a')}
+                      </p>
+                      <p className="text-sm text-muted-foreground">{communityFacilityName(session)}</p>
+                      <p className="text-sm text-muted-foreground">
+                        <CapacityBadge
+                          current={session.current_participants ?? 0}
+                          max={session.max_participants ?? 1}
+                          label="spots"
+                        />
+                        {session.price_per_participant != null && Number(session.price_per_participant) > 0 && (
+                          <span className="ml-2">${Number(session.price_per_participant).toFixed(0)}/person</span>
+                        )}
+                      </p>
+                    </div>
+                    <Button variant="outline" size="sm" className="min-h-[44px] shrink-0 touch-manipulation" asChild>
+                      <Link href={`/sessions/${session.id}`} prefetch={false}>
+                        <ExternalLink className="h-4 w-4 mr-1" />
+                        View
+                      </Link>
+                    </Button>
                   </div>
                 </CardContent>
               </Card>

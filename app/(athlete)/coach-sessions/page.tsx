@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { headers, cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
-import { CoachSessionsClient } from './coach-sessions-client';
+import { CoachSessionsClient, type CommunitySession } from './coach-sessions-client';
 import type { CoachSession } from '@/app/(athlete)/athlete-dashboard/coach-schedule-card';
 
 export const dynamic = 'force-dynamic';
@@ -13,7 +13,15 @@ export default async function CoachSessionsPage({
   searchParams: Promise<{ tab?: string }>;
 }) {
   const sp = await searchParams;
-  const tab = sp.tab === 'requests' ? 'requests' : sp.tab === 'completed' ? 'completed' : 'upcoming';
+  const tabParam = sp.tab;
+  const initialTab: 'mine' | 'requests' | 'completed' | 'all' =
+    tabParam === 'requests'
+      ? 'requests'
+      : tabParam === 'past' || tabParam === 'completed'
+        ? 'completed'
+        : tabParam === 'all'
+          ? 'all'
+          : 'mine';
 
   const headersList = await headers();
   const host = headersList.get('host') || '';
@@ -90,14 +98,39 @@ export default async function CoachSessionsPage({
     session: sessionMap.get(r.session_id),
   }));
 
+  // Other coaches’ bookable sessions (same visibility as parent Training list — public / invite_only)
+  const { data: communitySessions } = await supabase
+    .from('sessions')
+    .select(`
+      id,
+      scheduled_datetime,
+      status,
+      session_type,
+      session_mode,
+      join_policy,
+      focus_area,
+      current_participants,
+      max_participants,
+      price_per_participant,
+      athlete_id,
+      athletes:athlete_id(id, first_name, last_name, school, photo_url),
+      facilities:facility_id(id, name)
+    `)
+    .neq('athlete_id', coachId)
+    .in('status', ['scheduled', 'pending_payment'])
+    .gte('scheduled_datetime', now)
+    .in('join_policy', ['public', 'invite_only'])
+    .order('scheduled_datetime', { ascending: true })
+    .limit(150);
+
   return (
     <div className="container mx-auto px-4 py-5 pb-8 md:py-8 max-w-full">
       <h1 className="text-2xl font-bold text-foreground md:text-3xl mb-1">My sessions</h1>
       <p className="text-muted-foreground text-sm md:text-base mb-6">
-        Open sessions, who signed up, your payout · Requests · Past
+        Your upcoming sessions · Requests · Past · All open sessions on the platform
       </p>
       <CoachSessionsClient
-        initialTab={tab}
+        initialTab={initialTab}
         upcomingSessions={(upcoming ?? []) as CoachSession[]}
         completedSessions={(completed ?? []) as CoachSession[]}
         pendingRequests={requestsWithSession as Array<{
@@ -111,6 +144,7 @@ export default async function CoachSessionsPage({
           session?: { id: string; scheduled_datetime: string; session_type?: string; session_mode?: string; facilities?: { name?: string } | null };
         }>}
         payoutRate={athlete?.payout_rate ?? 0.8333}
+        communitySessions={(communitySessions ?? []) as unknown as CommunitySession[]}
       />
     </div>
   );
