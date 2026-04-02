@@ -1,17 +1,19 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import useSWR from 'swr';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { ShoppingCart, X, ArrowLeft, CreditCard, Loader2, Wallet, Tag, Check } from 'lucide-react';
+import { ShoppingCart, X, ArrowLeft, CreditCard, Loader2, Wallet, Tag, Check, AlertCircle } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useCart } from '@/lib/cart-context';
 import { formatEST } from '@/lib/format-date';
 import { getSessionTypeDisplay } from '@/components/session-type-badge';
+import { useAutoAssignSoloWrestler } from '@/lib/hooks/use-auto-assign-solo-wrestler';
 
 const fetcher = (url: string) => fetch(url).then(r => r.json());
 
@@ -23,7 +25,7 @@ type Wrestler = {
 };
 
 export function CartCheckoutClient({
-  wrestlers,
+  wrestlers: initialWrestlers,
   userEmail,
   existingDiscount,
 }: {
@@ -32,7 +34,13 @@ export function CartCheckoutClient({
   existingDiscount?: number;
 }) {
   const router = useRouter();
-  const { items, removeItem, clearCart, total, count } = useCart();
+  const { items, removeItem, clearCart, setAthleteForItem, total, count } = useCart();
+  const { data: wrestlersRes } = useSWR<{ wrestlers: Wrestler[] }>('/api/wrestlers', fetcher);
+  const wrestlers = useMemo(
+    () => (wrestlersRes?.wrestlers?.length ? wrestlersRes.wrestlers : initialWrestlers),
+    [wrestlersRes?.wrestlers, initialWrestlers]
+  );
+  useAutoAssignSoloWrestler(items, wrestlers, setAthleteForItem);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
@@ -43,7 +51,7 @@ export function CartCheckoutClient({
   const [appliedDiscount, setAppliedDiscount] = useState<number>(existingDiscount ?? 0);
   const [promoApplied, setPromoApplied] = useState(!!existingDiscount);
 
-  const allLinesHaveWrestler = items.length > 0 && items.every((i) => i.athlete_id);
+  const allLinesHaveWrestler = items.length > 0 && items.every((i) => Boolean(i.athlete_id));
 
   // Fetch credit balance
   const { data: creditsData } = useSWR('/api/credits', fetcher);
@@ -91,7 +99,7 @@ export function CartCheckoutClient({
       return;
     }
     if (!allLinesHaveWrestler) {
-      setError('Select a wrestler for each spot (go back to your cart).');
+      setError('Select a wrestler for each spot above.');
       return;
     }
 
@@ -176,9 +184,13 @@ export function CartCheckoutClient({
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {!allLinesHaveWrestler && items.length > 0 && (
+          {wrestlers.length === 0 && items.length > 0 && (
             <p className="text-sm text-amber-600 dark:text-amber-400">
-              Go back to your cart and choose which wrestler each spot is for before paying.
+              Add a wrestler profile to your account, or{' '}
+              <Link href="/cart" className="underline font-medium">
+                return to the cart
+              </Link>{' '}
+              to review.
             </p>
           )}
 
@@ -190,7 +202,17 @@ export function CartCheckoutClient({
                 const dt = new Date(item.scheduled_datetime);
                 const dayName = formatEST(dt, 'EEE');
                 const { label: typeLabel } = getSessionTypeDisplay(item.session_type, null);
-                const w = wrestlers.find((x) => x.id === item.athlete_id);
+                const takenForThisSession = items
+                  .filter((o) => o.id === item.id && o.lineId !== item.lineId)
+                  .map((o) => o.athlete_id)
+                  .filter(Boolean) as string[];
+                const availableWrestlers = wrestlers.filter(
+                  (kid) => !takenForThisSession.includes(kid.id) || kid.id === item.athlete_id
+                );
+                const needsSelection =
+                  wrestlers.length > 0 &&
+                  !item.athlete_id &&
+                  (wrestlers.length > 1 || availableWrestlers.length === 0);
 
                 return (
                   <div
@@ -207,10 +229,43 @@ export function CartCheckoutClient({
                       <p className="text-sm text-muted-foreground">
                         {typeLabel}
                       </p>
-                      {w && (
-                        <p className="text-sm text-foreground mt-1">
-                          Wrestler: {[w.first_name, w.last_name].filter(Boolean).join(' ')}
-                        </p>
+                      {wrestlers.length > 0 && (
+                        <div className="mt-3 space-y-2">
+                          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                            Booking for
+                          </p>
+                          {wrestlers.length === 1 && availableWrestlers.length > 0 ? (
+                            <p className="text-sm text-foreground">
+                              {[wrestlers[0].first_name, wrestlers[0].last_name].filter(Boolean).join(' ')}
+                            </p>
+                          ) : availableWrestlers.length > 0 ? (
+                            <Select
+                              value={item.athlete_id || ''}
+                              onValueChange={(value) => setAthleteForItem(item.lineId, value)}
+                            >
+                              <SelectTrigger className={needsSelection ? 'border-amber-500/60' : ''}>
+                                <SelectValue placeholder="Select wrestler" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {availableWrestlers.map((kid) => (
+                                  <SelectItem key={kid.id} value={kid.id}>
+                                    {[kid.first_name, kid.last_name].filter(Boolean).join(' ') || 'Wrestler'}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          ) : (
+                            <p className="text-sm text-amber-600 dark:text-amber-400">
+                              No wrestler left for this spot — adjust the other line or remove a duplicate.
+                            </p>
+                          )}
+                          {needsSelection && availableWrestlers.length > 0 && (
+                            <div className="flex items-center gap-1.5 text-amber-600 dark:text-amber-400 text-xs">
+                              <AlertCircle className="h-3 w-3 shrink-0" />
+                              <span>Select which wrestler this spot is for</span>
+                            </div>
+                          )}
+                        </div>
                       )}
                     </div>
                     <div className="flex items-center gap-3">

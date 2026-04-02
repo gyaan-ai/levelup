@@ -8,9 +8,10 @@ import { ShoppingCart, X, Calendar, MapPin, User, ChevronRight, Wallet, Sparkles
 import { useCart } from '@/lib/cart-context';
 import { formatEST } from '@/lib/format-date';
 import { SessionTypeBadge } from '@/components/session-type-badge';
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useAutoAssignSoloWrestler } from '@/lib/hooks/use-auto-assign-solo-wrestler';
 
 const fetcher = (url: string) => fetch(url).then(r => r.json());
 
@@ -34,20 +35,7 @@ export default function CartPage() {
   // Fetch parent's wrestlers
   const { data: wrestlersData } = useSWR<{ wrestlers: Wrestler[] }>('/api/wrestlers', fetcher);
   const wrestlers = useMemo(() => wrestlersData?.wrestlers ?? [], [wrestlersData]);
-
-  // Auto-select the only child when each session appears once (not when two spots = same session for two kids)
-  useEffect(() => {
-    if (wrestlers.length !== 1) return;
-    const linesPerSession = new Map<string, number>();
-    for (const i of items) {
-      linesPerSession.set(i.id, (linesPerSession.get(i.id) ?? 0) + 1);
-    }
-    items.forEach((item) => {
-      if (item.athlete_id) return;
-      if ((linesPerSession.get(item.id) ?? 0) > 1) return;
-      setAthleteForItem(item.lineId, wrestlers[0].id);
-    });
-  }, [wrestlers, items, setAthleteForItem]);
+  useAutoAssignSoloWrestler(items, wrestlers, setAthleteForItem);
 
   // Check if all items have an athlete assigned
   const allItemsHaveAthlete = items.every((item) => item.athlete_id);

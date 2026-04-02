@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
+import { getWrestlersForParentUser } from '@/lib/wrestlers-for-parent';
 import { CartCheckoutClient } from './cart-checkout-client';
 
 export const metadata = {
@@ -25,12 +26,13 @@ export default async function CartCheckoutPage() {
     redirect('/login?redirect=/cart/checkout');
   }
 
-  // Fetch user's wrestlers for selection
-  const { data: wrestlers } = await supabase
-    .from('youth_wrestlers')
-    .select('id, first_name, last_name, photo_url')
-    .eq('parent_id', user.id)
-    .order('first_name');
+  const wrestlerRows = await getWrestlersForParentUser(supabase, user.id);
+  const wrestlers = wrestlerRows.map((w) => ({
+    id: w.id,
+    first_name: w.first_name,
+    last_name: w.last_name,
+    photo_url: w.photo_url ?? null,
+  }));
 
   // Check if user has an existing percentage discount from signup
   const { data: existingDiscountData } = await supabase
