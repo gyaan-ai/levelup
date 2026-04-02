@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Calendar, DollarSign, CalendarPlus, Users, Star } from 'lucide-react';
+import { Calendar, DollarSign, CalendarPlus, Users, Star, BookUser } from 'lucide-react';
 import { formatEST } from '@/lib/format-date';
 import { differenceInHours, differenceInDays } from 'date-fns';
 import { CoachPlaybook } from '@/components/coach-playbook';
@@ -337,7 +337,7 @@ export function CoachHomeClient({
 
       <section>
         <h2 className="text-lg font-semibold text-foreground mb-3">Quick actions</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           <Link href="/coach-sessions/create">
             <Button className="w-full min-h-[56px] touch-manipulation flex flex-col gap-0.5 bg-[#D4AF37] hover:bg-[#B8963C] text-black">
               <CalendarPlus className="h-4 w-4 shrink-0" />
@@ -356,6 +356,13 @@ export function CoachHomeClient({
               <Users className="h-4 w-4 shrink-0" />
               <span className="text-xs">Sessions</span>
               <span className="text-[10px] font-normal text-muted-foreground">View all</span>
+            </Button>
+          </Link>
+          <Link href="/coach-roster">
+            <Button variant="outline" className="w-full min-h-[56px] touch-manipulation flex flex-col gap-0.5">
+              <BookUser className="h-4 w-4 shrink-0" />
+              <span className="text-xs">Roster</span>
+              <span className="text-[10px] font-normal text-muted-foreground">Copy kid #s</span>
             </Button>
           </Link>
           <Link href="/coach-earnings">

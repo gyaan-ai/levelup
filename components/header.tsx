@@ -184,6 +184,12 @@ export function Header() {
                     My sessions
                   </Link>
                   <Link
+                    href="/coach-roster"
+                    className="text-white hover:text-accent transition-colors font-medium"
+                  >
+                    Roster
+                  </Link>
+                  <Link
                     href="/profile"
                     className="text-white hover:text-accent transition-colors font-medium"
                   >

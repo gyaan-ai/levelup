@@ -1,30 +1,12 @@
 /**
- * Copy text to the clipboard. Uses Clipboard API first, then a textarea + execCommand
- * fallback (Safari/iOS often block async clipboard after await fetch; fallback usually works).
+ * Copy text to the clipboard.
+ * Order matters: synchronous `execCommand` runs first so the copy stays within the user gesture
+ * (iOS Safari often rejects `navigator.clipboard.writeText` after `await` in the same handler).
+ * Then Clipboard API, then ClipboardItem, then execCommand again as last resort.
  */
-export async function copyTextToClipboard(text: string): Promise<boolean> {
-  if (typeof window === 'undefined' || !text) return false;
 
-  if (window.isSecureContext && navigator.clipboard?.writeText) {
-    try {
-      await navigator.clipboard.writeText(text);
-      return true;
-    } catch {
-      /* try ClipboardItem (some WebKit builds handle multiline better) */
-    }
-  }
-
-  if (window.isSecureContext && navigator.clipboard?.write && typeof ClipboardItem !== 'undefined') {
-    try {
-      await navigator.clipboard.write([
-        new ClipboardItem({ 'text/plain': new Blob([text], { type: 'text/plain' }) }),
-      ]);
-      return true;
-    } catch {
-      /* try fallback */
-    }
-  }
-
+function copyViaExecCommand(text: string): boolean {
+  if (typeof document === 'undefined' || !text) return false;
   try {
     const ta = document.createElement('textarea');
     ta.value = text;
@@ -50,4 +32,33 @@ export async function copyTextToClipboard(text: string): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+export async function copyTextToClipboard(text: string): Promise<boolean> {
+  if (typeof window === 'undefined' || !text) return false;
+
+  // 1) Sync — best chance on mobile Safari for multiline phone lists
+  if (copyViaExecCommand(text)) return true;
+
+  if (window.isSecureContext && navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch {
+      /* try ClipboardItem */
+    }
+  }
+
+  if (window.isSecureContext && navigator.clipboard?.write && typeof ClipboardItem !== 'undefined') {
+    try {
+      await navigator.clipboard.write([
+        new ClipboardItem({ 'text/plain': new Blob([text], { type: 'text/plain' }) }),
+      ]);
+      return true;
+    } catch {
+      /* last resort */
+    }
+  }
+
+  return copyViaExecCommand(text);
 }
