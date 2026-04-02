@@ -63,120 +63,153 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ received: true });
       }
       
-      // Handle cart checkout (multiple sessions)
-      if (isCartCheckout && sessionIds.length > 0) {
-        const youthWrestlerId = session.metadata?.youth_wrestler_id;
+      // Handle cart checkout (multiple lines: session + wrestler per line; same session may repeat for two kids)
+      if (isCartCheckout) {
         const parentId = session.metadata?.parent_id;
         const sessionPrices = session.metadata?.session_prices?.split(',') || [];
         const creditsUsed = parseFloat(session.metadata?.credits_to_use || '0');
-        
-        if (!youthWrestlerId || !parentId) {
-          console.error('Cart checkout webhook: missing youth_wrestler_id or parent_id', session.metadata);
-          return NextResponse.json({ error: 'Missing wrestler/parent metadata' }, { status: 500 });
+        const cartLinesRaw = session.metadata?.cart_lines as string | undefined;
+        const youthWrestlerIdLegacy = session.metadata?.youth_wrestler_id;
+
+        if (!parentId) {
+          console.error('Cart checkout webhook: missing parent_id', session.metadata);
+          return NextResponse.json({ error: 'Missing parent metadata' }, { status: 500 });
         }
-        
+
         const rawMetaTenant = (session.metadata?.tenant_slug as string | undefined)?.trim().toLowerCase();
         const tenantSlug = rawMetaTenant && rawMetaTenant in tenants ? rawMetaTenant : 'guild';
         const supabase = createAdminClient(tenantSlug);
-        
-        // Get actual Stripe fee for this checkout
-        const paymentIntentId = typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id;
+
+        const paymentIntentId =
+          typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id;
         const totalStripeFee = paymentIntentId ? await getStripeFee(stripe, paymentIntentId) : 0;
-        // Distribute fee proportionally across sessions based on price
-        const totalPrice = sessionPrices.reduce((sum, p) => sum + parseFloat(p.split(':')[1] || '0'), 0);
-        
-        // Process each session in the cart
-        for (const sid of sessionIds) {
-          // Parse price for this session
-          const priceEntry = sessionPrices.find(p => p.startsWith(`${sid}:`));
-          const amountPaid = priceEntry ? parseFloat(priceEntry.split(':')[1]) : 0;
-          // Proportional Stripe fee for this session
+
+        type CartLineRow = { sid: string; ywid: string; amountPaid: number };
+        let rows: CartLineRow[] = [];
+
+        if (cartLinesRaw && cartLinesRaw.length > 0) {
+          rows = cartLinesRaw
+            .split(';')
+            .filter(Boolean)
+            .map((seg) => {
+              const [sid, ywid, priceStr] = seg.split('|');
+              return {
+                sid: sid?.trim() ?? '',
+                ywid: ywid?.trim() ?? '',
+                amountPaid: parseFloat(priceStr || '0'),
+              };
+            })
+            .filter((r) => r.sid && r.ywid);
+        } else if (sessionIds.length > 0 && youthWrestlerIdLegacy) {
+          for (const sid of sessionIds) {
+            const priceEntry = sessionPrices.find((p) => p.startsWith(`${sid}:`));
+            const amountPaid = priceEntry ? parseFloat(priceEntry.split(':')[1]) : 0;
+            rows.push({ sid, ywid: youthWrestlerIdLegacy, amountPaid });
+          }
+        }
+
+        if (rows.length === 0) {
+          console.error('Cart checkout webhook: no cart lines', session.metadata);
+          return NextResponse.json({ error: 'Missing cart lines' }, { status: 500 });
+        }
+
+        const totalPrice = rows.reduce((sum, r) => sum + r.amountPaid, 0);
+
+        const currentBySession = new Map<string, number>();
+
+        for (const { sid, ywid, amountPaid } of rows) {
           const sessionStripeFee = totalPrice > 0 ? (amountPaid / totalPrice) * totalStripeFee : 0;
-          
-          // Check if already registered
+
           const { data: existing } = await supabase
             .from('session_participants')
             .select('id')
             .eq('session_id', sid)
-            .eq('youth_wrestler_id', youthWrestlerId)
+            .eq('youth_wrestler_id', ywid)
             .maybeSingle();
-          
+
+          const { data: sess } = await supabase
+            .from('sessions')
+            .select('current_participants, athlete_id, scheduled_datetime')
+            .eq('id', sid)
+            .single();
+
           if (!existing) {
-            // Get current participant count
-            const { data: sess } = await supabase
-              .from('sessions')
-              .select('current_participants, athlete_id, scheduled_datetime')
-              .eq('id', sid)
-              .single();
-            const current = (sess as { current_participants?: number } | null)?.current_participants ?? 0;
-            
-            // Insert participant with Stripe tracking
+            const currentFromDb = (sess as { current_participants?: number } | null)?.current_participants ?? 0;
+            const baseline = currentBySession.has(sid) ? currentBySession.get(sid)! : currentFromDb;
+
             const { error: insertErr } = await supabase.from('session_participants').insert({
               session_id: sid,
-              youth_wrestler_id: youthWrestlerId,
+              youth_wrestler_id: ywid,
               parent_id: parentId,
               paid: true,
               amount_paid: amountPaid,
               stripe_payment_intent_id: paymentIntentId,
               stripe_fee: sessionStripeFee,
             });
-            
-if (insertErr) {
-            if (insertErr.code === '23505') {
-              // Duplicate - just update with Stripe data
-              await supabase
-                .from('session_participants')
-                .update({ paid: true, amount_paid: amountPaid, stripe_payment_intent_id: paymentIntentId, stripe_fee: sessionStripeFee })
-                .eq('session_id', sid)
-                .eq('youth_wrestler_id', youthWrestlerId);
-            } else {
-                console.error('Cart webhook: failed to insert participant', insertErr, { sid, youthWrestlerId });
+
+            if (insertErr) {
+              if (insertErr.code === '23505') {
+                await supabase
+                  .from('session_participants')
+                  .update({
+                    paid: true,
+                    amount_paid: amountPaid,
+                    stripe_payment_intent_id: paymentIntentId,
+                    stripe_fee: sessionStripeFee,
+                  })
+                  .eq('session_id', sid)
+                  .eq('youth_wrestler_id', ywid);
+              } else {
+                console.error('Cart webhook: failed to insert participant', insertErr, { sid, ywid });
               }
             } else {
-              // Update participant count
+              const next = baseline + 1;
+              currentBySession.set(sid, next);
               await supabase
                 .from('sessions')
-                .update({ current_participants: current + 1, updated_at: new Date().toISOString() })
+                .update({ current_participants: next, updated_at: new Date().toISOString() })
                 .eq('id', sid);
-            }
-            
-            // Notify coach
-            const coachId = (sess as { athlete_id?: string } | null)?.athlete_id;
-            const dt = (sess as { scheduled_datetime?: string } | null)?.scheduled_datetime;
-            if (coachId) {
-              const dateStr = dt ? formatEST(new Date(dt), 'EEE MMM d, h:mm a') : 'your session';
-              await createNotification(supabase, {
-                user_id: coachId,
-                type: 'session_booked',
-                title: 'Someone just booked your session',
-                body: `New booking for ${dateStr}. Check My sessions.`,
-                data: { session_id: sid },
-              }).catch((e) => console.warn('Cart webhook: coach notification failed', e));
-              await sendCoachNewSignupSms(supabase, coachId, dateStr).catch(() => {});
+
+              const coachId = (sess as { athlete_id?: string } | null)?.athlete_id;
+              const dt = (sess as { scheduled_datetime?: string } | null)?.scheduled_datetime;
+              if (coachId) {
+                const dateStr = dt ? formatEST(new Date(dt), 'EEE MMM d, h:mm a') : 'your session';
+                await createNotification(supabase, {
+                  user_id: coachId,
+                  type: 'session_booked',
+                  title: 'Someone just booked your session',
+                  body: `New booking for ${dateStr}. Check My sessions.`,
+                  data: { session_id: sid },
+                }).catch((e) => console.warn('Cart webhook: coach notification failed', e));
+                await sendCoachNewSignupSms(supabase, coachId, dateStr).catch(() => {});
+              }
             }
           } else {
-            // Update existing with Stripe data
             await supabase
               .from('session_participants')
-              .update({ paid: true, amount_paid: amountPaid, stripe_payment_intent_id: paymentIntentId, stripe_fee: sessionStripeFee })
+              .update({
+                paid: true,
+                amount_paid: amountPaid,
+                stripe_payment_intent_id: paymentIntentId,
+                stripe_fee: sessionStripeFee,
+              })
               .eq('session_id', sid)
-              .eq('youth_wrestler_id', youthWrestlerId);
+              .eq('youth_wrestler_id', ywid);
           }
         }
-        
-        // Deduct credits if used
+
         if (creditsUsed > 0) {
           const { applyCredits } = await import('@/lib/credits');
           await applyCredits({
             userId: parentId,
             amount: creditsUsed,
-            sessionId: sessionIds[0], // Use first session as reference
-            description: `Cart checkout for ${sessionIds.length} sessions`,
+            sessionId: rows[0].sid,
+            description: `Cart checkout for ${rows.length} spot(s)`,
             tenantSlug,
           });
         }
-        
-        console.log('Cart checkout webhook completed:', { sessionIds, youthWrestlerId, parentId, creditsUsed });
+
+        console.log('Cart checkout webhook completed:', { rows: rows.length, parentId, creditsUsed });
         return NextResponse.json({ received: true });
       }
       

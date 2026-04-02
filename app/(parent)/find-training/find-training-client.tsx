@@ -10,7 +10,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
-import { MapPin, Calendar, Users, Clock, ShoppingCart, Check, ChevronRight, Filter, X, Copy, Lock } from 'lucide-react';
+import { MapPin, Calendar, Users, Clock, ShoppingCart, Check, ChevronRight, Filter, X, Copy, Lock, Minus } from 'lucide-react';
 import { useCart } from '@/lib/cart-context';
 import { formatEST } from '@/lib/format-date';
 import { startOfDay } from 'date-fns';
@@ -81,7 +81,7 @@ export function FindTrainingClient({
   initialSessionType?: string;
 }) {
   const router = useRouter();
-  const { addItem, removeItem, isInCart } = useCart();
+  const { addItem, removeItem, isInCart, items } = useCart();
   const [date, setDate] = useState(initialDate || '');
   const [time, setTime] = useState(initialTime || 'any');
   const [location, setLocation] = useState(initialLocation || 'all');
@@ -186,7 +186,11 @@ export function FindTrainingClient({
     const current = getEffectiveFilledCount(session);
     const openSlots = Math.max(0, max - current);
     const price = session.price_per_participant;
-    const inCart = isInCart(session.id);
+    const cartQty = items.filter((i) => i.id === session.id).length;
+    const maxCartQty = Math.min(
+      openSlots,
+      parentWrestlerIds.length >= 1 ? parentWrestlerIds.length : 1
+    );
     const isInviteOnly = (session as { join_policy?: string | null }).join_policy === 'invite_only';
     const isPartner = session.session_type === '2-athlete' || session.session_type === 'partner';
     const isPrivate = session.session_type === 'private';
@@ -224,22 +228,29 @@ export function FindTrainingClient({
     // Session is not bookable if full OR invite-only (without access) OR all wrestlers already booked
     const isNotBookable = openSlots === 0 || isInviteOnly || allParentWrestlersBooked;
 
-    const handleAddToCart = (e: React.MouseEvent) => {
+    const buildCartPayload = () => ({
+      id: session.id,
+      scheduled_datetime: session.scheduled_datetime,
+      session_type: session.session_type,
+      price_per_participant: session.price_per_participant,
+      coach_name: coachData ? [coachData.first_name, coachData.last_name].filter(Boolean).join(' ') : 'Coach',
+      coach_id: coachData?.id ?? session.athlete_id,
+      facility_name: facilityData?.name ?? '',
+    });
+
+    const handleAddOne = (e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      if (inCart) {
-        removeItem(session.id);
-      } else {
-        addItem({
-          id: session.id,
-          scheduled_datetime: session.scheduled_datetime,
-          session_type: session.session_type,
-          price_per_participant: session.price_per_participant,
-          coach_name: coachData ? [coachData.first_name, coachData.last_name].filter(Boolean).join(' ') : 'Coach',
-          coach_id: coachData?.id ?? session.athlete_id,
-          facility_name: facilityData?.name ?? '',
-        });
-      }
+      if (cartQty >= maxCartQty) return;
+      addItem({ ...buildCartPayload(), lineId: crypto.randomUUID() });
+    };
+
+    const handleRemoveOne = (e: React.MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const linesForSession = items.filter((i) => i.id === session.id);
+      const last = linesForSession[linesForSession.length - 1];
+      if (last) removeItem(last.lineId);
     };
 
     return (
@@ -450,28 +461,55 @@ export function FindTrainingClient({
                   <Lock className="h-3 w-3" />
                   Invite Only
                 </span>
-              ) : inCart ? (
+              ) : cartQty === 0 ? (
                 <Button
                   size="sm"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    router.push('/cart');
-                  }}
-                  className="min-h-[44px] min-w-[44px] gap-1.5 transition-all bg-zinc-800 hover:bg-zinc-700 text-[#D4AF37] border border-[#D4AF37]/30"
-                >
-                  <Check className="h-4 w-4" />
-                  In Cart
-                </Button>
-              ) : (
-                <Button
-                  size="sm"
-                  onClick={handleAddToCart}
+                  onClick={handleAddOne}
                   className="min-h-[44px] min-w-[44px] gap-1.5 transition-all bg-[#D4AF37] hover:bg-[#B8963C] text-black"
                 >
                   <ShoppingCart className="h-4 w-4" />
                   Add
                 </Button>
+              ) : (
+                <div className="flex flex-col items-end gap-2">
+                  <div className="flex items-center gap-1.5">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={handleRemoveOne}
+                      className="h-10 w-10 p-0 border-zinc-600"
+                      aria-label="Remove one spot"
+                    >
+                      <Minus className="h-4 w-4" />
+                    </Button>
+                    <span className="min-w-[2rem] text-center text-sm font-semibold tabular-nums">{cartQty}</span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={handleAddOne}
+                      disabled={cartQty >= maxCartQty}
+                      className="h-10 w-10 p-0 border-zinc-600 disabled:opacity-40"
+                      aria-label="Add another spot"
+                    >
+                      <ShoppingCart className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      router.push('/cart');
+                    }}
+                    className="h-8 text-xs text-[#D4AF37] hover:text-[#D4AF37]/90"
+                  >
+                    View cart
+                  </Button>
+                </div>
               )
             ) : (
               <span className="text-xs text-zinc-500 bg-zinc-800 px-3 py-2.5 min-h-[44px] rounded flex items-center">Full</span>
@@ -502,31 +540,58 @@ export function FindTrainingClient({
                   </span>
                 );
               }
-              if (inCart) {
+              if (cartQty === 0) {
                 return (
                   <Button
                     size="sm"
+                    onClick={handleAddOne}
+                    className="w-full min-h-[44px] gap-1.5 transition-all bg-[#D4AF37] hover:bg-[#B8963C] text-black"
+                  >
+                    <ShoppingCart className="h-4 w-4" />
+                    Add to Cart
+                  </Button>
+                );
+              }
+              return (
+                <div className="w-full space-y-2">
+                  <div className="flex items-center justify-center gap-3">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={handleRemoveOne}
+                      className="h-11 w-11 p-0 border-zinc-600"
+                      aria-label="Remove one spot"
+                    >
+                      <Minus className="h-4 w-4" />
+                    </Button>
+                    <span className="min-w-[2.5rem] text-center text-lg font-semibold tabular-nums">{cartQty}</span>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={handleAddOne}
+                      disabled={cartQty >= maxCartQty}
+                      className="h-11 w-11 p-0 border-zinc-600 disabled:opacity-40"
+                      aria-label="Add another spot"
+                    >
+                      <ShoppingCart className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
                     onClick={(e) => {
                       e.preventDefault();
                       e.stopPropagation();
                       router.push('/cart');
                     }}
-                    className="w-full min-h-[44px] gap-1.5 transition-all bg-zinc-800 hover:bg-zinc-700 text-[#D4AF37] border border-[#D4AF37]/30"
+                    className="w-full min-h-[44px] text-[#D4AF37] border-[#D4AF37]/30"
                   >
-                    <Check className="h-4 w-4" />
-                    In Cart
+                    View cart · ${((price ?? 0) * cartQty).toFixed(0)}
                   </Button>
-                );
-              }
-              return (
-                <Button
-                  size="sm"
-                  onClick={handleAddToCart}
-                  className="w-full min-h-[44px] gap-1.5 transition-all bg-[#D4AF37] hover:bg-[#B8963C] text-black"
-                >
-                  <ShoppingCart className="h-4 w-4" />
-                  Add to Cart
-                </Button>
+                </div>
               );
             })()}
           </div>

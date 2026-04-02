@@ -8,7 +8,7 @@ import { ShoppingCart, X, Calendar, MapPin, User, ChevronRight, Wallet, Sparkles
 import { useCart } from '@/lib/cart-context';
 import { formatEST } from '@/lib/format-date';
 import { SessionTypeBadge } from '@/components/session-type-badge';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -33,17 +33,20 @@ export default function CartPage() {
 
   // Fetch parent's wrestlers
   const { data: wrestlersData } = useSWR<{ wrestlers: Wrestler[] }>('/api/wrestlers', fetcher);
-  const wrestlers = wrestlersData?.wrestlers ?? [];
+  const wrestlers = useMemo(() => wrestlersData?.wrestlers ?? [], [wrestlersData]);
 
-  // Auto-select single wrestler for all cart items
+  // Auto-select the only child when each session appears once (not when two spots = same session for two kids)
   useEffect(() => {
-    if (wrestlers.length === 1) {
-      items.forEach((item) => {
-        if (!item.athlete_id) {
-          setAthleteForItem(item.id, wrestlers[0].id);
-        }
-      });
+    if (wrestlers.length !== 1) return;
+    const linesPerSession = new Map<string, number>();
+    for (const i of items) {
+      linesPerSession.set(i.id, (linesPerSession.get(i.id) ?? 0) + 1);
     }
+    items.forEach((item) => {
+      if (item.athlete_id) return;
+      if ((linesPerSession.get(item.id) ?? 0) > 1) return;
+      setAthleteForItem(item.lineId, wrestlers[0].id);
+    });
   }, [wrestlers, items, setAthleteForItem]);
 
   // Check if all items have an athlete assigned
@@ -85,25 +88,32 @@ export default function CartPage() {
       {/* Header */}
       <div className="px-4 pt-6 pb-4">
         <h1 className="text-2xl font-bold text-foreground">Cart</h1>
-        <p className="text-zinc-500 text-sm mt-0.5">{count} session{count !== 1 ? 's' : ''}</p>
+        <p className="text-zinc-500 text-sm mt-0.5">{count} spot{count !== 1 ? 's' : ''}</p>
       </div>
 
       {/* Session List */}
       <div className="px-4 space-y-3">
         {items.map((item) => {
           const dt = new Date(item.scheduled_datetime);
-          const selectedWrestler = wrestlers.find((w) => w.id === item.athlete_id);
-          const needsSelection = !item.athlete_id && wrestlers.length > 1;
+          const takenForThisSession = items
+            .filter((o) => o.id === item.id && o.lineId !== item.lineId)
+            .map((o) => o.athlete_id)
+            .filter(Boolean) as string[];
+          const availableWrestlers = wrestlers.filter(
+            (w) => !takenForThisSession.includes(w.id) || w.id === item.athlete_id
+          );
+          const needsSelection =
+            !item.athlete_id && (wrestlers.length > 1 || availableWrestlers.length === 0);
 
           return (
             <div
-              key={item.id}
+              key={item.lineId}
               className="relative bg-zinc-900/50 border border-zinc-800/50 rounded-2xl p-4 group"
             >
               {/* Remove button */}
               <button
                 type="button"
-                onClick={() => removeItem(item.id)}
+                onClick={() => removeItem(item.lineId)}
                 className="absolute top-3 right-3 p-2 text-zinc-500 hover:text-red-400 transition-colors rounded-full hover:bg-red-500/10"
                 aria-label="Remove from cart"
               >
@@ -142,36 +152,38 @@ export default function CartPage() {
               {wrestlers.length > 0 && (
                 <div className="mt-4 pt-3 border-t border-zinc-800">
                   <label className="text-sm text-zinc-500 mb-2 block">Booking for</label>
-                  {wrestlers.length === 1 ? (
-                    // Single wrestler - just show name
+                  {wrestlers.length === 1 && availableWrestlers.length > 0 ? (
                     <div className="flex items-center gap-2 text-foreground">
                       <div className="w-6 h-6 rounded-full bg-[#D4AF37]/20 flex items-center justify-center text-xs font-medium text-[#D4AF37]">
                         {wrestlers[0].first_name.charAt(0)}
                       </div>
                       <span className="font-medium">{wrestlers[0].first_name} {wrestlers[0].last_name}</span>
                     </div>
-                  ) : (
-                    // Multiple wrestlers - show dropdown
+                  ) : availableWrestlers.length > 0 ? (
                     <Select
                       value={item.athlete_id || ''}
-                      onValueChange={(value) => setAthleteForItem(item.id, value)}
+                      onValueChange={(value) => setAthleteForItem(item.lineId, value)}
                     >
                       <SelectTrigger className={`w-full ${needsSelection ? 'border-amber-500/50' : ''}`}>
                         <SelectValue placeholder="Select wrestler" />
                       </SelectTrigger>
                       <SelectContent>
-                        {wrestlers.map((w) => (
+                        {availableWrestlers.map((w) => (
                           <SelectItem key={w.id} value={w.id}>
                             {w.first_name} {w.last_name}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
+                  ) : (
+                    <p className="text-sm text-amber-500">
+                      No wrestler left for this spot — remove a duplicate line or pick a different session.
+                    </p>
                   )}
-                  {needsSelection && (
+                  {needsSelection && availableWrestlers.length > 0 && (
                     <div className="flex items-center gap-1.5 mt-2 text-amber-500 text-xs">
                       <AlertCircle className="h-3 w-3" />
-                      <span>Select which wrestler to book</span>
+                      <span>Select which wrestler this spot is for</span>
                     </div>
                   )}
                 </div>
@@ -228,7 +240,7 @@ export default function CartPage() {
           {!allItemsHaveAthlete && (
             <div className="flex items-center gap-2 text-amber-500 text-sm mb-3">
               <AlertCircle className="h-4 w-4" />
-              <span>Please select a wrestler for each session</span>
+              <span>Select a wrestler for each spot</span>
             </div>
           )}
           

@@ -30,7 +30,7 @@ export function CartDropdown() {
         <button
           type="button"
           className="relative flex items-center justify-center min-h-[44px] min-w-[44px] p-1.5 text-white hover:text-accent transition-colors font-medium rounded hover:bg-white/10"
-          aria-label={count > 0 ? `Cart (${count} sessions)` : 'Cart'}
+          aria-label={count > 0 ? `Cart (${count} spots)` : 'Cart'}
           title="Cart"
         >
           <ShoppingCart className="h-5 w-5" />
@@ -77,7 +77,7 @@ export function CartDropdown() {
                 
                 return (
                   <div
-                    key={item.id}
+                    key={item.lineId}
                     className="flex items-start gap-3 p-3 border-b border-border last:border-0 hover:bg-muted/30"
                   >
                     <div className="flex-1 min-w-0">
@@ -93,7 +93,7 @@ export function CartDropdown() {
                     </div>
                     <button
                       type="button"
-                      onClick={() => removeItem(item.id)}
+                      onClick={() => removeItem(item.lineId)}
                       className="p-1.5 text-muted-foreground hover:text-destructive transition-colors rounded hover:bg-destructive/10"
                       aria-label="Remove from cart"
                     >
@@ -106,7 +106,7 @@ export function CartDropdown() {
 
             <div className="p-4 border-t border-border bg-muted/30">
               <div className="flex items-center justify-between mb-3">
-                <span className="text-sm text-muted-foreground">{count} session{count !== 1 ? 's' : ''}</span>
+                <span className="text-sm text-muted-foreground">{count} spot{count !== 1 ? 's' : ''}</span>
                 <span className="font-semibold">${total.toFixed(2)}</span>
               </div>
               <Button onClick={handleCheckout} className="w-full">

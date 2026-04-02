@@ -7,13 +7,6 @@ import useSWR from 'swr';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { ShoppingCart, X, ArrowLeft, CreditCard, Loader2, Wallet, Tag, Check } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useCart } from '@/lib/cart-context';
@@ -40,7 +33,6 @@ export function CartCheckoutClient({
 }) {
   const router = useRouter();
   const { items, removeItem, clearCart, total, count } = useCart();
-  const [selectedWrestler, setSelectedWrestler] = useState(wrestlers[0]?.id ?? '');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
@@ -50,10 +42,8 @@ export function CartCheckoutClient({
   const [promoError, setPromoError] = useState<string | null>(null);
   const [appliedDiscount, setAppliedDiscount] = useState<number>(existingDiscount ?? 0);
   const [promoApplied, setPromoApplied] = useState(!!existingDiscount);
-  
-  console.log("[v0] existingDiscount from server:", existingDiscount);
-  console.log("[v0] appliedDiscount state:", appliedDiscount);
-  console.log("[v0] promoApplied state:", promoApplied);
+
+  const allLinesHaveWrestler = items.length > 0 && items.every((i) => i.athlete_id);
 
   // Fetch credit balance
   const { data: creditsData } = useSWR('/api/credits', fetcher);
@@ -96,12 +86,21 @@ export function CartCheckoutClient({
   };
 
   const handleCheckout = async () => {
-    if (!selectedWrestler) {
-      setError('Please select a wrestler');
-      return;
-    }
     if (items.length === 0) {
       setError('Your cart is empty');
+      return;
+    }
+    if (!allLinesHaveWrestler) {
+      setError('Select a wrestler for each spot (go back to your cart).');
+      return;
+    }
+
+    const lines = items
+      .filter((i) => i.athlete_id)
+      .map((i) => ({ sessionId: i.id, wrestlerId: i.athlete_id as string }));
+    const pairKeys = new Set(lines.map((l) => `${l.sessionId}:${l.wrestlerId}`));
+    if (pairKeys.size !== lines.length) {
+      setError('Each spot must be for a different wrestler when booking the same session twice.');
       return;
     }
 
@@ -112,10 +111,7 @@ export function CartCheckoutClient({
       const res = await fetch('/api/cart/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionIds: items.map((item) => item.id),
-          wrestlerId: selectedWrestler,
-        }),
+        body: JSON.stringify({ lines }),
       });
 
       const data = await res.json();
@@ -173,33 +169,17 @@ export function CartCheckoutClient({
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <ShoppingCart className="h-5 w-5" />
-            Checkout ({count} session{count !== 1 ? 's' : ''})
+            Checkout ({count} spot{count !== 1 ? 's' : ''})
           </CardTitle>
           <CardDescription>
-            Review your sessions and complete payment
+            Review each spot and complete payment in one transaction
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {/* Wrestler Selection */}
-          {wrestlers.length > 0 && (
-            <div>
-              <Label htmlFor="wrestler">Select Wrestler</Label>
-              <Select value={selectedWrestler} onValueChange={setSelectedWrestler}>
-                <SelectTrigger id="wrestler" className="min-h-[44px]">
-                  <SelectValue placeholder="Choose a wrestler" />
-                </SelectTrigger>
-                <SelectContent>
-                  {wrestlers.map((w) => (
-                    <SelectItem key={w.id} value={w.id}>
-                      {[w.first_name, w.last_name].filter(Boolean).join(' ')}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground mt-1">
-                This wrestler will be registered for all sessions in your cart
-              </p>
-            </div>
+          {!allLinesHaveWrestler && items.length > 0 && (
+            <p className="text-sm text-amber-600 dark:text-amber-400">
+              Go back to your cart and choose which wrestler each spot is for before paying.
+            </p>
           )}
 
           {/* Session List */}
@@ -210,10 +190,11 @@ export function CartCheckoutClient({
                 const dt = new Date(item.scheduled_datetime);
                 const dayName = formatEST(dt, 'EEE');
                 const { label: typeLabel } = getSessionTypeDisplay(item.session_type, null);
+                const w = wrestlers.find((x) => x.id === item.athlete_id);
 
                 return (
                   <div
-                    key={item.id}
+                    key={item.lineId}
                     className="flex items-start gap-3 p-4"
                   >
                     <div className="flex-1 min-w-0">
@@ -226,6 +207,11 @@ export function CartCheckoutClient({
                       <p className="text-sm text-muted-foreground">
                         {typeLabel}
                       </p>
+                      {w && (
+                        <p className="text-sm text-foreground mt-1">
+                          Wrestler: {[w.first_name, w.last_name].filter(Boolean).join(' ')}
+                        </p>
+                      )}
                     </div>
                     <div className="flex items-center gap-3">
                       <span className="font-medium">
@@ -233,7 +219,7 @@ export function CartCheckoutClient({
                       </span>
                       <button
                         type="button"
-                        onClick={() => removeItem(item.id)}
+                        onClick={() => removeItem(item.lineId)}
                         className="p-1.5 text-muted-foreground hover:text-destructive transition-colors rounded hover:bg-destructive/10"
                         aria-label="Remove from cart"
                       >
@@ -338,7 +324,7 @@ export function CartCheckoutClient({
           {/* Checkout Button */}
           <Button
             onClick={handleCheckout}
-            disabled={loading || !selectedWrestler}
+            disabled={loading || !allLinesHaveWrestler}
             className="w-full min-h-[48px] text-base gap-2"
           >
             {loading ? (

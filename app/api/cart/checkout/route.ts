@@ -1,3 +1,4 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
@@ -5,14 +6,36 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import { getStripeInstance } from '@/lib/stripe/webhooks';
 import { formatEST } from '@/lib/format-date';
-import { hasMinPhoneDigits } from '@/lib/phone';
 import { getEffectiveFilledCount } from '@/lib/sessions';
 import { getUserCreditBalance, applyCredits } from '@/lib/credits';
 
+type CartLine = { sessionId: string; wrestlerId: string };
+
+async function verifyWrestlerBelongsToParent(
+  supabase: SupabaseClient,
+  userId: string,
+  wrestlerId: string
+): Promise<boolean> {
+  const { data: yw } = await supabase
+    .from('youth_wrestlers')
+    .select('id, parent_id')
+    .eq('id', wrestlerId)
+    .maybeSingle();
+  if (!yw) return false;
+  const ywParentId = (yw as { parent_id?: string }).parent_id;
+  if (ywParentId === userId) return true;
+  const { data: link } = await supabase
+    .from('youth_wrestler_parents')
+    .select('id')
+    .eq('youth_wrestler_id', wrestlerId)
+    .eq('parent_id', userId)
+    .maybeSingle();
+  return !!link;
+}
+
 /**
  * POST - Multi-session checkout: pay for multiple sessions in one Stripe transaction.
- * Creates a Stripe Checkout Session with line items for each session.
- * The webhook will handle creating session_participants for each.
+ * Each cart line is one spot (session + youth wrestler). The same session may appear twice for two kids.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -31,47 +54,48 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const body = (await req.json()) as { sessionIds: string[]; wrestlerId: string };
-    const { sessionIds, wrestlerId } = body;
+    const body = (await req.json()) as {
+      lines?: CartLine[];
+      sessionIds?: string[];
+      wrestlerId?: string;
+    };
 
-    if (!sessionIds || !Array.isArray(sessionIds) || sessionIds.length === 0) {
+    let lines: CartLine[] = [];
+    if (body.lines && Array.isArray(body.lines) && body.lines.length > 0) {
+      lines = body.lines.filter(
+        (l) => l && typeof l.sessionId === 'string' && typeof l.wrestlerId === 'string'
+      );
+    } else if (body.sessionIds?.length && body.wrestlerId) {
+      lines = body.sessionIds.map((sessionId) => ({ sessionId, wrestlerId: body.wrestlerId! }));
+    }
+
+    if (lines.length === 0) {
       return NextResponse.json({ error: 'No sessions selected' }, { status: 400 });
     }
-    if (!wrestlerId) {
-      return NextResponse.json({ error: 'No wrestler selected' }, { status: 400 });
+
+    const pairKey = new Set<string>();
+    for (const l of lines) {
+      const k = `${l.sessionId}:${l.wrestlerId}`;
+      if (pairKey.has(k)) {
+        return NextResponse.json(
+          { error: 'Duplicate booking line for the same session and wrestler' },
+          { status: 400 }
+        );
+      }
+      pairKey.add(k);
     }
 
-    // Verify wrestler belongs to user
-    const { data: yw } = await supabase
-      .from('youth_wrestlers')
-      .select('id, parent_id, phone, first_name, last_name')
-      .eq('id', wrestlerId)
-      .single();
-
-    if (!yw) {
-      return NextResponse.json({ error: 'Wrestler not found' }, { status: 400 });
-    }
-
-    const ywParentId = (yw as { parent_id?: string }).parent_id;
-    const isPrimaryParent = ywParentId === user.id;
-
-    if (!isPrimaryParent) {
-      const { data: link } = await supabase
-        .from('youth_wrestler_parents')
-        .select('id')
-        .eq('youth_wrestler_id', wrestlerId)
-        .eq('parent_id', user.id)
-        .maybeSingle();
-      if (!link) {
+    const uniqueWrestlerIds = [...new Set(lines.map((l) => l.wrestlerId))];
+    for (const wid of uniqueWrestlerIds) {
+      const ok = await verifyWrestlerBelongsToParent(supabase, user.id, wid);
+      if (!ok) {
         return NextResponse.json({ error: 'Wrestler not found or not yours' }, { status: 400 });
       }
     }
 
-    // Phone validation removed - allow checkout without wrestler phone number
-
     const admin = createAdminClient(tenant.slug);
 
-    // Fetch all sessions
+    const sessionIdsUnique = [...new Set(lines.map((l) => l.sessionId))];
     const { data: sessions, error: sessionsErr } = await supabase
       .from('sessions')
       .select(`
@@ -80,81 +104,113 @@ export async function POST(req: NextRequest) {
         scheduled_datetime, status,
         athletes(first_name, last_name)
       `)
-      .in('id', sessionIds);
+      .in('id', sessionIdsUnique);
 
-    if (sessionsErr || !sessions || sessions.length === 0) {
+    if (sessionsErr || !sessions || sessions.length !== sessionIdsUnique.length) {
       return NextResponse.json({ error: 'Sessions not found' }, { status: 404 });
     }
 
-    // Validate each session and build line items
-    const lineItems: Array<{
+    const sessionById = new Map(
+      sessions.map((s) => [s.id, s as Record<string, unknown> & { id: string }])
+    );
+
+    const linesPerSession = new Map<string, number>();
+    for (const l of lines) {
+      linesPerSession.set(l.sessionId, (linesPerSession.get(l.sessionId) || 0) + 1);
+    }
+
+    for (const [sid, needed] of linesPerSession) {
+      const s = sessionById.get(sid);
+      if (!s) return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+
+      const joinPolicy = s.join_policy as string | undefined;
+      const status = s.status as string | undefined;
+      if (joinPolicy !== 'public' && joinPolicy !== 'invite_only') {
+        return NextResponse.json({ error: 'Session is not open for registration' }, { status: 400 });
+      }
+      if (!['scheduled', 'pending_payment'].includes(status ?? '')) {
+        return NextResponse.json({ error: 'Session is not open for registration' }, { status: 400 });
+      }
+
+      const { count: participantRowCount } = await admin
+        .from('session_participants')
+        .select('*', { count: 'exact', head: true })
+        .eq('session_id', sid);
+
+      const max = (s.max_participants as number | undefined) ?? 2;
+      const filled = getEffectiveFilledCount(
+        {
+          current_participants: s.current_participants as number | undefined,
+          max_participants: s.max_participants as number | undefined,
+          session_participants: null,
+        },
+        participantRowCount ?? 0
+      );
+      if (filled + needed > max) {
+        const dt = s.scheduled_datetime
+          ? formatEST(new Date(s.scheduled_datetime as string), 'MMM d')
+          : 'a session';
+        return NextResponse.json({ error: `Session on ${dt} is full` }, { status: 400 });
+      }
+    }
+
+    const { data: wrestlerNames } = await admin
+      .from('youth_wrestlers')
+      .select('id, first_name, last_name')
+      .in('id', uniqueWrestlerIds);
+    const nameByWrestler = new Map(
+      (wrestlerNames ?? []).map((w) => [
+        w.id,
+        [w.first_name, w.last_name].filter(Boolean).join(' ').trim() || 'Wrestler',
+      ])
+    );
+
+    for (const line of lines) {
+      const { data: existing } = await supabase
+        .from('session_participants')
+        .select('id')
+        .eq('session_id', line.sessionId)
+        .eq('youth_wrestler_id', line.wrestlerId)
+        .maybeSingle();
+      if (existing) {
+        const s = sessionById.get(line.sessionId);
+        const dt = s?.scheduled_datetime
+          ? formatEST(new Date(s.scheduled_datetime as string), 'MMM d')
+          : 'a session';
+        return NextResponse.json({ error: `Already registered for session on ${dt}` }, { status: 409 });
+      }
+    }
+
+    type LineItem = {
       quantity: number;
       price_data: {
         currency: string;
         unit_amount: number;
         product_data: { name: string; description: string };
       };
-    }> = [];
+    };
 
-    const sessionMetadata: Array<{ session_id: string; price: number }> = [];
+    const lineItems: LineItem[] = [];
+    const sessionMetadata: Array<{ session_id: string; wrestler_id: string; price: number }> = [];
 
-    for (const session of sessions) {
-      const s = session as {
-        id: string;
-        parent_id?: string;
-        join_policy?: string;
-        status?: string;
-        current_participants?: number;
-        max_participants?: number;
-        price_per_participant?: number;
-        scheduled_datetime?: string;
-        athletes?: { first_name?: string; last_name?: string } | { first_name?: string; last_name?: string }[] | null;
-      };
-
-      // Check if session is open
-      if (s.join_policy !== 'public' && s.join_policy !== 'invite_only') {
-        return NextResponse.json({ error: `Session is not open for registration` }, { status: 400 });
-      }
-      if (!['scheduled', 'pending_payment'].includes(s.status ?? '')) {
-        return NextResponse.json({ error: `Session is not open for registration` }, { status: 400 });
-      }
-
-      // Check capacity
-      const { count: participantRowCount } = await admin
-        .from('session_participants')
-        .select('*', { count: 'exact', head: true })
-        .eq('session_id', s.id);
-
-      const max = s.max_participants ?? 2;
-      const filled = getEffectiveFilledCount(
-        { current_participants: s.current_participants, max_participants: s.max_participants, session_participants: null },
-        participantRowCount ?? 0
-      );
-      if (filled >= max) {
-        const dt = s.scheduled_datetime ? formatEST(new Date(s.scheduled_datetime), 'MMM d') : 'a session';
-        return NextResponse.json({ error: `Session on ${dt} is full` }, { status: 400 });
-      }
-
-      // Check if already registered
-      const { data: existing } = await supabase
-        .from('session_participants')
-        .select('id')
-        .eq('session_id', s.id)
-        .eq('youth_wrestler_id', wrestlerId)
-        .maybeSingle();
-      if (existing) {
-        const dt = s.scheduled_datetime ? formatEST(new Date(s.scheduled_datetime), 'MMM d') : 'a session';
-        return NextResponse.json({ error: `Already registered for session on ${dt}` }, { status: 409 });
-      }
-
-      const pricePer = s.price_per_participant != null && s.price_per_participant > 0 ? s.price_per_participant : 30;
+    for (const line of lines) {
+      const s = sessionById.get(line.sessionId)!;
+      const pricePer =
+        s.price_per_participant != null && Number(s.price_per_participant) > 0
+          ? Number(s.price_per_participant)
+          : 30;
       const amountCents = Math.round(pricePer * 100);
 
-      const dt = s.scheduled_datetime ? new Date(s.scheduled_datetime) : null;
+      const dt = s.scheduled_datetime ? new Date(s.scheduled_datetime as string) : null;
       const coach = Array.isArray(s.athletes) ? s.athletes[0] : s.athletes;
-      const coachName = coach ? [coach.first_name, coach.last_name].filter(Boolean).join(' ') : 'Coach';
+      const coachName = coach
+        ? [(coach as { first_name?: string }).first_name, (coach as { last_name?: string }).last_name]
+            .filter(Boolean)
+            .join(' ')
+        : 'Coach';
+      const kid = nameByWrestler.get(line.wrestlerId) ?? 'Wrestler';
       const desc = dt
-        ? `${formatEST(dt, 'EEE, MMM d')} at ${formatEST(dt, 'h:mm a')} with ${coachName}`
+        ? `${formatEST(dt, 'EEE, MMM d')} at ${formatEST(dt, 'h:mm a')} with ${coachName} · ${kid}`
         : 'Session registration';
 
       lineItems.push({
@@ -169,45 +225,48 @@ export async function POST(req: NextRequest) {
         },
       });
 
-      sessionMetadata.push({ session_id: s.id, price: pricePer });
+      sessionMetadata.push({ session_id: line.sessionId, wrestler_id: line.wrestlerId, price: pricePer });
     }
 
-    // Calculate total price
     let totalPrice = sessionMetadata.reduce((sum, m) => sum + m.price, 0);
 
-    // Check for parent percentage discount (from promo code like FAMILY10)
-    const { data: discountData, error: discountError } = await admin
+    const { data: discountData } = await admin
       .from('parent_percentage_discounts')
       .select('percent_off')
       .eq('parent_id', user.id)
       .maybeSingle();
-    
+
     const percentOff = discountData?.percent_off ?? 0;
     const discountAmount = percentOff > 0 ? totalPrice * (percentOff / 100) : 0;
     totalPrice = totalPrice - discountAmount;
 
-    // Also apply discount to line items for Stripe
     if (percentOff > 0) {
       for (const item of lineItems) {
-        const originalAmount = item.price_data.unit_amount;
-        const discountedAmount = Math.round(originalAmount * (1 - percentOff / 100));
+        const discountedAmount = Math.round(item.price_data.unit_amount * (1 - percentOff / 100));
         item.price_data.unit_amount = discountedAmount;
         item.price_data.product_data.description = `${item.price_data.product_data.description} (${percentOff}% off)`;
       }
-      // Update sessionMetadata prices too
       for (const meta of sessionMetadata) {
         meta.price = meta.price * (1 - percentOff / 100);
       }
     }
 
-    // Check user's credit balance
     const creditBalance = await getUserCreditBalance(user.id, tenant.slug);
     const creditsToUse = Math.min(creditBalance, totalPrice);
     const amountToPay = totalPrice - creditsToUse;
 
-    // If credits cover the full amount, register directly without Stripe
+    const cartLinesMeta = sessionMetadata
+      .map((m) => `${m.session_id}|${m.wrestler_id}|${m.price.toFixed(2)}`)
+      .join(';');
+
     if (amountToPay <= 0) {
-      // Use credits for each session
+      const currentCountBySession = new Map<string, number>();
+      for (const s of sessions) {
+        currentCountBySession.set(
+          s.id,
+          (s as { current_participants?: number }).current_participants ?? 0
+        );
+      }
       for (const meta of sessionMetadata) {
         await applyCredits({
           userId: user.id,
@@ -217,30 +276,25 @@ export async function POST(req: NextRequest) {
           tenantSlug: tenant.slug,
         });
 
-        // Register the wrestler for the session
         await admin.from('session_participants').insert({
           session_id: meta.session_id,
-          youth_wrestler_id: wrestlerId,
+          youth_wrestler_id: meta.wrestler_id,
           parent_id: user.id,
           amount_paid: meta.price,
           payment_method: 'credit',
           status: 'confirmed',
         });
 
-        // Update session participant count
-        const session = sessions.find(s => s.id === meta.session_id);
-        if (session) {
-          await admin.from('sessions').update({
-            current_participants: ((session as { current_participants?: number }).current_participants ?? 0) + 1,
-          }).eq('id', meta.session_id);
-        }
+        const next = (currentCountBySession.get(meta.session_id) ?? 0) + 1;
+        currentCountBySession.set(meta.session_id, next);
+        await admin.from('sessions').update({ current_participants: next }).eq('id', meta.session_id);
       }
 
-      return NextResponse.json({ 
-        success: true, 
+      return NextResponse.json({
+        success: true,
         paidWithCredits: true,
         creditsUsed: creditsToUse,
-        redirectUrl: `/cart/success?credits_used=${creditsToUse}&sessions=${sessionIds.length}`,
+        redirectUrl: `/cart/success?credits_used=${creditsToUse}&sessions=${lines.length}`,
       });
     }
 
@@ -249,42 +303,43 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Online payment is not enabled' }, { status: 503 });
     }
 
-    // Adjust line items if partial credit is used
     let adjustedLineItems = lineItems;
     if (creditsToUse > 0) {
-      // Apply credit as a discount to the first item(s)
       let remainingCredit = creditsToUse;
-      adjustedLineItems = lineItems.map((item, idx) => {
-        if (remainingCredit <= 0) return item;
-        const originalPrice = item.price_data.unit_amount / 100;
-        const discount = Math.min(remainingCredit, originalPrice);
-        remainingCredit -= discount;
-        const newAmount = Math.round((originalPrice - discount) * 100);
-        if (newAmount <= 0) {
-          // This item is fully covered by credit, skip it
-          return null;
-        }
-        return {
-          ...item,
-          price_data: {
-            ...item.price_data,
-            unit_amount: newAmount,
-            product_data: {
-              ...item.price_data.product_data,
-              description: `${item.price_data.product_data.description} (Credit applied: $${discount.toFixed(2)})`,
+      adjustedLineItems = lineItems
+        .map((item) => {
+          if (remainingCredit <= 0) return item;
+          const originalPrice = item.price_data.unit_amount / 100;
+          const discount = Math.min(remainingCredit, originalPrice);
+          remainingCredit -= discount;
+          const newAmount = Math.round((originalPrice - discount) * 100);
+          if (newAmount <= 0) {
+            return null;
+          }
+          return {
+            ...item,
+            price_data: {
+              ...item.price_data,
+              unit_amount: newAmount,
+              product_data: {
+                ...item.price_data.product_data,
+                description: `${item.price_data.product_data.description} (Credit applied: $${discount.toFixed(2)})`,
+              },
             },
-          },
-        };
-      }).filter(Boolean) as typeof lineItems;
+          };
+        })
+        .filter(Boolean) as LineItem[];
     }
 
     const stripe = getStripeInstance(tenant.slug);
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (host.startsWith('localhost') ? `http://${host}` : `https://${host}`);
-    
+    const baseUrl =
+      process.env.NEXT_PUBLIC_APP_URL || (host.startsWith('localhost') ? `http://${host}` : `https://${host}`);
+
     const successUrl = `${baseUrl}/cart/success?stripe_cs={CHECKOUT_SESSION_ID}`;
     const cancelUrl = `${baseUrl}/cart/checkout`;
 
-    const idempotencyKey = `cart-checkout-${user.id}-${sessionIds.sort().join('-')}-${wrestlerId}-${Date.now()}`.slice(0, 255);
+    const idemParts = lines.map((l) => `${l.sessionId}:${l.wrestlerId}`).sort();
+    const idempotencyKey = `cart-checkout-${user.id}-${idemParts.join(',')}-${Date.now()}`.slice(0, 255);
 
     const stripeSession = await stripe.checkout.sessions.create(
       {
@@ -295,10 +350,10 @@ export async function POST(req: NextRequest) {
           app: 'the-guild',
           tenant_slug: tenant.slug,
           cart_checkout: 'true',
-          youth_wrestler_id: wrestlerId,
           parent_id: user.id,
-          session_ids: sessionIds.join(','),
-          session_prices: sessionMetadata.map(m => `${m.session_id}:${m.price}`).join(','),
+          cart_lines: cartLinesMeta,
+          session_ids: sessionIdsUnique.join(','),
+          session_prices: sessionMetadata.map((m) => `${m.session_id}:${m.price}`).join(','),
           credits_to_use: creditsToUse.toString(),
         },
         success_url: successUrl,
@@ -312,7 +367,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Could not start checkout' }, { status: 500 });
     }
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       checkoutUrl: stripeSession.url,
       creditsApplied: creditsToUse,
       totalAfterCredits: amountToPay,
