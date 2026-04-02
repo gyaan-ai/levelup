@@ -16,26 +16,31 @@ import {
 import { Copy, Check, Plus, X, Share2 } from 'lucide-react';
 import { formatEST } from '@/lib/format-date';
 import { SESSION_FOCUS_AREAS } from '@/lib/focus-areas';
+import type { CoachCreateSessionType } from '@/lib/coach-session-pricing';
+import { COACH_SESSION_FALLBACK_USD } from '@/lib/coach-session-pricing';
 
 type Facility = { id: string; name: string; school: string; address?: string | null };
 
-const SESSION_PRESETS = {
-  small_group: { label: 'Small Group', price: 30, maxParticipants: 6, duration: 60 },
-  partner: { label: 'Partner Session', price: 50, maxParticipants: 2, duration: 60 },
-  private: { label: 'Private Session', price: 75, maxParticipants: 1, duration: 60 },
+/** Format only — price comes from recommendedPrices (rate card) with coach override in the price field */
+const SESSION_FORMAT = {
+  small_group: { label: 'Small group', maxParticipants: 6, duration: 60 },
+  partner: { label: 'Partner (2 athletes)', maxParticipants: 2, duration: 60 },
+  private: { label: 'Private (1-on-1)', maxParticipants: 1, duration: 60 },
 } as const;
 
-type SessionTypeKey = keyof typeof SESSION_PRESETS;
+type SessionTypeKey = CoachCreateSessionType;
 type DateTimeEntry = { date: string; time: string };
 
 export function CoachCreateSessionForm({
   coachId,
   coachName,
   facilities,
+  recommendedPrices,
 }: {
   coachId: string;
   coachName: string;
   facilities: Facility[];
+  recommendedPrices: Record<SessionTypeKey, number>;
 }) {
   const [sessionType, setSessionType] = useState<SessionTypeKey>('small_group');
   const [joinPolicy, setJoinPolicy] = useState<'public' | 'invite_only'>('public');
@@ -43,7 +48,7 @@ export function CoachCreateSessionForm({
   const [dateTimes, setDateTimes] = useState<DateTimeEntry[]>([{ date: '', time: '' }]);
   const [durationMinutes, setDurationMinutes] = useState(60);
   const [maxParticipants, setMaxParticipants] = useState(6);
-  const [pricePerParticipant, setPricePerParticipant] = useState(30);
+  const [pricePerParticipant, setPricePerParticipant] = useState(() => recommendedPrices.small_group);
   const [focusArea, setFocusArea] = useState('');
   const [focusArea2, setFocusArea2] = useState('');
 
@@ -69,8 +74,8 @@ export function CoachCreateSessionForm({
 
   const handleSessionTypeChange = (type: SessionTypeKey) => {
     setSessionType(type);
-    const preset = SESSION_PRESETS[type];
-    setPricePerParticipant(preset.price);
+    const preset = SESSION_FORMAT[type];
+    setPricePerParticipant(recommendedPrices[type] ?? COACH_SESSION_FALLBACK_USD[type]);
     setMaxParticipants(preset.maxParticipants);
     setDurationMinutes(preset.duration);
   };
@@ -242,17 +247,20 @@ export function CoachCreateSessionForm({
           <form onSubmit={handleSubmit} className="space-y-4">
             {/* Session Type */}
             <div>
-              <Label>Session Type</Label>
+              <Label>Session type</Label>
               <Select value={sessionType} onValueChange={(v) => handleSessionTypeChange(v as SessionTypeKey)}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="small_group">Small Group ($30/person)</SelectItem>
-                  <SelectItem value="partner">Partner ($50/person)</SelectItem>
-                  <SelectItem value="private">Private ($75)</SelectItem>
+                  <SelectItem value="small_group">{SESSION_FORMAT.small_group.label}</SelectItem>
+                  <SelectItem value="partner">{SESSION_FORMAT.partner.label}</SelectItem>
+                  <SelectItem value="private">{SESSION_FORMAT.private.label}</SelectItem>
                 </SelectContent>
               </Select>
+              <p className="text-xs text-muted-foreground mt-1.5">
+                Suggested price for this format is filled in below (from your rate card). You can change it to any amount parents will pay.
+              </p>
             </div>
 
             {/* Facility */}
@@ -371,14 +379,20 @@ export function CoachCreateSessionForm({
                 />
               </div>
               <div>
-                <Label>Price ($)</Label>
+                <Label htmlFor="coach-session-price">
+                  {sessionType === 'private' ? 'Session price ($)' : 'Price per spot ($)'}
+                </Label>
                 <Input
+                  id="coach-session-price"
                   type="number"
                   min={0}
-                  step={5}
+                  step={1}
                   value={pricePerParticipant}
                   onChange={(e) => setPricePerParticipant(Number(e.target.value) || 0)}
                 />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Suggested: ${recommendedPrices[sessionType]?.toFixed(0) ?? '—'} · What parents pay — edit freely.
+                </p>
               </div>
             </div>
 
