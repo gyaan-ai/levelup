@@ -3,8 +3,6 @@ import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
-import { isProfileComplete } from '@/lib/athletes';
-import { Athlete } from '@/types';
 import Link from 'next/link';
 import { CoachCreateSessionForm } from './coach-create-session-form';
 
@@ -24,7 +22,7 @@ export default async function CoachCreateSessionPage() {
   if (userData?.role !== 'coach' && userData?.role !== 'admin') redirect('/athlete-dashboard');
 
   const { data: athlete } = await supabase.from('athletes').select('*').eq('id', user.id).maybeSingle();
-  if (!athlete || !isProfileComplete(athlete as Athlete)) redirect('/onboarding');
+  if (!athlete) redirect('/onboarding');
 
   // Get coach's facilities (primary + secondary)
   const admin = createAdminClient(tenant.slug);

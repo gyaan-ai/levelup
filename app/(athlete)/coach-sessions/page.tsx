@@ -2,9 +2,6 @@ import { redirect } from 'next/navigation';
 import { headers, cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
-import { isProfileComplete } from '@/lib/athletes';
-import type { Athlete } from '@/types';
-
 import { CoachSessionsClient } from './coach-sessions-client';
 import type { CoachSession } from '@/app/(athlete)/athlete-dashboard/coach-schedule-card';
 
@@ -41,8 +38,8 @@ export default async function CoachSessionsPage({
 
   const { data: athlete } = await supabase.from('athletes').select('*').eq('id', coachId).maybeSingle();
   
-  // Only redirect to onboarding for actual coaches, not admins viewing as coach
-  if (!viewAsCoachId && (!athlete || !isProfileComplete(athlete as Athlete))) {
+  // Missing athlete row — must complete signup; incomplete profile is OK (banner on home)
+  if (!viewAsCoachId && !athlete) {
     redirect('/onboarding');
   }
 

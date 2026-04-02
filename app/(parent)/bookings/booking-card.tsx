@@ -19,6 +19,8 @@ import { showSessionSmsCopyAndTextGroup } from '@/lib/session-sms-tools';
 import { CopySessionPhonesButton } from '@/components/copy-session-phones-button';
 import { CoachTextGroupDialog } from '@/components/coach-text-group-dialog';
 import { copyTextToClipboard } from '@/lib/copy-to-clipboard';
+import { AddToCalendarButton } from '@/components/add-to-calendar-button';
+import { SessionContactsPanel } from '@/components/session-contacts-panel';
 
 const CANCELLATION_WINDOW_HOURS = 24;
 
@@ -66,15 +68,26 @@ interface BookingCardProps {
   isPast?: boolean;
   /** Admin Home (all sessions): show Copy Cell #s + Text group — APIs allow admin only */
   showAdminSmsTools?: boolean;
+  /** Coach home: same layout as parent card, with earnings + reg link + contacts */
+  variant?: 'parent' | 'coach';
+  /** Required when variant is coach — projected / max payout for this session */
+  coachEarnings?: { projected: number; max: number };
 }
 
-export function BookingCard({ session, isPast = false, showAdminSmsTools = false }: BookingCardProps) {
+export function BookingCard({
+  session,
+  isPast = false,
+  showAdminSmsTools = false,
+  variant = 'parent',
+  coachEarnings,
+}: BookingCardProps) {
   const router = useRouter();
   const [cancelling, setCancelling] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [regLinkCopied, setRegLinkCopied] = useState(false);
   const [textGroupOpen, setTextGroupOpen] = useState(false);
 
   const handleCopyShareLink = async () => {
@@ -84,6 +97,15 @@ export function BookingCard({ session, isPast = false, showAdminSmsTools = false
     if (ok) {
       setLinkCopied(true);
       setTimeout(() => setLinkCopied(false), 2000);
+    }
+  };
+
+  const handleCopyRegLink = async () => {
+    const url = `${typeof window !== 'undefined' ? window.location.origin : ''}/sessions/${session.id}/register`;
+    const ok = await copyTextToClipboard(url);
+    if (ok) {
+      setRegLinkCopied(true);
+      setTimeout(() => setRegLinkCopied(false), 2000);
     }
   };
 
@@ -97,6 +119,7 @@ export function BookingCard({ session, isPast = false, showAdminSmsTools = false
   const familyHasSpot = session.isFamilyParticipant !== false;
   const canLeave = canCancel && !session.isOwner && familyHasSpot;
   const showJoinWhenNotEnrolled =
+    variant !== 'coach' &&
     session.isFamilyParticipant === false &&
     !isPast &&
     isSessionOpenForParentBrowse(session) &&
@@ -210,9 +233,13 @@ export function BookingCard({ session, isPast = false, showAdminSmsTools = false
             <p className="text-sm text-muted-foreground flex items-center gap-1.5 flex-wrap">
               <User className="h-3.5 w-3.5 shrink-0" />
               {session.coach.id && String(session.coach.id).trim() ? (
-                <Link href={`/athlete/${String(session.coach.id).trim()}`} className="hover:underline text-foreground font-medium">
-                  {session.coach.name}
-                </Link>
+                variant === 'coach' ? (
+                  <span className="text-foreground font-medium">{session.coach.name}</span>
+                ) : (
+                  <Link href={`/athlete/${String(session.coach.id).trim()}`} className="hover:underline text-foreground font-medium">
+                    {session.coach.name}
+                  </Link>
+                )
               ) : (
                 session.coach.name
               )}
@@ -222,13 +249,15 @@ export function BookingCard({ session, isPast = false, showAdminSmsTools = false
                   <span className="text-muted-foreground/80">({session.coach.school})</span>
                 </span>
               )}
-              {session.coach.id && String(session.coach.id).trim() && (
+              {variant !== 'coach' && session.coach.id && String(session.coach.id).trim() && (
                 <Link href={`/athlete/${String(session.coach.id).trim()}`} className="text-xs text-accent hover:underline">
                   View profile
                 </Link>
               )}
             </p>
-            <StarRating averageRating={session.coach.average_rating} reviewCount={session.coach.review_count} size="sm" />
+            {variant !== 'coach' && (
+              <StarRating averageRating={session.coach.average_rating} reviewCount={session.coach.review_count} size="sm" />
+            )}
             {(session.max_participants ?? 1) > 1 && (
               <p className="text-sm text-muted-foreground flex items-center gap-2">
                 <CapacityBadge
@@ -246,8 +275,32 @@ export function BookingCard({ session, isPast = false, showAdminSmsTools = false
             </div>
           </div>
           <div className="text-left sm:text-right flex flex-col sm:items-end gap-2 shrink-0">
-            <p className={isPast ? 'font-bold' : 'text-xl font-bold'}>
-              {session.amountPaid != null && session.amountPaid > 0
+            <p
+              className={
+                isPast
+                  ? 'font-bold'
+                  : variant === 'coach'
+                    ? 'text-xl font-bold text-[#D4AF37]'
+                    : 'text-xl font-bold'
+              }
+            >
+              {variant === 'coach' && coachEarnings ? (
+                (() => {
+                  const { projected, max } = coachEarnings;
+                  const maxP = Math.max(1, session.max_participants ?? 1);
+                  if (maxP <= 1) {
+                    if (projected > 0) return `Earning: $${projected.toFixed(0)}`;
+                    if (max > 0) return `Up to $${max.toFixed(0)} when booked`;
+                    return '—';
+                  }
+                  if (projected > 0) {
+                    return projected < max
+                      ? `Earning: $${projected.toFixed(0)} (of $${max.toFixed(0)} if full)`
+                      : `Earning: $${projected.toFixed(0)}`;
+                  }
+                  return max > 0 ? `$${max.toFixed(0)} if full` : '—';
+                })()
+              ) : session.amountPaid != null && session.amountPaid > 0
                 ? `You paid $${Number(session.amountPaid).toFixed(2)}`
                 : session.total_price > 0
                   ? `$${Number(session.total_price).toFixed(2)}`
@@ -358,10 +411,11 @@ export function BookingCard({ session, isPast = false, showAdminSmsTools = false
               <div className="mt-2 p-3 border border-destructive/50 rounded-lg bg-destructive/5 text-left w-full max-w-xs">
                 <p className="text-sm font-medium mb-2">Cancel this session?</p>
                 <p className="text-xs text-muted-foreground mb-3">
-                  {willGetRefund
-                    ? `A refund of $${Number(session.total_price).toFixed(2)} will be processed (24h+ notice).`
-                    : `Less than ${CANCELLATION_WINDOW_HOURS} hours notice — no refund.`
-                  }
+                  {variant === 'coach'
+                    ? 'This cancels the session for all booked wrestlers. Parents are notified; refunds follow the same timing rules as parent cancellations.'
+                    : willGetRefund
+                      ? `A refund of $${Number(session.total_price).toFixed(2)} will be processed (24h+ notice).`
+                      : `Less than ${CANCELLATION_WINDOW_HOURS} hours notice — no refund.`}
                 </p>
                 <div className="flex gap-2">
                   <Button 
@@ -412,6 +466,45 @@ export function BookingCard({ session, isPast = false, showAdminSmsTools = false
             )}
           </div>
         </div>
+        {variant === 'coach' && !isPast && (
+          <>
+            <div className="mt-4 flex flex-wrap gap-2 border-t border-border pt-4">
+              <AddToCalendarButton
+                sessionId={session.id}
+                title={session.wrestlers.length > 0 ? session.wrestlers.join(', ') : 'Coaching session'}
+                start={session.scheduled_datetime}
+                location={session.facility}
+                size="sm"
+                className="min-h-[40px] touch-manipulation"
+              />
+              <CopySessionPhonesButton sessionId={session.id} className="min-h-[40px] touch-manipulation" />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="min-h-[40px] touch-manipulation"
+                onClick={handleCopyRegLink}
+              >
+                {regLinkCopied ? (
+                  <>
+                    <Check className="h-4 w-4 mr-1 shrink-0" />
+                    Copied
+                  </>
+                ) : (
+                  <>
+                    <Share2 className="h-4 w-4 mr-1 shrink-0" />
+                    Registration link
+                  </>
+                )}
+              </Button>
+            </div>
+            <SessionContactsPanel
+              sessionId={session.id}
+              participantCount={session.current_participants ?? 0}
+              className="mt-2"
+            />
+          </>
+        )}
       </CardContent>
     </Card>
   );

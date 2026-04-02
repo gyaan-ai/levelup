@@ -67,7 +67,7 @@ export default async function CoachHomePage() {
     redirect('/coach-pending');
   }
   
-  if (!isViewingAsCoach && !isProfileComplete(athlete)) redirect('/onboarding');
+  const needsOnboarding = !isViewingAsCoach && !isProfileComplete(athlete);
 
   // This month earnings (one number for quick actions)
   const thisMonthStart = new Date();
@@ -82,12 +82,21 @@ export default async function CoachHomePage() {
   const thisMonthEarnings = thisMonthSessions?.reduce((sum, s) => sum + Number(s.athlete_payment || 0), 0) || 0;
 
   // Upcoming (limit 5 for home)
-  const { data: upcomingSessions } = await supabase
+  const nowIso = new Date().toISOString();
+
+  const { count: upcomingSessionsCount } = await supabase
     .from('sessions')
-    .select('*, facilities(name), session_participants(youth_wrestler_id, youth_wrestlers(id, first_name, last_name))')
+    .select('*', { count: 'exact', head: true })
     .eq('athlete_id', coachId)
     .in('status', ['scheduled', 'pending_payment'])
-    .gte('scheduled_datetime', new Date().toISOString())
+    .gte('scheduled_datetime', nowIso);
+
+  const { data: upcomingSessions } = await supabase
+    .from('sessions')
+    .select('*, facilities(id, name), session_participants(youth_wrestler_id, youth_wrestlers(id, first_name, last_name))')
+    .eq('athlete_id', coachId)
+    .in('status', ['scheduled', 'pending_payment'])
+    .gte('scheduled_datetime', nowIso)
     .order('scheduled_datetime', { ascending: true })
     .limit(5);
 
@@ -98,6 +107,8 @@ export default async function CoachHomePage() {
     .eq('status', 'pending');
 
   const coachFirstName = athlete?.first_name ?? null;
+  const coachDisplayName =
+    [athlete?.first_name, athlete?.last_name].filter(Boolean).join(' ').trim() || 'Coach';
   const averageRating = athlete?.average_rating ?? null;
 
   // Get actual review count from database (not the cached column)
@@ -128,13 +139,18 @@ export default async function CoachHomePage() {
       <CoachHomeClient
         coachId={coachId}
         upcomingSessions={(upcomingSessions ?? []) as CoachSession[]}
+        upcomingSessionsCount={upcomingSessionsCount ?? 0}
         pendingRequestsCount={pendingRequestsCount ?? 0}
         thisMonthEarnings={thisMonthEarnings}
         coachFirstName={coachFirstName}
+        coachDisplayName={coachDisplayName}
+        coachSchool={athlete?.school ?? null}
+        coachPhotoUrl={athlete?.photo_url ?? null}
         averageRating={averageRating}
         reviewCount={reviewCount ?? 0}
         recentReviews={recentReviews}
         payoutRate={Number(athlete?.payout_rate) || 0.8333}
+        needsOnboarding={needsOnboarding}
       />
     </div>
   );

@@ -323,7 +323,7 @@ export default function OnboardingPage() {
         skipLabel="Skip for now"
         wizardTitle="Coach profile"
         wizardDescription="A few steps to get you set up"
-        exitHref="/"
+        exitHref="/athlete-dashboard"
         exitLabel="Exit setup"
       >
         {error && (
@@ -339,33 +339,8 @@ export default function OnboardingPage() {
         )}
 
         <Form {...form}>
-          {/* Step 0: Earnings preview */}
+          {/* Step 0: Photo first — avoid leading with static $ amounts (coaches set rates on their rate card) */}
           {step === 0 && (
-            <Card className="border-0 shadow-none">
-              <CardContent className="p-0">
-                <p className="text-muted-foreground mb-4">
-                  Here’s what you earn per session. You earn more when you teach groups.
-                </p>
-                <ul className="space-y-3 text-foreground">
-                  <li className="flex justify-between items-baseline gap-4">
-                    <span>Private session</span>
-                    <span className="font-semibold">$50</span>
-                  </li>
-                  <li className="flex justify-between items-baseline gap-4">
-                    <span>Partner session (2 athletes)</span>
-                    <span className="font-semibold">$75</span>
-                  </li>
-                  <li className="flex justify-between items-baseline gap-4">
-                    <span>Small group (up to 6)</span>
-                    <span className="font-semibold">Up to $150</span>
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Step 1: Photo */}
-          {step === 1 && (
             <Card className="border-0 shadow-none">
               <CardContent className="p-0">
                 <p className="text-muted-foreground mb-4">
@@ -392,6 +367,31 @@ export default function OnboardingPage() {
                     <p className="text-xs text-muted-foreground">Tap to upload (max 5MB)</p>
                   </div>
                 </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Step 1: Reference payouts (you set your own rates on your rate card) */}
+          {step === 1 && (
+            <Card className="border-0 shadow-none">
+              <CardContent className="p-0">
+                <p className="text-muted-foreground mb-4">
+                  Example Guild payout ranges for reference — you set your own session rates on your rate card.
+                </p>
+                <ul className="space-y-3 text-foreground">
+                  <li className="flex justify-between items-baseline gap-4">
+                    <span>Private session</span>
+                    <span className="font-semibold">$50</span>
+                  </li>
+                  <li className="flex justify-between items-baseline gap-4">
+                    <span>Partner session (2 athletes)</span>
+                    <span className="font-semibold">$75</span>
+                  </li>
+                  <li className="flex justify-between items-baseline gap-4">
+                    <span>Small group (up to 6)</span>
+                    <span className="font-semibold">Up to $150</span>
+                  </li>
+                </ul>
               </CardContent>
             </Card>
           )}

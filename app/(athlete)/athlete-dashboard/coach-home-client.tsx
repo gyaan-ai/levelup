@@ -3,17 +3,12 @@
 import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Calendar, DollarSign, CalendarPlus, Users, Share2, Star, Check } from 'lucide-react';
-import { CopySessionPhonesButton } from '@/components/copy-session-phones-button';
-import { useState } from 'react';
+import { Calendar, DollarSign, CalendarPlus, Users, Star } from 'lucide-react';
 import { formatEST } from '@/lib/format-date';
 import { differenceInHours, differenceInDays } from 'date-fns';
-import { AddToCalendarButton } from '@/components/add-to-calendar-button';
-import { SessionTypeBadge } from '@/components/session-type-badge';
-import { SessionContactsPanel } from '@/components/session-contacts-panel';
 import { CoachPlaybook } from '@/components/coach-playbook';
 import { CoachRankCard } from '@/components/coach-rank-card';
+import { BookingCard, type BookingSession } from '@/app/(parent)/bookings/booking-card';
 import type { CoachSession } from './coach-schedule-card';
 
 function facilityName(s: CoachSession): string {
@@ -22,6 +17,14 @@ function facilityName(s: CoachSession): string {
   const arr = Array.isArray(f) ? f : [f];
   const first = arr[0] as { name?: string } | null;
   return first?.name ?? '—';
+}
+
+function facilityId(s: CoachSession): string | null {
+  const f = s.facilities;
+  if (!f || typeof f !== 'object') return null;
+  const arr = Array.isArray(f) ? f : [f];
+  const id = (arr[0] as { id?: string })?.id;
+  return id && String(id).trim() ? String(id) : null;
 }
 
 function wrestlerNames(s: CoachSession): string[] {
@@ -35,6 +38,73 @@ function wrestlerNames(s: CoachSession): string[] {
     .filter((n): n is string => Boolean(n));
 }
 
+function primaryWrestlerId(s: CoachSession): string | null {
+  const parts = s.session_participants ?? [];
+  const first = parts[0];
+  return first ? (first as { youth_wrestler_id?: string }).youth_wrestler_id ?? null : null;
+}
+
+function isTentativeSession(s: CoachSession, current: number): boolean {
+  const max = s.max_participants ?? 1;
+  if (current >= max) return false;
+  const isGroup = s.session_type === 'group' || s.session_type === 'small_group';
+  const isPartnerOpen = s.session_mode === 'partner-open';
+  return isGroup || isPartnerOpen;
+}
+
+function toCoachBooking(
+  session: CoachSession,
+  coach: {
+    id: string;
+    name: string;
+    school: string | null;
+    photo_url: string | null | undefined;
+    average_rating: number | null | undefined;
+    review_count: number;
+  },
+  payoutRate: number
+): { session: BookingSession; coachEarnings: { projected: number; max: number } } {
+  const actualParticipants = Array.isArray(session.session_participants) ? session.session_participants.length : 0;
+  const current = actualParticipants || session.current_participants || 0;
+  const max = session.max_participants ?? 1;
+  const pricePerParticipant = Number(session.price_per_participant ?? 0);
+  const projected = Math.round(current * pricePerParticipant * payoutRate * 100) / 100;
+  const maxEarn = Math.round(max * pricePerParticipant * payoutRate * 100) / 100;
+
+  return {
+    session: {
+      id: session.id,
+      scheduled_datetime: session.scheduled_datetime,
+      status: session.status,
+      total_price: Number(session.total_price ?? 0),
+      price_per_participant: session.price_per_participant != null ? Number(session.price_per_participant) : undefined,
+      session_type: session.session_type,
+      session_mode: session.session_mode,
+      focus_area: session.focus_area ?? null,
+      focus_area_2: session.focus_area_2 ?? null,
+      current_participants: current,
+      max_participants: max,
+      partner_invite_code: session.partner_invite_code ?? null,
+      isTentative: isTentativeSession(session, current),
+      isOwner: true,
+      coach: {
+        name: coach.name,
+        school: coach.school ?? '',
+        id: coach.id,
+        photo_url: coach.photo_url,
+        average_rating: coach.average_rating ?? null,
+        review_count: coach.review_count,
+      },
+      facility: facilityName(session),
+      facility_id: facilityId(session),
+      wrestlers: wrestlerNames(session),
+      primaryWrestlerId: primaryWrestlerId(session),
+      joinPolicy: session.join_policy ?? null,
+    },
+    coachEarnings: { projected, max: maxEarn },
+  };
+}
+
 type Review = {
   id: string;
   rating: number;
@@ -46,34 +116,47 @@ type Review = {
 type Props = {
   coachId: string;
   upcomingSessions: CoachSession[];
+  /** Total upcoming count (may be >5 while list is capped) */
+  upcomingSessionsCount: number;
   pendingRequestsCount: number;
   thisMonthEarnings: number;
   coachFirstName?: string | null;
+  /** Full name for booking cards (matches parent-facing coach line) */
+  coachDisplayName: string;
+  coachSchool?: string | null;
+  coachPhotoUrl?: string | null;
   averageRating?: number | null;
   reviewCount?: number;
   recentReviews?: Review[];
   payoutRate?: number;
+  needsOnboarding?: boolean;
 };
 
 export function CoachHomeClient({
   coachId,
   upcomingSessions,
+  upcomingSessionsCount,
   pendingRequestsCount,
   thisMonthEarnings,
   coachFirstName,
+  coachDisplayName,
+  coachSchool,
+  coachPhotoUrl,
   averageRating,
   reviewCount = 0,
   recentReviews = [],
   payoutRate = 0.8333,
+  needsOnboarding = false,
 }: Props) {
-  const [copiedId, setCopiedId] = useState<string | null>(null);
-
-  const handleCopyLink = async (sessionId: string) => {
-    const url = `${window.location.origin}/sessions/${sessionId}`;
-    await navigator.clipboard.writeText(url);
-    setCopiedId(sessionId);
-    setTimeout(() => setCopiedId(null), 2000);
+  const coachBlock = {
+    id: coachId,
+    name: coachDisplayName,
+    school: coachSchool ?? null,
+    photo_url: coachPhotoUrl,
+    average_rating: averageRating,
+    review_count: reviewCount,
   };
+
   const nextSession = upcomingSessions[0];
   const reminderLabel = nextSession
     ? (() => {
@@ -90,14 +173,41 @@ export function CoachHomeClient({
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold text-foreground md:text-3xl">Home</h1>
-<p className="text-muted-foreground text-sm md:text-base">
+      <p className="text-muted-foreground text-sm md:text-base">
         {coachFirstName ? `Hey ${coachFirstName}, here's what's up.` : 'Your schedule and quick actions.'}
       </p>
 
-      {/* Coach Leaderboard Rank */}
-      <CoachRankCard coachId={coachId} />
+      {/* Bookings · earnings · rating at a glance */}
+      <Card className="border-border/80 bg-muted/20">
+        <CardContent className="p-4 sm:p-5">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Upcoming bookings</p>
+              <p className="text-2xl font-bold text-foreground tabular-nums mt-1">{upcomingSessionsCount}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Scheduled sessions</p>
+            </div>
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">This month</p>
+              <p className="text-2xl font-bold text-[#D4AF37] tabular-nums mt-1">${thisMonthEarnings.toFixed(0)}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Completed session payouts</p>
+              <Link href="/coach-earnings" className="text-xs text-accent font-medium mt-1 inline-block">
+                Earnings details →
+              </Link>
+            </div>
+            <div>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Your rating</p>
+              <div className="flex items-baseline gap-2 mt-1">
+                <span className="text-2xl font-bold tabular-nums">{averageRating != null ? averageRating.toFixed(1) : '—'}</span>
+                <span className="text-sm text-muted-foreground">({reviewCount} review{reviewCount !== 1 ? 's' : ''})</span>
+              </div>
+              <Link href="/coach-reviews" className="text-xs text-accent font-medium mt-1 inline-block">
+                All reviews →
+              </Link>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
-{/* Next session reminder — prominent so college kids do not forget */}
       {reminderLabel && (
         <div className="rounded-lg border-2 border-accent/50 bg-accent/15 px-4 py-4">
           <p className="font-medium text-foreground">{reminderLabel}</p>
@@ -105,12 +215,11 @@ export function CoachHomeClient({
         </div>
       )}
 
-      {/* Coach Playbook - actionable outreach items */}
-      <CoachPlaybook />
-
-      {/* Upcoming sessions */}
       <section>
-        <h2 className="text-lg font-semibold text-foreground mb-3">Upcoming</h2>
+        <h2 className="text-lg font-semibold text-foreground mb-3">Your bookings</h2>
+        <p className="text-sm text-muted-foreground mb-4">
+          Same details parents see on My Bookings — who&apos;s signed up, time, place, and your estimated payout.
+        </p>
         {upcomingSessions.length === 0 ? (
           <Card className="border-dashed">
             <CardContent className="py-8 text-center">
@@ -125,112 +234,26 @@ export function CoachHomeClient({
           </Card>
         ) : (
           <div className="space-y-3">
-            {upcomingSessions.slice(0, 5).map((session) => {
-              // Count actual participants from joined data instead of potentially stale column
-              const actualParticipants = Array.isArray(session.session_participants) 
-                ? session.session_participants.length 
-                : 0;
-              const current = actualParticipants || session.current_participants || 0;
-              const max = session.max_participants ?? 1;
-              const pricePerParticipant = Number(session.price_per_participant ?? 0);
-              const projectedEarnings = Math.round(current * pricePerParticipant * payoutRate * 100) / 100;
-              const maxEarnings = Math.round(max * pricePerParticipant * payoutRate * 100) / 100;
-              console.log('[v0] earnings calc:', { max, pricePerParticipant, payoutRate, maxEarnings });
-              const isFull = current >= max;
-              const showSpotsCount = session.session_type === 'group' || session.session_type === 'partner' || max > 1;
-              
+            {upcomingSessions.map((session) => {
+              const { session: bookingSession, coachEarnings } = toCoachBooking(session, coachBlock, payoutRate);
               return (
-              <Card key={session.id}>
-                <CardContent className="p-4">
-                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2 mb-1">
-                        <SessionTypeBadge sessionType={session.session_type} sessionMode={session.session_mode} />
-                        {showSpotsCount && (
-                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                            isFull 
-                              ? 'bg-emerald-500/20 text-emerald-400' 
-                              : current === 0 
-                                ? 'bg-amber-500/20 text-amber-400'
-                                : 'bg-blue-500/20 text-blue-400'
-                          }`}>
-                            {current}/{max} spots
-                          </span>
-                        )}
-                      </div>
-                      <p className="font-medium text-foreground">
-                        {formatEST(new Date(session.scheduled_datetime), 'EEE, MMM d')} · {formatEST(new Date(session.scheduled_datetime), 'h:mm a')}
-                      </p>
-                      <p className="text-sm text-muted-foreground">
-                        {facilityName(session)}
-                        {wrestlerNames(session).length > 0 && ` · ${wrestlerNames(session).join(', ')}`}
-                      </p>
-                      {max > 1 ? (
-                        <p className="text-sm font-medium text-[#D4AF37] mt-1">
-                          {current > 0 
-                            ? `Earning: $${projectedEarnings.toFixed(0)}${!isFull ? ` (of $${maxEarnings.toFixed(0)} if full)` : ''}`
-                            : `$${maxEarnings.toFixed(0)} if full`
-                          }
-                        </p>
-                      ) : current > 0 && (
-                        <p className="text-sm font-medium text-[#D4AF37] mt-1">
-                          Earning: ${projectedEarnings.toFixed(0)}
-                        </p>
-                      )}
-                    </div>
-                    <div className="flex flex-wrap gap-2 shrink-0">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="min-h-[44px] touch-manipulation"
-                        onClick={() => handleCopyLink(session.id)}
-                      >
-                        {copiedId === session.id ? (
-                          <>
-                            <Check className="h-4 w-4 mr-1 text-emerald-500" />
-                            Copied
-                          </>
-                        ) : (
-                          <>
-                            <Share2 className="h-4 w-4 mr-1" />
-                            Share
-                          </>
-                        )}
-                      </Button>
-                      <AddToCalendarButton
-                        sessionId={session.id}
-                        title={`Session ${wrestlerNames(session).join(', ') || 'with athlete'}`}
-                        start={session.scheduled_datetime}
-                        location={facilityName(session)}
-                        size="sm"
-                        className="min-h-[44px] touch-manipulation"
-                      />
-                      <CopySessionPhonesButton
-                        sessionId={session.id}
-                        className="min-h-[44px] touch-manipulation"
-                      />
-                    </div>
-                  </div>
-                  
-                  {/* Expandable contact info */}
-                  <SessionContactsPanel
-                    sessionId={session.id}
-                    participantCount={current}
-                  />
-                </CardContent>
-              </Card>
+                <BookingCard
+                  key={session.id}
+                  session={bookingSession}
+                  variant="coach"
+                  coachEarnings={coachEarnings}
+                />
               );
             })}
           </div>
         )}
-        {upcomingSessions.length > 5 && (
+        {upcomingSessionsCount > 5 && (
           <Link href="/coach-sessions" className="block mt-2 text-sm text-accent font-medium">
-            View all sessions →
+            View all {upcomingSessionsCount} sessions →
           </Link>
         )}
       </section>
 
-      {/* Session requests — simple language for college kids */}
       {pendingRequestsCount > 0 && (
         <Card className="border-amber-500/40 bg-amber-500/5">
           <CardHeader className="pb-2">
@@ -250,10 +273,24 @@ export function CoachHomeClient({
         </Card>
       )}
 
-      {/* Reviews section */}
+      <CoachRankCard coachId={coachId} />
+      <CoachPlaybook />
+
+      {needsOnboarding && (
+        <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-950 dark:text-amber-50">
+          <p className="font-medium">Finish your coach profile</p>
+          <p className="mt-1 text-amber-900/90 dark:text-amber-100/90">
+            Add a short bio and a few details so parents can book you. You can do this anytime.
+          </p>
+          <Button asChild className="mt-3 bg-amber-600 hover:bg-amber-700 text-black" size="sm">
+            <Link href="/onboarding">Continue setup</Link>
+          </Button>
+        </div>
+      )}
+
       <section>
         <div className="flex items-center justify-between mb-3">
-          <h2 className="text-lg font-semibold text-foreground">Reviews</h2>
+          <h2 className="text-lg font-semibold text-foreground">New reviews</h2>
           {reviewCount > 0 && (
             <Link href="/coach-reviews" className="text-sm text-accent font-medium">
               See all {reviewCount} →
@@ -271,13 +308,6 @@ export function CoachHomeClient({
         ) : (
           <Card>
             <CardContent className="p-4">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="flex items-center gap-1">
-                  <Star className="h-5 w-5 fill-[#D4AF37] text-[#D4AF37]" />
-                  <span className="text-xl font-bold">{averageRating?.toFixed(1) ?? '—'}</span>
-                </div>
-                <span className="text-muted-foreground">({reviewCount} review{reviewCount !== 1 ? 's' : ''})</span>
-              </div>
               <div className="space-y-3">
                 {recentReviews.slice(0, 3).map((review) => (
                   <div key={review.id} className="border-t border-border pt-3 first:border-0 first:pt-0">
@@ -305,7 +335,6 @@ export function CoachHomeClient({
         )}
       </section>
 
-      {/* Quick actions — super simple labels */}
       <section>
         <h2 className="text-lg font-semibold text-foreground mb-3">Quick actions</h2>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
