@@ -18,6 +18,10 @@ import {
 } from './admin-dashboard-client';
 import { coachPayoutUsd } from '@/lib/coach-session-payout';
 
+function roundRatingAvg(sum: number, count: number): number {
+  return Math.round((sum / count) * 100) / 100;
+}
+
 function getAdminEmails(): Set<string> {
   const raw = process.env.ADMIN_EMAILS || '';
   return new Set(
@@ -65,7 +69,7 @@ export default async function AdminPage() {
 
   const admin = createAdminClient(tenant.slug);
 
-  const [sessionsRes, usersRes, creditsRes, athletesRes] = await Promise.all([
+  const [sessionsRes, usersRes, creditsRes, athletesRes, reviewsRes] = await Promise.all([
     admin
       .from('sessions')
       .select(`
@@ -107,6 +111,7 @@ export default async function AdminPage() {
       .from('athletes')
       .select('id, first_name, last_name, school, average_rating, review_count, active')
       .order('last_name'),
+    admin.from('reviews').select('athlete_id, rating'),
   ]);
 
   if (usersRes.error) {
@@ -126,6 +131,22 @@ export default async function AdminPage() {
   }
   if (athletesRes.error) {
     console.error('Admin athletes fetch error:', athletesRes.error);
+  }
+  if (reviewsRes.error) {
+    console.error('Admin reviews fetch error:', reviewsRes.error);
+  }
+
+  const reviewAggByAthlete = new Map<string, { sum: number; count: number }>();
+  for (const row of reviewsRes.data ?? []) {
+    const r = row as { athlete_id?: string; rating?: number };
+    const id = r.athlete_id;
+    if (!id) continue;
+    const rating = Number(r.rating);
+    if (!Number.isFinite(rating)) continue;
+    const prev = reviewAggByAthlete.get(id) ?? { sum: 0, count: 0 };
+    prev.sum += rating;
+    prev.count += 1;
+    reviewAggByAthlete.set(id, prev);
   }
 
   
@@ -275,6 +296,14 @@ export default async function AdminPage() {
   }>;
   const athleteMap = new Map<string, AthleteReport>();
   for (const o of athletesRows) {
+    const agg = reviewAggByAthlete.get(o.id);
+    const fromReviews =
+      agg && agg.count > 0
+        ? {
+            average_rating: roundRatingAvg(agg.sum, agg.count),
+            review_count: agg.count,
+          }
+        : null;
     athleteMap.set(o.id, {
       athlete_id: o.id,
       athlete_name: `${o.first_name} ${o.last_name}`.trim() || '—',
@@ -282,8 +311,16 @@ export default async function AdminPage() {
       session_count: 0,
       total_earnings: 0,
       completed_count: 0,
-      average_rating: o.average_rating != null ? Number(o.average_rating) : null,
-      review_count: o.review_count != null ? Number(o.review_count) : 0,
+      average_rating: fromReviews
+        ? fromReviews.average_rating
+        : o.average_rating != null
+          ? Number(o.average_rating)
+          : null,
+      review_count: fromReviews
+        ? fromReviews.review_count
+        : o.review_count != null
+          ? Number(o.review_count)
+          : 0,
       active: o.active ?? false,
     });
   }
