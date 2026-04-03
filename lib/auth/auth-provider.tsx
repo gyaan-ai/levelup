@@ -159,7 +159,16 @@ export function AuthProvider({
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      // Password reset emails sometimes fall back to Site URL (/) when /reset-password is not
+      // in Supabase "Redirect URLs". Recovery still establishes a session on whatever page loads;
+      // send users to the reset form so they can set a new password.
+      if (event === 'PASSWORD_RECOVERY' && typeof window !== 'undefined') {
+        const p = window.location.pathname;
+        if (p !== '/reset-password' && !p.startsWith('/reset-password/')) {
+          router.replace('/reset-password');
+        }
+      }
       setUser(session?.user ?? null);
       if (session?.user) {
         fetchUserRole(session.user.id).finally(() => setLoading(false));
@@ -170,7 +179,7 @@ export function AuthProvider({
     });
 
     return () => subscription.unsubscribe();
-  }, [tenantSlug, supabase, fetchUserRole]);
+  }, [tenantSlug, supabase, fetchUserRole, router]);
 
   const signOut = async () => {
     await supabase.auth.signOut();
