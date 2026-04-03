@@ -60,7 +60,7 @@ function ResetPasswordForm() {
             if (!cancelled) {
               setInitError(
                 exchangeErr.message?.includes('code verifier')
-                  ? 'This reset link must be opened on the same browser where you requested it, or the link expired. Request a new link from Forgot password.'
+                  ? 'This link must open on the same site address where you requested the reset (for example www vs non-www must match), in the same browser, and links expire after use. Request a new link from Forgot password.'
                   : exchangeErr.message || 'Invalid or expired link'
               );
             }

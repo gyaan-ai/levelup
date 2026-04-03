@@ -6,27 +6,7 @@ import { ParentBottomNav } from './parent-bottom-nav';
 import { CoachBottomNav } from './coach-bottom-nav';
 import { YouthWrestlerBottomNav } from './youth-wrestler-bottom-nav';
 import { AdminBottomNav } from './admin-bottom-nav';
-
-const PARENT_ROUTES = [
-  '/',
-  '/dashboard',
-  '/home',
-  '/training',
-  '/find-training',
-  '/browse',
-  '/bookings',
-  '/inbox',
-  '/account',
-  '/my-wrestlers',
-  '/my-coaches',
-  '/partner-sessions',
-  '/small-group-sessions',
-  '/wrestlers',
-  '/sessions',
-  '/cart',
-  '/wallet',
-  '/checkout',
-];
+import { isParentRoute } from '@/lib/parent-routes';
 
 const COACH_ROUTES = [
   '/athlete-dashboard',
@@ -53,13 +33,6 @@ const YOUTH_WRESTLER_ROUTES = [
 ];
 
 const ADMIN_ROUTES = ['/dashboard', '/admin', '/account'];
-
-function isParentRoute(pathname: string | null): boolean {
-  if (!pathname) return false;
-  return PARENT_ROUTES.some(
-    (route) => pathname === route || (route !== '/dashboard' && pathname.startsWith(route + '/'))
-  );
-}
 
 function isCoachRoute(pathname: string | null): boolean {
   if (!pathname) return false;
