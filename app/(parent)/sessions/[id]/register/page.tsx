@@ -10,6 +10,7 @@ import { User, Calendar, MapPin, Users } from 'lucide-react';
 import { formatEST } from '@/lib/format-date';
 import { SchoolLogo } from '@/components/school-logo';
 import { hasMinPhoneDigits } from '@/lib/phone';
+import { ensureAutoFamilyDiscountForParent } from '@/lib/family-auto-discount';
 
 export default async function SessionRegisterPage({
   params,
@@ -118,6 +119,9 @@ export default async function SessionRegisterPage({
   const dt = s.scheduled_datetime ? new Date(s.scheduled_datetime) : null;
 
   const admin = createAdminClient(tenant.slug);
+  if (role === 'parent') {
+    await ensureAutoFamilyDiscountForParent(admin, user.id, user.email);
+  }
   // Parent percentage discount (e.g. FAMILY10) — used to show discounted price and message
   const { data: pctDiscount } = !isOwner
     ? await admin

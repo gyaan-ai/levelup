@@ -4,6 +4,7 @@ import { getTenantByDomain } from '@/config/tenants';
 import { verifyInviteToken } from '@/lib/invite-parent-token';
 import { validateRequiredYouthPhone } from '@/lib/phone';
 import { resolveDiscountPercentOff } from '@/lib/discount-codes';
+import { family10CodeBlockedForEmail } from '@/lib/family-auto-discount';
 
 export async function POST(req: NextRequest) {
   try {
@@ -112,6 +113,12 @@ export async function POST(req: NextRequest) {
             error:
               'This code is not a percent-off discount. Use a family code like FAMILY10, or ask an admin to set "Percent off" on this code.',
           },
+          { status: 400 }
+        );
+      }
+      if (family10CodeBlockedForEmail(codeNormalized, email)) {
+        return NextResponse.json(
+          { error: 'This discount code is not available for your account.' },
           { status: 400 }
         );
       }

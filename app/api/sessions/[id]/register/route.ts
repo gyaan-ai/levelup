@@ -12,6 +12,7 @@ import { hasMinPhoneDigits } from '@/lib/phone';
 import { rosterSnapshotFromYouthRow } from '@/lib/session-roster-snapshot';
 import { finalizeRegisterFromCheckoutSession } from '@/lib/finalize-session-register-from-stripe';
 import { getEffectiveFilledCount } from '@/lib/sessions';
+import { ensureAutoFamilyDiscountForParent } from '@/lib/family-auto-discount';
 
 /**
  * POST - Pay & register a youth wrestler for a session (public or invite_only).
@@ -70,6 +71,9 @@ export async function POST(
     };
 
     const admin = createAdminClient(tenant.slug);
+    if (role === 'parent') {
+      await ensureAutoFamilyDiscountForParent(admin, user.id, user.email);
+    }
     const { count: participantRowCount } = await admin
       .from('session_participants')
       .select('*', { count: 'exact', head: true })

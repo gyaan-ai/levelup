@@ -14,6 +14,7 @@ import { ProfileImage } from '@/components/profile-image';
 import { formatEST } from '@/lib/format-date';
 import { SessionTypeBadge } from '@/components/session-type-badge';
 import { SchoolLogo } from '@/components/school-logo';
+import { ensureAutoFamilyDiscountForParent } from '@/lib/family-auto-discount';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,6 +44,9 @@ export default async function HomePage() {
 
   const nowISO = new Date().toISOString();
   const admin = createAdminClient(tenant.slug);
+  if (userData?.role === 'parent') {
+    await ensureAutoFamilyDiscountForParent(admin, user.id, user.email);
+  }
 
   // Get parent's wrestlers
   const youthWrestlerIds = await getParentYouthWrestlerIds(supabase, user.id);

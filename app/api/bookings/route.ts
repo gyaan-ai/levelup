@@ -10,6 +10,7 @@ import type { SessionMode, JoinPolicy } from '@/types';
 import { formatEST } from '@/lib/format-date';
 import { hasMinPhoneDigits } from '@/lib/phone';
 import { rosterSnapshotFromYouthRow } from '@/lib/session-roster-snapshot';
+import { ensureAutoFamilyDiscountForParent } from '@/lib/family-auto-discount';
 
 export async function POST(req: NextRequest) {
   try {
@@ -74,6 +75,9 @@ export async function POST(req: NextRequest) {
     }
 
     const admin = createAdminClient(tenant.slug);
+    if (userData?.role === 'parent') {
+      await ensureAutoFamilyDiscountForParent(admin, user.id, user.email);
+    }
 
     const { data: ywPhoneRows } = await admin
       .from('youth_wrestlers')

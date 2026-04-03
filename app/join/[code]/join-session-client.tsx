@@ -97,20 +97,12 @@ export function JoinSessionClient({
     setJoining(true);
     try {
       const codeTrimmed = promoCode.trim();
+      // Do not redeem on pay — autofill can put a code in the field without intent. Require Apply.
       if (codeTrimmed && !codeApplied) {
-        const redeemRes = await fetch('/api/redeem-discount-code', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code: codeTrimmed }),
-        });
-        const redeemData = await redeemRes.json();
-        if (!redeemRes.ok && !redeemData.alreadyUsed) {
-          setError(redeemData.error || 'Invalid or expired promo code');
-          setJoining(false);
-          payLock.current = false;
-          return;
-        }
-        if (redeemRes.ok && (redeemData.success || redeemData.alreadyUsed)) setCodeApplied(true);
+        setError('Click Apply to confirm your promo code before paying.');
+        setJoining(false);
+        payLock.current = false;
+        return;
       }
 
       const res = await fetch(`/api/sessions/${sessionId}/register`, {
@@ -211,6 +203,8 @@ export function JoinSessionClient({
             onChange={(e) => { setPromoCode(e.target.value.toUpperCase()); setError(null); setCodeApplied(false); }}
             className="uppercase flex-1"
             autoComplete="off"
+            name="guild-join-promo"
+            data-lpignore="true"
           />
           <Button
             type="button"
@@ -223,7 +217,9 @@ export function JoinSessionClient({
         </div>
         {percentOff != null && isSmallGroup && (
           <p className="text-sm text-green-600 dark:text-green-400 font-medium">
-            {codeApplied ? `Code applied. You get ${percentOff}% off — pay & register below.` : `Your ${percentOff}% discount applies — pay & register below.`}
+            {codeApplied
+              ? `Code applied. You get ${percentOff}% off — pay & register below.`
+              : `Your account has a ${percentOff}% family discount — the price below reflects it.`}
           </p>
         )}
       </div>

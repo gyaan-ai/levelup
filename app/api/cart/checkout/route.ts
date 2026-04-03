@@ -8,6 +8,7 @@ import { getStripeInstance } from '@/lib/stripe/webhooks';
 import { formatEST } from '@/lib/format-date';
 import { getEffectiveFilledCount } from '@/lib/sessions';
 import { getUserCreditBalance, applyCredits } from '@/lib/credits';
+import { ensureAutoFamilyDiscountForParent } from '@/lib/family-auto-discount';
 
 type CartLine = { sessionId: string; wrestlerId: string };
 
@@ -94,6 +95,9 @@ export async function POST(req: NextRequest) {
     }
 
     const admin = createAdminClient(tenant.slug);
+    if (role === 'parent') {
+      await ensureAutoFamilyDiscountForParent(admin, user.id, user.email);
+    }
 
     const sessionIdsUnique = [...new Set(lines.map((l) => l.sessionId))];
     const { data: sessions, error: sessionsErr } = await supabase

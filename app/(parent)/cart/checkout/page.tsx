@@ -3,6 +3,8 @@ import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
 import { getWrestlersForParentUser } from '@/lib/wrestlers-for-parent';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { ensureAutoFamilyDiscountForParent } from '@/lib/family-auto-discount';
 import { CartCheckoutClient } from './cart-checkout-client';
 
 export const metadata = {
@@ -24,6 +26,12 @@ export default async function CartCheckoutPage() {
 
   if (!user) {
     redirect('/login?redirect=/cart/checkout');
+  }
+
+  const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
+  const admin = createAdminClient(tenant.slug);
+  if (userData?.role === 'parent') {
+    await ensureAutoFamilyDiscountForParent(admin, user.id, user.email);
   }
 
   const wrestlerRows = await getWrestlersForParentUser(supabase, user.id);

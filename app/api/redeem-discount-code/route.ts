@@ -4,11 +4,13 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import { resolveDiscountPercentOff } from '@/lib/discount-codes';
+import { family10CodeBlockedForEmail } from '@/lib/family-auto-discount';
 
 /**
  * POST - Parent redeems a discount code after signup (e.g. they forgot at signup).
  * Body: { code: string }
  * Percent-off codes (e.g. FAMILY10) grant `parent_percentage_discounts`. Early-adopter free sessions are disabled.
+ * When FAMILY10_REDEEM_ALLOWLIST_ONLY=true, only emails in FAMILY10_AUTO_PARENT_EMAILS may redeem FAMILY10.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -52,6 +54,13 @@ export async function POST(req: NextRequest) {
     }
     if (codeRow.active === false) {
       return NextResponse.json({ error: 'This discount code is no longer active' }, { status: 400 });
+    }
+
+    if (family10CodeBlockedForEmail(codeNormalized, user.email)) {
+      return NextResponse.json(
+        { error: 'This discount code is not available for your account.' },
+        { status: 400 }
+      );
     }
 
     const max = codeRow.max_redemptions;

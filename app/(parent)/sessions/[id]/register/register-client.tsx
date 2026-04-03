@@ -92,20 +92,11 @@ export function SessionRegisterClient({ sessionId, isOwner, isSmallGroup = false
     setLoading(true);
     try {
       const codeTrimmed = promoCode.trim();
-      if (codeTrimmed && !isOwner && !codeApplied) {
-        const redeemRes = await fetch('/api/redeem-discount-code', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code: codeTrimmed }),
-        });
-        const redeemData = await redeemRes.json();
-        if (!redeemRes.ok && !redeemData.alreadyUsed) {
-          setError(redeemData.error || 'Invalid or expired promo code');
-          setLoading(false);
-          submitLock.current = false;
-          return;
-        }
-        if (redeemRes.ok && (redeemData.success || redeemData.alreadyUsed)) setCodeApplied(true);
+      if (!isOwner && codeTrimmed && !codeApplied) {
+        setError('Click Apply to confirm your promo code before paying.');
+        setLoading(false);
+        submitLock.current = false;
+        return;
       }
 
       const res = await fetch(`/api/sessions/${sessionId}/register`, {
@@ -208,6 +199,8 @@ export function SessionRegisterClient({ sessionId, isOwner, isSmallGroup = false
               onChange={(e) => { setPromoCode(e.target.value.toUpperCase()); setError(null); setCodeApplied(false); }}
               className="uppercase flex-1"
               autoComplete="off"
+              name="guild-session-register-promo"
+              data-lpignore="true"
             />
             <Button
               type="button"
@@ -220,7 +213,9 @@ export function SessionRegisterClient({ sessionId, isOwner, isSmallGroup = false
           </div>
           {isSmallGroup && percentOff != null && (
             <p className="text-sm text-green-600 dark:text-green-400 font-medium">
-              {codeApplied ? `Code applied. You get ${percentOff}% off — pay & register below.` : `Your ${percentOff}% discount applies — pay & register below.`}
+              {codeApplied
+                ? `Code applied. You get ${percentOff}% off — pay & register below.`
+                : `Your account has a ${percentOff}% family discount — the price below reflects it.`}
             </p>
           )}
         </div>

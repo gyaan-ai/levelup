@@ -12,6 +12,7 @@ import { formatEST } from '@/lib/format-date';
 import { JoinSessionClient } from './join-session-client';
 import { hasMinPhoneDigits } from '@/lib/phone';
 import { getEffectiveFilledCount } from '@/lib/sessions';
+import { ensureAutoFamilyDiscountForParent } from '@/lib/family-auto-discount';
 
 /** Always fresh roster from DB (avoid stale cached HTML after admin adds a participant). */
 export const dynamic = 'force-dynamic';
@@ -33,6 +34,12 @@ export default async function JoinByCodePage({
 
   // Fetch session by invite code with admin client so unauthenticated users can open the join link (RLS would otherwise block)
   const admin = createAdminClient(tenant.slug);
+  if (user) {
+    const { data: urow } = await supabase.from('users').select('role').eq('id', user.id).maybeSingle();
+    if (urow?.role === 'parent') {
+      await ensureAutoFamilyDiscountForParent(admin, user.id, user.email);
+    }
+  }
   const { data: session, error } = await admin
     .from('sessions')
     .select('*, athletes(id, first_name, last_name, school, photo_url), facilities(id, name, address)')
