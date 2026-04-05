@@ -15,6 +15,7 @@ import {
   type AthleteReport,
   type CoachPayout,
   type CreditRecord,
+  type YouthSessionSpendLine,
 } from './admin-dashboard-client';
 import { coachPayoutUsd } from '@/lib/coach-session-payout';
 
@@ -227,6 +228,34 @@ export default async function AdminPage() {
     return rows.length;
   }
 
+  const youthSessionSpendLines: YouthSessionSpendLine[] = [];
+  for (const s of sessionsRows) {
+    const a = s.athletes;
+    const coach = Array.isArray(a) ? a[0] : a;
+    const coachName = coach ? `${coach.first_name} ${coach.last_name}`.trim() : '—';
+    const f = s.facilities;
+    const fo = Array.isArray(f) ? f[0] : f;
+    const facilityName = fo?.name ?? '—';
+    const raw = s.session_participants;
+    const rows = Array.isArray(raw) ? raw : raw ? [raw] : [];
+    for (const p of rows) {
+      const pr = p as ParticipantRow;
+      const yid = pr.youth_wrestler_id;
+      if (yid == null || yid === '') continue;
+      const amt = Math.round(Number(pr.amount_paid ?? 0) * 100) / 100;
+      youthSessionSpendLines.push({
+        youth_wrestler_id: yid,
+        session_id: s.id,
+        amount_paid: amt,
+        scheduled_datetime: s.scheduled_datetime,
+        session_status: s.status,
+        coach_name: coachName,
+        facility_name: facilityName,
+      });
+    }
+  }
+  youthSessionSpendLines.sort((a, b) => b.scheduled_datetime.localeCompare(a.scheduled_datetime));
+
   const sessions: AdminSession[] = sessionsRows.map((s) => {
     const a = s.athletes;
     const o = Array.isArray(a) ? a[0] : a;
@@ -404,6 +433,7 @@ export default async function AdminPage() {
         coachPayouts={coachPayouts}
         credits={credits}
         usersError={usersRes.error?.message ?? null}
+        youthSessionSpendLines={youthSessionSpendLines}
       />
     </div>
   );

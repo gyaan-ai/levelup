@@ -207,6 +207,17 @@ export type CreditRecord = {
   expires_at?: string | null;
 };
 
+/** Per youth wrestler row on a session (from session_participants.amount_paid). */
+export type YouthSessionSpendLine = {
+  youth_wrestler_id: string;
+  session_id: string;
+  amount_paid: number;
+  scheduled_datetime: string;
+  session_status: string;
+  coach_name: string;
+  facility_name: string;
+};
+
 type SectionId = 'overview' | 'bookings' | 'money' | 'people';
 type SubSectionId = 
   | 'dashboard' 
@@ -229,6 +240,8 @@ type Props = {
   coachPayouts: CoachPayout[];
   credits: CreditRecord[];
   usersError?: string | null;
+  /** Parent-paid session rows per youth wrestler (Stripe / recorded amounts). */
+  youthSessionSpendLines: YouthSessionSpendLine[];
 };
 
 // Sidebar Navigation Item Component
@@ -527,6 +540,7 @@ export function AdminDashboardClient({
   coachPayouts,
   credits,
   usersError,
+  youthSessionSpendLines = [],
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -592,6 +606,12 @@ export function AdminDashboardClient({
   const [historyPayoutTo, setHistoryPayoutTo] = useState('');
   const [historySearch, setHistorySearch] = useState('');
   const [payoutHistoryPeriod, setPayoutHistoryPeriod] = useState<PayoutHistoryPeriodPreset>('all');
+  const [athletesSubTab, setAthletesSubTab] = useState<'directory' | 'spending'>('directory');
+  const [athleteSpendPeriod, setAthleteSpendPeriod] = useState<PayoutHistoryPeriodPreset>('all');
+  const [athleteSpendDateFrom, setAthleteSpendDateFrom] = useState('');
+  const [athleteSpendDateTo, setAthleteSpendDateTo] = useState('');
+  const [athleteSpendWrestlerFilter, setAthleteSpendWrestlerFilter] = useState('all');
+  const [athleteSpendSearch, setAthleteSpendSearch] = useState('');
   
   // Fetch roster for a session via API
   const [rosterLoading, setRosterLoading] = useState(false);
@@ -1496,6 +1516,94 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
     () => sessions.filter((s) => s.status === 'completed' && s.athlete_payout_date).length,
     [sessions]
   );
+
+  const spendByYouthIdAll = useMemo(() => {
+    const m = new Map<string, { total: number; count: number }>();
+    for (const line of youthSessionSpendLines) {
+      const prev = m.get(line.youth_wrestler_id) ?? { total: 0, count: 0 };
+      prev.total += line.amount_paid;
+      prev.count += 1;
+      m.set(line.youth_wrestler_id, {
+        total: Math.round(prev.total * 100) / 100,
+        count: prev.count,
+      });
+    }
+    return m;
+  }, [youthSessionSpendLines]);
+
+  const totalYouthSpendAllTime = useMemo(
+    () => Math.round(youthSessionSpendLines.reduce((s, l) => s + l.amount_paid, 0) * 100) / 100,
+    [youthSessionSpendLines]
+  );
+
+  const effectiveAthleteSpendBounds = useMemo(() => {
+    if (athleteSpendPeriod === 'custom') {
+      return { from: athleteSpendDateFrom || null, to: athleteSpendDateTo || null };
+    }
+    const b = payoutDateBoundsForPreset(athleteSpendPeriod);
+    return b ? { from: b.from, to: b.to } : { from: null, to: null };
+  }, [athleteSpendPeriod, athleteSpendDateFrom, athleteSpendDateTo]);
+
+  const filteredAthleteSpendLines = useMemo(() => {
+    const bounds = effectiveAthleteSpendBounds;
+    const q = athleteSpendSearch.trim().toLowerCase();
+    return youthSessionSpendLines.filter((line) => {
+      const sd = formatInTimeZone(new Date(line.scheduled_datetime), APP_TIMEZONE, 'yyyy-MM-dd');
+      if (bounds.from && sd < bounds.from) return false;
+      if (bounds.to && sd > bounds.to) return false;
+      if (athleteSpendWrestlerFilter !== 'all' && line.youth_wrestler_id !== athleteSpendWrestlerFilter)
+        return false;
+      if (q) {
+        const kid = kidsList.find((k) => k.id === line.youth_wrestler_id);
+        const name = kid ? `${kid.first_name} ${kid.last_name}`.toLowerCase() : '';
+        const hay = `${name} ${line.coach_name} ${line.facility_name} ${line.session_id}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [
+    youthSessionSpendLines,
+    effectiveAthleteSpendBounds,
+    athleteSpendWrestlerFilter,
+    athleteSpendSearch,
+    kidsList,
+  ]);
+
+  const athleteSpendByWrestlerRows = useMemo(() => {
+    const map = new Map<string, { name: string; total: number; sessions: number }>();
+    for (const line of filteredAthleteSpendLines) {
+      const kid = kidsList.find((k) => k.id === line.youth_wrestler_id);
+      const name = kid
+        ? `${kid.first_name} ${kid.last_name}`.trim()
+        : `Wrestler ${line.youth_wrestler_id.slice(0, 8)}…`;
+      const prev = map.get(line.youth_wrestler_id);
+      if (prev) {
+        prev.total = Math.round((prev.total + line.amount_paid) * 100) / 100;
+        prev.sessions += 1;
+      } else {
+        map.set(line.youth_wrestler_id, { name, total: line.amount_paid, sessions: 1 });
+      }
+    }
+    return Array.from(map.entries())
+      .map(([youth_wrestler_id, v]) => ({ youth_wrestler_id, ...v }))
+      .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
+  }, [filteredAthleteSpendLines, kidsList]);
+
+  const athleteSpendFilteredTotal = useMemo(
+    () => Math.round(filteredAthleteSpendLines.reduce((s, l) => s + l.amount_paid, 0) * 100) / 100,
+    [filteredAthleteSpendLines]
+  );
+
+  const wrestlerSpendFilterOptions = useMemo(() => {
+    const ids = [...new Set(youthSessionSpendLines.map((l) => l.youth_wrestler_id))].sort();
+    return ids.map((id) => {
+      const kid = kidsList.find((k) => k.id === id);
+      const label = kid
+        ? `${kid.first_name} ${kid.last_name}`.trim()
+        : `Unknown (${id.slice(0, 8)}…)`;
+      return { id, label };
+    });
+  }, [youthSessionSpendLines, kidsList]);
 
   // Generate chart data from sessions
   const revenueChartData = useMemo(() => {
@@ -2999,64 +3107,370 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
         return (
           <div className="space-y-6">
             <div>
-              <h2 className="text-lg font-semibold">Youth Athletes</h2>
-              <p className="text-sm text-muted-foreground">Kids registered by parents</p>
+              <h2 className="text-lg font-semibold">Youth athletes</h2>
+              <p className="text-sm text-muted-foreground">
+                Directory of registered wrestlers. Spending uses recorded payments per session (Stripe lines).
+              </p>
             </div>
 
-            <Card className="overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/50">
-                    <tr>
-                      <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Name</th>
-                      <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">School</th>
-                      <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Parent</th>
-                      <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Level</th>
-                      <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Joined</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {kidsLoading ? (
-                      <tr>
-                        <td colSpan={5} className="py-12 text-center">
-                          <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
-                        </td>
-                      </tr>
-                    ) : kidsList.length === 0 ? (
-                      <tr>
-                        <td colSpan={5} className="py-12 text-center text-muted-foreground">
-                          <User className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
-                          <p>No athletes found</p>
-                        </td>
-                      </tr>
-                    ) : (
-                      kidsList.map((k) => (
-                        <tr key={k.id} className="hover:bg-muted/30 transition-colors">
-                          <td className="py-3 px-4">
-                            <div className="flex items-center gap-3">
-                              <ProfileImage
-                                src={k.photo_url}
-                                focusX={k.photo_focus_x}
-                                focusY={k.photo_focus_y}
-                                alt={`${k.first_name} ${k.last_name}`}
-                                className="h-8 w-8 rounded-full"
-                              />
-                              <span className="font-medium">{k.first_name} {k.last_name}</span>
-                            </div>
-                          </td>
-                          <td className="py-3 px-4 text-muted-foreground">{k.school || '-'}</td>
-                          <td className="py-3 px-4 text-muted-foreground">{k.parent_email}</td>
-                          <td className="py-3 px-4">
-                            {k.skill_level && <Badge variant="outline">{k.skill_level}</Badge>}
-                          </td>
-                          <td className="py-3 px-4 text-muted-foreground">{formatEST(new Date(k.created_at), 'MMM d, yyyy')}</td>
+            <Tabs
+              value={athletesSubTab}
+              onValueChange={(v) => setAthletesSubTab(v as 'directory' | 'spending')}
+              className="w-full"
+            >
+              <TabsList className="grid w-full max-w-md grid-cols-2">
+                <TabsTrigger value="directory">Directory</TabsTrigger>
+                <TabsTrigger value="spending" className="gap-2">
+                  <DollarSign className="h-4 w-4" />
+                  Spending
+                  {youthSessionSpendLines.length > 0 && (
+                    <span className="ml-1 rounded-full bg-muted px-2 py-0.5 text-xs">
+                      {youthSessionSpendLines.length}
+                    </span>
+                  )}
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="directory" className="mt-6 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Card className="p-4">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider">Total spent (all kids)</p>
+                    <p className="text-2xl font-semibold tabular-nums text-[#B89D60]">
+                      ${totalYouthSpendAllTime.toFixed(2)}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">Sum of parent payments on sessions</p>
+                  </Card>
+                  <Card className="p-4">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider">Paid session lines</p>
+                    <p className="text-2xl font-semibold">{youthSessionSpendLines.length}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Wrestler rows on sessions with amount</p>
+                  </Card>
+                </div>
+
+                <Card className="overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-muted/50">
+                        <tr>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            Name
+                          </th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            School
+                          </th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            Parent
+                          </th>
+                          <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            Total spent
+                          </th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            Level
+                          </th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            Joined
+                          </th>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </Card>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {kidsLoading ? (
+                          <tr>
+                            <td colSpan={6} className="py-12 text-center">
+                              <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+                            </td>
+                          </tr>
+                        ) : kidsList.length === 0 ? (
+                          <tr>
+                            <td colSpan={6} className="py-12 text-center text-muted-foreground">
+                              <User className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
+                              <p>No athletes found</p>
+                            </td>
+                          </tr>
+                        ) : (
+                          kidsList.map((k) => {
+                            const agg = spendByYouthIdAll.get(k.id);
+                            return (
+                              <tr key={k.id} className="hover:bg-muted/30 transition-colors">
+                                <td className="py-3 px-4">
+                                  <div className="flex items-center gap-3">
+                                    <ProfileImage
+                                      src={k.photo_url}
+                                      focusX={k.photo_focus_x}
+                                      focusY={k.photo_focus_y}
+                                      alt={`${k.first_name} ${k.last_name}`}
+                                      className="h-8 w-8 rounded-full"
+                                    />
+                                    <span className="font-medium">
+                                      {k.first_name} {k.last_name}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className="py-3 px-4 text-muted-foreground">{k.school || '-'}</td>
+                                <td className="py-3 px-4 text-muted-foreground">{k.parent_email}</td>
+                                <td className="py-3 px-4 text-right tabular-nums font-medium">
+                                  ${(agg?.total ?? 0).toFixed(2)}
+                                  {agg && agg.count > 0 && (
+                                    <span className="block text-[11px] text-muted-foreground font-normal">
+                                      {agg.count} session line{agg.count === 1 ? '' : 's'}
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="py-3 px-4">
+                                  {k.skill_level && <Badge variant="outline">{k.skill_level}</Badge>}
+                                </td>
+                                <td className="py-3 px-4 text-muted-foreground">
+                                  {formatEST(new Date(k.created_at), 'MMM d, yyyy')}
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="spending" className="mt-6 space-y-4">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-end">
+                  <div className="lg:col-span-3">
+                    <Label className="text-xs text-muted-foreground">Session date</Label>
+                    <Select
+                      value={athleteSpendPeriod}
+                      onValueChange={(v) => setAthleteSpendPeriod(v as PayoutHistoryPeriodPreset)}
+                    >
+                      <SelectTrigger className="mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All time</SelectItem>
+                        <SelectItem value="week">This week</SelectItem>
+                        <SelectItem value="month">This month</SelectItem>
+                        <SelectItem value="last30">Last 30 days</SelectItem>
+                        <SelectItem value="ytd">Year to date</SelectItem>
+                        <SelectItem value="custom">Custom range…</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      Filters by session date ({APP_TIMEZONE}).
+                    </p>
+                  </div>
+                  {athleteSpendPeriod === 'custom' && (
+                    <>
+                      <div className="lg:col-span-2">
+                        <Label className="text-xs text-muted-foreground">From</Label>
+                        <Input
+                          type="date"
+                          className="mt-1"
+                          value={athleteSpendDateFrom}
+                          onChange={(e) => setAthleteSpendDateFrom(e.target.value)}
+                        />
+                      </div>
+                      <div className="lg:col-span-2">
+                        <Label className="text-xs text-muted-foreground">To</Label>
+                        <Input
+                          type="date"
+                          className="mt-1"
+                          value={athleteSpendDateTo}
+                          onChange={(e) => setAthleteSpendDateTo(e.target.value)}
+                        />
+                      </div>
+                    </>
+                  )}
+                  <div className="lg:col-span-2">
+                    <Label className="text-xs text-muted-foreground">Athlete</Label>
+                    <Select value={athleteSpendWrestlerFilter} onValueChange={setAthleteSpendWrestlerFilter}>
+                      <SelectTrigger className="mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All athletes</SelectItem>
+                        {wrestlerSpendFilterOptions.map((o) => (
+                          <SelectItem key={o.id} value={o.id}>
+                            {o.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="lg:col-span-2">
+                    <Label className="text-xs text-muted-foreground">Search</Label>
+                    <Input
+                      className="mt-1"
+                      placeholder="Name, coach, facility…"
+                      value={athleteSpendSearch}
+                      onChange={(e) => setAthleteSpendSearch(e.target.value)}
+                    />
+                  </div>
+                  <div className="lg:col-span-1 flex justify-end">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="mt-6 lg:mt-0"
+                      onClick={() => {
+                        setAthleteSpendPeriod('all');
+                        setAthleteSpendDateFrom('');
+                        setAthleteSpendDateTo('');
+                        setAthleteSpendWrestlerFilter('all');
+                        setAthleteSpendSearch('');
+                      }}
+                    >
+                      Clear
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Card className="p-4">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider">Filtered total</p>
+                    <p className="text-2xl font-semibold tabular-nums">${athleteSpendFilteredTotal.toFixed(2)}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {filteredAthleteSpendLines.length} session line(s)
+                    </p>
+                  </Card>
+                  <Card className="p-4">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider">All-time total</p>
+                    <p className="text-2xl font-semibold tabular-nums">${totalYouthSpendAllTime.toFixed(2)}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Not affected by filters above</p>
+                  </Card>
+                </div>
+
+                <Card className="overflow-hidden">
+                  <div className="px-4 py-3 border-b border-border bg-muted/30">
+                    <h3 className="text-sm font-semibold">Totals by athlete</h3>
+                    <p className="text-xs text-muted-foreground">Same filters as session lines below.</p>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-muted/50">
+                        <tr>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            Athlete
+                          </th>
+                          <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            Sessions
+                          </th>
+                          <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            Total
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {athleteSpendByWrestlerRows.length === 0 ? (
+                          <tr>
+                            <td colSpan={3} className="py-8 text-center text-muted-foreground text-sm">
+                              No spending in this period for the current filters.
+                            </td>
+                          </tr>
+                        ) : (
+                          <>
+                            {athleteSpendByWrestlerRows.map((row) => (
+                              <tr key={row.youth_wrestler_id} className="hover:bg-muted/30">
+                                <td className="py-3 px-4 font-medium">{row.name}</td>
+                                <td className="py-3 px-4 text-right tabular-nums">{row.sessions}</td>
+                                <td className="py-3 px-4 text-right tabular-nums font-medium">
+                                  ${row.total.toFixed(2)}
+                                </td>
+                              </tr>
+                            ))}
+                            <tr className="bg-muted/40 font-medium">
+                              <td className="py-3 px-4">Total</td>
+                              <td className="py-3 px-4 text-right tabular-nums">
+                                {athleteSpendByWrestlerRows.reduce((s, r) => s + r.sessions, 0)}
+                              </td>
+                              <td className="py-3 px-4 text-right tabular-nums">
+                                ${athleteSpendFilteredTotal.toFixed(2)}
+                              </td>
+                            </tr>
+                          </>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+
+                <Card className="overflow-hidden">
+                  <div className="px-4 py-3 border-b border-border bg-muted/30">
+                    <h3 className="text-sm font-semibold">Session lines</h3>
+                    <p className="text-xs text-muted-foreground">Each row is one wrestler on one session.</p>
+                  </div>
+                  <div className="overflow-x-auto max-h-[min(65vh,640px)] overflow-y-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-muted/50 sticky top-0 z-10">
+                        <tr>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            Session date
+                          </th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            Athlete
+                          </th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            Coach
+                          </th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            Facility
+                          </th>
+                          <th className="text-center py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            Status
+                          </th>
+                          <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            Paid
+                          </th>
+                          <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            Link
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {filteredAthleteSpendLines.length === 0 ? (
+                          <tr>
+                            <td colSpan={7} className="py-10 text-center text-muted-foreground text-sm">
+                              No lines match. Load athletes or widen filters.
+                            </td>
+                          </tr>
+                        ) : (
+                          filteredAthleteSpendLines.map((line) => {
+                            const kid = kidsList.find((kk) => kk.id === line.youth_wrestler_id);
+                            const aname = kid
+                              ? `${kid.first_name} ${kid.last_name}`.trim()
+                              : `Unknown (${line.youth_wrestler_id.slice(0, 8)}…)`;
+                            return (
+                              <tr key={`${line.session_id}-${line.youth_wrestler_id}`} className="hover:bg-muted/30">
+                                <td className="py-3 px-4 whitespace-nowrap text-muted-foreground text-xs">
+                                  {formatEST(new Date(line.scheduled_datetime), 'MMM d, yyyy h:mm a')}
+                                </td>
+                                <td className="py-3 px-4 font-medium">{aname}</td>
+                                <td className="py-3 px-4 text-muted-foreground">{line.coach_name}</td>
+                                <td className="py-3 px-4 text-muted-foreground max-w-[180px] truncate">
+                                  {line.facility_name}
+                                </td>
+                                <td className="py-3 px-4 text-center">
+                                  <Badge variant="outline" className="text-xs">
+                                    {line.session_status}
+                                  </Badge>
+                                </td>
+                                <td className="py-3 px-4 text-right tabular-nums font-medium">
+                                  ${line.amount_paid.toFixed(2)}
+                                </td>
+                                <td className="py-3 px-4 text-right">
+                                  <Link href={`/admin/sessions/${line.session_id}/edit`}>
+                                    <Button variant="ghost" size="sm" className="h-8 gap-1 text-[#B89D60]">
+                                      <Pencil className="h-3.5 w-3.5" />
+                                      Edit
+                                    </Button>
+                                  </Link>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+              </TabsContent>
+            </Tabs>
           </div>
         );
       }
