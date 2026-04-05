@@ -1897,12 +1897,16 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
                                 setMarkingAthleteId(p.athlete_id);
                                 const amount = parseFloat(payoutTotalByAthlete[p.athlete_id] || p.amount.toString());
                                 try {
-                                  const res = await fetch('/api/admin/payout-log', {
+                                  const res = await fetch('/api/admin/mark-payout-paid', {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({ athlete_id: p.athlete_id, amount }),
                                   });
                                   if (res.ok) router.refresh();
+                                  else {
+                                    const data = await res.json().catch(() => ({}));
+                                    alert(data.error || 'Could not mark payout paid');
+                                  }
                                 } finally {
                                   setMarkingAthleteId(null);
                                 }
