@@ -13,6 +13,7 @@ import { rosterSnapshotFromYouthRow } from '@/lib/session-roster-snapshot';
 import { finalizeRegisterFromCheckoutSession } from '@/lib/finalize-session-register-from-stripe';
 import { getEffectiveFilledCount } from '@/lib/sessions';
 import { ensureAutoFamilyDiscountForParent } from '@/lib/family-auto-discount';
+import { checkoutAllowSavedAccountPercent, resolveCheckoutPercentOff } from '@/lib/checkout-promo';
 
 /**
  * POST - Pay & register a youth wrestler for a session (public or invite_only).
@@ -41,8 +42,8 @@ export async function POST(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const body = (await req.json()) as { youthWrestlerId: string };
-    const { youthWrestlerId } = body;
+    const body = (await req.json()) as { youthWrestlerId: string; promoCode?: string };
+    const { youthWrestlerId, promoCode } = body;
     if (!youthWrestlerId) return NextResponse.json({ error: 'Missing youthWrestlerId' }, { status: 400 });
     if (role === 'youth_wrestler' && youthWrestlerId !== user.id) {
       return NextResponse.json({ error: 'Youth wrestlers can only register themselves' }, { status: 403 });
@@ -71,7 +72,7 @@ export async function POST(
     };
 
     const admin = createAdminClient(tenant.slug);
-    if (role === 'parent') {
+    if (role === 'parent' && checkoutAllowSavedAccountPercent()) {
       await ensureAutoFamilyDiscountForParent(admin, user.id, user.email);
     }
     const { count: participantRowCount } = await admin
@@ -205,7 +206,11 @@ export async function POST(
       .select('percent_off')
       .eq('parent_id', user.id)
       .maybeSingle();
-    const percentOff = pctDiscount?.percent_off != null ? Number(pctDiscount.percent_off) : 0;
+    const percentOff = await resolveCheckoutPercentOff(admin, {
+      savedPercent: pctDiscount?.percent_off,
+      email: user.email,
+      promoCode,
+    });
     const priceAfterDiscount = percentOff >= 1 && percentOff <= 100
       ? pricePer * (1 - percentOff / 100)
       : pricePer;

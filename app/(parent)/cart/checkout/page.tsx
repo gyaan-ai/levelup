@@ -4,7 +4,14 @@ import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
 import { getWrestlersForParentUser } from '@/lib/wrestlers-for-parent';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { ensureAutoFamilyDiscountForParent } from '@/lib/family-auto-discount';
+import {
+  ensureAutoFamilyDiscountForParent,
+  effectivePercentOffForCheckout,
+} from '@/lib/family-auto-discount';
+import {
+  checkoutAllowSavedAccountPercent,
+  displayPercentForPromoOnlyCheckout,
+} from '@/lib/checkout-promo';
 import { CartCheckoutClient } from './cart-checkout-client';
 
 export const metadata = {
@@ -29,8 +36,9 @@ export default async function CartCheckoutPage() {
   }
 
   const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
+  const savedCheckout = checkoutAllowSavedAccountPercent();
   const admin = createAdminClient(tenant.slug);
-  if (userData?.role === 'parent') {
+  if (userData?.role === 'parent' && savedCheckout) {
     await ensureAutoFamilyDiscountForParent(admin, user.id, user.email);
   }
 
@@ -49,12 +57,17 @@ export default async function CartCheckoutPage() {
     .eq('parent_id', user.id)
     .maybeSingle();
 
+  const existingDiscountEff = savedCheckout
+    ? effectivePercentOffForCheckout(existingDiscountData?.percent_off, user.email)
+    : await displayPercentForPromoOnlyCheckout(admin, user.email);
+
   return (
     <div className="container max-w-3xl py-8 px-4">
       <CartCheckoutClient 
         wrestlers={wrestlers ?? []} 
         userEmail={user.email ?? ''} 
-        existingDiscount={existingDiscountData?.percent_off}
+        checkoutUsesSavedAccountDiscount={savedCheckout}
+        existingDiscount={existingDiscountEff >= 1 ? existingDiscountEff : undefined}
       />
     </div>
   );

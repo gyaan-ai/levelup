@@ -6,6 +6,8 @@ import { getTenantByDomain } from '@/config/tenants';
 import Link from 'next/link';
 import { CreateSessionForm } from './create-session-form';
 
+export const dynamic = 'force-dynamic';
+
 export default async function AdminCreateSessionPage() {
   const headersList = await headers();
   const host = headersList.get('host') || '';
@@ -25,12 +27,23 @@ export default async function AdminCreateSessionPage() {
     admin.from('facilities').select('id, name, school, address').order('name'),
   ]);
 
+  if (athletesRes.error) {
+    console.error('[admin/sessions/create] athletes query failed', athletesRes.error);
+  }
+  if (facilitiesRes.error) {
+    console.error('[admin/sessions/create] facilities query failed', facilitiesRes.error);
+  }
+
   const athletes = (athletesRes.data ?? []).map((a) => ({
     id: a.id,
     name: [a.first_name, a.last_name].filter(Boolean).join(' ').trim() || 'Coach',
     school: a.school ?? '',
   }));
   const facilities = facilitiesRes.data ?? [];
+  const loadError =
+    athletesRes.error?.message ||
+    facilitiesRes.error?.message ||
+    null;
 
   return (
     <div className="container mx-auto px-4 py-8">
@@ -43,6 +56,11 @@ export default async function AdminCreateSessionPage() {
           Assign a coach, set time and facility, then share the link so kids can join.
         </p>
       </div>
+      {loadError && (
+        <p className="mb-4 rounded-md border border-destructive/50 bg-destructive/10 px-4 py-2 text-sm text-destructive">
+          Could not load coaches or facilities: {loadError}
+        </p>
+      )}
       <CreateSessionForm athletes={athletes} facilities={facilities} />
     </div>
   );

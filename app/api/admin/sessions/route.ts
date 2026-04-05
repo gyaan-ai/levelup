@@ -3,7 +3,7 @@ import { headers } from 'next/headers';
 import { fromZonedTime } from 'date-fns-tz';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getTenantByDomain } from '@/config/tenants';
+import { getTenantFromRequestHeaders } from '@/config/tenants';
 import { generateInviteCode } from '@/lib/sessions';
 import { APP_TIMEZONE } from '@/lib/format-date';
 import { notifySessionScheduledFollowers } from '@/lib/notify-session-scheduled-followers';
@@ -11,6 +11,15 @@ import {
   getRecommendedPricePerParticipant,
   type CoachCreateSessionType,
 } from '@/lib/coach-session-pricing';
+
+/** Trim + lowercase for Postgres uuid text comparisons; returns null if not a plausible UUID string. */
+function normalizeUuidParam(value: unknown): string | null {
+  if (value == null) return null;
+  const s = String(value).trim().toLowerCase();
+  if (!s) return null;
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(s)) return null;
+  return s;
+}
 
 /**
  * POST - Admin creates a small-group session: assign coach, set time/facility, get shareable link.
@@ -20,7 +29,7 @@ export async function POST(req: NextRequest) {
   try {
     const headersList = await headers();
     const host = headersList.get('host') || '';
-    const tenant = getTenantByDomain(host);
+    const tenant = getTenantFromRequestHeaders(headersList);
     if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
 
     const supabase = await createClient(tenant.slug);
@@ -47,8 +56,8 @@ export async function POST(req: NextRequest) {
       focusArea2?: string;
     };
     const {
-      athleteId,
-      facilityId,
+      athleteId: rawAthleteId,
+      facilityId: rawFacilityId,
       scheduledDate,
       scheduledTime,
       durationMinutes = 60,
@@ -60,28 +69,29 @@ export async function POST(req: NextRequest) {
       focusArea2,
     } = body;
 
+    const athleteId = normalizeUuidParam(rawAthleteId);
+    const facilityId = normalizeUuidParam(rawFacilityId);
+
     if (!athleteId || !facilityId || !scheduledDate || !scheduledTime) {
       return NextResponse.json(
-        { error: 'Missing athleteId, facilityId, scheduledDate, or scheduledTime' },
+        {
+          error:
+            !athleteId || !facilityId
+              ? 'Invalid or missing coach or facility. Refresh the page and pick the coach and facility again.'
+              : 'Missing scheduledDate or scheduledTime',
+        },
         { status: 400 }
       );
     }
 
+    const userIdNorm = String(user.id).trim().toLowerCase();
+
     // Coaches can only create sessions for themselves
-    if (isCoach && athleteId !== user.id) {
+    if (isCoach && athleteId !== userIdNorm) {
       return NextResponse.json({ error: 'Coaches can only create sessions for themselves' }, { status: 403 });
     }
 
     const admin = createAdminClient(tenant.slug);
-
-    const sessionTypeKey = (sessionType || 'small_group') as CoachCreateSessionType;
-    const defaultPrice = await getRecommendedPricePerParticipant(admin, athleteId, sessionTypeKey);
-    const hasExplicitPrice =
-      bodyPrice !== undefined &&
-      bodyPrice !== null &&
-      String(bodyPrice).trim() !== '' &&
-      !Number.isNaN(Number(bodyPrice));
-    const price = hasExplicitPrice ? Math.max(0, Number(bodyPrice)) : defaultPrice;
 
     const [datePart] = scheduledDate.split('T');
     // Interpret date + time as Eastern; store UTC so display (formatEST) shows correct time
@@ -96,24 +106,53 @@ export async function POST(req: NextRequest) {
         : Math.min(20, Math.max(2, Number.isFinite(rawMax) && rawMax > 0 ? rawMax : sessionType === 'partner' ? 2 : 6));
     const duration = Math.min(120, Math.max(30, Number(durationMinutes) || 60));
 
-    // Coach must exist - also get payout rate
+    // Coach must exist in athletes (same id as auth user for coaches) — also get payout rate
     const { data: athlete, error: athleteErr } = await admin
       .from('athletes')
       .select('id, payout_rate, rate_tier')
       .eq('id', athleteId)
-      .single();
-    if (athleteErr || !athlete) {
-      return NextResponse.json({ error: 'Coach not found' }, { status: 404 });
+      .maybeSingle();
+    if (athleteErr) {
+      console.error('[admin/sessions POST] athletes lookup error', { athleteId, code: athleteErr.code, message: athleteErr.message });
+      return NextResponse.json({ error: 'Could not verify coach. Try again.' }, { status: 500 });
+    }
+    if (!athlete) {
+      const { data: urow } = await admin.from('users').select('id, role, email').eq('id', athleteId).maybeSingle();
+      if (urow?.role === 'coach') {
+        return NextResponse.json(
+          {
+            error:
+              'This coach account has no athlete profile row. They may need to finish signup, or the profile was removed. Fix in Supabase (athletes) or Admin → Users before creating sessions.',
+          },
+          { status: 409 }
+        );
+      }
+      console.error('[admin/sessions POST] coach id not in athletes', { athleteId, usersRole: urow?.role ?? null });
+      const mismatchHint =
+        ' If coaches show in the list but this fails, the app server may be using a different Supabase project than the one you checked (verify NEXT_PUBLIC_* and *_SUPABASE_SERVICE_KEY match the same project).';
+      const errorMsg = urow
+        ? `No coach profile in athletes for this account (user role: ${urow.role}). Session creation requires a row in public.athletes with id equal to the coach user id.${mismatchHint}`
+        : `Coach not found for that id (no matching users row). Refresh and pick the coach again.${mismatchHint}`;
+      return NextResponse.json({ error: errorMsg }, { status: 404 });
     }
     // Default to 80% (0.8000), founding coaches get 83.33% (0.8333)
     const coachPayoutRate = (athlete as { payout_rate?: number }).payout_rate ?? 0.8000;
+
+    const sessionTypeKey = (sessionType || 'small_group') as CoachCreateSessionType;
+    const defaultPrice = await getRecommendedPricePerParticipant(admin, athleteId, sessionTypeKey);
+    const hasExplicitPrice =
+      bodyPrice !== undefined &&
+      bodyPrice !== null &&
+      String(bodyPrice).trim() !== '' &&
+      !Number.isNaN(Number(bodyPrice));
+    const price = hasExplicitPrice ? Math.max(0, Number(bodyPrice)) : defaultPrice;
 
     // Facility must exist
     const { data: facility, error: facilityErr } = await admin
       .from('facilities')
       .select('id')
       .eq('id', facilityId)
-      .single();
+      .maybeSingle();
     if (facilityErr || !facility) {
       return NextResponse.json({ error: 'Facility not found' }, { status: 404 });
     }
@@ -179,7 +218,7 @@ export async function POST(req: NextRequest) {
 
     // Only notify followers if session is published
     if (session.published) {
-      void notifySessionScheduledFollowers(tenant.slug, athleteId, {
+      void notifySessionScheduledFollowers(tenant.slug, athlete.id, {
         sessionId: session.id,
         scheduledDatetime: session.scheduled_datetime,
         joinUrlPath: `/join/${session.partner_invite_code}`,

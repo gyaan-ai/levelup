@@ -11,6 +11,7 @@ import { formatEST } from '@/lib/format-date';
 import { hasMinPhoneDigits } from '@/lib/phone';
 import { rosterSnapshotFromYouthRow } from '@/lib/session-roster-snapshot';
 import { ensureAutoFamilyDiscountForParent } from '@/lib/family-auto-discount';
+import { checkoutAllowSavedAccountPercent, resolveCheckoutPercentOff } from '@/lib/checkout-promo';
 
 export async function POST(req: NextRequest) {
   try {
@@ -42,6 +43,7 @@ export async function POST(req: NextRequest) {
       totalPrice: number;
       pricePerParticipant?: number;
       productId?: string;
+      promoCode?: string;
     };
     const {
       athleteId,
@@ -54,6 +56,7 @@ export async function POST(req: NextRequest) {
       totalPrice,
       pricePerParticipant,
       productId,
+      promoCode,
     } = body;
 
     if (!athleteId || !youthWrestlerIds?.length || !scheduledDate || !scheduledTime || totalPrice == null) {
@@ -75,7 +78,7 @@ export async function POST(req: NextRequest) {
     }
 
     const admin = createAdminClient(tenant.slug);
-    if (userData?.role === 'parent') {
+    if (userData?.role === 'parent' && checkoutAllowSavedAccountPercent()) {
       await ensureAutoFamilyDiscountForParent(admin, user.id, user.email);
     }
 
@@ -106,7 +109,11 @@ export async function POST(req: NextRequest) {
       .select('percent_off')
       .eq('parent_id', user.id)
       .maybeSingle();
-    const percentOff = pctDiscount?.percent_off != null ? Number(pctDiscount.percent_off) : 0;
+    const percentOff = await resolveCheckoutPercentOff(admin, {
+      savedPercent: pctDiscount?.percent_off,
+      email: user.email,
+      promoCode,
+    });
     const priceAfterPct = percentOff >= 1 && percentOff <= 100
       ? totalPrice * (1 - percentOff / 100)
       : totalPrice;

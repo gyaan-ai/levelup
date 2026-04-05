@@ -122,8 +122,8 @@ export function CreateSessionForm({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            athleteId,
-            facilityId,
+            athleteId: athleteId.trim(),
+            facilityId: facilityId.trim(),
             scheduledDate: dt.date,
             scheduledTime: dt.time,
             durationMinutes,
@@ -131,6 +131,7 @@ export function CreateSessionForm({
             pricePerParticipant,
             sessionType,
             joinPolicy,
+            published: joinPolicy !== 'private',
             focusArea: focusArea || undefined,
             focusArea2: focusArea2 || undefined,
           }),

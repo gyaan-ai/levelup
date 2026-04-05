@@ -9,6 +9,7 @@ import { formatEST } from '@/lib/format-date';
 import { getEffectiveFilledCount } from '@/lib/sessions';
 import { getUserCreditBalance, applyCredits } from '@/lib/credits';
 import { ensureAutoFamilyDiscountForParent } from '@/lib/family-auto-discount';
+import { checkoutAllowSavedAccountPercent, resolveCheckoutPercentOff } from '@/lib/checkout-promo';
 
 type CartLine = { sessionId: string; wrestlerId: string };
 
@@ -59,6 +60,7 @@ export async function POST(req: NextRequest) {
       lines?: CartLine[];
       sessionIds?: string[];
       wrestlerId?: string;
+      promoCode?: string;
     };
 
     let lines: CartLine[] = [];
@@ -95,7 +97,7 @@ export async function POST(req: NextRequest) {
     }
 
     const admin = createAdminClient(tenant.slug);
-    if (role === 'parent') {
+    if (role === 'parent' && checkoutAllowSavedAccountPercent()) {
       await ensureAutoFamilyDiscountForParent(admin, user.id, user.email);
     }
 
@@ -240,7 +242,11 @@ export async function POST(req: NextRequest) {
       .eq('parent_id', user.id)
       .maybeSingle();
 
-    const percentOff = discountData?.percent_off ?? 0;
+    const percentOff = await resolveCheckoutPercentOff(admin, {
+      savedPercent: discountData?.percent_off,
+      email: user.email,
+      promoCode: body.promoCode,
+    });
     const discountAmount = percentOff > 0 ? totalPrice * (percentOff / 100) : 0;
     totalPrice = totalPrice - discountAmount;
 

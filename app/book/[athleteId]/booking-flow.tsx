@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Calendar } from '@/components/ui/calendar';
@@ -76,11 +78,21 @@ interface BookingFlowProps {
   products?: Product[];
   /** When set, pre-select this wrestler so the parent doesn't have to choose again (e.g. from Home "Book session" for a specific kid). */
   preselectedYouthWrestlerId?: string | null;
+  /** When false (default), percent discount only if user applies a valid promo on this flow. */
+  checkoutUsesSavedAccountDiscount?: boolean;
 }
 
 type AvailabilityByDay = { day_of_week: number; start_time: string; end_time: string }[];
 
-export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, products = [], preselectedYouthWrestlerId = null }: BookingFlowProps) {
+export function BookingFlow({
+  athlete,
+  facility,
+  youthWrestlers,
+  tenantPricing,
+  products = [],
+  preselectedYouthWrestlerId = null,
+  checkoutUsesSavedAccountDiscount = false,
+}: BookingFlowProps) {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
   const [selectedWrestlers, setSelectedWrestlers] = useState<YouthWrestler[]>(() => {
@@ -99,6 +111,11 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
   const [availabilityDates, setAvailabilityDates] = useState<Set<string>>(new Set());
   const [slots, setSlots] = useState<string[]>([]);
   const [percentOff, setPercentOff] = useState<number | null>(null);
+  const [bookingPromoCode, setBookingPromoCode] = useState('');
+  const [bookingPromoApplied, setBookingPromoApplied] = useState(false);
+  const [bookingPromoPercent, setBookingPromoPercent] = useState<number | null>(null);
+  const [bookingPromoLoading, setBookingPromoLoading] = useState(false);
+  const [bookingPromoError, setBookingPromoError] = useState<string | null>(null);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [freeEntitlements, setFreeEntitlements] = useState({ free1on1: 0, free2Athlete: 0 });
@@ -135,10 +152,17 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
   const priceInfo = getProductPrice();
   const totalPrice = priceInfo?.total ?? 0;
   const pricePerParticipant = priceInfo?.pricePerParticipant;
-  const displayPrice = percentOff != null && percentOff >= 1 && percentOff <= 100
-    ? totalPrice * (1 - percentOff / 100)
-    : totalPrice;
-  const hasPercentDiscount = percentOff != null && percentOff >= 1 && percentOff <= 100;
+  const effectivePercentOff = checkoutUsesSavedAccountDiscount
+    ? percentOff
+    : bookingPromoApplied && bookingPromoPercent != null
+      ? bookingPromoPercent
+      : null;
+  const displayPrice =
+    effectivePercentOff != null && effectivePercentOff >= 1 && effectivePercentOff <= 100
+      ? totalPrice * (1 - effectivePercentOff / 100)
+      : totalPrice;
+  const hasPercentDiscount =
+    effectivePercentOff != null && effectivePercentOff >= 1 && effectivePercentOff <= 100;
 
   const firstPrivateProduct = products.find(p => p.slug === 'private' || (p.min_participants === 1 && p.max_participants === 1));
   const firstPartnerProduct = products.find(p => p.slug === 'partner' || (p.min_participants <= 2 && p.max_participants >= 2));
@@ -185,24 +209,26 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
   useEffect(() => {
     (async () => {
       try {
-        const [entRes, pctRes] = await Promise.all([
-          fetch('/api/early-adopter-entitlements'),
-          fetch('/api/account/percentage-discount'),
-        ]);
+        const entRes = await fetch('/api/early-adopter-entitlements');
         if (entRes.ok) {
           const d = await entRes.json();
           setFreeEntitlements({ free1on1: d.free1on1 ?? 0, free2Athlete: d.free2Athlete ?? 0 });
         }
-        if (pctRes.ok) {
-          const p = await pctRes.json();
-          const n = p.percent_off != null ? Number(p.percent_off) : null;
-          setPercentOff(n != null && n >= 1 && n <= 100 ? n : null);
+        if (checkoutUsesSavedAccountDiscount) {
+          const pctRes = await fetch('/api/account/percentage-discount');
+          if (pctRes.ok) {
+            const p = await pctRes.json();
+            const n = p.percent_off != null ? Number(p.percent_off) : null;
+            setPercentOff(n != null && n >= 1 && n <= 100 ? n : null);
+          }
+        } else {
+          setPercentOff(null);
         }
       } catch {
         /* ignore */
       }
     })();
-  }, []);
+  }, [checkoutUsesSavedAccountDiscount]);
 
   useEffect(() => {
     let ok = true;
@@ -291,9 +317,43 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
     (currentStep === 2 && sessionChoice && (!isPartner || partnerOption)) ||
     (currentStep === 3 && !!selectedDate && !!selectedTime);
 
+  const handleBookingApplyPromo = async () => {
+    const t = bookingPromoCode.trim();
+    if (!t) return;
+    setBookingPromoLoading(true);
+    setBookingPromoError(null);
+    try {
+      const res = await fetch('/api/checkout/validate-promo-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: t.toUpperCase() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setBookingPromoError(data.error || 'Invalid code');
+        return;
+      }
+      setBookingPromoPercent(data.percent_off);
+      setBookingPromoApplied(true);
+    } catch {
+      setBookingPromoError('Could not validate code');
+    } finally {
+      setBookingPromoLoading(false);
+    }
+  };
+
   const handlePay = async () => {
     if (!sessionMode || !selectedDate || !selectedTime || totalPrice <= 0) {
       alert('Please complete all steps.');
+      return;
+    }
+    if (
+      !checkoutUsesSavedAccountDiscount &&
+      !willUseFreeSession &&
+      bookingPromoCode.trim() &&
+      !bookingPromoApplied
+    ) {
+      alert('Click Apply to confirm your promo code before paying, or clear the promo field.');
       return;
     }
     setLoading(true);
@@ -314,6 +374,10 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
           totalPrice,
           pricePerParticipant: pricePerParticipant ?? undefined,
           productId: selectedProduct?.id ?? undefined,
+          promoCode:
+            !checkoutUsesSavedAccountDiscount && bookingPromoApplied && bookingPromoCode.trim()
+              ? bookingPromoCode.trim().toUpperCase()
+              : undefined,
         }),
       });
       const data = await res.json();
@@ -702,11 +766,41 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
                     {facility.address && <p className="text-sm text-muted-foreground">{facility.address}</p>}
                   </div>
                 )}
+                {!checkoutUsesSavedAccountDiscount && !willUseFreeSession && (
+                  <div className="space-y-2 pt-2">
+                    <Label htmlFor="booking-promo">Promo code (discount only if you Apply a valid code)</Label>
+                    <div className="flex gap-2 flex-wrap">
+                      <Input
+                        id="booking-promo"
+                        className="max-w-xs uppercase"
+                        value={bookingPromoCode}
+                        onChange={(e) => {
+                          setBookingPromoCode(e.target.value.toUpperCase());
+                          setBookingPromoApplied(false);
+                          setBookingPromoPercent(null);
+                          setBookingPromoError(null);
+                        }}
+                        autoComplete="off"
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleBookingApplyPromo}
+                        disabled={bookingPromoLoading || !bookingPromoCode.trim()}
+                      >
+                        {bookingPromoLoading ? '…' : 'Apply'}
+                      </Button>
+                    </div>
+                    {bookingPromoError && (
+                      <p className="text-sm text-destructive">{bookingPromoError}</p>
+                    )}
+                  </div>
+                )}
                 <div className="pt-4 border-t flex justify-between items-center">
                   <span className="font-semibold">Price</span>
                   <span className="text-2xl font-bold">
                     {willUseFreeSession ? <span className="text-accent">Free (early adopter)</span> : hasPercentDiscount ? (
-                      <span>{percentOff}% off: ${displayPrice.toFixed(2)}</span>
+                      <span>{effectivePercentOff}% off: ${displayPrice.toFixed(2)}</span>
                     ) : (
                       `$${totalPrice.toFixed(2)}`
                     )}
@@ -719,7 +813,7 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
                 )}
                 {hasPercentDiscount && !willUseFreeSession && (
                   <p className="text-sm text-muted-foreground">
-                    Your {percentOff}% family discount is applied. You&apos;ll pay ${displayPrice.toFixed(2)}.
+                    {effectivePercentOff}% discount applied. You&apos;ll pay ${displayPrice.toFixed(2)}.
                   </p>
                 )}
                 {(sessionMode === 'partner-invite' || sessionMode === 'partner-open') && !willUseFreeSession && (
@@ -813,7 +907,7 @@ export function BookingFlow({ athlete, facility, youthWrestlers, tenantPricing, 
               <div className="pt-4 border-t flex justify-between">
                 <span className="font-semibold">Total</span>
                 <span className="text-xl font-bold">
-                  {sessionMode ? (hasPercentDiscount ? `$${displayPrice.toFixed(2)} (${percentOff}% off)` : `$${totalPrice.toFixed(2)}`) : '—'}
+                  {sessionMode ? (hasPercentDiscount ? `$${displayPrice.toFixed(2)} (${effectivePercentOff}% off)` : `$${totalPrice.toFixed(2)}`) : '—'}
                 </span>
               </div>
             </CardContent>

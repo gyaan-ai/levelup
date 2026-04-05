@@ -3,6 +3,7 @@ import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
+import { checkoutAllowSavedAccountPercent } from '@/lib/checkout-promo';
 import { BookingFlow } from './booking-flow';
 
 export default async function BookPage({
@@ -137,6 +138,7 @@ export default async function BookPage({
       tenantPricing={tenant.pricing}
       products={products}
       preselectedYouthWrestlerId={preselectedYouthWrestlerId}
+      checkoutUsesSavedAccountDiscount={checkoutAllowSavedAccountPercent()}
     />
   );
 }

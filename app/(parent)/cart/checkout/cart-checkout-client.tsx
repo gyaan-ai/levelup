@@ -27,10 +27,12 @@ type Wrestler = {
 export function CartCheckoutClient({
   wrestlers: initialWrestlers,
   userEmail,
+  checkoutUsesSavedAccountDiscount,
   existingDiscount,
 }: {
   wrestlers: Wrestler[];
   userEmail: string;
+  checkoutUsesSavedAccountDiscount: boolean;
   existingDiscount?: number;
 }) {
   const router = useRouter();
@@ -49,7 +51,7 @@ export function CartCheckoutClient({
   const [promoLoading, setPromoLoading] = useState(false);
   const [promoError, setPromoError] = useState<string | null>(null);
   const [appliedDiscount, setAppliedDiscount] = useState<number>(existingDiscount ?? 0);
-  const [promoApplied, setPromoApplied] = useState(!!existingDiscount);
+  const [promoApplied, setPromoApplied] = useState((existingDiscount ?? 0) > 0);
 
   const allLinesHaveWrestler = items.length > 0 && items.every((i) => Boolean(i.athlete_id));
 
@@ -65,24 +67,38 @@ export function CartCheckoutClient({
   
   const handleApplyPromo = async () => {
     if (!promoCode.trim()) return;
-    
+
     setPromoLoading(true);
     setPromoError(null);
-    
+
     try {
-      const res = await fetch('/api/redeem-discount-code', {
+      if (checkoutUsesSavedAccountDiscount) {
+        const res = await fetch('/api/redeem-discount-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: promoCode.trim().toUpperCase() }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setPromoError(data.error || 'Invalid promo code');
+          return;
+        }
+        setAppliedDiscount(data.percent_off);
+        setPromoApplied(true);
+        setPromoError(null);
+        return;
+      }
+
+      const res = await fetch('/api/checkout/validate-promo-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code: promoCode.trim().toUpperCase() }),
       });
-      
       const data = await res.json();
-      
       if (!res.ok) {
         setPromoError(data.error || 'Invalid promo code');
         return;
       }
-      
       setAppliedDiscount(data.percent_off);
       setPromoApplied(true);
       setPromoError(null);
@@ -116,10 +132,15 @@ export function CartCheckoutClient({
     setError(null);
 
     try {
+      const promoPayload =
+        !checkoutUsesSavedAccountDiscount && promoApplied && promoCode.trim()
+          ? promoCode.trim().toUpperCase()
+          : undefined;
+
       const res = await fetch('/api/cart/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lines }),
+        body: JSON.stringify({ lines, promoCode: promoPayload }),
       });
 
       const data = await res.json();
@@ -289,7 +310,9 @@ export function CartCheckoutClient({
 
           {/* Promo Code */}
           <div className="space-y-2">
-            <Label htmlFor="promo">Promo Code</Label>
+            <Label htmlFor="promo">
+              {checkoutUsesSavedAccountDiscount ? 'Promo Code' : 'Promo code (required for discount — Apply, then pay)'}
+            </Label>
             {promoApplied ? (
               <div className="flex items-center gap-2 p-3 bg-accent/10 border border-accent/20 rounded-lg">
                 <Check className="h-4 w-4 text-accent" />
@@ -303,7 +326,13 @@ export function CartCheckoutClient({
                   id="promo"
                   placeholder="Enter code"
                   value={promoCode}
-                  onChange={(e) => setPromoCode(e.target.value.toUpperCase())}
+                  onChange={(e) => {
+                    setPromoCode(e.target.value.toUpperCase());
+                    setPromoApplied(false);
+                    if (!checkoutUsesSavedAccountDiscount) {
+                      setAppliedDiscount(0);
+                    }
+                  }}
                   className="flex-1"
                 />
                 <Button

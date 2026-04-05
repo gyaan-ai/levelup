@@ -35,6 +35,45 @@ export function family10CodeBlockedForEmail(
 }
 
 /**
+ * When `FAMILY10_AUTO_PARENT_EMAILS` is non-empty, only those login emails get a percent
+ * discount at checkout (cart, session register, bookings). Everyone else pays full price
+ * even if `parent_percentage_discounts` still has a row (e.g. mistaken redeem).
+ *
+ * When `FAMILY10_REQUIRE_ALLOWLIST_FOR_CHECKOUT=true`, the same gate applies even if the
+ * allowlist env is empty — so no one gets a percent discount until you add allowed emails.
+ */
+export function familyCheckoutGatedByAllowlist(): boolean {
+  if (process.env.FAMILY10_REQUIRE_ALLOWLIST_FOR_CHECKOUT === 'true') {
+    return true;
+  }
+  return parseFamilyAutoParentEmails().size > 0;
+}
+
+/**
+ * Emergency: set `FAMILY10_DISABLE_ALL_CHECKOUT_PERCENT_OFF=true` to charge full price for everyone.
+ */
+export function familyCheckoutPercentDisabled(): boolean {
+  return process.env.FAMILY10_DISABLE_ALL_CHECKOUT_PERCENT_OFF === 'true';
+}
+
+/**
+ * Percent off applied at Stripe / UI. Respects allowlist gate and kill switch.
+ */
+export function effectivePercentOffForCheckout(
+  percentOffFromDb: number | null | undefined,
+  email: string | null | undefined
+): number {
+  if (familyCheckoutPercentDisabled()) return 0;
+  const raw = percentOffFromDb != null ? Number(percentOffFromDb) : NaN;
+  if (!Number.isFinite(raw) || raw < 1) return 0;
+  const clamped = Math.min(100, Math.round(raw));
+  if (familyCheckoutGatedByAllowlist() && !emailHasFamilyAllowlist(email)) {
+    return 0;
+  }
+  return clamped;
+}
+
+/**
  * Idempotent: if this parent email is on the org allowlist and they have no `parent_percentage_discounts` row yet,
  * inserts FAMILY10 from `discount_codes`. Does not increment `discount_codes.redemptions` (org grant).
  */

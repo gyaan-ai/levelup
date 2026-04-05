@@ -170,3 +170,16 @@ export function getTenantConfig(slug: string): TenantConfig {
   }
   return tenant;
 }
+
+/**
+ * Prefer middleware-set x-tenant-slug so API routes use the same tenant as the edge
+ * even if Host / forwarded headers differ (e.g. proxies, preview URLs).
+ */
+export function getTenantFromRequestHeaders(headersList: Headers): TenantConfig | null {
+  const fromSlug = headersList.get('x-tenant-slug')?.trim() || '';
+  if (fromSlug && tenants[fromSlug]) {
+    return tenants[fromSlug];
+  }
+  const host = headersList.get('host') || '';
+  return getTenantByDomain(host);
+}

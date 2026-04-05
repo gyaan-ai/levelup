@@ -15,6 +15,7 @@ import { formatEST } from '@/lib/format-date';
 import { SessionTypeBadge } from '@/components/session-type-badge';
 import { SchoolLogo } from '@/components/school-logo';
 import { ensureAutoFamilyDiscountForParent } from '@/lib/family-auto-discount';
+import { checkoutAllowSavedAccountPercent } from '@/lib/checkout-promo';
 
 export const dynamic = 'force-dynamic';
 
@@ -44,7 +45,7 @@ export default async function HomePage() {
 
   const nowISO = new Date().toISOString();
   const admin = createAdminClient(tenant.slug);
-  if (userData?.role === 'parent') {
+  if (userData?.role === 'parent' && checkoutAllowSavedAccountPercent()) {
     await ensureAutoFamilyDiscountForParent(admin, user.id, user.email);
   }
 
