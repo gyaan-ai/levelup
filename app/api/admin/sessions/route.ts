@@ -109,7 +109,7 @@ export async function POST(req: NextRequest) {
     // Coach must exist in athletes (same id as auth user for coaches) — also get payout rate
     const { data: athlete, error: athleteErr } = await admin
       .from('athletes')
-      .select('id, payout_rate, rate_tier')
+      .select('id, payout_rate')
       .eq('id', athleteId)
       .maybeSingle();
     if (athleteErr) {
