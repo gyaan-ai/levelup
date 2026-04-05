@@ -108,20 +108,41 @@ export default async function HomePage() {
         .in('id', familySessionIds)
         .eq('status', 'completed')
         .order('scheduled_datetime', { ascending: false })
-        .limit(20)
+        .limit(200)
     : { data: [] };
 
-  // Get existing reviews to filter out already-reviewed sessions
-  const completedIds = (completedSessions ?? []).map((s: { id: string }) => s.id);
-  const { data: existingReviews } = completedIds.length > 0
-    ? await supabase
-        .from('session_reviews')
-        .select('session_id')
-        .in('session_id', completedIds)
-        .eq('parent_id', user.id)
-    : { data: [] };
-  const reviewedSessionIds = new Set((existingReviews ?? []).map((r: { session_id: string }) => r.session_id));
-  const sessionsAwaitingReview = (completedSessions ?? []).filter((s: { id: string }) => !reviewedSessionIds.has(s.id)).slice(0, 3);
+  // Coaches this parent has already reviewed (one review per coach is enough — no per-session nag)
+  const { data: myReviewsForCoaches } = await supabase
+    .from('reviews')
+    .select('athlete_id')
+    .eq('parent_id', user.id);
+  const reviewedCoachIds = new Set(
+    (myReviewsForCoaches ?? [])
+      .map((r: { athlete_id?: string | null }) => r.athlete_id)
+      .filter((id): id is string => Boolean(id))
+  );
+
+  type CompletedRow = {
+    id: string;
+    athlete_id?: string | null;
+    scheduled_datetime: string;
+    session_type?: string;
+    session_mode?: string;
+    athletes?: unknown;
+    session_participants?: unknown;
+  };
+
+  const completedList = (completedSessions ?? []) as unknown as CompletedRow[];
+  const pendingCoachReview: CompletedRow[] = [];
+  const seenCoach = new Set<string>();
+  for (const s of completedList) {
+    const coachId = s.athlete_id && String(s.athlete_id).trim();
+    if (!coachId || reviewedCoachIds.has(coachId)) continue;
+    if (seenCoach.has(coachId)) continue;
+    seenCoach.add(coachId);
+    pendingCoachReview.push(s);
+  }
+  const sessionsAwaitingReview = pendingCoachReview.slice(0, 20);
 
   // Get next session info per wrestler
   const nextSessionByWrestler: Record<string, string> = {};
@@ -183,7 +204,7 @@ export default async function HomePage() {
             {showReviewButton ? (
               <div className="flex items-center gap-1 text-[#D4AF37]">
                 <Star className="h-4 w-4" />
-                <span className="text-sm font-medium">Review</span>
+                <span className="text-sm font-medium">Rate coach</span>
               </div>
             ) : (
               <>
@@ -272,15 +293,19 @@ export default async function HomePage() {
         )}
       </section>
 
-      {/* Sessions Awaiting Review */}
+      {/* One reminder per coach: rate the coach (session link is for the form only) */}
       {sessionsAwaitingReview.length > 0 && (
         <section className="px-4 mb-6">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-lg font-semibold text-foreground">Leave Feedback</h2>
+            <h2 className="text-lg font-semibold text-foreground">Rate your coaches</h2>
             <span className="text-xs bg-[#D4AF37]/20 text-[#D4AF37] px-2 py-1 rounded-full font-medium">
               {sessionsAwaitingReview.length} pending
             </span>
           </div>
+          <p className="text-sm text-zinc-500 mb-3">
+            You may see several reminders — one for each coach you&apos;ve completed a session with but haven&apos;t rated yet.
+            Each reminder goes away after you leave feedback for that coach.
+          </p>
           <div className="space-y-3">
             {sessionsAwaitingReview.map((session) => (
               <SessionCard key={(session as SessionRow).id} session={session as SessionRow} showReviewButton />

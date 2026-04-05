@@ -249,6 +249,7 @@ export default async function AdminPage() {
         amount_paid: amt,
         scheduled_datetime: s.scheduled_datetime,
         session_status: s.status,
+        session_type: s.session_type ?? undefined,
         coach_name: coachName,
         facility_name: facilityName,
       });

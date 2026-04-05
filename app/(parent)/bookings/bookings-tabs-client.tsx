@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -22,10 +22,22 @@ export function BookingsTabsClient({
 }) {
   const [activeTab, setActiveTab] = useState<TabId>('upcoming');
   const hasUpcoming = thisWeek.length > 0 || thisMonth.length > 0 || later.length > 0;
-  
-  // Separate past sessions into needing review vs already reviewed
-  const needsReview = closed.filter(s => s.status === 'completed' && !s.hasReviewed);
-  const reviewed = closed.filter(s => s.status === 'completed' && s.hasReviewed);
+
+  // One card per coach awaiting a first review (same as parent home)
+  const needsReview = useMemo(() => {
+    const raw = closed.filter((s) => s.status === 'completed' && !s.hasReviewed);
+    const byCoach = new Map<string, BookingSession>();
+    for (const s of raw) {
+      const cid = s.coach.id;
+      const prev = byCoach.get(cid);
+      if (!prev || new Date(s.scheduled_datetime) > new Date(prev.scheduled_datetime)) {
+        byCoach.set(cid, s);
+      }
+    }
+    return Array.from(byCoach.values());
+  }, [closed]);
+
+  const reviewed = closed.filter((s) => s.status === 'completed' && s.hasReviewed);
   const otherPast = closed.filter(s => s.status !== 'completed');
 
   return (
@@ -141,7 +153,7 @@ export function BookingsTabsClient({
                     </h2>
                   </div>
                   <p className="text-sm text-zinc-400 mb-4">
-                    Help coaches improve by sharing your experience
+                    One row per coach you haven&apos;t rated yet — you can have several if you&apos;ve worked with multiple coaches.
                   </p>
                   <div className="space-y-3">
                     {needsReview.map((s) => (

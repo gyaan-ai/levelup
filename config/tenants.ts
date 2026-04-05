@@ -143,6 +143,20 @@ function hostMatchesConfiguredAppUrl(host: string): boolean {
   }
 }
 
+/**
+ * Public hostname for tenant detection (and share links). Prefer X-Forwarded-Host
+ * so API routes match middleware when Host is an internal/upstream value.
+ */
+export function resolveHostnameFromHeaders(h: Headers): string {
+  const xf = h.get('x-forwarded-host');
+  if (xf) {
+    const first = xf.split(',')[0]?.trim().split(':')[0] ?? '';
+    if (first) return first.toLowerCase();
+  }
+  const host = h.get('host') || '';
+  return host.split(':')[0].toLowerCase();
+}
+
 export function getTenantByDomain(hostname: string): TenantConfig | null {
   const host = hostname.split(':')[0].toLowerCase();
   // Primary domain and localhost for dev
@@ -180,6 +194,5 @@ export function getTenantFromRequestHeaders(headersList: Headers): TenantConfig 
   if (fromSlug && tenants[fromSlug]) {
     return tenants[fromSlug];
   }
-  const host = headersList.get('host') || '';
-  return getTenantByDomain(host);
+  return getTenantByDomain(resolveHostnameFromHeaders(headersList));
 }

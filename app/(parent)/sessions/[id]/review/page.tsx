@@ -118,6 +118,27 @@ export default async function SessionReviewPage({
   const f = session.facilities;
   const facility = Array.isArray(f) ? f[0] : (f as { name: string } | null);
 
+  const coachName = coach ? `${coach.first_name} ${coach.last_name}` : 'Coach';
+  const coachId = coach?.id ?? '';
+
+  if (coachId) {
+    const { data: existingCoachRows } = await supabase
+      .from('reviews')
+      .select('session_id')
+      .eq('parent_id', user.id)
+      .eq('athlete_id', coachId)
+      .limit(1);
+    const existingForCoach = existingCoachRows?.[0];
+    if (existingForCoach && existingForCoach.session_id !== sessionId) {
+      return (
+        <ReviewError
+          title="Feedback already shared"
+          message={`You already left feedback for ${coachName}. One review per coach is enough — thank you!`}
+        />
+      );
+    }
+  }
+
   const { data: existing } = await supabase
     .from('reviews')
     .select('id, rating, comment, tags')
@@ -125,7 +146,6 @@ export default async function SessionReviewPage({
     .eq('parent_id', user.id)
     .maybeSingle();
 
-  const coachName = coach ? `${coach.first_name} ${coach.last_name}` : 'Coach';
   const facilityName = facility?.name ?? '';
 
   return (

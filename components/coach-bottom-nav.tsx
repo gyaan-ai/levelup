@@ -2,18 +2,18 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, CalendarPlus, DollarSign, User } from 'lucide-react';
+import { Home, Calendar, CalendarPlus, Users, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 /**
- * Coach mobile bottom nav - 4 core items per spec:
- * Home (dashboard), Sessions (list + create), Earnings, Profile
- * Uses gold active states matching parent nav style.
+ * Coach mobile bottom nav — aligns with desktop header: Home, Schedule, Sessions, Roster, Profile.
+ * Earnings, session types, reviews, inbox live in the header overflow menu (see CoachHeaderMobile).
  */
-const ITEMS: readonly { href: string; label: string; icon: typeof Home }[] = [
-  { href: '/athlete-dashboard', label: 'Home', icon: Home },
+const ITEMS: readonly { href: string; label: string; icon: typeof Home; homeTab?: boolean }[] = [
+  { href: '/athlete-dashboard', label: 'Home', icon: Home, homeTab: true },
+  { href: '/availability', label: 'Schedule', icon: Calendar },
   { href: '/coach-sessions', label: 'Sessions', icon: CalendarPlus },
-  { href: '/coach-earnings', label: 'Earnings', icon: DollarSign },
+  { href: '/coach-roster', label: 'Roster', icon: Users },
   { href: '/profile', label: 'Profile', icon: User },
 ];
 
@@ -25,10 +25,10 @@ export function CoachBottomNav() {
       className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around border-t border-border/50 bg-black/95 backdrop-blur-xl supports-[backdrop-filter]:bg-black/90 pb-[env(safe-area-inset-bottom)] md:hidden"
       aria-label="Coach navigation"
     >
-      {ITEMS.map(({ href, label, icon: Icon }) => {
-        const isActive =
-          pathname === href ||
-          (href !== '/athlete-dashboard' && pathname.startsWith(href));
+      {ITEMS.map(({ href, label, icon: Icon, homeTab }) => {
+        const isActive = homeTab
+          ? pathname === '/' || pathname === '/athlete-dashboard' || pathname.startsWith('/athlete-dashboard/')
+          : pathname === href || (href !== '/' && pathname.startsWith(href + '/'));
         return (
           <Link
             key={href}
@@ -51,10 +51,12 @@ export function CoachBottomNav() {
                 aria-hidden 
               />
             </div>
-            <span className={cn(
-              "mt-1 transition-all duration-200",
-              isActive ? "opacity-100" : "opacity-70"
-            )}>
+            <span
+              className={cn(
+                'mt-1 transition-all duration-200 max-w-[4.5rem] truncate leading-tight',
+                isActive ? 'opacity-100' : 'opacity-70'
+              )}
+            >
               {label}
             </span>
             {isActive && (

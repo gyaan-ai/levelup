@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getTenantByDomain } from '@/config/tenants';
+import { getTenantByDomain, resolveHostnameFromHeaders } from '@/config/tenants';
 
 export async function middleware(req: NextRequest) {
-  const hostname = req.headers.get('host') || '';
-  
-  // Extract tenant from subdomain
+  const hostname = resolveHostnameFromHeaders(req.headers);
+
+  // Extract tenant from subdomain / known domains
   const tenant = getTenantByDomain(hostname);
   
   if (!tenant) {

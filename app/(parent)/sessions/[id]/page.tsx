@@ -277,15 +277,17 @@ export default async function SessionDetailPage({
     if (amt != null && Number(amt) > 0) amountPaid += Number(amt);
   }
 
-  const pastSessionIds = isPast && s.status === 'completed' ? [sessionId] : [];
-  const { data: myReviews } = pastSessionIds.length > 0
-    ? await supabase
-        .from('reviews')
-        .select('session_id')
-        .eq('parent_id', user.id)
-        .in('session_id', pastSessionIds)
-    : { data: [] };
-  const hasReviewed = (myReviews ?? []).length > 0;
+  const coachIdForReview = s.athlete_id && String(s.athlete_id).trim();
+  const { data: coachReviewRows } =
+    isPast && s.status === 'completed' && coachIdForReview
+      ? await supabase
+          .from('reviews')
+          .select('id')
+          .eq('parent_id', user.id)
+          .eq('athlete_id', coachIdForReview)
+          .limit(1)
+      : { data: [] };
+  const hasReviewed = (coachReviewRows ?? []).length > 0;
 
   const statusBadge = (status: string) => {
     if (status === 'scheduled') return <Badge>Scheduled</Badge>;

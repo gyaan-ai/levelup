@@ -128,15 +128,15 @@ export default async function MyBookingsPage() {
   const coachIdsForReviewStats = [...new Set(all.map((s) => s.athlete_id).filter(Boolean) as string[])];
   const bookingsReviewStatsMap = await fetchCoachReviewStatsMap(supabase, coachIdsForReviewStats);
 
-  const pastSessionIds = past.map((s) => s.id);
-  const { data: myReviews } = pastSessionIds.length > 0
-    ? await supabase
-        .from('reviews')
-        .select('session_id')
-        .eq('parent_id', user.id)
-        .in('session_id', pastSessionIds)
-    : { data: [] };
-  const reviewedSessionIds = new Set((myReviews ?? []).map((r: { session_id: string }) => r.session_id));
+  const { data: myReviewsForCoaches } = await supabase
+    .from('reviews')
+    .select('athlete_id')
+    .eq('parent_id', user.id);
+  const reviewedCoachIds = new Set(
+    (myReviewsForCoaches ?? [])
+      .map((r: { athlete_id?: string | null }) => r.athlete_id)
+      .filter((id): id is string => Boolean(id))
+  );
 
   // All participant names per session (admin fetch so we show all kids on the card, not just current user's)
   let allParticipantsBySession: Record<string, string[]> = {};
@@ -241,7 +241,7 @@ export default async function MyBookingsPage() {
     facility_id: facilityId(s),
     wrestlers: wrestlers(s),
     primaryWrestlerId: primaryWrestlerId(s),
-    hasReviewed: s.status === 'completed' ? reviewedSessionIds.has(s.id) : undefined,
+    hasReviewed: s.status === 'completed' ? reviewedCoachIds.has(coach(s).id) : undefined,
   });
 
   const thisWeekSessions = thisWeek.map(transformSession);

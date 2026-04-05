@@ -3,7 +3,7 @@ import { headers } from 'next/headers';
 import { fromZonedTime } from 'date-fns-tz';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getTenantFromRequestHeaders } from '@/config/tenants';
+import { getTenantFromRequestHeaders, resolveHostnameFromHeaders } from '@/config/tenants';
 import { generateInviteCode } from '@/lib/sessions';
 import { APP_TIMEZONE } from '@/lib/format-date';
 import { notifySessionScheduledFollowers } from '@/lib/notify-session-scheduled-followers';
@@ -12,13 +12,26 @@ import {
   type CoachCreateSessionType,
 } from '@/lib/coach-session-pricing';
 
-/** Trim + lowercase for Postgres uuid text comparisons; returns null if not a plausible UUID string. */
+/**
+ * Normalize ids from JSON / UI (trim, strip BOM/invisibles, braces, optional 32-hex form).
+ */
 function normalizeUuidParam(value: unknown): string | null {
   if (value == null) return null;
-  const s = String(value).trim().toLowerCase();
+  let s = String(value).trim();
+  s = s.replace(/^\{|\}$/g, '').replace(/^urn:uuid:/i, '').trim();
+  s = s.replace(/[\u200b-\u200f\ufeff\u00a0\u202f]/g, '');
   if (!s) return null;
-  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/.test(s)) return null;
-  return s;
+  s = s.toLowerCase();
+  const hyphenated =
+    /^([0-9a-f]{8})-([0-9a-f]{4})-([0-9a-f]{4})-([0-9a-f]{4})-([0-9a-f]{12})$/.exec(s);
+  if (hyphenated) {
+    return `${hyphenated[1]}-${hyphenated[2]}-${hyphenated[3]}-${hyphenated[4]}-${hyphenated[5]}`;
+  }
+  const compact = s.replace(/-/g, '');
+  if (/^[0-9a-f]{32}$/.test(compact)) {
+    return `${compact.slice(0, 8)}-${compact.slice(8, 12)}-${compact.slice(12, 16)}-${compact.slice(16, 20)}-${compact.slice(20)}`;
+  }
+  return null;
 }
 
 /**
@@ -28,7 +41,7 @@ function normalizeUuidParam(value: unknown): string | null {
 export async function POST(req: NextRequest) {
   try {
     const headersList = await headers();
-    const host = headersList.get('host') || '';
+    const outwardHost = resolveHostnameFromHeaders(headersList) || '';
     const tenant = getTenantFromRequestHeaders(headersList);
     if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
 
@@ -212,7 +225,7 @@ export async function POST(req: NextRequest) {
 
     const baseUrl =
       process.env.NEXT_PUBLIC_APP_URL ||
-      (host.startsWith('localhost') ? `http://${host}` : `https://${host}`);
+      (outwardHost.startsWith('localhost') ? `http://${outwardHost}` : `https://${outwardHost}`);
     const shareUrl = `${baseUrl}/join/${session.partner_invite_code}`;
 
     // Only notify followers when UI asked for a published / discoverable session (private → skip)

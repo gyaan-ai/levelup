@@ -8,7 +8,11 @@ import { easternCalendarDaysBetween, formatEST } from '@/lib/format-date';
 import { differenceInHours } from 'date-fns';
 import { CoachPlaybook } from '@/components/coach-playbook';
 import { CoachRankCard } from '@/components/coach-rank-card';
-import { BookingCard, type BookingSession } from '@/app/(parent)/bookings/booking-card';
+import {
+  BookingCard,
+  type BookingSession,
+  type CoachTransferSessionOption,
+} from '@/app/(parent)/bookings/booking-card';
 import type { CoachSession } from './coach-schedule-card';
 
 function facilityName(s: CoachSession): string {
@@ -42,6 +46,25 @@ function primaryWrestlerId(s: CoachSession): string | null {
   const parts = s.session_participants ?? [];
   const first = parts[0];
   return first ? (first as { youth_wrestler_id?: string }).youth_wrestler_id ?? null : null;
+}
+
+function coachTransferOptionsForSession(
+  all: CoachSession[],
+  currentId: string
+): CoachTransferSessionOption[] {
+  return all
+    .filter((s) => s.id !== currentId)
+    .map((s) => {
+      const actualParticipants = Array.isArray(s.session_participants) ? s.session_participants.length : 0;
+      const current = actualParticipants || s.current_participants || 0;
+      return {
+        id: s.id,
+        scheduled_datetime: s.scheduled_datetime,
+        facilityLabel: facilityName(s),
+        current_participants: current,
+        max_participants: s.max_participants ?? 1,
+      };
+    });
 }
 
 function isTentativeSession(s: CoachSession, current: number): boolean {
@@ -243,6 +266,7 @@ export function CoachHomeClient({
                   session={bookingSession}
                   variant="coach"
                   coachEarnings={coachEarnings}
+                  coachTransferSessionOptions={coachTransferOptionsForSession(upcomingSessions, session.id)}
                 />
               );
             })}

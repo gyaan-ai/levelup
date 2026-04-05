@@ -214,6 +214,8 @@ export type YouthSessionSpendLine = {
   amount_paid: number;
   scheduled_datetime: string;
   session_status: string;
+  /** Session type (private, group, …) for admin filters. */
+  session_type?: string;
   coach_name: string;
   facility_name: string;
 };
@@ -606,7 +608,18 @@ export function AdminDashboardClient({
   const [historyPayoutTo, setHistoryPayoutTo] = useState('');
   const [historySearch, setHistorySearch] = useState('');
   const [payoutHistoryPeriod, setPayoutHistoryPeriod] = useState<PayoutHistoryPeriodPreset>('all');
-  const [athletesSubTab, setAthletesSubTab] = useState<'directory' | 'spending'>('directory');
+  const [athletesSubTab, setAthletesSubTab] = useState<'leaderboard' | 'directory' | 'spending'>(
+    'leaderboard'
+  );
+  const [youthLeaderboardTimeFilter, setYouthLeaderboardTimeFilter] = useState<
+    'all' | '7d' | '30d' | '90d'
+  >('all');
+  const [youthLeaderboardTypeFilter, setYouthLeaderboardTypeFilter] = useState<string>('all');
+  const [youthLeaderboardSchoolFilter, setYouthLeaderboardSchoolFilter] = useState<string>('all');
+  const [youthLeaderboardSort, setYouthLeaderboardSort] = useState<
+    'spent' | 'bookings' | 'open' | 'completed'
+  >('spent');
+  const [youthLeaderboardSearch, setYouthLeaderboardSearch] = useState('');
   const [athleteSpendPeriod, setAthleteSpendPeriod] = useState<PayoutHistoryPeriodPreset>('all');
   const [athleteSpendDateFrom, setAthleteSpendDateFrom] = useState('');
   const [athleteSpendDateTo, setAthleteSpendDateTo] = useState('');
@@ -993,6 +1006,149 @@ export function AdminDashboardClient({
     }
     return Array.from(schools).sort();
   }, [athleteReports]);
+
+  /** Kid (high school) schools for youth leaderboard filter */
+  const uniqueYouthSchools = useMemo(() => {
+    const schools = new Set<string>();
+    for (const k of kidsList) {
+      if (k.school && k.school.trim() !== '') schools.add(k.school.trim());
+    }
+    return Array.from(schools).sort();
+  }, [kidsList]);
+
+  /** Youth athlete leaderboard (session lines per kid), mirrors coach leaderboard filters */
+  const youthLeaderboardData = useMemo(() => {
+    const now = new Date();
+    const cutoff =
+      youthLeaderboardTimeFilter === '7d'
+        ? new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+        : youthLeaderboardTimeFilter === '30d'
+          ? new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+          : youthLeaderboardTimeFilter === '90d'
+            ? new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
+            : null;
+
+    const lines = youthSessionSpendLines.filter((line) => {
+      if (cutoff && new Date(line.scheduled_datetime) < cutoff) return false;
+      if (youthLeaderboardTypeFilter !== 'all') {
+        const t = (line.session_type ?? '').trim();
+        if (t !== youthLeaderboardTypeFilter) return false;
+      }
+      return true;
+    });
+
+    const byYouth = new Map<
+      string,
+      {
+        youth_wrestler_id: string;
+        name: string;
+        school: string;
+        total_spent: number;
+        booking_count: number;
+        open_count: number;
+        pending_payment_count: number;
+        completed_count: number;
+      }
+    >();
+
+    for (const line of lines) {
+      const id = line.youth_wrestler_id;
+      const kid = kidsList.find((k) => k.id === id);
+      const name = kid
+        ? `${kid.first_name} ${kid.last_name}`.trim()
+        : `Wrestler ${id.slice(0, 8)}…`;
+      const school = kid?.school?.trim() ?? '';
+
+      const prev =
+        byYouth.get(id) ??
+        {
+          youth_wrestler_id: id,
+          name,
+          school,
+          total_spent: 0,
+          booking_count: 0,
+          open_count: 0,
+          pending_payment_count: 0,
+          completed_count: 0,
+        };
+
+      prev.booking_count += 1;
+      prev.total_spent = Math.round((prev.total_spent + line.amount_paid) * 100) / 100;
+      if (line.session_status === 'scheduled') prev.open_count += 1;
+      else if (line.session_status === 'pending_payment') prev.pending_payment_count += 1;
+      else if (line.session_status === 'completed') prev.completed_count += 1;
+
+      byYouth.set(id, { ...prev, name, school });
+    }
+
+    if (youthLeaderboardTimeFilter === 'all') {
+      for (const k of kidsList) {
+        if (byYouth.has(k.id)) continue;
+        byYouth.set(k.id, {
+          youth_wrestler_id: k.id,
+          name: `${k.first_name} ${k.last_name}`.trim(),
+          school: k.school?.trim() ?? '',
+          total_spent: 0,
+          booking_count: 0,
+          open_count: 0,
+          pending_payment_count: 0,
+          completed_count: 0,
+        });
+      }
+    }
+
+    let result = Array.from(byYouth.values());
+
+    if (youthLeaderboardSchoolFilter !== 'all') {
+      if (youthLeaderboardSchoolFilter === 'non-affiliated') {
+        result = result.filter(
+          (a) =>
+            !a.school ||
+            a.school.trim() === '' ||
+            a.school.toLowerCase() === 'non-affiliated' ||
+            a.school.toLowerCase() === 'independent' ||
+            a.school.toLowerCase() === 'n/a'
+        );
+      } else {
+        result = result.filter((a) => a.school === youthLeaderboardSchoolFilter);
+      }
+    }
+
+    if (youthLeaderboardSearch.trim()) {
+      const q = youthLeaderboardSearch.toLowerCase().trim();
+      result = result.filter(
+        (a) =>
+          a.name.toLowerCase().includes(q) ||
+          a.school.toLowerCase().includes(q) ||
+          a.youth_wrestler_id.toLowerCase().includes(q)
+      );
+    }
+
+    result.sort((a, b) => {
+      switch (youthLeaderboardSort) {
+        case 'spent':
+          return b.total_spent - a.total_spent || a.name.localeCompare(b.name);
+        case 'bookings':
+          return b.booking_count - a.booking_count || a.name.localeCompare(b.name);
+        case 'open':
+          return b.open_count - a.open_count || a.name.localeCompare(b.name);
+        case 'completed':
+          return b.completed_count - a.completed_count || a.name.localeCompare(b.name);
+        default:
+          return 0;
+      }
+    });
+
+    return result;
+  }, [
+    youthSessionSpendLines,
+    kidsList,
+    youthLeaderboardTimeFilter,
+    youthLeaderboardTypeFilter,
+    youthLeaderboardSchoolFilter,
+    youthLeaderboardSort,
+    youthLeaderboardSearch,
+  ]);
 
   // Computed financial data with filters
   const financeData = useMemo(() => {
@@ -3104,21 +3260,32 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
 
       // Athletes (Youth Wrestlers) sub-section
       if (subSection === 'athletes') {
+        const youthLbTotalSpent = youthLeaderboardData.reduce((s, a) => s + a.total_spent, 0);
+        const youthLbTotalOpen = youthLeaderboardData.reduce((s, a) => s + a.open_count, 0);
+        const youthLbTotalPending = youthLeaderboardData.reduce((s, a) => s + a.pending_payment_count, 0);
+        const youthLbActiveWithOpen = youthLeaderboardData.filter((a) => a.open_count > 0).length;
+
         return (
           <div className="space-y-6">
             <div>
               <h2 className="text-lg font-semibold">Youth athletes</h2>
               <p className="text-sm text-muted-foreground">
-                Directory of registered wrestlers. Spending uses recorded payments per session (Stripe lines).
+                Leaderboard shows bookings and parent-paid totals by session date. Directory and Spending are below.
               </p>
             </div>
 
             <Tabs
               value={athletesSubTab}
-              onValueChange={(v) => setAthletesSubTab(v as 'directory' | 'spending')}
+              onValueChange={(v) =>
+                setAthletesSubTab(v as 'leaderboard' | 'directory' | 'spending')
+              }
               className="w-full"
             >
-              <TabsList className="grid w-full max-w-md grid-cols-2">
+              <TabsList className="grid w-full max-w-2xl grid-cols-3">
+                <TabsTrigger value="leaderboard" className="gap-1">
+                  <Trophy className="h-3.5 w-3.5" />
+                  Leaderboard
+                </TabsTrigger>
                 <TabsTrigger value="directory">Directory</TabsTrigger>
                 <TabsTrigger value="spending" className="gap-2">
                   <DollarSign className="h-4 w-4" />
@@ -3130,6 +3297,247 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
                   )}
                 </TabsTrigger>
               </TabsList>
+
+              <TabsContent value="leaderboard" className="mt-6 space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-[#B89D60]/10">
+                      <Trophy className="h-5 w-5 text-[#B89D60]" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold">Athlete leaderboard</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {youthLeaderboardData.length} athlete{youthLeaderboardData.length !== 1 ? 's' : ''} in view
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <Card className="p-4">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total spent</p>
+                    <p className="text-xl font-semibold mt-1 text-[#B89D60] tabular-nums">
+                      ${youthLbTotalSpent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                  </Card>
+                  <Card className="p-4">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Open bookings</p>
+                    <p className="text-xl font-semibold mt-1 tabular-nums">{youthLbTotalOpen}</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">Scheduled session spots</p>
+                  </Card>
+                  <Card className="p-4">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Pending payment</p>
+                    <p className="text-xl font-semibold mt-1 text-amber-500 tabular-nums">{youthLbTotalPending}</p>
+                  </Card>
+                  <Card className="p-4">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">With open spots</p>
+                    <p className="text-xl font-semibold mt-1 tabular-nums">{youthLbActiveWithOpen}</p>
+                  </Card>
+                </div>
+
+                <Card className="p-4">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium text-muted-foreground uppercase">Time:</span>
+                      <div className="flex items-center rounded-lg border border-border bg-muted/30 p-1">
+                        {(['all', '7d', '30d', '90d'] as const).map((period) => (
+                          <button
+                            key={period}
+                            type="button"
+                            onClick={() => setYouthLeaderboardTimeFilter(period)}
+                            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                              youthLeaderboardTimeFilter === period
+                                ? 'bg-[#B89D60] text-black'
+                                : 'text-muted-foreground hover:text-foreground'
+                            }`}
+                          >
+                            {period === 'all' ? 'All Time' : period}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium text-muted-foreground uppercase">Type:</span>
+                      <Select value={youthLeaderboardTypeFilter} onValueChange={setYouthLeaderboardTypeFilter}>
+                        <SelectTrigger className="w-36 h-9">
+                          <SelectValue placeholder="All types" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Types</SelectItem>
+                          {sessionTypesForFilter.map((t) => (
+                            <SelectItem key={t} value={t}>
+                              {t}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium text-muted-foreground uppercase">School:</span>
+                      <Select value={youthLeaderboardSchoolFilter} onValueChange={setYouthLeaderboardSchoolFilter}>
+                        <SelectTrigger className="w-40 h-9">
+                          <SelectValue placeholder="All schools" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Schools</SelectItem>
+                          <SelectItem value="non-affiliated">Non-Affiliated</SelectItem>
+                          {uniqueYouthSchools.map((school) => (
+                            <SelectItem key={school} value={school}>
+                              {school}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium text-muted-foreground uppercase">Sort:</span>
+                      <Select
+                        value={youthLeaderboardSort}
+                        onValueChange={(v) =>
+                          setYouthLeaderboardSort(v as 'spent' | 'bookings' | 'open' | 'completed')
+                        }
+                      >
+                        <SelectTrigger className="w-40 h-9">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="spent">Total spent</SelectItem>
+                          <SelectItem value="bookings">Bookings</SelectItem>
+                          <SelectItem value="open">Open</SelectItem>
+                          <SelectItem value="completed">Completed</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="relative flex-1 min-w-[200px]">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search athletes…"
+                        className="pl-9"
+                        value={youthLeaderboardSearch}
+                        onChange={(e) => setYouthLeaderboardSearch(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </Card>
+
+                <Card className="overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-muted/50">
+                        <tr>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider w-10">
+                            #
+                          </th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            Athlete
+                          </th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            School
+                          </th>
+                          <th className="text-center py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            Open
+                          </th>
+                          <th className="text-center py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            Completed
+                          </th>
+                          <th className="text-center py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            Pending
+                          </th>
+                          <th className="text-center py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            Bookings
+                          </th>
+                          <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            Spent
+                          </th>
+                          <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            Actions
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {kidsLoading ? (
+                          <tr>
+                            <td colSpan={9} className="py-12 text-center">
+                              <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+                            </td>
+                          </tr>
+                        ) : youthLeaderboardData.length === 0 ? (
+                          <tr>
+                            <td colSpan={9} className="py-12 text-center text-muted-foreground">
+                              <User className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
+                              <p>No athletes match these filters</p>
+                            </td>
+                          </tr>
+                        ) : (
+                          youthLeaderboardData.map((a, idx) => (
+                            <tr key={a.youth_wrestler_id} className="hover:bg-muted/30 transition-colors">
+                              <td className="py-3 px-4">
+                                {idx < 3 ? (
+                                  <div
+                                    className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                                      idx === 0
+                                        ? 'bg-[#B89D60] text-black'
+                                        : idx === 1
+                                          ? 'bg-gray-400 text-black'
+                                          : 'bg-amber-700 text-white'
+                                    }`}
+                                  >
+                                    {idx + 1}
+                                  </div>
+                                ) : (
+                                  <span className="text-muted-foreground pl-1.5">{idx + 1}</span>
+                                )}
+                              </td>
+                              <td className="py-3 px-4 font-medium">{a.name}</td>
+                              <td className="py-3 px-4 text-muted-foreground">{a.school || '—'}</td>
+                              <td className="py-3 px-4 text-center">
+                                {a.open_count > 0 ? (
+                                  <Badge
+                                    variant="outline"
+                                    className="border-emerald-600 bg-emerald-600/20 text-emerald-400"
+                                  >
+                                    {a.open_count}
+                                  </Badge>
+                                ) : (
+                                  <span className="text-muted-foreground">0</span>
+                                )}
+                              </td>
+                              <td className="py-3 px-4 text-center tabular-nums">{a.completed_count}</td>
+                              <td className="py-3 px-4 text-center">
+                                {a.pending_payment_count > 0 ? (
+                                  <Badge
+                                    variant="outline"
+                                    className="border-amber-500 bg-amber-500/20 text-amber-400"
+                                  >
+                                    {a.pending_payment_count}
+                                  </Badge>
+                                ) : (
+                                  <span className="text-muted-foreground">0</span>
+                                )}
+                              </td>
+                              <td className="py-3 px-4 text-center tabular-nums">{a.booking_count}</td>
+                              <td className="py-3 px-4 text-right tabular-nums font-semibold text-[#B89D60]">
+                                ${a.total_spent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </td>
+                              <td className="py-3 px-4 text-right">
+                                <Link href={`/wrestlers/${a.youth_wrestler_id}`} target="_blank">
+                                  <Button variant="ghost" size="sm" className="h-8">
+                                    <ExternalLink className="h-3.5 w-3.5" />
+                                  </Button>
+                                </Link>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+              </TabsContent>
 
               <TabsContent value="directory" className="mt-6 space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

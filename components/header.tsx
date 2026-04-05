@@ -28,6 +28,7 @@ import { useTenant } from '@/components/theme-provider';
 import { BrandLogo } from '@/components/brand-logo';
 import { CartDropdown } from '@/components/cart-dropdown';
 import { createClient } from '@/lib/supabase/client';
+import { CoachHeaderMobile } from '@/components/coach-header-mobile';
 
 type Coach = { id: string; first_name: string; last_name: string; school: string | null };
 
@@ -136,6 +137,12 @@ export function Header() {
 
           {user ? (
             <>
+            <div className="flex items-center gap-2 shrink-0 ml-auto">
+              {effectiveRole === 'coach' && (
+                <div className="md:hidden">
+                  <CoachHeaderMobile onSignOut={handleSignOut} />
+                </div>
+              )}
             {/* Post-login: nav aligned to profile (athlete = coach, parent, youth_wrestler, admin) */}
             <nav className="hidden md:flex items-center gap-6">
               {effectiveRole === 'coach' && (
@@ -373,6 +380,7 @@ export function Header() {
                 </Button>
               </div>
             </nav>
+            </div>
 
             {/* Mobile logged-in admin: same “Preview as” as desktop (bottom nav doesn’t include role switch) */}
             {isAdmin && (

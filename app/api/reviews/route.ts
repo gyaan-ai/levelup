@@ -71,7 +71,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-/** POST /api/reviews — create or update a review. One review per session per parent; only the parent (or a parent whose kid participated) can leave it. */
+/** POST /api/reviews — create or update a review for this session. One review per coach per parent (session is the anchor row). */
 export async function POST(req: NextRequest) {
   try {
     const headersList = await headers();
@@ -153,6 +153,20 @@ export async function POST(req: NextRequest) {
     const coachId = session.athlete_id as string;
     if (!coachId) {
       return NextResponse.json({ error: 'Session has no coach' }, { status: 400 });
+    }
+
+    const { data: existingForCoachRows } = await admin
+      .from('reviews')
+      .select('id, session_id')
+      .eq('parent_id', user.id)
+      .eq('athlete_id', coachId)
+      .limit(1);
+    const existingForCoach = existingForCoachRows?.[0];
+    if (existingForCoach && existingForCoach.session_id !== sessionId) {
+      return NextResponse.json(
+        { error: 'You already left feedback for this coach' },
+        { status: 400 }
+      );
     }
 
     const { data: priorReview } = await admin
