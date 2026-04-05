@@ -263,6 +263,7 @@ export default async function AdminPage() {
       drop_in_amount: dropInAmount(s),
       drop_in_count: dropInCount(s),
       stripe_fee_sum: stripeFeeSum(s),
+      athlete_payout_date: s.athlete_payout_date ?? null,
     };
   });
 

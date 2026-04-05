@@ -55,6 +55,7 @@ import {
   MessageSquare,
   Phone,
   Bell,
+  History,
 } from 'lucide-react';
 import Link from 'next/link';
 import { ProfileImage } from '@/components/profile-image';
@@ -67,6 +68,8 @@ import { CopySessionPhonesButton } from '@/components/copy-session-phones-button
 import { CoachTextGroupDialog } from '@/components/coach-text-group-dialog';
 import { showSessionSmsCopyAndTextGroup } from '@/lib/session-sms-tools';
 import { AdminCockpitView } from './admin-cockpit-view';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { coachPayoutUsd } from '@/lib/coach-session-payout';
 import {
   Area,
   AreaChart,
@@ -111,6 +114,8 @@ export type AdminSession = {
   drop_in_count?: number;
   /** Sum of actual Stripe fees from session_participants.stripe_fee */
   stripe_fee_sum?: number;
+  /** When the coach was marked paid for this session (YYYY-MM-DD from DB) */
+  athlete_payout_date?: string | null;
 };
 
 export type AdminUser = {
@@ -542,6 +547,12 @@ export function AdminDashboardClient({
   const [financeTimeFilter, setFinanceTimeFilter] = useState<'all' | '7d' | '30d' | '90d' | 'ytd'>('all');
   const [financeTypeFilter, setFinanceTypeFilter] = useState<string>('all');
   const [financeSchoolFilter, setFinanceSchoolFilter] = useState<string>('all');
+
+  const [payoutTab, setPayoutTab] = useState<'pending' | 'history'>('pending');
+  const [historyCoachFilter, setHistoryCoachFilter] = useState<string>('all');
+  const [historyPayoutFrom, setHistoryPayoutFrom] = useState('');
+  const [historyPayoutTo, setHistoryPayoutTo] = useState('');
+  const [historySearch, setHistorySearch] = useState('');
   
   // Fetch roster for a session via API
   const [rosterLoading, setRosterLoading] = useState(false);
@@ -1353,6 +1364,61 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
   const totalCoachPayoutsDue = coachPayouts.reduce((sum, p) => sum + p.amount, 0);
   const pendingFacilityRequests = facilityRequests.filter(r => r.status === 'pending').length;
 
+  const payoutHistoryCoachOptions = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const s of sessions) {
+      if (s.status !== 'completed' || !s.athlete_payout_date) continue;
+      if (!m.has(s.athlete_id)) m.set(s.athlete_id, s.athlete_name);
+    }
+    return Array.from(m.entries()).sort((a, b) => a[1].localeCompare(b[1]));
+  }, [sessions]);
+
+  const payoutHistoryRows = useMemo(() => {
+    const q = historySearch.trim().toLowerCase();
+    return sessions
+      .filter((s) => s.status === 'completed' && s.athlete_payout_date)
+      .filter((s) => {
+        if (historyCoachFilter !== 'all' && s.athlete_id !== historyCoachFilter) return false;
+        if (q && !(s.athlete_name || '').toLowerCase().includes(q)) return false;
+        const pd = (s.athlete_payout_date || '').slice(0, 10);
+        if (historyPayoutFrom && pd < historyPayoutFrom) return false;
+        if (historyPayoutTo && pd > historyPayoutTo) return false;
+        return true;
+      })
+      .map((s) => {
+        const stored = Number(s.athlete_payment ?? 0);
+        const payoutAmount =
+          stored > 0
+            ? Math.round(stored * 100) / 100
+            : coachPayoutUsd({
+                athlete_payment: s.athlete_payment,
+                price_per_participant: s.price_per_participant,
+                current_participants: s.current_participants,
+                participant_amount_paid_sum: s.participant_amount_paid_sum,
+              });
+        return { session: s, payoutAmount };
+      })
+      .sort((a, b) => {
+        const da = a.session.athlete_payout_date || '';
+        const db = b.session.athlete_payout_date || '';
+        if (da !== db) return db.localeCompare(da);
+        return (
+          new Date(b.session.scheduled_datetime).getTime() -
+          new Date(a.session.scheduled_datetime).getTime()
+        );
+      });
+  }, [sessions, historyCoachFilter, historyPayoutFrom, historyPayoutTo, historySearch]);
+
+  const payoutHistoryTotal = useMemo(
+    () => payoutHistoryRows.reduce((sum, r) => sum + r.payoutAmount, 0),
+    [payoutHistoryRows]
+  );
+
+  const paidSessionsCount = useMemo(
+    () => sessions.filter((s) => s.status === 'completed' && s.athlete_payout_date).length,
+    [sessions]
+  );
+
   // Generate chart data from sessions
   const revenueChartData = useMemo(() => {
     const last7Days = [...Array(7)].map((_, i) => {
@@ -1818,110 +1884,309 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
         return (
           <div className="space-y-6">
             <div>
-              <h2 className="text-lg font-semibold">Coach Payouts</h2>
-              <p className="text-sm text-muted-foreground">Manage pending payments to coaches</p>
+              <h2 className="text-lg font-semibold">Coach payouts</h2>
+              <p className="text-sm text-muted-foreground">
+                Pay coaches outside the app (Venmo, Zelle, etc.), then mark paid here. History lists every session
+                already marked paid.
+              </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <Card className="p-4">
-                <p className="text-xs text-muted-foreground uppercase tracking-wider">Total Due</p>
-                <p className="text-2xl font-semibold text-[#B89D60]">${totalCoachPayoutsDue.toFixed(2)}</p>
-              </Card>
-              <Card className="p-4">
-                <p className="text-xs text-muted-foreground uppercase tracking-wider">Coaches to Pay</p>
-                <p className="text-2xl font-semibold">{coachPayouts.filter(p => p.amount > 0).length}</p>
-              </Card>
-              <Card className="p-4">
-                <p className="text-xs text-muted-foreground uppercase tracking-wider">Completed Sessions</p>
-                <p className="text-2xl font-semibold">{billing.completedCount}</p>
-              </Card>
-            </div>
+            <Tabs value={payoutTab} onValueChange={(v) => setPayoutTab(v as 'pending' | 'history')} className="w-full">
+              <TabsList className="grid w-full max-w-md grid-cols-2">
+                <TabsTrigger value="pending" className="gap-2">
+                  <Wallet className="h-4 w-4" />
+                  Pending
+                  {coachPayouts.filter((p) => p.amount > 0).length > 0 && (
+                    <span className="ml-1 rounded-full bg-[#B89D60]/25 px-2 py-0.5 text-xs">
+                      {coachPayouts.filter((p) => p.amount > 0).length}
+                    </span>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger value="history" className="gap-2">
+                  <History className="h-4 w-4" />
+                  History
+                  {paidSessionsCount > 0 && (
+                    <span className="ml-1 rounded-full bg-muted px-2 py-0.5 text-xs">{paidSessionsCount}</span>
+                  )}
+                </TabsTrigger>
+              </TabsList>
 
-            <Card className="overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-muted/50">
-                    <tr>
-                      <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Coach</th>
-                      <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">School</th>
-                      <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Payment Info</th>
-                      <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Amount</th>
-                      <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border">
-                    {coachPayouts.length === 0 ? (
-                      <tr>
-                        <td colSpan={5} className="py-12 text-center text-muted-foreground">
-                          <Wallet className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
-                          <p>No payouts due</p>
-                        </td>
-                      </tr>
-                    ) : (
-                      coachPayouts.map((p) => (
-                        <tr key={p.athlete_id} className="hover:bg-muted/30 transition-colors">
-                          <td className="py-3 px-4 font-medium">{p.name}</td>
-                          <td className="py-3 px-4 text-muted-foreground">{p.school}</td>
-                          <td className="py-3 px-4">
-                            {p.venmo_handle && (
-                              <div className="flex items-center gap-1 text-sm">
-                                <span className="text-muted-foreground">Venmo:</span>
-                                <span className="font-medium">{p.venmo_handle}</span>
-                              </div>
-                            )}
-                            {p.zelle_email && (
-                              <div className="flex items-center gap-1 text-sm">
-                                <span className="text-muted-foreground">Zelle:</span>
-                                <span className="font-medium">{p.zelle_email}</span>
-                              </div>
-                            )}
-                            {!p.venmo_handle && !p.zelle_email && (
-                              <span className="text-muted-foreground text-xs">No payment info</span>
-                            )}
-                          </td>
-                          <td className="py-3 px-4 text-right">
-                            <Input
-                              type="number"
-                              step="0.01"
-                              className="w-24 h-8 text-right ml-auto"
-                              value={payoutTotalByAthlete[p.athlete_id] ?? p.amount.toFixed(2)}
-                              onChange={(e) => setPayoutTotalByAthlete(prev => ({ ...prev, [p.athlete_id]: e.target.value }))}
-                            />
-                          </td>
-                          <td className="py-3 px-4 text-right">
-                            <Button
-                              size="sm"
-                              className="bg-[#B89D60] hover:bg-[#9A8550] text-black h-8"
-                              disabled={markingAthleteId === p.athlete_id}
-                              onClick={async () => {
-                                setMarkingAthleteId(p.athlete_id);
-                                const amount = parseFloat(payoutTotalByAthlete[p.athlete_id] || p.amount.toString());
-                                try {
-                                  const res = await fetch('/api/admin/mark-payout-paid', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ athlete_id: p.athlete_id, amount }),
-                                  });
-                                  if (res.ok) router.refresh();
-                                  else {
-                                    const data = await res.json().catch(() => ({}));
-                                    alert(data.error || 'Could not mark payout paid');
-                                  }
-                                } finally {
-                                  setMarkingAthleteId(null);
-                                }
-                              }}
-                            >
-                              {markingAthleteId === p.athlete_id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Mark Paid'}
-                            </Button>
-                          </td>
+              <TabsContent value="pending" className="mt-6 space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <Card className="p-4">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider">Total due</p>
+                    <p className="text-2xl font-semibold text-[#B89D60]">${totalCoachPayoutsDue.toFixed(2)}</p>
+                  </Card>
+                  <Card className="p-4">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider">Coaches to pay</p>
+                    <p className="text-2xl font-semibold">{coachPayouts.filter((p) => p.amount > 0).length}</p>
+                  </Card>
+                  <Card className="p-4">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider">Completed sessions (all)</p>
+                    <p className="text-2xl font-semibold">{billing.completedCount}</p>
+                  </Card>
+                </div>
+
+                <Card className="overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-muted/50">
+                        <tr>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            Coach
+                          </th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            School
+                          </th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            Payment info
+                          </th>
+                          <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            Amount
+                          </th>
+                          <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            Actions
+                          </th>
                         </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </Card>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {coachPayouts.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} className="py-12 text-center text-muted-foreground">
+                              <Wallet className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
+                              <p>No payouts due</p>
+                              <p className="text-xs mt-2 max-w-sm mx-auto">
+                                Completed sessions with no payout date appear here. Mark sessions complete first, then
+                                pay the coach and click Mark paid.
+                              </p>
+                            </td>
+                          </tr>
+                        ) : (
+                          coachPayouts.map((p) => (
+                            <tr key={p.athlete_id} className="hover:bg-muted/30 transition-colors">
+                              <td className="py-3 px-4 font-medium">{p.name}</td>
+                              <td className="py-3 px-4 text-muted-foreground">{p.school}</td>
+                              <td className="py-3 px-4">
+                                {p.venmo_handle && (
+                                  <div className="flex items-center gap-1 text-sm">
+                                    <span className="text-muted-foreground">Venmo:</span>
+                                    <span className="font-medium">{p.venmo_handle}</span>
+                                  </div>
+                                )}
+                                {p.zelle_email && (
+                                  <div className="flex items-center gap-1 text-sm">
+                                    <span className="text-muted-foreground">Zelle:</span>
+                                    <span className="font-medium">{p.zelle_email}</span>
+                                  </div>
+                                )}
+                                {!p.venmo_handle && !p.zelle_email && (
+                                  <span className="text-muted-foreground text-xs">No payment info</span>
+                                )}
+                              </td>
+                              <td className="py-3 px-4 text-right">
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  className="w-24 h-8 text-right ml-auto"
+                                  value={payoutTotalByAthlete[p.athlete_id] ?? p.amount.toFixed(2)}
+                                  onChange={(e) =>
+                                    setPayoutTotalByAthlete((prev) => ({
+                                      ...prev,
+                                      [p.athlete_id]: e.target.value,
+                                    }))
+                                  }
+                                />
+                              </td>
+                              <td className="py-3 px-4 text-right">
+                                <Button
+                                  size="sm"
+                                  className="bg-[#B89D60] hover:bg-[#9A8550] text-black h-8"
+                                  disabled={markingAthleteId === p.athlete_id}
+                                  onClick={async () => {
+                                    setMarkingAthleteId(p.athlete_id);
+                                    const amount = parseFloat(
+                                      payoutTotalByAthlete[p.athlete_id] || p.amount.toString()
+                                    );
+                                    try {
+                                      const res = await fetch('/api/admin/mark-payout-paid', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ athlete_id: p.athlete_id, amount }),
+                                      });
+                                      if (res.ok) router.refresh();
+                                      else {
+                                        const data = await res.json().catch(() => ({}));
+                                        alert(data.error || 'Could not mark payout paid');
+                                      }
+                                    } finally {
+                                      setMarkingAthleteId(null);
+                                    }
+                                  }}
+                                >
+                                  {markingAthleteId === p.athlete_id ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  ) : (
+                                    'Mark paid'
+                                  )}
+                                </Button>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="history" className="mt-6 space-y-4">
+                <div className="flex flex-col gap-4 lg:flex-row lg:flex-wrap lg:items-end">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 flex-1">
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Coach</Label>
+                      <Select value={historyCoachFilter} onValueChange={setHistoryCoachFilter}>
+                        <SelectTrigger className="mt-1">
+                          <SelectValue placeholder="All coaches" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All coaches</SelectItem>
+                          {payoutHistoryCoachOptions.map(([id, name]) => (
+                            <SelectItem key={id} value={id}>
+                              {name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Payout date from</Label>
+                      <Input
+                        type="date"
+                        className="mt-1"
+                        value={historyPayoutFrom}
+                        onChange={(e) => setHistoryPayoutFrom(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Payout date to</Label>
+                      <Input
+                        type="date"
+                        className="mt-1"
+                        value={historyPayoutTo}
+                        onChange={(e) => setHistoryPayoutTo(e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label className="text-xs text-muted-foreground">Search coach</Label>
+                      <Input
+                        className="mt-1"
+                        placeholder="Name…"
+                        value={historySearch}
+                        onChange={(e) => setHistorySearch(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setHistoryCoachFilter('all');
+                      setHistoryPayoutFrom('');
+                      setHistoryPayoutTo('');
+                      setHistorySearch('');
+                    }}
+                  >
+                    Clear filters
+                  </Button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Card className="p-4">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider">Filtered total</p>
+                    <p className="text-2xl font-semibold tabular-nums">${payoutHistoryTotal.toFixed(2)}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{payoutHistoryRows.length} session row(s)</p>
+                  </Card>
+                  <Card className="p-4">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider">All-time paid sessions</p>
+                    <p className="text-2xl font-semibold">{paidSessionsCount}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Sessions with a payout date set</p>
+                  </Card>
+                </div>
+
+                <Card className="overflow-hidden">
+                  <div className="overflow-x-auto max-h-[min(70vh,720px)] overflow-y-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-muted/50 sticky top-0 z-10">
+                        <tr>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            Paid date
+                          </th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            Coach
+                          </th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            School
+                          </th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            Session
+                          </th>
+                          <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            Amount
+                          </th>
+                          <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            Link
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {payoutHistoryRows.length === 0 ? (
+                          <tr>
+                            <td colSpan={6} className="py-12 text-center text-muted-foreground">
+                              <History className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
+                              <p>No payout history matches the filters</p>
+                              <p className="text-xs mt-2 max-w-md mx-auto">
+                                Rows appear after you mark a coach paid on the Pending tab. Adjust filters or clear them
+                                to see all recorded payouts.
+                              </p>
+                            </td>
+                          </tr>
+                        ) : (
+                          payoutHistoryRows.map(({ session: s, payoutAmount }) => (
+                            <tr key={s.id} className="hover:bg-muted/30 transition-colors">
+                              <td className="py-3 px-4 whitespace-nowrap text-muted-foreground">
+                                {(s.athlete_payout_date || '').slice(0, 10) || '—'}
+                              </td>
+                              <td className="py-3 px-4 font-medium">{s.athlete_name}</td>
+                              <td className="py-3 px-4 text-muted-foreground">{s.athlete_school}</td>
+                              <td className="py-3 px-4">
+                                <div className="text-muted-foreground text-xs">
+                                  {formatEST(new Date(s.scheduled_datetime), 'MMM d, yyyy h:mm a')}
+                                </div>
+                                <div className="text-xs text-muted-foreground/80 truncate max-w-[200px]">
+                                  {s.facility_name}
+                                </div>
+                              </td>
+                              <td className="py-3 px-4 text-right tabular-nums font-medium">
+                                ${payoutAmount.toFixed(2)}
+                              </td>
+                              <td className="py-3 px-4 text-right">
+                                <Link href={`/admin/sessions/${s.id}/edit`}>
+                                  <Button variant="ghost" size="sm" className="h-8 gap-1 text-[#B89D60]">
+                                    <Pencil className="h-3.5 w-3.5" />
+                                    Edit
+                                  </Button>
+                                </Link>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+              </TabsContent>
+            </Tabs>
           </div>
         );
       }
