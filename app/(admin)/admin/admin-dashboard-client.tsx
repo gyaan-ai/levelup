@@ -63,7 +63,7 @@ import { CapacityBadge } from '@/components/capacity-badge';
 import { SessionTypeBadge } from '@/components/session-type-badge';
 import { formatEST, APP_TIMEZONE } from '@/lib/format-date';
 import { formatInTimeZone, toZonedTime } from 'date-fns-tz';
-import { startOfWeek, endOfWeek, addWeeks } from 'date-fns';
+import { startOfWeek, startOfMonth, startOfYear, subDays, endOfWeek, addWeeks } from 'date-fns';
 import { CopySessionPhonesButton } from '@/components/copy-session-phones-button';
 import { CoachTextGroupDialog } from '@/components/coach-text-group-dialog';
 import { showSessionSmsCopyAndTextGroup } from '@/lib/session-sms-tools';
@@ -80,6 +80,33 @@ import {
   YAxis,
   Tooltip,
 } from 'recharts';
+
+/** Payout history presets use the date stored in athlete_payout_date (Eastern calendar day). */
+type PayoutHistoryPeriodPreset = 'week' | 'month' | 'last30' | 'ytd' | 'all' | 'custom';
+
+function payoutDateBoundsForPreset(preset: PayoutHistoryPeriodPreset): { from: string; to: string } | null {
+  if (preset === 'all' || preset === 'custom') return null;
+  const now = new Date();
+  const todayStr = formatInTimeZone(now, APP_TIMEZONE, 'yyyy-MM-dd');
+  const zoned = toZonedTime(now, APP_TIMEZONE);
+  if (preset === 'week') {
+    const ws = startOfWeek(zoned, { weekStartsOn: 0 });
+    return { from: formatInTimeZone(ws, APP_TIMEZONE, 'yyyy-MM-dd'), to: todayStr };
+  }
+  if (preset === 'month') {
+    const ms = startOfMonth(zoned);
+    return { from: formatInTimeZone(ms, APP_TIMEZONE, 'yyyy-MM-dd'), to: todayStr };
+  }
+  if (preset === 'last30') {
+    const d = subDays(zoned, 29);
+    return { from: formatInTimeZone(d, APP_TIMEZONE, 'yyyy-MM-dd'), to: todayStr };
+  }
+  if (preset === 'ytd') {
+    const ys = startOfYear(zoned);
+    return { from: formatInTimeZone(ys, APP_TIMEZONE, 'yyyy-MM-dd'), to: todayStr };
+  }
+  return null;
+}
 
 export type AdminSession = {
   id: string;
@@ -117,6 +144,17 @@ export type AdminSession = {
   /** When the coach was marked paid for this session (YYYY-MM-DD from DB) */
   athlete_payout_date?: string | null;
 };
+
+function sessionPayoutAmountUsd(s: AdminSession): number {
+  const stored = Number(s.athlete_payment ?? 0);
+  if (stored > 0) return Math.round(stored * 100) / 100;
+  return coachPayoutUsd({
+    athlete_payment: s.athlete_payment,
+    price_per_participant: s.price_per_participant,
+    current_participants: s.current_participants,
+    participant_amount_paid_sum: s.participant_amount_paid_sum,
+  });
+}
 
 export type AdminUser = {
   id: string;
@@ -553,6 +591,7 @@ export function AdminDashboardClient({
   const [historyPayoutFrom, setHistoryPayoutFrom] = useState('');
   const [historyPayoutTo, setHistoryPayoutTo] = useState('');
   const [historySearch, setHistorySearch] = useState('');
+  const [payoutHistoryPeriod, setPayoutHistoryPeriod] = useState<PayoutHistoryPeriodPreset>('all');
   
   // Fetch roster for a session via API
   const [rosterLoading, setRosterLoading] = useState(false);
@@ -1373,31 +1412,31 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
     return Array.from(m.entries()).sort((a, b) => a[1].localeCompare(b[1]));
   }, [sessions]);
 
+  const effectivePayoutHistoryBounds = useMemo(() => {
+    if (payoutHistoryPeriod === 'custom') {
+      return {
+        from: historyPayoutFrom || null,
+        to: historyPayoutTo || null,
+      };
+    }
+    const b = payoutDateBoundsForPreset(payoutHistoryPeriod);
+    return b ? { from: b.from, to: b.to } : { from: null, to: null };
+  }, [payoutHistoryPeriod, historyPayoutFrom, historyPayoutTo]);
+
   const payoutHistoryRows = useMemo(() => {
     const q = historySearch.trim().toLowerCase();
+    const { from: boundFrom, to: boundTo } = effectivePayoutHistoryBounds;
     return sessions
       .filter((s) => s.status === 'completed' && s.athlete_payout_date)
       .filter((s) => {
         if (historyCoachFilter !== 'all' && s.athlete_id !== historyCoachFilter) return false;
         if (q && !(s.athlete_name || '').toLowerCase().includes(q)) return false;
         const pd = (s.athlete_payout_date || '').slice(0, 10);
-        if (historyPayoutFrom && pd < historyPayoutFrom) return false;
-        if (historyPayoutTo && pd > historyPayoutTo) return false;
+        if (boundFrom && pd < boundFrom) return false;
+        if (boundTo && pd > boundTo) return false;
         return true;
       })
-      .map((s) => {
-        const stored = Number(s.athlete_payment ?? 0);
-        const payoutAmount =
-          stored > 0
-            ? Math.round(stored * 100) / 100
-            : coachPayoutUsd({
-                athlete_payment: s.athlete_payment,
-                price_per_participant: s.price_per_participant,
-                current_participants: s.current_participants,
-                participant_amount_paid_sum: s.participant_amount_paid_sum,
-              });
-        return { session: s, payoutAmount };
-      })
+      .map((s) => ({ session: s, payoutAmount: sessionPayoutAmountUsd(s) }))
       .sort((a, b) => {
         const da = a.session.athlete_payout_date || '';
         const db = b.session.athlete_payout_date || '';
@@ -1407,7 +1446,46 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
           new Date(a.session.scheduled_datetime).getTime()
         );
       });
-  }, [sessions, historyCoachFilter, historyPayoutFrom, historyPayoutTo, historySearch]);
+  }, [sessions, effectivePayoutHistoryBounds, historyCoachFilter, historySearch]);
+
+  const payoutByCoachRows = useMemo(() => {
+    const q = historySearch.trim().toLowerCase();
+    const { from: boundFrom, to: boundTo } = effectivePayoutHistoryBounds;
+    const map = new Map<
+      string,
+      { athlete_id: string; name: string; school: string; total: number; sessionCount: number }
+    >();
+    for (const s of sessions) {
+      if (s.status !== 'completed' || !s.athlete_payout_date) continue;
+      const pd = (s.athlete_payout_date || '').slice(0, 10);
+      if (boundFrom && pd < boundFrom) continue;
+      if (boundTo && pd > boundTo) continue;
+      if (historyCoachFilter !== 'all' && s.athlete_id !== historyCoachFilter) continue;
+      if (q && !(s.athlete_name || '').toLowerCase().includes(q)) continue;
+      const amt = sessionPayoutAmountUsd(s);
+      const prev = map.get(s.athlete_id);
+      if (prev) {
+        prev.total = Math.round((prev.total + amt) * 100) / 100;
+        prev.sessionCount += 1;
+      } else {
+        map.set(s.athlete_id, {
+          athlete_id: s.athlete_id,
+          name: s.athlete_name,
+          school: s.athlete_school,
+          total: amt,
+          sessionCount: 1,
+        });
+      }
+    }
+    return Array.from(map.values()).sort(
+      (a, b) => b.total - a.total || a.name.localeCompare(b.name)
+    );
+  }, [sessions, effectivePayoutHistoryBounds, historyCoachFilter, historySearch]);
+
+  const payoutByCoachGrandTotal = useMemo(
+    () => payoutByCoachRows.reduce((sum, r) => sum + r.total, 0),
+    [payoutByCoachRows]
+  );
 
   const payoutHistoryTotal = useMemo(
     () => payoutHistoryRows.reduce((sum, r) => sum + r.payoutAmount, 0),
@@ -2040,9 +2118,53 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
               </TabsContent>
 
               <TabsContent value="history" className="mt-6 space-y-4">
-                <div className="flex flex-col gap-4 lg:flex-row lg:flex-wrap lg:items-end">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 flex-1">
-                    <div>
+                <div className="flex flex-col gap-4">
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-end">
+                    <div className="lg:col-span-3">
+                      <Label className="text-xs text-muted-foreground">Time period</Label>
+                      <Select
+                        value={payoutHistoryPeriod}
+                        onValueChange={(v) => setPayoutHistoryPeriod(v as PayoutHistoryPeriodPreset)}
+                      >
+                        <SelectTrigger className="mt-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All time</SelectItem>
+                          <SelectItem value="week">This week</SelectItem>
+                          <SelectItem value="month">This month</SelectItem>
+                          <SelectItem value="last30">Last 30 days</SelectItem>
+                          <SelectItem value="ytd">Year to date</SelectItem>
+                          <SelectItem value="custom">Custom range…</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-[11px] text-muted-foreground mt-1 leading-snug">
+                        Filter by payout date (when marked paid). Week starts Sunday ({APP_TIMEZONE}).
+                      </p>
+                    </div>
+                    {payoutHistoryPeriod === 'custom' && (
+                      <>
+                        <div className="lg:col-span-2">
+                          <Label className="text-xs text-muted-foreground">Payout date from</Label>
+                          <Input
+                            type="date"
+                            className="mt-1"
+                            value={historyPayoutFrom}
+                            onChange={(e) => setHistoryPayoutFrom(e.target.value)}
+                          />
+                        </div>
+                        <div className="lg:col-span-2">
+                          <Label className="text-xs text-muted-foreground">Payout date to</Label>
+                          <Input
+                            type="date"
+                            className="mt-1"
+                            value={historyPayoutTo}
+                            onChange={(e) => setHistoryPayoutTo(e.target.value)}
+                          />
+                        </div>
+                      </>
+                    )}
+                    <div className="lg:col-span-2">
                       <Label className="text-xs text-muted-foreground">Coach</Label>
                       <Select value={historyCoachFilter} onValueChange={setHistoryCoachFilter}>
                         <SelectTrigger className="mt-1">
@@ -2058,25 +2180,7 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
                         </SelectContent>
                       </Select>
                     </div>
-                    <div>
-                      <Label className="text-xs text-muted-foreground">Payout date from</Label>
-                      <Input
-                        type="date"
-                        className="mt-1"
-                        value={historyPayoutFrom}
-                        onChange={(e) => setHistoryPayoutFrom(e.target.value)}
-                      />
-                    </div>
-                    <div>
-                      <Label className="text-xs text-muted-foreground">Payout date to</Label>
-                      <Input
-                        type="date"
-                        className="mt-1"
-                        value={historyPayoutTo}
-                        onChange={(e) => setHistoryPayoutTo(e.target.value)}
-                      />
-                    </div>
-                    <div>
+                    <div className="lg:col-span-2">
                       <Label className="text-xs text-muted-foreground">Search coach</Label>
                       <Input
                         className="mt-1"
@@ -2085,34 +2189,102 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
                         onChange={(e) => setHistorySearch(e.target.value)}
                       />
                     </div>
+                    <div className="lg:col-span-1 flex justify-end">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="mt-6 lg:mt-0"
+                        onClick={() => {
+                          setPayoutHistoryPeriod('all');
+                          setHistoryCoachFilter('all');
+                          setHistoryPayoutFrom('');
+                          setHistoryPayoutTo('');
+                          setHistorySearch('');
+                        }}
+                      >
+                        Clear filters
+                      </Button>
+                    </div>
                   </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setHistoryCoachFilter('all');
-                      setHistoryPayoutFrom('');
-                      setHistoryPayoutTo('');
-                      setHistorySearch('');
-                    }}
-                  >
-                    Clear filters
-                  </Button>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <Card className="p-4">
                     <p className="text-xs text-muted-foreground uppercase tracking-wider">Filtered total</p>
                     <p className="text-2xl font-semibold tabular-nums">${payoutHistoryTotal.toFixed(2)}</p>
-                    <p className="text-xs text-muted-foreground mt-1">{payoutHistoryRows.length} session row(s)</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {payoutHistoryRows.length} session row(s) · matches detail table below
+                    </p>
                   </Card>
                   <Card className="p-4">
                     <p className="text-xs text-muted-foreground uppercase tracking-wider">All-time paid sessions</p>
                     <p className="text-2xl font-semibold">{paidSessionsCount}</p>
-                    <p className="text-xs text-muted-foreground mt-1">Sessions with a payout date set</p>
+                    <p className="text-xs text-muted-foreground mt-1">Sessions with a payout date set (not filtered)</p>
                   </Card>
                 </div>
+
+                <Card className="overflow-hidden">
+                  <div className="px-4 py-3 border-b border-border bg-muted/30">
+                    <h3 className="text-sm font-semibold">Totals by coach</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Same time period and coach/search filters as below. Grand total ${payoutByCoachGrandTotal.toFixed(2)}.
+                    </p>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-muted/50">
+                        <tr>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            Coach
+                          </th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            School
+                          </th>
+                          <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            Sessions
+                          </th>
+                          <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            Total paid
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {payoutByCoachRows.length === 0 ? (
+                          <tr>
+                            <td colSpan={4} className="py-8 text-center text-muted-foreground text-sm">
+                              No payouts in this period for the current filters.
+                            </td>
+                          </tr>
+                        ) : (
+                          <>
+                            {payoutByCoachRows.map((row) => (
+                              <tr key={row.athlete_id} className="hover:bg-muted/30">
+                                <td className="py-3 px-4 font-medium">{row.name}</td>
+                                <td className="py-3 px-4 text-muted-foreground">{row.school}</td>
+                                <td className="py-3 px-4 text-right tabular-nums">{row.sessionCount}</td>
+                                <td className="py-3 px-4 text-right tabular-nums font-medium">
+                                  ${row.total.toFixed(2)}
+                                </td>
+                              </tr>
+                            ))}
+                            <tr className="bg-muted/40 font-medium">
+                              <td className="py-3 px-4" colSpan={2}>
+                                Total
+                              </td>
+                              <td className="py-3 px-4 text-right tabular-nums">
+                                {payoutByCoachRows.reduce((s, r) => s + r.sessionCount, 0)}
+                              </td>
+                              <td className="py-3 px-4 text-right tabular-nums">
+                                ${payoutByCoachGrandTotal.toFixed(2)}
+                              </td>
+                            </tr>
+                          </>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
 
                 <Card className="overflow-hidden">
                   <div className="overflow-x-auto max-h-[min(70vh,720px)] overflow-y-auto">
