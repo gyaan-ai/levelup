@@ -9,7 +9,7 @@ import { createRegisterConfirmationToken } from '@/lib/confirmation-token';
 import { createNotification } from '@/lib/notifications';
 import { sendCoachNewSignupSms } from '@/lib/twilio';
 import { hasMinPhoneDigits } from '@/lib/phone';
-import { rosterSnapshotFromYouthRow } from '@/lib/session-roster-snapshot';
+import { maybeBackfillRosterSnapshot } from '@/lib/session-roster-snapshot';
 import { finalizeRegisterFromCheckoutSession } from '@/lib/finalize-session-register-from-stripe';
 import { getEffectiveFilledCount } from '@/lib/sessions';
 import { ensureAutoFamilyDiscountForParent } from '@/lib/family-auto-discount';
@@ -133,9 +133,9 @@ export async function POST(
         parent_id: user.id,
         paid: true,
         amount_paid: 0,
-        ...rosterSnapshotFromYouthRow((yw ?? {}) as { first_name?: string; last_name?: string; photo_url?: string }),
       });
       if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 });
+      await maybeBackfillRosterSnapshot(admin, { session_id: sessionId, youth_wrestler_id: youthWrestlerId }, yw ?? {});
       await supabase.from('sessions').update({ current_participants: current + 1, updated_at: new Date().toISOString() }).eq('id', sessionId);
       const coachId = (session as { athlete_id?: string }).athlete_id;
       const dt = s.scheduled_datetime;

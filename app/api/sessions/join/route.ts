@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import { hasMinPhoneDigits } from '@/lib/phone';
-import { rosterSnapshotFromYouthRow } from '@/lib/session-roster-snapshot';
+import { maybeBackfillRosterSnapshot } from '@/lib/session-roster-snapshot';
 
 /**
  * POST - Join a session by invite code. Adds the current user's youth wrestler as a participant.
@@ -77,7 +77,6 @@ export async function POST(req: NextRequest) {
       parent_id: user.id,
       paid: false,
       amount_paid: null,
-      ...rosterSnapshotFromYouthRow((yw ?? {}) as { first_name?: string; last_name?: string; photo_url?: string }),
     });
 
     if (insertErr) {
@@ -87,6 +86,8 @@ export async function POST(req: NextRequest) {
       console.error('Join session insert error:', insertErr);
       return NextResponse.json({ error: insertErr.message }, { status: 500 });
     }
+
+    await maybeBackfillRosterSnapshot(admin, { session_id: session.id, youth_wrestler_id: youthWrestlerId }, yw ?? {});
 
     const { error: updateErr } = await admin
       .from('sessions')

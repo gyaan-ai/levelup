@@ -7,7 +7,7 @@ import { createNotification } from '@/lib/notifications';
 import { sendCoachNewSignupSms } from '@/lib/twilio';
 import { formatEST } from '@/lib/format-date';
 import { headers } from 'next/headers';
-import { rosterSnapshotFromYouthRow } from '@/lib/session-roster-snapshot';
+import { maybeBackfillRosterSnapshot } from '@/lib/session-roster-snapshot';
 
 /**
  * Fetch the actual Stripe fee from a PaymentIntent's balance transaction.
@@ -276,7 +276,6 @@ export async function POST(req: NextRequest) {
             amount_paid: amountPaid,
             stripe_payment_intent_id: paymentIntentId,
             stripe_fee: stripeFee,
-            ...rosterSnapshotFromYouthRow((ywSnap ?? {}) as { first_name?: string; last_name?: string; photo_url?: string }),
           });
           if (insertErr) {
             // Concurrent webhook deliveries or Stripe retries: two workers both saw "no row" — second insert loses UNIQUE race.
@@ -286,6 +285,7 @@ export async function POST(req: NextRequest) {
                 .update({ paid: true, amount_paid: amountPaid, stripe_payment_intent_id: paymentIntentId, stripe_fee: stripeFee })
                 .eq('session_id', sessionId)
                 .eq('youth_wrestler_id', youthWrestlerId);
+              await maybeBackfillRosterSnapshot(supabase, { session_id: sessionId, youth_wrestler_id: youthWrestlerId }, ywSnap ?? {});
             } else {
               console.error('Webhook: failed to insert session_participant (register)', {
                 code: insertErr.code,
@@ -309,6 +309,7 @@ export async function POST(req: NextRequest) {
             if (upErr) {
               console.error('Webhook: failed to increment current_participants', upErr);
             }
+            await maybeBackfillRosterSnapshot(supabase, { session_id: sessionId, youth_wrestler_id: youthWrestlerId }, ywSnap ?? {});
           }
         } else {
           await supabase
@@ -316,6 +317,12 @@ export async function POST(req: NextRequest) {
             .update({ paid: true, amount_paid: amountPaid, stripe_payment_intent_id: paymentIntentId, stripe_fee: stripeFee })
             .eq('session_id', sessionId)
             .eq('youth_wrestler_id', youthWrestlerId);
+          const { data: ywExisting } = await supabase
+            .from('youth_wrestlers')
+            .select('first_name, last_name, photo_url')
+            .eq('id', youthWrestlerId)
+            .maybeSingle();
+          await maybeBackfillRosterSnapshot(supabase, { session_id: sessionId, youth_wrestler_id: youthWrestlerId }, ywExisting ?? {});
         }
         // Notify coach so they see it (college kids need reminders)
         const { data: sessRow } = await supabase

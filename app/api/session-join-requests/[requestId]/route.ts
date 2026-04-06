@@ -5,7 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import { createNotification } from '@/lib/notifications';
 import { hasMinPhoneDigits } from '@/lib/phone';
-import { rosterSnapshotFromYouthRow } from '@/lib/session-roster-snapshot';
+import { maybeBackfillRosterSnapshot } from '@/lib/session-roster-snapshot';
 
 export async function PATCH(
   req: NextRequest,
@@ -78,17 +78,20 @@ export async function PATCH(
       }).eq('id', sessionId);
       if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 });
 
+      const ywJoinId = (joinRequest as { youth_wrestler_id?: string }).youth_wrestler_id;
       const { error: partErr } = await supabase.from('session_participants').insert({
         session_id: sessionId,
-        youth_wrestler_id: (joinRequest as { youth_wrestler_id?: string }).youth_wrestler_id,
+        youth_wrestler_id: ywJoinId,
         parent_id: (joinRequest as { requesting_parent_id?: string }).requesting_parent_id,
         paid: false,
         amount_paid: null,
-        ...rosterSnapshotFromYouthRow((ywRow ?? {}) as { first_name?: string; last_name?: string; photo_url?: string }),
       });
       if (partErr) {
         await supabase.from('sessions').update({ current_participants: current }).eq('id', sessionId);
         return NextResponse.json({ error: partErr.message }, { status: 500 });
+      }
+      if (ywJoinId) {
+        await maybeBackfillRosterSnapshot(createAdminClient(tenant.slug), { session_id: sessionId, youth_wrestler_id: ywJoinId }, ywRow ?? {});
       }
     }
 

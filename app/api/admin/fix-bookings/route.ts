@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { maybeBackfillRosterSnapshot } from '@/lib/session-roster-snapshot';
 
 export async function POST(req: NextRequest) {
   try {
@@ -59,7 +60,7 @@ export async function POST(req: NextRequest) {
         continue;
       }
       
-      // Insert participant
+      // Insert participant (roster_* via maybeBackfill when columns exist)
       const { error: insertError } = await supabase.from('session_participants').insert({
         session_id: sessionId,
         youth_wrestler_id: wrestler.id,
@@ -68,15 +69,14 @@ export async function POST(req: NextRequest) {
         amount_paid: session.price_per_participant || 0,
         payment_method: 'stripe',
         status: 'confirmed',
-        roster_first_name: wrestler.first_name,
-        roster_last_name: wrestler.last_name,
-        roster_photo_url: wrestler.photo_url,
       });
       
       if (insertError) {
         results.push({ sessionId, status: 'error', error: insertError.message });
         continue;
       }
+
+      await maybeBackfillRosterSnapshot(supabase, { session_id: sessionId, youth_wrestler_id: wrestler.id }, wrestler);
       
       // Update participant count
       const currentCount = session.current_participants || 0;

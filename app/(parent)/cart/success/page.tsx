@@ -7,7 +7,7 @@ import { headers } from 'next/headers';
 import { getTenantByDomain } from '@/config/tenants';
 import { getStripeInstance } from '@/lib/stripe/webhooks';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { rosterSnapshotFromYouthRow } from '@/lib/session-roster-snapshot';
+import { maybeBackfillRosterSnapshot } from '@/lib/session-roster-snapshot';
 import { createNotification } from '@/lib/notifications';
 import { sendCoachNewSignupSms } from '@/lib/twilio';
 import { formatEST } from '@/lib/format-date';
@@ -73,8 +73,6 @@ export default async function CartSuccessPage({
         .eq('id', wrestlerId)
         .single();
 
-      const snapshot = rosterSnapshotFromYouthRow(yw || {});
-
       for (const sessionId of sessionIds) {
         // Check if already registered
         const { data: existing } = await admin
@@ -87,7 +85,7 @@ export default async function CartSuccessPage({
         if (!existing) {
           const price = priceMap[sessionId] ?? 30;
           
-          // Insert participant
+          // Insert participant (roster_* columns optional — see maybeBackfillRosterSnapshot)
           await admin.from('session_participants').insert({
             session_id: sessionId,
             youth_wrestler_id: wrestlerId,
@@ -95,8 +93,8 @@ export default async function CartSuccessPage({
             paid: true,
             amount_paid: price,
             stripe_checkout_session_id: stripe_cs,
-            ...snapshot,
           });
+          await maybeBackfillRosterSnapshot(admin, { session_id: sessionId, youth_wrestler_id: wrestlerId }, yw || {});
 
           // Increment participant count
           const { data: sess } = await admin

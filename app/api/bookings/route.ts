@@ -9,7 +9,7 @@ import { createNotification } from '@/lib/notifications';
 import type { SessionMode, JoinPolicy } from '@/types';
 import { formatEST } from '@/lib/format-date';
 import { hasMinPhoneDigits } from '@/lib/phone';
-import { rosterSnapshotFromYouthRow } from '@/lib/session-roster-snapshot';
+import { maybeBackfillRosterSnapshot } from '@/lib/session-roster-snapshot';
 import { ensureAutoFamilyDiscountForParent } from '@/lib/family-auto-discount';
 import { checkoutAllowSavedAccountPercent, resolveCheckoutPercentOff } from '@/lib/checkout-promo';
 import { normalizeCoachOrWrestlerId, verifyCoachForParentBooking } from '@/lib/server-booking-coach';
@@ -234,12 +234,12 @@ export async function POST(req: NextRequest) {
         parent_id: user.id,
         paid: false,
         amount_paid: testModePenny ? (0.50 / numParticipants) : (pricePerParticipant ?? totalPrice / numParticipants),
-        ...rosterSnapshotFromYouthRow((ywRow ?? {}) as { first_name?: string; last_name?: string; photo_url?: string }),
       });
       if (partError) {
         await supabase.from('sessions').delete().eq('id', session.id);
         return NextResponse.json({ error: 'Failed to add participants' }, { status: 500 });
       }
+      await maybeBackfillRosterSnapshot(admin, { session_id: session.id, youth_wrestler_id: ywId }, ywRow ?? {});
     }
 
     // Stripe Checkout: enable by setting STRIPE_CHECKOUT_ENABLED=true (and keys + webhook).
