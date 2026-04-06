@@ -121,7 +121,7 @@ export default async function CoachPendingPage() {
           <div className="pt-4 border-t">
             <p className="text-xs text-muted-foreground mb-2">While you wait:</p>
             <ul className="text-xs text-muted-foreground space-y-1">
-              <li>- Make sure your SafeSport certification is current</li>
+              <li>- Gather SafeSport and background-check documentation if you still need them</li>
               <li>- Think about your coaching schedule and availability</li>
               <li>- Prepare a great profile photo</li>
             </ul>

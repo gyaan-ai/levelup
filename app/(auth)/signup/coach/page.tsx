@@ -31,6 +31,7 @@ import {
 import Link from 'next/link';
 import { ArrowLeft, ArrowRight, Check, Loader2 } from 'lucide-react';
 import { GuildIndependentContractorAgreement } from '@/components/guild-independent-contractor-agreement';
+import { zOptionalCheckbox, zRequiredAgreementCheckbox } from '@/lib/zod-checkbox';
 
 const coachApplicationSchema = z.object({
   // Step 1: Basic Info
@@ -48,10 +49,10 @@ const coachApplicationSchema = z.object({
   // Step 3: Photo & Bio
   bio: z.string().min(50, 'Bio must be at least 50 characters'),
   
-  // Step 4: Safety & Certs (+ optional t-shirt)
-  hasSafeSport: z.boolean(),
+  // Step 4: Safety & Certs (+ optional t-shirt) — attestations optional; never block application (see validateCurrentStep case 4)
+  hasSafeSport: zOptionalCheckbox,
   safeSportExpiry: z.string().optional(),
-  hasBackgroundCheck: z.boolean(),
+  hasBackgroundCheck: zOptionalCheckbox,
   backgroundCheckDate: z.string().optional(),
   tshirtSize: z.string().optional(),
   
@@ -63,8 +64,8 @@ const coachApplicationSchema = z.object({
   // Step 6: Agreement & Account
   password: z.string().min(6, 'Password must be at least 6 characters'),
   confirmPassword: z.string(),
-  agreesToTerms: z.boolean().refine(val => val === true, 'You must accept the Independent Contractor Agreement'),
-  agreesToSessionTypes: z.boolean().refine(val => val === true, 'You must commit to offering all session types'),
+  agreesToTerms: zRequiredAgreementCheckbox('You must accept the Independent Contractor Agreement'),
+  agreesToSessionTypes: zRequiredAgreementCheckbox('You must commit to offering all session types'),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ['confirmPassword'],
@@ -141,7 +142,8 @@ export default function CoachApplicationPage() {
         fieldsToValidate = ['bio'];
         break;
       case 4:
-        fieldsToValidate = ['hasSafeSport', 'hasBackgroundCheck'];
+        // Certifications are informational only for this step — do not block Next (Zod used to fail on undefined booleans)
+        fieldsToValidate = [];
         break;
       case 5:
         fieldsToValidate = ['payoutMethod'];
@@ -153,8 +155,8 @@ export default function CoachApplicationPage() {
         break;
     }
 
-    const result = await form.trigger(fieldsToValidate);
-    return result;
+    if (fieldsToValidate.length === 0) return true;
+    return form.trigger(fieldsToValidate);
   };
 
   const nextStep = async () => {
@@ -185,7 +187,6 @@ export default function CoachApplicationPage() {
 
       if (!response.ok) {
         setError(data.error || 'Application failed');
-        setLoading(false);
         return;
       }
 
@@ -200,11 +201,11 @@ export default function CoachApplicationPage() {
         return;
       }
 
-      // Redirect to pending page
       router.push('/coach-pending');
       router.refresh();
-    } catch (err) {
+    } catch {
       setError('An unexpected error occurred');
+    } finally {
       setLoading(false);
     }
   };
@@ -437,14 +438,14 @@ export default function CoachApplicationPage() {
                           <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
                             <FormControl>
                               <Checkbox
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
+                                checked={!!field.value}
+                                onCheckedChange={(c) => field.onChange(c === true)}
                               />
                             </FormControl>
                             <div className="space-y-1 leading-none">
                               <FormLabel>I have SafeSport Certification</FormLabel>
                               <FormDescription>
-                                Required to coach youth athletes. Get certified at{' '}
+                                Optional to submit — you can complete before or after approval. Get certified at{' '}
                                 <a href="https://safesport.org" target="_blank" rel="noopener noreferrer" className="text-[#D4AF37] underline">
                                   safesport.org
                                 </a>
@@ -476,14 +477,14 @@ export default function CoachApplicationPage() {
                           <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
                             <FormControl>
                               <Checkbox
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
+                                checked={!!field.value}
+                                onCheckedChange={(c) => field.onChange(c === true)}
                               />
                             </FormControl>
                             <div className="space-y-1 leading-none">
                               <FormLabel>I have a Background Check on file</FormLabel>
                               <FormDescription>
-                                Through your school, club, or USA Wrestling
+                                Optional to submit — through your school, club, or USA Wrestling
                               </FormDescription>
                             </div>
                           </FormItem>
@@ -655,8 +656,8 @@ export default function CoachApplicationPage() {
                           <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
                             <FormControl>
                               <Checkbox
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
+                                checked={!!field.value}
+                                onCheckedChange={(c) => field.onChange(c === true)}
                               />
                             </FormControl>
                             <div className="space-y-1 leading-none">
@@ -675,8 +676,8 @@ export default function CoachApplicationPage() {
                           <FormItem className="flex flex-row items-start space-x-3 space-y-0 rounded-md border p-4">
                             <FormControl>
                               <Checkbox
-                                checked={field.value}
-                                onCheckedChange={field.onChange}
+                                checked={!!field.value}
+                                onCheckedChange={(c) => field.onChange(c === true)}
                               />
                             </FormControl>
                             <div className="space-y-1 leading-none">

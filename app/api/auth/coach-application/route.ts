@@ -5,6 +5,16 @@ import {
   buildCoachApplicationAthleteInsert,
   buildCoachApplicationUserInsert,
 } from '@/lib/coach-application-signup';
+import {
+  getCoachApplicationsNotifyEmail,
+  sendCoachApplicationSubmittedToAdmin,
+  sendCoachApplicationSubmittedToCoach,
+} from '@/lib/email/coach-application-emails';
+import { getRequestBaseUrl } from '@/lib/request-base-url';
+
+function bodyBool(v: unknown): boolean {
+  return v === true || v === 'true';
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -123,9 +133,9 @@ export async function POST(req: NextRequest) {
         payoutMethod,
         venmoHandle: venmoHandle ?? null,
         zelleContact: zelleContact ?? null,
-        hasSafeSport: !!hasSafeSport,
+        hasSafeSport: bodyBool(hasSafeSport),
         safeSportExpiry: safeSportExpiry ?? null,
-        hasBackgroundCheck: !!hasBackgroundCheck,
+        hasBackgroundCheck: bodyBool(hasBackgroundCheck),
         backgroundCheckDate: backgroundCheckDate ?? null,
         tshirtSize: tshirtSize ?? null,
       })
@@ -140,8 +150,27 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // TODO: Send notification email to admin about new application
-    // TODO: Send confirmation email to coach
+    const baseUrl = getRequestBaseUrl(req);
+    try {
+      await Promise.all([
+        sendCoachApplicationSubmittedToCoach({
+          to: emailNormalized,
+          firstName,
+          tenant,
+          baseUrl,
+        }),
+        sendCoachApplicationSubmittedToAdmin({
+          adminEmail: getCoachApplicationsNotifyEmail(tenant),
+          applicantFirstName: firstName,
+          applicantLastName: lastName,
+          applicantEmail: emailNormalized,
+          tenant,
+          baseUrl,
+        }),
+      ]);
+    } catch (e) {
+      console.error('[email] coach application notifications failed:', e);
+    }
 
     return NextResponse.json({
       success: true,

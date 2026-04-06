@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
+import { sendCoachApplicationRejected } from '@/lib/email/coach-application-emails';
 
 export async function POST(req: NextRequest) {
   try {
@@ -68,15 +69,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `Failed to reject: ${updateError.message}` }, { status: 500 });
     }
 
-    // Get email for notification
     const { data: coachUser } = await admin
       .from('users')
       .select('email')
       .eq('id', coachId)
       .single();
 
-    // TODO: Send rejection email to coach
-    // await sendRejectionEmail(coachUser?.email, coach.first_name, reason);
+    if (coachUser?.email) {
+      try {
+        await sendCoachApplicationRejected({
+          to: coachUser.email,
+          firstName: coach.first_name,
+          reason: reason.trim(),
+          tenant,
+        });
+      } catch (e) {
+        console.error('[email] coach rejection notify failed:', e);
+      }
+    }
 
     return NextResponse.json({
       success: true,

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
+import { sendCoachApplicationApproved } from '@/lib/email/coach-application-emails';
+import { getRequestBaseUrl } from '@/lib/request-base-url';
 
 export async function POST(req: NextRequest) {
   try {
@@ -63,15 +65,24 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `Failed to approve: ${updateError.message}` }, { status: 500 });
     }
 
-    // Get email for notification
     const { data: coachUser } = await admin
       .from('users')
       .select('email')
       .eq('id', coachId)
       .single();
 
-    // TODO: Send approval email to coach
-    // await sendApprovalEmail(coachUser?.email, coach.first_name);
+    if (coachUser?.email) {
+      try {
+        await sendCoachApplicationApproved({
+          to: coachUser.email,
+          firstName: coach.first_name,
+          tenant,
+          baseUrl: getRequestBaseUrl(req),
+        });
+      } catch (e) {
+        console.error('[email] coach approval notify failed:', e);
+      }
+    }
 
     return NextResponse.json({
       success: true,

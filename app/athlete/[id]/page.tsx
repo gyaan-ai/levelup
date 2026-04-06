@@ -17,6 +17,7 @@ import { CoachSessionBadge } from '@/components/coach-session-badge';
 import { FollowCoachButton } from '@/components/follow-coach-button';
 import { DeleteAthleteProfileButton } from '@/components/delete-athlete-profile-button';
 import { ProfileImage } from '@/components/profile-image';
+import { isBackgroundCheckValidForDisplay, isSafeSportValidForDisplay } from '@/lib/athletes';
 
 const SCHOOL_COLORS: Record<string, { bg: string; text: string }> = {
   'UNC': { bg: 'bg-blue-600', text: 'text-white' },
@@ -109,17 +110,12 @@ export default async function AthleteProfilePage({
   // Use athlete.total_sessions (completed only, maintained by trigger) for badge and display
   const completedSessions = athlete.total_sessions ?? 0;
 
-  // Check certification status
   const today = new Date();
   today.setHours(0, 0, 0, 0);
 
-  const isSafeSportCertified = athlete.safesport_expiration
-    ? new Date(athlete.safesport_expiration) > today
-    : false;
-
-  const isBackgroundChecked = athlete.background_check_expiration
-    ? new Date(athlete.background_check_expiration) > today
-    : false;
+  // Check certification status (SafeSport uses true expiration; background uses attestation + completion date — see lib/athletes)
+  const isSafeSportCertified = isSafeSportValidForDisplay(athlete);
+  const isBackgroundChecked = isBackgroundCheckValidForDisplay(athlete);
 
   const isUSAWrestlingMember = athlete.usa_wrestling_expiration
     ? new Date(athlete.usa_wrestling_expiration) > today
