@@ -862,6 +862,22 @@ export function AdminDashboardClient({
     sessionCoachFilter,
   ]);
 
+  /** Sum spots and collected $ for the current filter (matches table rows). */
+  const sessionListTotals = useMemo(() => {
+    let booked = 0;
+    let capacity = 0;
+    let collected = 0;
+    for (const s of filteredSessions) {
+      const cur = Number(s.current_participants) || 0;
+      const max = Math.max(1, Number(s.max_participants) || 1);
+      booked += cur;
+      capacity += max;
+      collected += Number(s.participant_amount_paid_sum) || 0;
+    }
+    const openings = Math.max(0, capacity - booked);
+    return { booked, capacity, openings, collected };
+  }, [filteredSessions]);
+
   const filteredUsers = users.filter((u) => {
     if (userRoleFilter !== 'all' && u.role !== userRoleFilter) return false;
     if (userSearch) {
@@ -2074,6 +2090,26 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
             </div>
           </Card>
 
+          {filteredSessions.length > 0 && (
+            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm">
+              <div>
+                <span className="text-muted-foreground">Bookings </span>
+                <span className="font-semibold tabular-nums text-foreground">{sessionListTotals.booked}</span>
+                <span className="text-muted-foreground"> / </span>
+                <span className="font-semibold tabular-nums text-foreground">{sessionListTotals.capacity}</span>
+                <span className="text-muted-foreground"> spots</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Openings </span>
+                <span className="font-semibold tabular-nums text-foreground">{sessionListTotals.openings}</span>
+              </div>
+              <div>
+                <span className="text-muted-foreground">Collected </span>
+                <span className="font-semibold tabular-nums text-foreground">${sessionListTotals.collected.toFixed(2)}</span>
+              </div>
+            </div>
+          )}
+
           {/* Sessions Table */}
           <Card className="overflow-hidden">
             <div className="overflow-x-auto">
@@ -2093,7 +2129,7 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
                 <tbody className="divide-y divide-border">
                   {filteredSessions.length === 0 ? (
                     <tr>
-                      <td colSpan={7} className="py-12 text-center text-muted-foreground">
+                      <td colSpan={8} className="py-12 text-center text-muted-foreground">
                         <div className="flex flex-col items-center gap-2">
                           <Calendar className="h-8 w-8 text-muted-foreground/50" />
                           <p>No sessions found</p>
