@@ -39,9 +39,6 @@ describe('coach application signup DB payloads', () => {
       safeSportExpiry: '2026-12-01',
       hasBackgroundCheck: false,
       backgroundCheckDate: null,
-      emergencyContactName: 'Mom',
-      emergencyContactPhone: '9195550000',
-      emergencyContactRelationship: 'Parent',
       tshirtSize: 'M',
     });
     expect(sortedKeys(row)).toEqual([...COACH_APPLICATION_ATHLETE_INSERT_KEYS].sort());

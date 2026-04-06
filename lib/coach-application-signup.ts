@@ -48,9 +48,6 @@ export type CoachApplicationAthleteInsertInput = {
   safeSportExpiry: string | null;
   hasBackgroundCheck: boolean;
   backgroundCheckDate: string | null;
-  emergencyContactName: string | null;
-  emergencyContactPhone: string | null;
-  emergencyContactRelationship: string | null;
   tshirtSize: string | null;
 };
 
@@ -83,9 +80,6 @@ export const COACH_APPLICATION_ATHLETE_INSERT_KEYS = [
   'safesport_expiration',
   'background_check',
   'background_check_expiration',
-  'emergency_contact_name',
-  'emergency_contact_phone',
-  'emergency_contact_relationship',
   'tshirt_size',
   'agreement_signed_at',
 ] as const;
@@ -109,9 +103,6 @@ export function buildCoachApplicationAthleteInsert(input: CoachApplicationAthlet
     safesport_expiration: toPgDateOrNull(input.safeSportExpiry ?? null),
     background_check: input.hasBackgroundCheck || false,
     background_check_expiration: toPgDateOrNull(input.backgroundCheckDate ?? null),
-    emergency_contact_name: input.emergencyContactName?.trim() || null,
-    emergency_contact_phone: input.emergencyContactPhone?.replace(/\D/g, '') || null,
-    emergency_contact_relationship: input.emergencyContactRelationship?.trim() || null,
     tshirt_size: input.tshirtSize || null,
     agreement_signed_at: new Date().toISOString(),
   };

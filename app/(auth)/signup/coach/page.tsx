@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/select';
 import Link from 'next/link';
 import { ArrowLeft, ArrowRight, Check, Loader2 } from 'lucide-react';
+import { GuildIndependentContractorAgreement } from '@/components/guild-independent-contractor-agreement';
 
 const coachApplicationSchema = z.object({
   // Step 1: Basic Info
@@ -43,32 +44,26 @@ const coachApplicationSchema = z.object({
   coachType: z.enum(['ncaa_athlete', 'club_hs_coach'], { required_error: 'Please select your coach type' }),
   school: z.string().min(1, 'School or club is required'),
   weightClass: z.string().optional(),
-  yearsExperience: z.string().optional(),
   
   // Step 3: Photo & Bio
   bio: z.string().min(50, 'Bio must be at least 50 characters'),
   
-  // Step 4: Safety & Certs
+  // Step 4: Safety & Certs (+ optional t-shirt)
   hasSafeSport: z.boolean(),
   safeSportExpiry: z.string().optional(),
   hasBackgroundCheck: z.boolean(),
   backgroundCheckDate: z.string().optional(),
-  
-  // Step 5: Emergency Contact
-  emergencyContactName: z.string().min(1, 'Emergency contact name is required'),
-  emergencyContactPhone: z.string().min(10, 'Valid phone number required'),
-  emergencyContactRelationship: z.string().min(1, 'Relationship is required'),
   tshirtSize: z.string().optional(),
   
-  // Step 6: Payout
+  // Step 5: Payout
   payoutMethod: z.enum(['venmo', 'zelle'], { required_error: 'Please select a payout method' }),
   venmoHandle: z.string().optional(),
   zelleContact: z.string().optional(),
   
-  // Step 7: Agreement & Account
+  // Step 6: Agreement & Account
   password: z.string().min(6, 'Password must be at least 6 characters'),
   confirmPassword: z.string(),
-  agreesToTerms: z.boolean().refine(val => val === true, 'You must agree to the terms'),
+  agreesToTerms: z.boolean().refine(val => val === true, 'You must accept the Independent Contractor Agreement'),
   agreesToSessionTypes: z.boolean().refine(val => val === true, 'You must commit to offering all session types'),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
@@ -89,9 +84,8 @@ const STEPS = [
   { id: 2, title: 'Background', description: 'Wrestling experience' },
   { id: 3, title: 'Profile', description: 'Photo and bio' },
   { id: 4, title: 'Safety', description: 'Certifications' },
-  { id: 5, title: 'Emergency', description: 'Contact info' },
-  { id: 6, title: 'Payout', description: 'How you get paid' },
-  { id: 7, title: 'Agreement', description: 'Terms and account' },
+  { id: 5, title: 'Payout', description: 'How you get paid' },
+  { id: 6, title: 'Agreement', description: 'Terms and account' },
 ];
 
 export default function CoachApplicationPage() {
@@ -113,15 +107,11 @@ export default function CoachApplicationPage() {
       coachType: undefined,
       school: '',
       weightClass: '',
-      yearsExperience: '',
       bio: '',
       hasSafeSport: false,
       safeSportExpiry: '',
       hasBackgroundCheck: false,
       backgroundCheckDate: '',
-      emergencyContactName: '',
-      emergencyContactPhone: '',
-      emergencyContactRelationship: '',
       tshirtSize: '',
       payoutMethod: undefined,
       venmoHandle: '',
@@ -154,14 +144,11 @@ export default function CoachApplicationPage() {
         fieldsToValidate = ['hasSafeSport', 'hasBackgroundCheck'];
         break;
       case 5:
-        fieldsToValidate = ['emergencyContactName', 'emergencyContactPhone', 'emergencyContactRelationship'];
-        break;
-      case 6:
         fieldsToValidate = ['payoutMethod'];
         if (watchPayoutMethod === 'venmo') fieldsToValidate.push('venmoHandle');
         if (watchPayoutMethod === 'zelle') fieldsToValidate.push('zelleContact');
         break;
-      case 7:
+      case 6:
         fieldsToValidate = ['password', 'confirmPassword', 'agreesToTerms', 'agreesToSessionTypes'];
         break;
     }
@@ -172,7 +159,7 @@ export default function CoachApplicationPage() {
 
   const nextStep = async () => {
     const isValid = await validateCurrentStep();
-    if (isValid && currentStep < 7) {
+    if (isValid && currentStep < 6) {
       setCurrentStep(currentStep + 1);
     }
   };
@@ -405,19 +392,6 @@ export default function CoachApplicationPage() {
                         </FormItem>
                       )}
                     />
-                    <FormField
-                      control={form.control}
-                      name="yearsExperience"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Years of Wrestling Experience (optional)</FormLabel>
-                          <FormControl>
-                            <Input type="number" placeholder="10" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
                   </>
                 )}
 
@@ -531,56 +505,6 @@ export default function CoachApplicationPage() {
                         />
                       )}
                     </div>
-                    <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
-                      <p className="text-sm text-amber-200">
-                        <strong>Note:</strong> You can still apply without these certifications, but you won&apos;t be able to coach until they&apos;re verified. We&apos;ll help you get set up.
-                      </p>
-                    </div>
-                  </>
-                )}
-
-                {/* Step 5: Emergency */}
-                {currentStep === 5 && (
-                  <>
-                    <FormField
-                      control={form.control}
-                      name="emergencyContactName"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Emergency Contact Name</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Jane Doe" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="emergencyContactPhone"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Emergency Contact Phone</FormLabel>
-                          <FormControl>
-                            <Input type="tel" placeholder="(919) 555-0123" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="emergencyContactRelationship"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Relationship</FormLabel>
-                          <FormControl>
-                            <Input placeholder="Parent, Spouse, etc." {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
                     <FormField
                       control={form.control}
                       name="tshirtSize"
@@ -604,11 +528,16 @@ export default function CoachApplicationPage() {
                         </FormItem>
                       )}
                     />
+                    <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                      <p className="text-sm text-amber-200">
+                        <strong>Note:</strong> You can still apply without these certifications, but you won&apos;t be able to coach until they&apos;re verified. We&apos;ll help you get set up.
+                      </p>
+                    </div>
                   </>
                 )}
 
-                {/* Step 6: Payout */}
-                {currentStep === 6 && (
+                {/* Step 5: Payout */}
+                {currentStep === 5 && (
                   <>
                     <FormField
                       control={form.control}
@@ -666,15 +595,32 @@ export default function CoachApplicationPage() {
                     )}
                     <div className="p-4 bg-muted/50 rounded-lg">
                       <p className="text-sm text-muted-foreground">
-                        <strong>Coach Earnings:</strong> You keep 83% of session revenue. The Guild handles payments, scheduling, and marketing.
+                        <strong>Coach Earnings:</strong> Your payout percentage is set for your account and shown after approval. The Guild handles payments, scheduling, and marketing.
                       </p>
                     </div>
                   </>
                 )}
 
-                {/* Step 7: Agreement */}
-                {currentStep === 7 && (
+                {/* Step 6: Agreement */}
+                {currentStep === 6 && (
                   <>
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-foreground">Independent Contractor Agreement</p>
+                      <p className="text-xs text-muted-foreground">
+                        Scroll to read the full agreement. Submitting your application records electronic acceptance (Sections
+                        11.5 and 12).
+                      </p>
+                      <div className="rounded-lg border border-border bg-muted/30 p-1">
+                        <div className="max-h-[min(50vh,440px)] overflow-y-auto rounded-md bg-background p-4">
+                          <GuildIndependentContractorAgreement />
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        <Link href="/coach-agreement" target="_blank" rel="noopener noreferrer" className="text-[#D4AF37] underline">
+                          Open printable version
+                        </Link>
+                      </p>
+                    </div>
                     <FormField
                       control={form.control}
                       name="password"
@@ -734,12 +680,10 @@ export default function CoachApplicationPage() {
                               />
                             </FormControl>
                             <div className="space-y-1 leading-none">
-                              <FormLabel>I agree to The Guild Coach Agreement</FormLabel>
+                              <FormLabel>I agree to the Independent Contractor Agreement above</FormLabel>
                               <FormDescription>
-                                Including code of conduct, cancellation policy, and payout terms.{' '}
-                                <Link href="/coach-agreement" target="_blank" className="text-[#D4AF37] underline">
-                                  Read full agreement
-                                </Link>
+                                I have read the agreement, am at least 18, and accept all terms including independent contractor
+                                status. This check constitutes my electronic signature under Section 11.5.
                               </FormDescription>
                             </div>
                           </FormItem>
@@ -765,7 +709,7 @@ export default function CoachApplicationPage() {
                     </Link>
                   )}
                   
-                  {currentStep < 7 ? (
+                  {currentStep < 6 ? (
                     <Button type="button" onClick={nextStep} className="bg-[#D4AF37] hover:bg-[#B8963C] text-black">
                       Next
                       <ArrowRight className="h-4 w-4 ml-2" />

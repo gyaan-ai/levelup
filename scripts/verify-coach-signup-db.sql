@@ -21,9 +21,8 @@ WHERE table_schema = 'public'
     'id', 'first_name', 'last_name', 'school', 'coach_type', 'weight_class', 'bio',
     'active', 'status', 'date_of_birth', 'payout_method', 'venmo_handle', 'zelle_email',
     'safesport_certified', 'safesport_expiration', 'background_check', 'background_check_expiration',
-    'emergency_contact_name', 'emergency_contact_phone', 'emergency_contact_relationship',
     'tshirt_size', 'agreement_signed_at'
   )
 ORDER BY column_name;
--- Expect 22 rows. Missing payout_method / safesport_certified / background_check =>
+-- Expect 19 rows. Missing payout_method / safesport_certified / background_check =>
 --   run 20260405121000_coach_application_athletes_columns.sql
