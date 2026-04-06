@@ -1,5 +1,21 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
+/** Set sessions.current_participants from actual session_participants rows (fixes drift). */
+export async function syncSessionParticipantCount(
+  admin: SupabaseClient,
+  sessionId: string
+): Promise<void> {
+  const { count, error } = await admin
+    .from('session_participants')
+    .select('*', { count: 'exact', head: true })
+    .eq('session_id', sessionId);
+  if (error) return;
+  await admin
+    .from('sessions')
+    .update({ current_participants: count ?? 0 })
+    .eq('id', sessionId);
+}
+
 export type TransferSessionRegistrationResult =
   | {
       ok: true;
@@ -68,38 +84,37 @@ export async function transferSessionRegistration(
     }
   }
 
-  const currentCount = targetSession.current_participants ?? 0;
+  const { count: targetRowCount } = await admin
+    .from('session_participants')
+    .select('*', { count: 'exact', head: true })
+    .eq('session_id', toSessionId);
+  const filled = targetRowCount ?? 0;
   const maxCount = targetSession.max_participants ?? 6;
-  if (currentCount >= maxCount) {
+  if (filled >= maxCount) {
     return { ok: false, status: 400, error: 'Target session is full' };
   }
 
-  const { error: updateError } = await admin
+  const { data: updatedRows, error: updateError } = await admin
     .from('session_participants')
     .update({ session_id: toSessionId })
-    .eq('id', participantId);
+    .eq('id', participantId)
+    .eq('session_id', fromSessionId)
+    .select('id');
 
   if (updateError) {
     return { ok: false, status: 500, error: updateError.message };
   }
-
-  const { data: sourceSession } = await admin
-    .from('sessions')
-    .select('current_participants')
-    .eq('id', fromSessionId)
-    .maybeSingle();
-
-  if (sourceSession) {
-    await admin
-      .from('sessions')
-      .update({ current_participants: Math.max(0, (sourceSession.current_participants ?? 1) - 1) })
-      .eq('id', fromSessionId);
+  if (!updatedRows?.length) {
+    return {
+      ok: false,
+      status: 409,
+      error:
+        'Could not move registration (participant may have already been moved or removed). Refresh and try again.',
+    };
   }
 
-  await admin
-    .from('sessions')
-    .update({ current_participants: (targetSession.current_participants ?? 0) + 1 })
-    .eq('id', toSessionId);
+  await syncSessionParticipantCount(admin, fromSessionId);
+  await syncSessionParticipantCount(admin, toSessionId);
 
   return {
     ok: true,

@@ -649,7 +649,27 @@ export function AdminDashboardClient({
     amountPaid: number;
   } | null>(null);
   const [transferTargetSessionId, setTransferTargetSessionId] = useState<string>('');
+  const [transferTargetSearch, setTransferTargetSearch] = useState('');
   const [transferLoading, setTransferLoading] = useState(false);
+
+  const transferTargetOptions = useMemo(() => {
+    const q = transferTargetSearch.trim().toLowerCase();
+    const now = Date.now();
+    return sessions
+      .filter((s) => s.id !== rosterSessionId && new Date(s.scheduled_datetime).getTime() > now)
+      .filter((s) => {
+        if (!q) return true;
+        const hay = `${s.athlete_name} ${s.athlete_school} ${s.facility_name} ${formatEST(
+          new Date(s.scheduled_datetime),
+          'MMM d yyyy h:mm a'
+        )}`.toLowerCase();
+        return hay.includes(q);
+      })
+      .sort(
+        (a, b) =>
+          new Date(a.scheduled_datetime).getTime() - new Date(b.scheduled_datetime).getTime()
+      );
+  }, [sessions, rosterSessionId, transferTargetSearch]);
   
   const handleTransferRegistration = async () => {
     if (!transferringParticipant || !rosterSessionId || !transferTargetSessionId) return;
@@ -673,7 +693,8 @@ export function AdminDashboardClient({
       alert(`Successfully transferred ${transferringParticipant.wrestlerName} with $${transferringParticipant.amountPaid} payment preserved`);
       setTransferringParticipant(null);
       setTransferTargetSessionId('');
-      // Refresh roster
+      setTransferTargetSearch('');
+      router.refresh();
       openRoster(rosterSessionId);
     } catch (err) {
       alert('Transfer failed: ' + (err instanceof Error ? err.message : String(err)));
@@ -4673,7 +4694,15 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
                         variant="ghost"
                         size="sm"
                         className="text-xs text-blue-400 hover:text-blue-300"
-                        onClick={() => setTransferringParticipant({ id: p.id, wrestlerName: p.wrestlerName, amountPaid: p.amountPaid })}
+                        onClick={() => {
+                          setTransferTargetSearch('');
+                          setTransferTargetSessionId('');
+                          setTransferringParticipant({
+                            id: p.id,
+                            wrestlerName: p.wrestlerName,
+                            amountPaid: p.amountPaid,
+                          });
+                        }}
                       >
                         Transfer
                       </Button>
@@ -4690,6 +4719,14 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
                   Transfer {transferringParticipant.wrestlerName} (${transferringParticipant.amountPaid} paid)
                 </div>
                 <div className="space-y-2">
+                  <Label htmlFor="transferTargetSearch">Find session (coach, facility, date)</Label>
+                  <Input
+                    id="transferTargetSearch"
+                    className="bg-zinc-800 border-zinc-700"
+                    placeholder={"e.g. O'Neill or Apr 6"}
+                    value={transferTargetSearch}
+                    onChange={(e) => setTransferTargetSearch(e.target.value)}
+                  />
                   <Label htmlFor="transferTarget">Move to Session</Label>
                   <select
                     id="transferTarget"
@@ -4698,23 +4735,28 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
                     onChange={(e) => setTransferTargetSessionId(e.target.value)}
                   >
                     <option value="">Select a session...</option>
-                    {sessions
-                      .filter(s => s.id !== rosterSessionId && new Date(s.scheduled_datetime) > new Date())
-                      .sort((a, b) => new Date(a.scheduled_datetime).getTime() - new Date(b.scheduled_datetime).getTime())
-                      .slice(0, 20)
-                      .map(s => (
-                        <option key={s.id} value={s.id}>
-                          {s.athlete_name} - {formatEST(new Date(s.scheduled_datetime), 'MMM d h:mm a')} ({s.current_participants}/{s.max_participants})
-                        </option>
-                      ))
-                    }
+                    {transferTargetOptions.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.athlete_name} — {formatEST(new Date(s.scheduled_datetime), 'MMM d h:mm a')} ·{' '}
+                        {s.facility_name} ({s.current_participants}/{s.max_participants})
+                      </option>
+                    ))}
                   </select>
+                  {transferTargetOptions.length === 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      No matching upcoming sessions. Adjust search or check the session is still in the future.
+                    </p>
+                  )}
                 </div>
                 <div className="flex gap-2 mt-3">
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => { setTransferringParticipant(null); setTransferTargetSessionId(''); }}
+                    onClick={() => {
+                      setTransferringParticipant(null);
+                      setTransferTargetSessionId('');
+                      setTransferTargetSearch('');
+                    }}
                   >
                     Cancel
                   </Button>
