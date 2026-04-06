@@ -415,7 +415,7 @@ export function BookingFlow({
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back to Profile
         </Link>
-        <div className="flex items-center gap-4 mb-2">
+        <div className="flex flex-col sm:flex-row sm:items-start gap-4 mb-2">
           <ProfileImage
             src={athlete.photo_url}
             alt={`${athlete.first_name} ${athlete.last_name}`}
@@ -424,11 +424,11 @@ export function BookingFlow({
             className="w-16 h-16 shrink-0"
             fallbackIconClassName="h-8 w-8 text-muted-foreground"
           />
-          <div>
+          <div className="min-w-0 flex-1 space-y-1">
             <h1 className="text-2xl font-bold">
               Book a Session with {athlete.first_name} {athlete.last_name}
             </h1>
-            <p className="text-muted-foreground flex items-center gap-2">
+            <p className="text-muted-foreground flex items-center gap-2 flex-wrap">
               <SchoolLogo school={athlete.school} size="sm" />
               {athlete.school}
             </p>

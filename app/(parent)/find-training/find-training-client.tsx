@@ -228,6 +228,12 @@ export function FindTrainingClient({
     // Session is not bookable if full OR invite-only (without access) OR all wrestlers already booked
     const isNotBookable = openSlots === 0 || isInviteOnly || allParentWrestlersBooked;
 
+    const copySessionLink = (e: React.MouseEvent) => {
+      e.stopPropagation();
+      const url = `${window.location.origin}/sessions/${session.id}`;
+      void navigator.clipboard.writeText(url);
+    };
+
     const buildCartPayload = () => ({
       id: session.id,
       scheduled_datetime: session.scheduled_datetime,
@@ -272,17 +278,31 @@ export function FindTrainingClient({
               />
             </Link>
 
-            {/* Mobile: Session type + date inline with photo */}
+            {/* Mobile: Session type + date inline with photo (same meta as desktop: Share, focus) */}
             <div className="flex-1 min-w-0 sm:hidden">
-              <div className="flex items-center gap-1.5 flex-wrap">
+              <div className="flex items-center gap-2 mb-1.5 flex-wrap">
                 <SessionTypeBadge sessionType={session.session_type} sessionMode={session.session_mode} />
                 {(session as { join_policy?: string | null }).join_policy === 'invite_only' ? (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-900/50 text-amber-400 border border-amber-700/50">
-                    Invite
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-amber-900/50 text-amber-400 border border-amber-700/50">
+                    Invite Only
                   </span>
                 ) : (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-900/50 text-emerald-400 border border-emerald-700/50">
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-900/50 text-emerald-400 border border-emerald-700/50">
                     Open
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={copySessionLink}
+                  className="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700 transition-colors flex items-center gap-1"
+                  title="Copy session link"
+                >
+                  <Copy className="h-3 w-3" />
+                  Share
+                </button>
+                {session.focus_area && (
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400">
+                    {session.focus_area}
                   </span>
                 )}
               </div>
@@ -314,11 +334,8 @@ export function FindTrainingClient({
                 </span>
               )}
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  const url = `${window.location.origin}/sessions/${session.id}`;
-                  navigator.clipboard.writeText(url);
-                }}
+                type="button"
+                onClick={copySessionLink}
                 className="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700 transition-colors flex items-center gap-1"
                 title="Copy session link"
               >

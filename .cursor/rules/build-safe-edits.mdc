@@ -18,4 +18,5 @@ Code changes must not introduce build or runtime errors. Follow these every time
 ## Before finishing
 
 - After editing `.tsx`/`.ts`/`.jsx`/`.js`, run `npm run build` (or suggest the user run it) so broken syntax or type errors are caught before push. Do not rely only on the linter.
+- If you change coach application signup or `lib/coach-application-signup.ts`, run `npm test` so insert-column drift tests pass.
 - If the project uses Next.js, the build uses SWC; avoid ambiguous escapes and non-standard JS in JSX.

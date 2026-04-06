@@ -36,12 +36,12 @@ export default async function CoachApplicationsPage() {
       status,
       active,
       safesport_certified,
-      safesport_expiry,
+      safesport_expiration,
       background_check,
-      background_check_date,
+      background_check_expiration,
       payout_method,
       venmo_handle,
-      zelle_contact,
+      zelle_email,
       emergency_contact_name,
       emergency_contact_phone,
       emergency_contact_relationship,
@@ -55,11 +55,18 @@ export default async function CoachApplicationsPage() {
     `)
     .order('created_at', { ascending: false });
 
-  // Transform the data - Supabase returns users as array, we need a single object
-  const applications = (rawApplications || []).map((app) => ({
-    ...app,
-    users: Array.isArray(app.users) ? app.users[0] : app.users,
-  }));
+  // Map Postgres column names to UI fields (coach signup writes zelle_email, *_expiration).
+  const applications = (rawApplications || []).map((app) => {
+    const row = app as Record<string, unknown>;
+    const users = Array.isArray(app.users) ? app.users[0] : app.users;
+    return {
+      ...app,
+      safesport_expiry: (row.safesport_expiration ?? row.safesport_expiry ?? null) as string | null,
+      background_check_date: (row.background_check_expiration ?? row.background_check_date ?? null) as string | null,
+      zelle_contact: (row.zelle_email ?? row.zelle_contact ?? null) as string | null,
+      users,
+    };
+  });
 
   return (
     <div className="container mx-auto px-4 py-8">

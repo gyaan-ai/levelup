@@ -44,7 +44,7 @@ export interface Athlete {
   coach_type?: 'ncaa_athlete' | 'club_hs_coach';
   payout_method?: 'venmo' | 'zelle';
   venmo_handle?: string;
-  zelle_contact?: string;
+  zelle_email?: string;
   safesport_certified?: boolean;
   safesport_expiry?: string;
   background_check?: boolean;

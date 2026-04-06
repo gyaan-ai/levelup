@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
+import {
+  buildCoachApplicationAthleteInsert,
+  buildCoachApplicationUserInsert,
+} from '@/lib/coach-application-signup';
 
 export async function POST(req: NextRequest) {
   try {
@@ -87,15 +91,20 @@ export async function POST(req: NextRequest) {
 
     const userId = authData.user.id;
 
-    // Insert into users table
-    const { error: userError } = await supabaseAdmin.from('users').insert({
-      id: userId,
-      email: email.toLowerCase().trim(),
-      role: 'coach',
-      first_name: firstName.trim(),
-      last_name: lastName.trim(),
-      phone: phone.replace(/\D/g, ''),
-    });
+    const emailNormalized = email.toLowerCase().trim();
+
+    // Insert into users table (columns must match migrations — see lib/coach-application-signup.ts + tests)
+    const { error: userError } = await supabaseAdmin
+      .from('users')
+      .insert(
+        buildCoachApplicationUserInsert({
+          userId,
+          emailNormalized,
+          firstName,
+          lastName,
+          phoneDigits: phone.replace(/\D/g, ''),
+        })
+      );
 
     if (userError) {
       await supabaseAdmin.auth.admin.deleteUser(userId);
@@ -105,35 +114,29 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Create athlete (coach) profile with pending status
-    const { error: athleteError } = await supabaseAdmin.from('athletes').insert({
-      id: userId,
-      first_name: firstName.trim(),
-      last_name: lastName.trim(),
-      school: school.trim(),
-      coach_type: coachType,
-      weight_class: weightClass || null,
-      bio: bio.trim(),
-      active: false, // Not active until approved
-      status: 'pending', // Pending admin review
-      date_of_birth: dateOfBirth,
-      // Payout info
-      payout_method: payoutMethod,
-      venmo_handle: venmoHandle?.trim() || null,
-      zelle_contact: zelleContact?.trim() || null,
-      // Safety certs
-      safesport_certified: hasSafeSport || false,
-      safesport_expiry: safeSportExpiry || null,
-      background_check: hasBackgroundCheck || false,
-      background_check_date: backgroundCheckDate || null,
-      // Emergency contact
-      emergency_contact_name: emergencyContactName?.trim() || null,
-      emergency_contact_phone: emergencyContactPhone?.replace(/\D/g, '') || null,
-      emergency_contact_relationship: emergencyContactRelationship?.trim() || null,
-      tshirt_size: tshirtSize || null,
-      // Agreement
-      agreement_signed_at: new Date().toISOString(),
-    });
+    const { error: athleteError } = await supabaseAdmin.from('athletes').insert(
+      buildCoachApplicationAthleteInsert({
+        userId,
+        firstName,
+        lastName,
+        school,
+        coachType,
+        weightClass: weightClass || null,
+        bio,
+        dateOfBirth,
+        payoutMethod,
+        venmoHandle: venmoHandle ?? null,
+        zelleContact: zelleContact ?? null,
+        hasSafeSport: !!hasSafeSport,
+        safeSportExpiry: safeSportExpiry ?? null,
+        hasBackgroundCheck: !!hasBackgroundCheck,
+        backgroundCheckDate: backgroundCheckDate ?? null,
+        emergencyContactName: emergencyContactName ?? null,
+        emergencyContactPhone: emergencyContactPhone ?? null,
+        emergencyContactRelationship: emergencyContactRelationship ?? null,
+        tshirtSize: tshirtSize ?? null,
+      })
+    );
 
     if (athleteError) {
       await supabaseAdmin.from('users').delete().eq('id', userId);

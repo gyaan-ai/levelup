@@ -369,6 +369,22 @@ export default async function AthleteProfilePage({
                   )
                 )}
               </div>
+              {(isParent || isAdmin) && !isOwnProfile && (
+                <p className="text-sm text-muted-foreground mt-4 max-w-xl">
+                  Don&apos;t see a time that works?{' '}
+                  <Link
+                    href={
+                      youthWrestlerId
+                        ? `/book/${athlete.id}/request?youthWrestlerId=${encodeURIComponent(youthWrestlerId)}`
+                        : `/book/${athlete.id}/request`
+                    }
+                    className="text-accent font-medium underline underline-offset-2 hover:no-underline"
+                  >
+                    Request a session
+                  </Link>{' '}
+                  — the coach can reply from their requests inbox.
+                </p>
+              )}
             </div>
           </div>
         </CardContent>
