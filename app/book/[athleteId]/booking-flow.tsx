@@ -432,6 +432,16 @@ export function BookingFlow({
               <SchoolLogo school={athlete.school} size="sm" />
               {athlete.school}
             </p>
+            <p className="text-sm text-muted-foreground mt-3 max-w-xl">
+              Don&apos;t see a time that works?{' '}
+              <Link
+                href={`/book/${athlete.id}/request`}
+                className="text-accent font-medium underline underline-offset-2 hover:no-underline"
+              >
+                Request a session
+              </Link>{' '}
+              and the coach will respond from My sessions → Requests.
+            </p>
           </div>
         </div>
       </div>

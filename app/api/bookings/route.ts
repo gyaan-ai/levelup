@@ -12,6 +12,7 @@ import { hasMinPhoneDigits } from '@/lib/phone';
 import { rosterSnapshotFromYouthRow } from '@/lib/session-roster-snapshot';
 import { ensureAutoFamilyDiscountForParent } from '@/lib/family-auto-discount';
 import { checkoutAllowSavedAccountPercent, resolveCheckoutPercentOff } from '@/lib/checkout-promo';
+import { normalizeCoachOrWrestlerId, verifyCoachForParentBooking } from '@/lib/server-booking-coach';
 
 export async function POST(req: NextRequest) {
   try {
@@ -63,21 +64,35 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
     }
 
-    // Resolve facility: use athlete's default if not provided
-    let facility_id = facilityId;
+    const athleteIdNorm = normalizeCoachOrWrestlerId(athleteId);
+    if (!athleteIdNorm) {
+      return NextResponse.json({ error: 'Invalid coach id.' }, { status: 400 });
+    }
+    const youthWrestlerIdsNorm: string[] = [];
+    for (const id of youthWrestlerIds) {
+      const n = normalizeCoachOrWrestlerId(id);
+      if (!n) {
+        return NextResponse.json({ error: 'Invalid wrestler id.' }, { status: 400 });
+      }
+      youthWrestlerIdsNorm.push(n);
+    }
+
+    const admin = createAdminClient(tenant.slug);
+    const coachCheck = await verifyCoachForParentBooking(admin, athleteIdNorm);
+    if (!coachCheck.ok) {
+      return NextResponse.json({ error: coachCheck.error }, { status: coachCheck.status });
+    }
+
+    let facility_id: string | null =
+      facilityId != null && String(facilityId).trim() !== ''
+        ? normalizeCoachOrWrestlerId(facilityId)
+        : null;
     if (!facility_id) {
-      const { data: athlete } = await supabase
-        .from('athletes')
-        .select('facility_id')
-        .eq('id', athleteId)
-        .single();
-      facility_id = athlete?.facility_id ?? null;
+      facility_id = coachCheck.coach.facility_id ?? null;
     }
     if (!facility_id) {
       return NextResponse.json({ error: 'Facility required' }, { status: 400 });
     }
-
-    const admin = createAdminClient(tenant.slug);
     if (userData?.role === 'parent' && checkoutAllowSavedAccountPercent()) {
       await ensureAutoFamilyDiscountForParent(admin, user.id, user.email);
     }
@@ -85,8 +100,8 @@ export async function POST(req: NextRequest) {
     const { data: ywPhoneRows } = await admin
       .from('youth_wrestlers')
       .select('id, phone, first_name, last_name, photo_url')
-      .in('id', youthWrestlerIds);
-    if (!ywPhoneRows || ywPhoneRows.length !== youthWrestlerIds.length) {
+      .in('id', youthWrestlerIdsNorm);
+    if (!ywPhoneRows || ywPhoneRows.length !== youthWrestlerIdsNorm.length) {
       return NextResponse.json({ error: 'One or more athletes not found' }, { status: 400 });
     }
     for (const row of ywPhoneRows) {
@@ -98,7 +113,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const numParticipants = youthWrestlerIds.length;
+    const numParticipants = youthWrestlerIdsNorm.length;
     const isPartner = sessionMode === 'partner-invite' || sessionMode === 'partner-open';
     const maxParticipants = isPartner ? 2 : Math.max(1, numParticipants);
     const sessionType = sessionMode === 'private' ? '1-on-1' : '2-athlete';
@@ -149,7 +164,12 @@ export async function POST(req: NextRequest) {
     let durationMinutes = 60;
     if (productId) {
       const { data: product } = await admin.from('products').select('id').eq('id', productId).maybeSingle();
-      const { data: service } = await admin.from('athlete_services').select('id, duration_minutes').eq('id', productId).eq('athlete_id', athleteId).maybeSingle();
+      const { data: service } = await admin
+        .from('athlete_services')
+        .select('id, duration_minutes')
+        .eq('id', productId)
+        .eq('athlete_id', athleteIdNorm)
+        .maybeSingle();
       if (product) {
         sessionProductId = productId;
       } else if (service) {
@@ -162,7 +182,7 @@ export async function POST(req: NextRequest) {
       .from('sessions')
       .insert({
         parent_id: user.id,
-        athlete_id: athleteId,
+        athlete_id: athleteIdNorm,
         facility_id,
         product_id: sessionProductId ?? undefined,
         athlete_service_id: sessionServiceId ?? undefined,
@@ -196,7 +216,7 @@ export async function POST(req: NextRequest) {
 
     try {
       await createNotification(admin, {
-        user_id: athleteId,
+        user_id: athleteIdNorm,
         type: 'new_session',
         title: 'New session booked',
         body: `Session on ${formatEST(new Date(scheduledDatetime), 'MMM d, yyyy')} at ${formatEST(new Date(scheduledDatetime), 'h:mm a')}. View your dashboard.`,
@@ -206,7 +226,7 @@ export async function POST(req: NextRequest) {
       console.warn('Notify coach of new session failed:', notifErr);
     }
 
-    for (const ywId of youthWrestlerIds) {
+    for (const ywId of youthWrestlerIdsNorm) {
       const ywRow = ywPhoneRows?.find((r) => r.id === ywId);
       const { error: partError } = await supabase.from('session_participants').insert({
         session_id: session.id,
@@ -259,8 +279,8 @@ export async function POST(req: NextRequest) {
             },
           }],
           metadata,
-          success_url: `${baseUrl}/book/${athleteId}/confirmed?${successParams.toString()}`,
-          cancel_url: `${baseUrl}/book/${athleteId}`,
+          success_url: `${baseUrl}/book/${athleteIdNorm}/confirmed?${successParams.toString()}`,
+          cancel_url: `${baseUrl}/book/${athleteIdNorm}`,
           customer_email: user.email ?? undefined,
         });
         checkoutUrl = stripeSession.url ?? undefined;

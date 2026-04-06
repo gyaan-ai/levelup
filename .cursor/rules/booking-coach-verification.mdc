@@ -1,0 +1,17 @@
+---
+description: Parent booking flows must verify coaches with service role, not user RLS
+globs: app/api/bookings/**/*.ts,app/api/parent-session-requests/**/*.ts
+alwaysApply: false
+---
+
+# Coach verification (production-critical)
+
+For **parent-driven** flows that load a coach by id (`public.athletes` where `id` = coach user id):
+
+- **Do not** use `createClient` (user session) to validate `athletes` by coach id. RLS can return **zero rows** even when the coach exists, causing false **"Coach not found"** in production.
+- **Do** use `createAdminClient(tenant.slug)` and `verifyCoachForParentBooking(admin, coachId)` from `@/lib/server-booking-coach`.
+- **Do** normalize ids with `normalizeCoachOrWrestlerId` (or `normalizeUuidParam`) from the request body before querying.
+
+`POST /api/bookings` and `POST /api/parent-session-requests` are the canonical implementations—match them when adding similar routes.
+
+Admin-only tools (e.g. `POST /api/admin/sessions`) may use different checks; still prefer service-role reads when diagnosing missing `athletes` rows.

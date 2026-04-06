@@ -45,6 +45,12 @@ export default async function HomePage() {
 
   const nowISO = new Date().toISOString();
   const admin = createAdminClient(tenant.slug);
+
+  const { count: pendingSessionRequestCount } = await supabase
+    .from('parent_session_requests')
+    .select('id', { count: 'exact', head: true })
+    .eq('requesting_parent_id', user.id)
+    .eq('status', 'pending');
   if (userData?.role === 'parent' && checkoutAllowSavedAccountPercent()) {
     await ensureAutoFamilyDiscountForParent(admin, user.id, user.email);
   }
@@ -292,6 +298,25 @@ export default async function HomePage() {
           </Card>
         )}
       </section>
+
+      {pendingSessionRequestCount != null && pendingSessionRequestCount > 0 && (
+        <section className="px-4 mb-6">
+          <Link href="/session-requests">
+            <Card className="border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/10 transition-colors">
+              <CardContent className="py-4 flex items-center justify-between gap-3">
+                <div>
+                  <p className="font-medium text-foreground">Session requests</p>
+                  <p className="text-sm text-zinc-400">
+                    {pendingSessionRequestCount} pending with{' '}
+                    {pendingSessionRequestCount === 1 ? 'a coach' : 'coaches'}
+                  </p>
+                </div>
+                <ChevronRight className="h-5 w-5 text-[#D4AF37] shrink-0" />
+              </CardContent>
+            </Card>
+          </Link>
+        </section>
+      )}
 
       {/* One reminder per coach: rate the coach (session link is for the form only) */}
       {sessionsAwaitingReview.length > 0 && (
