@@ -878,6 +878,15 @@ export function AdminDashboardClient({
     return { booked, capacity, openings, collected };
   }, [filteredSessions]);
 
+  const sessionsTotalsScopeLabel =
+    sessionStatusFilter === 'all'
+      ? 'All statuses'
+      : sessionStatusFilter === 'open'
+        ? 'Open (scheduled & pending payment)'
+        : sessionStatusFilter === 'completed'
+          ? 'Completed'
+          : 'Cancelled / other';
+
   const filteredUsers = users.filter((u) => {
     if (userRoleFilter !== 'all' && u.role !== userRoleFilter) return false;
     if (userSearch) {
@@ -2064,8 +2073,8 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All statuses</SelectItem>
-                  <SelectItem value="open">Open</SelectItem>
-                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="open">Open (upcoming)</SelectItem>
+                  <SelectItem value="completed">Completed (past)</SelectItem>
                   <SelectItem value="cancelled_other">Cancelled/Other</SelectItem>
                 </SelectContent>
               </Select>
@@ -2091,22 +2100,42 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
           </Card>
 
           {filteredSessions.length > 0 && (
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm">
-              <div>
-                <span className="text-muted-foreground">Bookings </span>
-                <span className="font-semibold tabular-nums text-foreground">{sessionListTotals.booked}</span>
-                <span className="text-muted-foreground"> / </span>
-                <span className="font-semibold tabular-nums text-foreground">{sessionListTotals.capacity}</span>
-                <span className="text-muted-foreground"> spots</span>
+            <div className="rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm">
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+                <div>
+                  <span className="text-muted-foreground">Bookings </span>
+                  <span className="font-semibold tabular-nums text-foreground">{sessionListTotals.booked}</span>
+                  <span className="text-muted-foreground"> / </span>
+                  <span className="font-semibold tabular-nums text-foreground">{sessionListTotals.capacity}</span>
+                  <span className="text-muted-foreground"> spots</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Openings </span>
+                  <span className="font-semibold tabular-nums text-foreground">{sessionListTotals.openings}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Collected </span>
+                  <span className="font-semibold tabular-nums text-foreground">${sessionListTotals.collected.toFixed(2)}</span>
+                </div>
               </div>
-              <div>
-                <span className="text-muted-foreground">Openings </span>
-                <span className="font-semibold tabular-nums text-foreground">{sessionListTotals.openings}</span>
-              </div>
-              <div>
-                <span className="text-muted-foreground">Collected </span>
-                <span className="font-semibold tabular-nums text-foreground">${sessionListTotals.collected.toFixed(2)}</span>
-              </div>
+              <p className="text-xs text-muted-foreground border-t border-border/60 mt-3 pt-3 leading-relaxed">
+                <span className="font-medium text-foreground">Totals scope: </span>
+                {sessionsTotalsScopeLabel}
+                {sessionStatusFilter === 'all' ? (
+                  <>
+                    {' '}
+                    · Including completed is useful for revenue and historical fill. Set Status to{' '}
+                    <span className="text-foreground font-medium">Open</span> for upcoming capacity only, or{' '}
+                    <span className="text-foreground font-medium">Completed</span> for past sessions only.
+                  </>
+                ) : sessionStatusFilter === 'open' ? (
+                  <> · Upcoming / bookable sessions only (spots and openings are forward-looking).</>
+                ) : sessionStatusFilter === 'completed' ? (
+                  <> · Past sessions only (collected is historical).</>
+                ) : (
+                  <> · Cancelled, no-show, and other non-open states.</>
+                )}
+              </p>
             </div>
           )}
 
