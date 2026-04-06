@@ -140,6 +140,8 @@ export default async function MyBookingsPage() {
 
   // All participant names per session (admin fetch so we show all kids on the card, not just current user's)
   let allParticipantsBySession: Record<string, string[]> = {};
+  /** Row count per session from session_participants (source of truth when sessions.current_participants is stale). */
+  const participantCountBySession: Record<string, number> = {};
   if (familySessionIds.length > 0) {
     const admin = createAdminClient(tenant.slug);
     const { data: allParts } = await admin
@@ -148,6 +150,10 @@ export default async function MyBookingsPage() {
       .in('session_id', familySessionIds);
     for (const p of allParts ?? []) {
       const row = p as { session_id: string; youth_wrestlers?: { first_name?: string; last_name?: string } | null };
+      const sid = row.session_id;
+      if (sid) {
+        participantCountBySession[sid] = (participantCountBySession[sid] ?? 0) + 1;
+      }
       const yw = row.youth_wrestlers;
       const name = yw ? `${yw.first_name ?? ''} ${yw.last_name ?? ''}`.trim() : null;
       if (name && row.session_id) {
@@ -231,7 +237,10 @@ export default async function MyBookingsPage() {
     session_mode: s.session_mode,
     focus_area: s.focus_area ?? null,
     focus_area_2: (s as { focus_area_2?: string | null }).focus_area_2 ?? null,
-    current_participants: s.current_participants ?? 0,
+    current_participants: Math.max(
+      Number(s.current_participants) || 0,
+      participantCountBySession[s.id] ?? 0
+    ),
     max_participants: s.max_participants ?? 1,
     partner_invite_code: s.partner_invite_code,
     isTentative: isTentative(s),
