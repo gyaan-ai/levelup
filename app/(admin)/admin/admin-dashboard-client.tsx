@@ -737,6 +737,7 @@ export function AdminDashboardClient({
   const [facilities, setFacilities] = useState<{ id: string; name: string; school: string }[]>([]);
   const [athleteEditSaving, setAthleteEditSaving] = useState(false);
   const [athletePhotoUploading, setAthletePhotoUploading] = useState(false);
+  const [athletePhotoError, setAthletePhotoError] = useState<string | null>(null);
   const [deactivatingId, setDeactivatingId] = useState<string | null>(null);
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [deletingAthleteId, setDeletingAthleteId] = useState<string | null>(null);
@@ -1309,6 +1310,7 @@ export function AdminDashboardClient({
   const openAthleteEdit = async (athleteId: string) => {
     setEditingAthleteId(athleteId);
     setAthleteEditForm(null);
+    setAthletePhotoError(null);
     try {
       const [athleteRes, facilitiesRes] = await Promise.all([
         fetch(`/api/admin/athletes/${athleteId}`),
@@ -4314,7 +4316,15 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
       </main>
 
       {/* Coach Edit Dialog */}
-      <Dialog open={!!editingAthleteId} onOpenChange={(open) => !open && setEditingAthleteId(null)}>
+      <Dialog
+        open={!!editingAthleteId}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditingAthleteId(null);
+            setAthletePhotoError(null);
+          }
+        }}
+      >
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Coach</DialogTitle>
@@ -4326,6 +4336,69 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
             </div>
           ) : (
             <form onSubmit={saveAthleteEdit} className="space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4 border-b border-border pb-4">
+                {athleteEditForm.photo_url ? (
+                  <img
+                    src={athleteEditForm.photo_url}
+                    alt=""
+                    className="w-20 h-20 rounded-full object-cover border border-border shrink-0"
+                  />
+                ) : (
+                  <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center text-xs text-muted-foreground shrink-0 border border-dashed border-border">
+                    No photo
+                  </div>
+                )}
+                <div className="flex flex-col gap-2">
+                  <input
+                    ref={athletePhotoInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = '';
+                      if (!file || !editingAthleteId) return;
+                      setAthletePhotoError(null);
+                      setAthletePhotoUploading(true);
+                      try {
+                        const fd = new FormData();
+                        fd.append('file', file);
+                        const res = await fetch(`/api/admin/athletes/${editingAthleteId}/upload-photo`, {
+                          method: 'POST',
+                          body: fd,
+                        });
+                        const data = await res.json().catch(() => ({}));
+                        if (!res.ok) {
+                          setAthletePhotoError(typeof data.error === 'string' ? data.error : 'Upload failed');
+                          return;
+                        }
+                        if (data.photoUrl) {
+                          setAthleteEditForm((prev) => (prev ? { ...prev, photo_url: data.photoUrl } : null));
+                        }
+                      } catch {
+                        setAthletePhotoError('Upload failed');
+                      } finally {
+                        setAthletePhotoUploading(false);
+                      }
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-fit"
+                    disabled={athletePhotoUploading}
+                    onClick={() => athletePhotoInputRef.current?.click()}
+                  >
+                    {athletePhotoUploading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                    Upload photo
+                  </Button>
+                  <p className="text-xs text-muted-foreground">JPG, PNG, or WebP · max 5MB · replaces current profile photo</p>
+                  {athletePhotoError ? (
+                    <p className="text-xs text-destructive">{athletePhotoError}</p>
+                  ) : null}
+                </div>
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="first_name">First Name</Label>
