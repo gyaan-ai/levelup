@@ -2048,6 +2048,9 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
 
           {/* Filters */}
           <Card className="p-4">
+            <p className="text-xs text-muted-foreground mb-3">
+              <span className="font-medium text-foreground">Filters</span> apply to the table and to the summary totals below (same date range, status, and coach).
+            </p>
             <div className="flex flex-wrap items-center gap-3">
               <div className="flex items-center gap-2">
                 <Input
@@ -2066,9 +2069,11 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
                   placeholder="To"
                 />
               </div>
-              
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground shrink-0">Status</span>
               <Select value={sessionStatusFilter} onValueChange={(v) => setSessionStatusFilter(v as typeof sessionStatusFilter)}>
-                <SelectTrigger className="w-36 h-9">
+                <SelectTrigger className="w-[11rem] h-9">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -2078,6 +2083,7 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
                   <SelectItem value="cancelled_other">Cancelled/Other</SelectItem>
                 </SelectContent>
               </Select>
+              </div>
 
               <Select value={sessionCoachFilter} onValueChange={setSessionCoachFilter}>
                 <SelectTrigger className="w-40 h-9">
@@ -2099,8 +2105,11 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
             </div>
           </Card>
 
-          {filteredSessions.length > 0 && (
+          {sessions.length > 0 && (
             <div className="rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+                Summary (matches filters above)
+              </p>
               <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
                 <div>
                   <span className="text-muted-foreground">Bookings </span>
@@ -2125,8 +2134,8 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
                   <>
                     {' '}
                     · Including completed is useful for revenue and historical fill. Set Status to{' '}
-                    <span className="text-foreground font-medium">Open</span> for upcoming capacity only, or{' '}
-                    <span className="text-foreground font-medium">Completed</span> for past sessions only.
+                    <span className="text-foreground font-medium">Open (upcoming)</span> for upcoming capacity only, or{' '}
+                    <span className="text-foreground font-medium">Completed (past)</span> for past sessions only.
                   </>
                 ) : sessionStatusFilter === 'open' ? (
                   <> · Upcoming / bookable sessions only (spots and openings are forward-looking).</>
