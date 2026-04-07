@@ -585,6 +585,8 @@ export function AdminDashboardClient({
     paid: boolean;
     amountPaid: number;
     isDropIn: boolean;
+    /** Manual / drop-in rows without Stripe PI — safe for admin delete */
+    canDelete?: boolean;
     createdAt: string;
   }>>([]);
   const [sessionCompletingId, setSessionCompletingId] = useState<string | null>(null);
@@ -651,6 +653,7 @@ export function AdminDashboardClient({
   const [transferTargetSessionId, setTransferTargetSessionId] = useState<string>('');
   const [transferTargetSearch, setTransferTargetSearch] = useState('');
   const [transferLoading, setTransferLoading] = useState(false);
+  const [deletingParticipantId, setDeletingParticipantId] = useState<string | null>(null);
 
   const transferTargetOptions = useMemo(() => {
     const q = transferTargetSearch.trim().toLowerCase();
@@ -700,6 +703,29 @@ export function AdminDashboardClient({
       alert('Transfer failed: ' + (err instanceof Error ? err.message : String(err)));
     } finally {
       setTransferLoading(false);
+    }
+  };
+
+  const handleDeleteRosterParticipant = async (participantId: string, wrestlerName: string) => {
+    if (!rosterSessionId) return;
+    if (!confirm(`Remove ${wrestlerName} from this session? This does not refund Stripe.`)) return;
+    setDeletingParticipantId(participantId);
+    try {
+      const res = await fetch(
+        `/api/admin/sessions/${rosterSessionId}/participants/${participantId}`,
+        { method: 'DELETE' }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert((data as { error?: string }).error || 'Delete failed');
+        return;
+      }
+      router.refresh();
+      await openRoster(rosterSessionId);
+    } catch (err) {
+      alert('Delete failed: ' + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setDeletingParticipantId(null);
     }
   };
 
@@ -4690,22 +4716,39 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
                           <Badge variant="outline" className="text-xs border-amber-600 bg-amber-600/20 text-amber-400">Pending</Badge>
                         )}
                       </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-xs text-blue-400 hover:text-blue-300"
-                        onClick={() => {
-                          setTransferTargetSearch('');
-                          setTransferTargetSessionId('');
-                          setTransferringParticipant({
-                            id: p.id,
-                            wrestlerName: p.wrestlerName,
-                            amountPaid: p.amountPaid,
-                          });
-                        }}
-                      >
-                        Transfer
-                      </Button>
+                      <div className="flex items-center gap-1 shrink-0">
+                        {p.canDelete && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-xs text-red-400 hover:text-red-300"
+                            disabled={deletingParticipantId === p.id}
+                            onClick={() => handleDeleteRosterParticipant(p.id, p.wrestlerName)}
+                          >
+                            {deletingParticipantId === p.id ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              'Delete'
+                            )}
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-xs text-blue-400 hover:text-blue-300"
+                          onClick={() => {
+                            setTransferTargetSearch('');
+                            setTransferTargetSessionId('');
+                            setTransferringParticipant({
+                              id: p.id,
+                              wrestlerName: p.wrestlerName,
+                              amountPaid: p.amountPaid,
+                            });
+                          }}
+                        >
+                          Transfer
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 ))}

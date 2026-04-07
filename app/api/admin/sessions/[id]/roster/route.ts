@@ -20,11 +20,27 @@ export async function GET(
     const admin = createAdminClient(tenant.slug);
 
     // Fetch session with participants via JOIN - only columns that exist
-    const { data: sessionData, error } = await admin
+    let sessionData: Record<string, unknown> | null = null;
+    let error: { message: string } | null = null;
+    const res1 = await admin
       .from('sessions')
-      .select('id, session_participants(id, amount_paid, youth_wrestler_id)')
+      .select(
+        'id, session_participants(id, amount_paid, youth_wrestler_id, stripe_payment_intent_id)'
+      )
       .eq('id', sessionId)
       .maybeSingle();
+    sessionData = res1.data as Record<string, unknown> | null;
+    error = res1.error;
+
+    if (error && (error.message ?? '').includes('stripe_payment_intent_id')) {
+      const res2 = await admin
+        .from('sessions')
+        .select('id, session_participants(id, amount_paid, youth_wrestler_id)')
+        .eq('id', sessionId)
+        .maybeSingle();
+      sessionData = res2.data as Record<string, unknown> | null;
+      error = res2.error;
+    }
 
     if (error) {
       return NextResponse.json({ roster: [], error: error.message }, { status: 500 });
@@ -63,6 +79,10 @@ export async function GET(
       const youthId = p.youth_wrestler_id as string | null;
       const wrestler = youthId ? wrestlerNames[youthId] : null;
       const name = wrestler ? `${wrestler.first_name} ${wrestler.last_name}`.trim() : 'Drop-in';
+      const stripePi = p.stripe_payment_intent_id as string | null | undefined;
+      /** Admin drop-ins / manual rows; Stripe checkout rows carry PI and must not be deleted here. */
+      const canDelete =
+        stripePi === undefined ? true : !stripePi || String(stripePi).trim() === '';
       return {
         id: p.id as string,
         wrestlerName: name,
@@ -71,6 +91,7 @@ export async function GET(
         paid: Number(p.amount_paid ?? 0) > 0,
         amountPaid: Number(p.amount_paid ?? 0),
         isDropIn: youthId === null,
+        canDelete,
         createdAt: '',
       };
     });
