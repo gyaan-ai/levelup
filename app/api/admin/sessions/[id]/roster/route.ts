@@ -80,6 +80,7 @@ export async function GET(
       const wrestler = youthId ? wrestlerNames[youthId] : null;
       const name = wrestler ? `${wrestler.first_name} ${wrestler.last_name}`.trim() : 'Drop-in';
       const stripePi = p.stripe_payment_intent_id as string | null | undefined;
+      const hasStripePayment = !!(stripePi && String(stripePi).trim() !== '');
       /** Admin drop-ins / manual rows; Stripe checkout rows carry PI and must not be deleted here. */
       const canDelete =
         stripePi === undefined ? true : !stripePi || String(stripePi).trim() === '';
@@ -92,6 +93,7 @@ export async function GET(
         amountPaid: Number(p.amount_paid ?? 0),
         isDropIn: youthId === null,
         canDelete,
+        hasStripePayment,
         createdAt: '',
       };
     });

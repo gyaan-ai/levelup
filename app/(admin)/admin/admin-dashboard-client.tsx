@@ -587,6 +587,8 @@ export function AdminDashboardClient({
     isDropIn: boolean;
     /** Manual / drop-in rows without Stripe PI — safe for admin delete */
     canDelete?: boolean;
+    /** Card payment on the source session — transfer does not create a new Stripe charge */
+    hasStripePayment?: boolean;
     createdAt: string;
   }>>([]);
   const [sessionCompletingId, setSessionCompletingId] = useState<string | null>(null);
@@ -630,6 +632,7 @@ export function AdminDashboardClient({
   
   // Fetch roster for a session via API
   const [rosterLoading, setRosterLoading] = useState(false);
+  const [parentCheckoutCopied, setParentCheckoutCopied] = useState(false);
   const openRoster = async (sessionId: string) => {
     setRosterSessionId(sessionId);
     setRosterLoading(true);
@@ -649,6 +652,7 @@ export function AdminDashboardClient({
     id: string;
     wrestlerName: string;
     amountPaid: number;
+    hasStripePayment?: boolean;
   } | null>(null);
   const [transferTargetSessionId, setTransferTargetSessionId] = useState<string>('');
   const [transferTargetSearch, setTransferTargetSearch] = useState('');
@@ -660,6 +664,7 @@ export function AdminDashboardClient({
     const now = Date.now();
     return sessions
       .filter((s) => s.id !== rosterSessionId && new Date(s.scheduled_datetime).getTime() > now)
+      .filter((s) => s.status === 'scheduled' || s.status === 'pending_payment')
       .filter((s) => {
         if (!q) return true;
         const hay = `${s.athlete_name} ${s.athlete_school} ${s.facility_name} ${formatEST(
@@ -676,7 +681,14 @@ export function AdminDashboardClient({
   
   const handleTransferRegistration = async () => {
     if (!transferringParticipant || !rosterSessionId || !transferTargetSessionId) return;
-    
+
+    if (transferringParticipant.hasStripePayment) {
+      const ok = window.confirm(
+        'This wrestler was charged with Stripe on the SOURCE session. Moving them does not send money to the new coach automatically. After the move, use “Copy parent checkout link” on the TARGET session if the parent still needs to pay that coach, or reconcile manually.'
+      );
+      if (!ok) return;
+    }
+
     setTransferLoading(true);
     try {
       const res = await fetch('/api/admin/sessions/transfer-registration', {
@@ -4677,6 +4689,53 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
               })()}
             </DialogDescription>
           </DialogHeader>
+          {rosterSessionId && (
+            <div className="rounded-lg border border-border bg-muted/40 p-3 space-y-2 text-sm">
+              <p className="font-medium text-foreground">Pay a parent (Stripe) for this session</p>
+              <p className="text-muted-foreground text-xs leading-relaxed">
+                Parent or admin opens the link, picks the wrestler, and pays the coach for this session. The parent must be linked to the kid (primary or{' '}
+                <code className="text-[11px]">youth_wrestler_parents</code>) or use the primary parent account.
+              </p>
+              <div className="flex flex-wrap gap-2 pt-1">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={async () => {
+                    const url = `${window.location.origin}/sessions/${rosterSessionId}/register`;
+                    try {
+                      await navigator.clipboard.writeText(url);
+                      setParentCheckoutCopied(true);
+                      setTimeout(() => setParentCheckoutCopied(false), 2000);
+                    } catch {
+                      window.prompt('Copy this URL:', url);
+                    }
+                  }}
+                >
+                  {parentCheckoutCopied ? (
+                    <>
+                      <Check className="h-3.5 w-3.5" /> Copied
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3.5 w-3.5" /> Copy parent checkout link
+                    </>
+                  )}
+                </Button>
+                <Button type="button" variant="outline" size="sm" className="gap-1.5" asChild>
+                  <a href={`/sessions/${rosterSessionId}/register`} target="_blank" rel="noreferrer">
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    Open register
+                  </a>
+                </Button>
+              </div>
+              <p className="text-muted-foreground text-xs pt-1 border-t border-border/60">
+                <strong className="text-foreground">Move a kid to another coach:</strong> use Transfer on a wrestler, then run checkout on the{' '}
+                <em>target</em> session if they still need to pay that coach.
+              </p>
+            </div>
+          )}
           <div className="py-4">
             {rosterLoading ? (
               <div className="flex items-center justify-center py-8">
@@ -4743,6 +4802,7 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
                               id: p.id,
                               wrestlerName: p.wrestlerName,
                               amountPaid: p.amountPaid,
+                              hasStripePayment: p.hasStripePayment,
                             });
                           }}
                         >
@@ -4787,7 +4847,7 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
                   </select>
                   {transferTargetOptions.length === 0 && (
                     <p className="text-xs text-muted-foreground">
-                      No matching upcoming sessions. Adjust search or check the session is still in the future.
+                      No matching open sessions (scheduled / pending payment, still upcoming). Search by coach name or date. Past sessions cannot be transfer targets here.
                     </p>
                   )}
                 </div>
