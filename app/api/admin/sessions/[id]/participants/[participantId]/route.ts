@@ -7,10 +7,10 @@ import { syncSessionParticipantCount } from '@/lib/transfer-session-registration
 
 /**
  * DELETE — Remove a session participant row (admin only).
- * Blocks deletion when stripe_payment_intent_id is set (Stripe-linked booking).
+ * Stripe-linked rows require JSON body `{ "acknowledgePaidRemoval": true }` after refund / intentional roster fix.
  */
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string; participantId: string }> }
 ) {
   try {
@@ -63,12 +63,25 @@ export async function DELETE(
       return NextResponse.json({ error: 'Participant not found' }, { status: 404 });
     }
 
+    let acknowledgePaidRemoval = false;
+    try {
+      const text = await req.text();
+      if (text.trim()) {
+        const body = JSON.parse(text) as { acknowledgePaidRemoval?: boolean };
+        acknowledgePaidRemoval = body?.acknowledgePaidRemoval === true;
+      }
+    } catch {
+      /* no/invalid body */
+    }
+
     const pi = (rowData as { stripe_payment_intent_id?: string | null }).stripe_payment_intent_id;
-    if (pi != null && String(pi).trim() !== '') {
+    const hasPi = pi != null && String(pi).trim() !== '';
+    if (hasPi && !acknowledgePaidRemoval) {
       return NextResponse.json(
         {
           error:
-            'This registration is linked to a Stripe payment. Remove it via refund/support workflows, not delete.',
+            'This registration is linked to a Stripe payment. Use Remove in admin and confirm, or refund in Stripe first.',
+          code: 'STRIPE_LINKED',
         },
         { status: 400 }
       );

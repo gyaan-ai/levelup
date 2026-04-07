@@ -718,24 +718,44 @@ export function AdminDashboardClient({
     }
   };
 
-  const handleDeleteRosterParticipant = async (participantId: string, wrestlerName: string) => {
+  const handleRemoveRosterParticipant = async (
+    participantId: string,
+    wrestlerName: string,
+    row: { hasStripePayment?: boolean; canDelete?: boolean; isDropIn?: boolean }
+  ) => {
     if (!rosterSessionId) return;
-    if (!confirm(`Remove ${wrestlerName} from this session? This does not refund Stripe.`)) return;
+    const paidStripe =
+      row.hasStripePayment === true ||
+      (row.hasStripePayment === undefined && row.canDelete === false && !row.isDropIn);
+    if (paidStripe) {
+      const ok = window.confirm(
+        `Remove ${wrestlerName} from this roster? This signup was paid with Stripe. Deleting only removes the roster row—it does not refund the card. Refund in Stripe separately if needed. Continue?`
+      );
+      if (!ok) return;
+    } else {
+      if (!confirm(`Remove ${wrestlerName} from this session?`)) return;
+    }
     setDeletingParticipantId(participantId);
     try {
       const res = await fetch(
         `/api/admin/sessions/${rosterSessionId}/participants/${participantId}`,
-        { method: 'DELETE' }
+        paidStripe
+          ? {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ acknowledgePaidRemoval: true }),
+            }
+          : { method: 'DELETE' }
       );
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        alert((data as { error?: string }).error || 'Delete failed');
+        alert((data as { error?: string }).error || 'Remove failed');
         return;
       }
       router.refresh();
       await openRoster(rosterSessionId);
     } catch (err) {
-      alert('Delete failed: ' + (err instanceof Error ? err.message : String(err)));
+      alert('Remove failed: ' + (err instanceof Error ? err.message : String(err)));
     } finally {
       setDeletingParticipantId(null);
     }
@@ -4776,21 +4796,19 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
                         )}
                       </div>
                       <div className="flex items-center gap-1 shrink-0">
-                        {p.canDelete && (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="text-xs text-red-400 hover:text-red-300"
-                            disabled={deletingParticipantId === p.id}
-                            onClick={() => handleDeleteRosterParticipant(p.id, p.wrestlerName)}
-                          >
-                            {deletingParticipantId === p.id ? (
-                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                              'Delete'
-                            )}
-                          </Button>
-                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-xs text-red-400 hover:text-red-300"
+                          disabled={deletingParticipantId === p.id}
+                          onClick={() => handleRemoveRosterParticipant(p.id, p.wrestlerName, p)}
+                        >
+                          {deletingParticipantId === p.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            'Remove'
+                          )}
+                        </Button>
                         <Button
                           variant="ghost"
                           size="sm"
