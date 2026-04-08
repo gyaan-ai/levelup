@@ -27,7 +27,7 @@ async function publicOriginFromRequest(): Promise<string> {
 /** Public Training list — open sessions browse (not a single session). */
 export default async function OpenSessionsQrPage() {
   const origin = await publicOriginFromRequest();
-  const targetUrl = `${origin}/training?tab=sessions&ref=qr`;
+  const targetUrl = `${origin}/training?tab=sessions`;
 
   const qrDataUrl = await QRCode.toDataURL(targetUrl, {
     width: 512,
