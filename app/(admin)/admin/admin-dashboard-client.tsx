@@ -662,8 +662,15 @@ export function AdminDashboardClient({
   const transferTargetOptions = useMemo(() => {
     const q = transferTargetSearch.trim().toLowerCase();
     const now = Date.now();
+    const todayEastern = formatEST(new Date(), 'yyyy-MM-dd');
+    /** Future sessions, or any session still on today's Eastern calendar (late-night roster moves after start time). */
+    const isEligibleTransferTarget = (scheduledDatetime: string) => {
+      const t = new Date(scheduledDatetime).getTime();
+      if (t > now) return true;
+      return formatEST(new Date(scheduledDatetime), 'yyyy-MM-dd') === todayEastern;
+    };
     return sessions
-      .filter((s) => s.id !== rosterSessionId && new Date(s.scheduled_datetime).getTime() > now)
+      .filter((s) => s.id !== rosterSessionId && isEligibleTransferTarget(s.scheduled_datetime))
       .filter((s) => s.status === 'scheduled' || s.status === 'pending_payment')
       .filter((s) => {
         if (!q) return true;
