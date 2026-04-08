@@ -663,7 +663,7 @@ export default function CoachApplicationPage() {
                             <div className="space-y-1 leading-none">
                               <FormLabel>I commit to offering all session types</FormLabel>
                               <FormDescription>
-                                Private (1-on-1), Partner (2 athletes), and Small Group (3-6 athletes)
+                                Private (1-on-1), Partner (up to 3 athletes), and Small Group (3-6 athletes)
                               </FormDescription>
                             </div>
                           </FormItem>

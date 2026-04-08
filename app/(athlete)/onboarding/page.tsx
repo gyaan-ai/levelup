@@ -384,7 +384,7 @@ export default function OnboardingPage() {
                     <span className="font-semibold">$50</span>
                   </li>
                   <li className="flex justify-between items-baseline gap-4">
-                    <span>Partner session (2 athletes)</span>
+                    <span>Partner session (up to 3 athletes)</span>
                     <span className="font-semibold">$75</span>
                   </li>
                   <li className="flex justify-between items-baseline gap-4">

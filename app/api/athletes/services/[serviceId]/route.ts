@@ -29,7 +29,7 @@ export async function PATCH(
     if (['private', 'partner', 'small_group'].includes(body.sessionType)) {
       updates.session_type = body.sessionType;
       if (body.sessionType === 'private') updates.max_participants = 1;
-      else if (body.sessionType === 'partner') updates.max_participants = 2;
+      else if (body.sessionType === 'partner') updates.max_participants = 3;
       else if (body.maxParticipants != null) {
         updates.max_participants = Math.min(20, Math.max(3, Number(body.maxParticipants)));
       }

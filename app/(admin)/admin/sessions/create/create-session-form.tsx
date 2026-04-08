@@ -23,7 +23,7 @@ type Facility = { id: string; name: string; school: string; address?: string | n
 // Session type presets
 const SESSION_PRESETS = {
   small_group: { label: 'Small Group', price: 30, maxParticipants: 6, duration: 60 },
-  partner: { label: 'Partner Session', price: 50, maxParticipants: 2, duration: 60 },
+  partner: { label: 'Partner Session', price: 50, maxParticipants: 3, duration: 60 },
   private: { label: 'Private Session', price: 75, maxParticipants: 1, duration: 60 },
 } as const;
 

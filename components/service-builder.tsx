@@ -24,7 +24,7 @@ const DURATIONS = [
 
 const SESSION_TYPES = [
   { value: 'private', label: 'Private (1:1)', icon: User, maxDefault: 1 },
-  { value: 'partner', label: 'Partner (1:2)', icon: Users, maxDefault: 2 },
+  { value: 'partner', label: 'Partner (1:3)', icon: Users, maxDefault: 3 },
   { value: 'small_group', label: 'Small group', icon: UserCircle, maxDefault: 6 },
 ] as const;
 
@@ -300,7 +300,7 @@ export function ServiceBuilder({ recommendedRates }: ServiceBuilderProps) {
             <p className="text-sm text-muted-foreground">
               Recommended range:{' '}
               {newType === 'private' && `about $${recommendedRates.oneOnOne} for 1 hr private`}
-              {newType === 'partner' && `about $${Math.round(recommendedRates.twoAthlete / 2)}/person for 1 hr (2 athletes)`}
+              {newType === 'partner' && `about $${Math.round(recommendedRates.twoAthlete / 2)}/person for 1 hr (up to 3 athletes)`}
               {newType === 'small_group' && `about $${recommendedRates.groupRate}/person for group sessions`}
             </p>
           )}

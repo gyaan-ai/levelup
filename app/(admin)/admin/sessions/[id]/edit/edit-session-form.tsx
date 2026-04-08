@@ -75,7 +75,7 @@ export function EditSessionForm({
   // Session type presets for auto-fill
   const SESSION_PRESETS = {
     small_group: { label: 'Small Group', price: 30, maxParticipants: 6 },
-    partner: { label: 'Partner Session', price: 50, maxParticipants: 2 },
+    partner: { label: 'Partner Session', price: 50, maxParticipants: 3 },
     private: { label: 'Private Session', price: 75, maxParticipants: 1 },
   } as const;
 

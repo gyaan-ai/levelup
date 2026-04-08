@@ -193,7 +193,7 @@ export function RequestSessionClient({
                 <SelectContent>
                   <SelectItem value="any">No preference</SelectItem>
                   <SelectItem value="private">Private (1:1)</SelectItem>
-                  <SelectItem value="partner">Partner (2 athletes)</SelectItem>
+                  <SelectItem value="partner">Partner (up to 3 athletes)</SelectItem>
                   <SelectItem value="small_group">Small group</SelectItem>
                   <SelectItem value="group">Group</SelectItem>
                 </SelectContent>

@@ -186,8 +186,9 @@ export async function POST(req: NextRequest) {
       tags: tags.length > 0 ? tags : null,
     };
 
-    // One review per session per family (upsert on session_id + parent_id)
-    const { data: review, error: upsertError } = await supabase
+    // Use service role for write: RLS INSERT only allows organizer or session_participants.parent_id,
+    // but participation includes linked parents (youth_wrestler_parents) validated above — same pattern as eligibility checks.
+    const { data: review, error: upsertError } = await admin
       .from('reviews')
       .upsert(row, {
         onConflict: 'session_id,parent_id',
