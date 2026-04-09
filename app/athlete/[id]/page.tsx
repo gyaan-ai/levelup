@@ -125,23 +125,6 @@ export default async function AthleteProfilePage({
     ? new Date(athlete.cpr_expiration) > today
     : false;
 
-  // Parse credentials JSONB
-  const credentials = athlete.credentials || {};
-  const credentialsList = Array.isArray(credentials)
-    ? credentials
-    : typeof credentials === 'object' && credentials !== null
-    ? Object.entries(credentials).map(([key, value]) => {
-        // Handle different credential formats
-        if (typeof value === 'string') {
-          return value;
-        }
-        if (typeof value === 'object' && value !== null && 'title' in value) {
-          return (value as any).title || key;
-        }
-        return key;
-      })
-    : [];
-
   const schoolColor = SCHOOL_COLORS[athlete.school] || { bg: 'bg-gray-500', text: 'text-white' };
 
   const { data: reviewsRows } = await supabase
@@ -386,41 +369,6 @@ export default async function AthleteProfilePage({
         </CardContent>
       </Card>
 
-      {/* Rate card: session types & pricing */}
-      {rateCardProducts.length > 0 && (
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5" />
-              Session types & rates
-            </CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Prices per participant. You&apos;ll choose date and time when you book.
-            </p>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-4">
-              {rateCardProducts.map((p) => (
-                <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 py-2 border-b last:border-0">
-                  <div>
-                    <p className="font-medium">{p.name}</p>
-                    {p.description != null && p.description !== '' && (
-                      <p className="text-sm text-muted-foreground">{p.description}</p>
-                    )}
-                    {p.min_participants != null && p.max_participants != null && p.min_participants !== p.max_participants && (
-                      <p className="text-xs text-muted-foreground">
-                        {p.min_participants}–{p.max_participants} participants
-                      </p>
-                    )}
-                  </div>
-                  <p className="text-lg font-semibold shrink-0">${p.price.toFixed(2)}</p>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Upcoming Sessions Section */}
       {(upcomingSessions ?? []).length > 0 && (
         <Card className="mb-6">
@@ -515,6 +463,77 @@ export default async function AthleteProfilePage({
         </Card>
       )}
 
+      {/* Training Location Section */}
+      {facility && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <MapPin className="h-5 w-5" />
+              Training Location
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <p className="font-semibold text-lg">{facility.name}</p>
+              {facility.school && (
+                <p className="text-sm text-muted-foreground">{facility.school}</p>
+              )}
+              {facility.address && (
+                <p className="text-muted-foreground">{facility.address}</p>
+              )}
+              <a
+                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                  facility.address
+                    ? `${facility.name}, ${facility.address}`
+                    : `${facility.name}${facility.school ? ` ${facility.school}` : ''}`
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 text-sm font-medium text-accent hover:underline"
+              >
+                <MapPin className="h-4 w-4" />
+                Get directions (Google Maps)
+              </a>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Rate card: session types & pricing */}
+      {rateCardProducts.length > 0 && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5" />
+              Session types & rates
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Prices per participant. You&apos;ll choose date and time when you book.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-4">
+              {rateCardProducts.map((p) => (
+                <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 py-2 border-b last:border-0">
+                  <div>
+                    <p className="font-medium">{p.name}</p>
+                    {p.description != null && p.description !== '' && (
+                      <p className="text-sm text-muted-foreground">{p.description}</p>
+                    )}
+                    {p.min_participants != null && p.max_participants != null && p.min_participants !== p.max_participants && (
+                      <p className="text-xs text-muted-foreground">
+                        {p.min_participants}–{p.max_participants} participants
+                      </p>
+                    )}
+                  </div>
+                  <p className="text-lg font-semibold shrink-0">${p.price.toFixed(2)}</p>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
       {/* What parents say — ratings and comments (anonymous; no names shown) */}
       {reviews.length > 0 && (
         <Card className="mb-6">
@@ -559,63 +578,6 @@ export default async function AthleteProfilePage({
                 </li>
               ))}
             </ul>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Credentials Section */}
-      <Card className="mb-6">
-        <CardHeader>
-            <CardTitle>Wrestling Credentials</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {credentialsList.length > 0 ? (
-            <ul className="space-y-2">
-              {credentialsList.map((credential, index) => (
-                <li key={index} className="flex items-start gap-2">
-                  <Award className="h-5 w-5 text-accent mt-0.5 flex-shrink-0" />
-                  <span className="text-muted-foreground">{String(credential)}</span>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="text-muted-foreground">No achievements listed yet</p>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Training Location Section */}
-      {facility && (
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <MapPin className="h-5 w-5" />
-              Training Location
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <p className="font-semibold text-lg">{facility.name}</p>
-              {facility.school && (
-                <p className="text-sm text-muted-foreground">{facility.school}</p>
-              )}
-              {facility.address && (
-                <p className="text-muted-foreground">{facility.address}</p>
-              )}
-              <a
-                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
-                  facility.address
-                    ? `${facility.name}, ${facility.address}`
-                    : `${facility.name}${facility.school ? ` ${facility.school}` : ''}`
-                )}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 text-sm font-medium text-accent hover:underline"
-              >
-                <MapPin className="h-4 w-4" />
-                Get directions (Google Maps)
-              </a>
-            </div>
           </CardContent>
         </Card>
       )}

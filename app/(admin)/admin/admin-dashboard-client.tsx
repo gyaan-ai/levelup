@@ -897,7 +897,6 @@ export function AdminDashboardClient({
     year: string | null;
     weight_class: string | null;
     bio: string | null;
-    credentials: Record<string, unknown> | null;
     photo_url: string | null;
     photo_focus_x: number;
     photo_focus_y: number;
@@ -908,9 +907,6 @@ export function AdminDashboardClient({
   const [facilities, setFacilities] = useState<{ id: string; name: string; school: string }[]>([]);
   const [athleteEditSaving, setAthleteEditSaving] = useState(false);
   const [athletePhotoUploading, setAthletePhotoUploading] = useState(false);
-  /** Editable JSON for credentials object (title → description lines on public profile). */
-  const [coachCredentialsJson, setCoachCredentialsJson] = useState('');
-  const [coachCredentialsJsonError, setCoachCredentialsJsonError] = useState<string | null>(null);
   const [athletePhotoError, setAthletePhotoError] = useState<string | null>(null);
   const [deactivatingId, setDeactivatingId] = useState<string | null>(null);
   const [approvingId, setApprovingId] = useState<string | null>(null);
@@ -1523,7 +1519,6 @@ export function AdminDashboardClient({
         year: a.year ?? null,
         weight_class: a.weight_class ?? null,
         bio: a.bio ?? null,
-        credentials: a.credentials ?? null,
         photo_url: a.photo_url ?? null,
         photo_focus_x: typeof a.photo_focus_x === 'number' ? a.photo_focus_x : 50,
         photo_focus_y: typeof a.photo_focus_y === 'number' ? a.photo_focus_y : 15,
@@ -1531,13 +1526,6 @@ export function AdminDashboardClient({
         zelle_email: a.zelle_email ?? null,
         active: a.active ?? true,
       });
-      setCoachCredentialsJsonError(null);
-      try {
-        const cred = a.credentials && typeof a.credentials === 'object' && !Array.isArray(a.credentials) ? a.credentials : {};
-        setCoachCredentialsJson(JSON.stringify(cred, null, 2));
-      } catch {
-        setCoachCredentialsJson('{}');
-      }
       setFacilities(facilitiesData.facilities ?? []);
     } catch {
       setEditingAthleteId(null);
@@ -1547,24 +1535,6 @@ export function AdminDashboardClient({
   const saveAthleteEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingAthleteId || !athleteEditForm) return;
-    setCoachCredentialsJsonError(null);
-    let credentialsParsed: Record<string, unknown> = {};
-    const trimmed = coachCredentialsJson.trim();
-    if (trimmed === '') {
-      credentialsParsed = {};
-    } else {
-      try {
-        const p = JSON.parse(trimmed) as unknown;
-        if (p === null || typeof p !== 'object' || Array.isArray(p)) {
-          setCoachCredentialsJsonError('Credentials must be a JSON object, e.g. {"NCAA D1": "School name"}');
-          return;
-        }
-        credentialsParsed = p as Record<string, unknown>;
-      } catch {
-        setCoachCredentialsJsonError('Invalid JSON in credentials. Fix or clear the field.');
-        return;
-      }
-    }
     setAthleteEditSaving(true);
     try {
       const res = await fetch(`/api/admin/athletes/${editingAthleteId}`, {
@@ -1579,7 +1549,6 @@ export function AdminDashboardClient({
           year: athleteEditForm.year || null,
           weight_class: athleteEditForm.weight_class || null,
           bio: athleteEditForm.bio || null,
-          credentials: credentialsParsed,
           photo_url: athleteEditForm.photo_url,
           photo_focus_x: athleteEditForm.photo_focus_x,
           photo_focus_y: athleteEditForm.photo_focus_y,
@@ -4798,8 +4767,6 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
           if (!open) {
             setEditingAthleteId(null);
             setAthletePhotoError(null);
-            setCoachCredentialsJson('');
-            setCoachCredentialsJsonError(null);
           }
         }}
       >
@@ -4936,25 +4903,6 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
                   onChange={(e) => setAthleteEditForm({ ...athleteEditForm, bio: e.target.value || null })}
                 />
                 <p className="text-xs text-muted-foreground">{(athleteEditForm.bio || '').length}/500</p>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="credentials_json">Credentials (JSON object)</Label>
-                <Textarea
-                  id="credentials_json"
-                  className="font-mono text-xs min-h-[100px]"
-                  placeholder='{"Certification": "USA Wrestling Level 2"}'
-                  value={coachCredentialsJson}
-                  onChange={(e) => {
-                    setCoachCredentialsJson(e.target.value);
-                    setCoachCredentialsJsonError(null);
-                  }}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Key = credential title, value = short description. Use {'{}'} for none.
-                </p>
-                {coachCredentialsJsonError ? (
-                  <p className="text-xs text-destructive">{coachCredentialsJsonError}</p>
-                ) : null}
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
