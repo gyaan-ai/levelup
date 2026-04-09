@@ -351,12 +351,25 @@ export async function POST(req: NextRequest) {
     const idemParts = lines.map((l) => `${l.sessionId}:${l.wrestlerId}`).sort();
     const idempotencyKey = `cart-checkout-${user.id}-${idemParts.join(',')}-${Date.now()}`.slice(0, 255);
 
+    const cartSessionTypes = sessionIdsUnique.map((id) =>
+      String((sessionById.get(id) as { session_type?: string | null } | undefined)?.session_type ?? '')
+    );
+    const cartSessionType =
+      cartSessionTypes.length > 0 && cartSessionTypes.every((t) => t === cartSessionTypes[0])
+        ? cartSessionTypes[0]!
+        : 'mixed';
+
     const stripeSession = await stripe.checkout.sessions.create(
       {
         mode: 'payment',
         payment_method_types: ['card'],
         line_items: adjustedLineItems,
         metadata: {
+          business: 'guild',
+          channel: 'bookings',
+          category: 'booking',
+          session_type: cartSessionType,
+          platform_fee_pct: '20',
           app: 'the-guild',
           tenant_slug: tenant.slug,
           cart_checkout: 'true',

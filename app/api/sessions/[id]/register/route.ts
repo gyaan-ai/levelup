@@ -235,6 +235,11 @@ export async function POST(
     /** One checkout per parent+session+kid — retries / double-submit reuse the same Session (no extra charges). */
     const idempotencyKey = `register-checkout-${sessionId}-${youthWrestlerId}-${user.id}`.slice(0, 255);
 
+    const sessionRow = session as {
+      athlete_id: string;
+      session_type?: string | null;
+    };
+
     const stripeSession = await stripe.checkout.sessions.create(
       {
         mode: 'payment',
@@ -253,6 +258,12 @@ export async function POST(
           },
         ],
       metadata: {
+        business: 'guild',
+        channel: 'bookings',
+        category: 'booking',
+        session_type: sessionRow.session_type ?? '',
+        coach_id: sessionRow.athlete_id,
+        platform_fee_pct: '20',
         app: 'the-guild',
         tenant_slug: tenant.slug,
         session_id: sessionId,

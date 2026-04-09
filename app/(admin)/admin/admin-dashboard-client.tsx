@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -52,6 +53,8 @@ import {
   X,
   Trophy,
   ArrowUpDown,
+  ChevronUp,
+  ChevronDown,
   MessageSquare,
   Phone,
   Bell,
@@ -219,6 +222,41 @@ export type YouthSessionSpendLine = {
   coach_name: string;
   facility_name: string;
 };
+
+type AdminSortDir = 'asc' | 'desc';
+
+function AdminSortColBtn({
+  label,
+  active,
+  dir,
+  onClick,
+  className = '',
+}: {
+  label: string;
+  active: boolean;
+  dir: AdminSortDir;
+  onClick: () => void;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex items-center gap-1 font-medium text-muted-foreground text-xs uppercase tracking-wider hover:text-foreground transition-colors ${className}`}
+    >
+      {label}
+      {active ? (
+        dir === 'asc' ? (
+          <ChevronUp className="h-3.5 w-3.5 shrink-0 text-[#B89D60]" />
+        ) : (
+          <ChevronDown className="h-3.5 w-3.5 shrink-0 text-[#B89D60]" />
+        )
+      ) : (
+        <ArrowUpDown className="h-3.5 w-3.5 shrink-0 opacity-35" />
+      )}
+    </button>
+  );
+}
 
 type SectionId = 'overview' | 'bookings' | 'money' | 'people';
 type SubSectionId = 
@@ -620,16 +658,63 @@ export function AdminDashboardClient({
   >('all');
   const [youthLeaderboardTypeFilter, setYouthLeaderboardTypeFilter] = useState<string>('all');
   const [youthLeaderboardSchoolFilter, setYouthLeaderboardSchoolFilter] = useState<string>('all');
-  const [youthLeaderboardSort, setYouthLeaderboardSort] = useState<
-    'spent' | 'bookings' | 'open' | 'completed'
-  >('spent');
+  type YouthLbSortKey = 'name' | 'school' | 'open' | 'completed' | 'pending' | 'bookings' | 'spent';
+  const [youthLbSort, setYouthLbSort] = useState<{ key: YouthLbSortKey; dir: AdminSortDir }>({
+    key: 'spent',
+    dir: 'desc',
+  });
   const [youthLeaderboardSearch, setYouthLeaderboardSearch] = useState('');
+  type YouthDirSortKey = 'name' | 'school' | 'parent' | 'spent' | 'level' | 'joined';
+  const [youthDirSort, setYouthDirSort] = useState<{ key: YouthDirSortKey; dir: AdminSortDir }>({
+    key: 'name',
+    dir: 'asc',
+  });
+  type WrestlerTotalsSortKey = 'name' | 'sessions' | 'total';
+  const [wrestlerTotalsSort, setWrestlerTotalsSort] = useState<{
+    key: WrestlerTotalsSortKey;
+    dir: AdminSortDir;
+  }>({ key: 'total', dir: 'desc' });
+  type AthleteSpendLineSortKey = 'date' | 'athlete' | 'coach' | 'facility' | 'status' | 'paid';
+  const [athleteSpendLineSort, setAthleteSpendLineSort] = useState<{
+    key: AthleteSpendLineSortKey;
+    dir: AdminSortDir;
+  }>({ key: 'date', dir: 'desc' });
   const [athleteSpendPeriod, setAthleteSpendPeriod] = useState<PayoutHistoryPeriodPreset>('all');
   const [athleteSpendDateFrom, setAthleteSpendDateFrom] = useState('');
   const [athleteSpendDateTo, setAthleteSpendDateTo] = useState('');
   const [athleteSpendWrestlerFilter, setAthleteSpendWrestlerFilter] = useState('all');
   const [athleteSpendSearch, setAthleteSpendSearch] = useState('');
-  
+
+  const toggleYouthLbSort = (key: YouthLbSortKey) => {
+    setYouthLbSort((prev) => {
+      if (prev.key === key) return { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' };
+      const isNumeric = key !== 'name' && key !== 'school';
+      return { key, dir: isNumeric ? 'desc' : 'asc' };
+    });
+  };
+  const toggleYouthDirSort = (key: YouthDirSortKey) => {
+    setYouthDirSort((prev) => {
+      if (prev.key === key) return { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' };
+      const descFirst = key === 'spent' || key === 'joined';
+      return { key, dir: descFirst ? 'desc' : 'asc' };
+    });
+  };
+  const toggleWrestlerTotalsSort = (key: WrestlerTotalsSortKey) => {
+    setWrestlerTotalsSort((prev) => {
+      if (prev.key === key) return { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' };
+      const isNumeric = key !== 'name';
+      return { key, dir: isNumeric ? 'desc' : 'asc' };
+    });
+  };
+  const toggleAthleteSpendLineSort = (key: AthleteSpendLineSortKey) => {
+    setAthleteSpendLineSort((prev) => {
+      if (prev.key === key) return { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' };
+      const descFirst =
+        key === 'date' || key === 'paid';
+      return { key, dir: descFirst ? 'desc' : 'asc' };
+    });
+  };
+
   // Fetch roster for a session via API
   const [rosterLoading, setRosterLoading] = useState(false);
   const [parentCheckoutCopied, setParentCheckoutCopied] = useState(false);
@@ -823,6 +908,9 @@ export function AdminDashboardClient({
   const [facilities, setFacilities] = useState<{ id: string; name: string; school: string }[]>([]);
   const [athleteEditSaving, setAthleteEditSaving] = useState(false);
   const [athletePhotoUploading, setAthletePhotoUploading] = useState(false);
+  /** Editable JSON for credentials object (title → description lines on public profile). */
+  const [coachCredentialsJson, setCoachCredentialsJson] = useState('');
+  const [coachCredentialsJsonError, setCoachCredentialsJsonError] = useState<string | null>(null);
   const [athletePhotoError, setAthletePhotoError] = useState<string | null>(null);
   const [deactivatingId, setDeactivatingId] = useState<string | null>(null);
   const [approvingId, setApprovingId] = useState<string | null>(null);
@@ -1236,16 +1324,33 @@ export function AdminDashboardClient({
       );
     }
 
+    const { key: lbKey, dir: lbDir } = youthLbSort;
     result.sort((a, b) => {
-      switch (youthLeaderboardSort) {
-        case 'spent':
-          return b.total_spent - a.total_spent || a.name.localeCompare(b.name);
-        case 'bookings':
-          return b.booking_count - a.booking_count || a.name.localeCompare(b.name);
+      const tieName = () => a.name.localeCompare(b.name);
+      const strCmp = (sa: string, sb: string) => {
+        const c = sa.localeCompare(sb);
+        return lbDir === 'desc' ? -c : c;
+      };
+      const numCmp = (na: number, nb: number) => {
+        const d = na - nb;
+        if (d !== 0) return lbDir === 'desc' ? -d : d;
+        return tieName();
+      };
+      switch (lbKey) {
+        case 'name':
+          return strCmp(a.name.toLowerCase(), b.name.toLowerCase());
+        case 'school':
+          return strCmp((a.school || '').toLowerCase(), (b.school || '').toLowerCase());
         case 'open':
-          return b.open_count - a.open_count || a.name.localeCompare(b.name);
+          return numCmp(a.open_count, b.open_count);
         case 'completed':
-          return b.completed_count - a.completed_count || a.name.localeCompare(b.name);
+          return numCmp(a.completed_count, b.completed_count);
+        case 'pending':
+          return numCmp(a.pending_payment_count, b.pending_payment_count);
+        case 'bookings':
+          return numCmp(a.booking_count, b.booking_count);
+        case 'spent':
+          return numCmp(a.total_spent, b.total_spent);
         default:
           return 0;
       }
@@ -1258,7 +1363,7 @@ export function AdminDashboardClient({
     youthLeaderboardTimeFilter,
     youthLeaderboardTypeFilter,
     youthLeaderboardSchoolFilter,
-    youthLeaderboardSort,
+    youthLbSort,
     youthLeaderboardSearch,
   ]);
 
@@ -1426,6 +1531,13 @@ export function AdminDashboardClient({
         zelle_email: a.zelle_email ?? null,
         active: a.active ?? true,
       });
+      setCoachCredentialsJsonError(null);
+      try {
+        const cred = a.credentials && typeof a.credentials === 'object' && !Array.isArray(a.credentials) ? a.credentials : {};
+        setCoachCredentialsJson(JSON.stringify(cred, null, 2));
+      } catch {
+        setCoachCredentialsJson('{}');
+      }
       setFacilities(facilitiesData.facilities ?? []);
     } catch {
       setEditingAthleteId(null);
@@ -1435,6 +1547,24 @@ export function AdminDashboardClient({
   const saveAthleteEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingAthleteId || !athleteEditForm) return;
+    setCoachCredentialsJsonError(null);
+    let credentialsParsed: Record<string, unknown> = {};
+    const trimmed = coachCredentialsJson.trim();
+    if (trimmed === '') {
+      credentialsParsed = {};
+    } else {
+      try {
+        const p = JSON.parse(trimmed) as unknown;
+        if (p === null || typeof p !== 'object' || Array.isArray(p)) {
+          setCoachCredentialsJsonError('Credentials must be a JSON object, e.g. {"NCAA D1": "School name"}');
+          return;
+        }
+        credentialsParsed = p as Record<string, unknown>;
+      } catch {
+        setCoachCredentialsJsonError('Invalid JSON in credentials. Fix or clear the field.');
+        return;
+      }
+    }
     setAthleteEditSaving(true);
     try {
       const res = await fetch(`/api/admin/athletes/${editingAthleteId}`, {
@@ -1449,7 +1579,7 @@ export function AdminDashboardClient({
           year: athleteEditForm.year || null,
           weight_class: athleteEditForm.weight_class || null,
           bio: athleteEditForm.bio || null,
-          credentials: athleteEditForm.credentials,
+          credentials: credentialsParsed,
           photo_url: athleteEditForm.photo_url,
           photo_focus_x: athleteEditForm.photo_focus_x,
           photo_focus_y: athleteEditForm.photo_focus_y,
@@ -1800,6 +1930,47 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
     return m;
   }, [youthSessionSpendLines]);
 
+  const sortedKidsDirectory = useMemo(() => {
+    const list = [...kidsList];
+    const { key, dir } = youthDirSort;
+    list.sort((ka, kb) => {
+      const aggA = spendByYouthIdAll.get(ka.id);
+      const aggB = spendByYouthIdAll.get(kb.id);
+      const spentA = aggA?.total ?? 0;
+      const spentB = aggB?.total ?? 0;
+      const nameA = `${ka.first_name} ${ka.last_name}`.toLowerCase();
+      const nameB = `${kb.first_name} ${kb.last_name}`.toLowerCase();
+      const tieName = () => nameA.localeCompare(nameB);
+      const strCmp = (sa: string, sb: string) => {
+        const c = sa.localeCompare(sb);
+        return dir === 'desc' ? -c : c;
+      };
+      switch (key) {
+        case 'name':
+          return strCmp(nameA, nameB);
+        case 'school':
+          return strCmp((ka.school ?? '').toLowerCase(), (kb.school ?? '').toLowerCase());
+        case 'parent':
+          return strCmp((ka.parent_email ?? '').toLowerCase(), (kb.parent_email ?? '').toLowerCase());
+        case 'spent': {
+          const d = spentA - spentB;
+          if (d !== 0) return dir === 'desc' ? -d : d;
+          return tieName();
+        }
+        case 'level':
+          return strCmp((ka.skill_level ?? '').toLowerCase(), (kb.skill_level ?? '').toLowerCase());
+        case 'joined': {
+          const t = new Date(ka.created_at).getTime() - new Date(kb.created_at).getTime();
+          if (t !== 0) return dir === 'desc' ? -t : t;
+          return tieName();
+        }
+        default:
+          return 0;
+      }
+    });
+    return list;
+  }, [kidsList, spendByYouthIdAll, youthDirSort]);
+
   const totalYouthSpendAllTime = useMemo(
     () => Math.round(youthSessionSpendLines.reduce((s, l) => s + l.amount_paid, 0) * 100) / 100,
     [youthSessionSpendLines]
@@ -1853,10 +2024,94 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
         map.set(line.youth_wrestler_id, { name, total: line.amount_paid, sessions: 1 });
       }
     }
-    return Array.from(map.entries())
-      .map(([youth_wrestler_id, v]) => ({ youth_wrestler_id, ...v }))
-      .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
+    return Array.from(map.entries()).map(([youth_wrestler_id, v]) => ({ youth_wrestler_id, ...v }));
   }, [filteredAthleteSpendLines, kidsList]);
+
+  const sortedAthleteSpendByWrestlerRows = useMemo(() => {
+    const rows = [...athleteSpendByWrestlerRows];
+    const { key, dir } = wrestlerTotalsSort;
+    rows.sort((a, b) => {
+      const tieName = () => a.name.localeCompare(b.name);
+      const strCmp = (sa: string, sb: string) => {
+        const c = sa.localeCompare(sb);
+        return dir === 'desc' ? -c : c;
+      };
+      switch (key) {
+        case 'name':
+          return strCmp(a.name.toLowerCase(), b.name.toLowerCase());
+        case 'sessions': {
+          const d = a.sessions - b.sessions;
+          if (d !== 0) return dir === 'desc' ? -d : d;
+          return tieName();
+        }
+        case 'total': {
+          const d = a.total - b.total;
+          if (d !== 0) return dir === 'desc' ? -d : d;
+          return tieName();
+        }
+        default:
+          return 0;
+      }
+    });
+    return rows;
+  }, [athleteSpendByWrestlerRows, wrestlerTotalsSort]);
+
+  const sortedFilteredAthleteSpendLines = useMemo(() => {
+    const lines = [...filteredAthleteSpendLines];
+    const { key, dir } = athleteSpendLineSort;
+    const athleteName = (line: YouthSessionSpendLine) => {
+      const kid = kidsList.find((k) => k.id === line.youth_wrestler_id);
+      return kid ? `${kid.first_name} ${kid.last_name}`.trim().toLowerCase() : '';
+    };
+    lines.sort((a, b) => {
+      const tieDate = () =>
+        new Date(a.scheduled_datetime).getTime() - new Date(b.scheduled_datetime).getTime();
+      const strCmp = (sa: string, sb: string) => {
+        const c = sa.localeCompare(sb);
+        return dir === 'desc' ? -c : c;
+      };
+      switch (key) {
+        case 'date': {
+          const t = tieDate();
+          if (t !== 0) return dir === 'desc' ? -t : t;
+          return a.session_id.localeCompare(b.session_id);
+        }
+        case 'athlete': {
+          const c = athleteName(a).localeCompare(athleteName(b));
+          if (c !== 0) return dir === 'desc' ? -c : c;
+          const t = tieDate();
+          return dir === 'desc' ? -t : t;
+        }
+        case 'coach': {
+          const c = (a.coach_name ?? '').toLowerCase().localeCompare((b.coach_name ?? '').toLowerCase());
+          if (c !== 0) return dir === 'desc' ? -c : c;
+          const t = tieDate();
+          return dir === 'desc' ? -t : t;
+        }
+        case 'facility': {
+          const c = (a.facility_name ?? '').toLowerCase().localeCompare((b.facility_name ?? '').toLowerCase());
+          if (c !== 0) return dir === 'desc' ? -c : c;
+          const t = tieDate();
+          return dir === 'desc' ? -t : t;
+        }
+        case 'status': {
+          const c = (a.session_status ?? '').localeCompare(b.session_status ?? '');
+          if (c !== 0) return dir === 'desc' ? -c : c;
+          const t = tieDate();
+          return dir === 'desc' ? -t : t;
+        }
+        case 'paid': {
+          const d = a.amount_paid - b.amount_paid;
+          if (d !== 0) return dir === 'desc' ? -d : d;
+          const t = tieDate();
+          return dir === 'desc' ? -t : t;
+        }
+        default:
+          return 0;
+      }
+    });
+    return lines;
+  }, [filteredAthleteSpendLines, athleteSpendLineSort, kidsList]);
 
   const athleteSpendFilteredTotal = useMemo(
     () => Math.round(filteredAthleteSpendLines.reduce((s, l) => s + l.amount_paid, 0) * 100) / 100,
@@ -3557,19 +3812,24 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
                     <div className="flex items-center gap-2">
                       <span className="text-xs font-medium text-muted-foreground uppercase">Sort:</span>
                       <Select
-                        value={youthLeaderboardSort}
-                        onValueChange={(v) =>
-                          setYouthLeaderboardSort(v as 'spent' | 'bookings' | 'open' | 'completed')
-                        }
+                        value={youthLbSort.key}
+                        onValueChange={(v) => {
+                          const key = v as YouthLbSortKey;
+                          const isNumeric = key !== 'name' && key !== 'school';
+                          setYouthLbSort({ key, dir: isNumeric ? 'desc' : 'asc' });
+                        }}
                       >
-                        <SelectTrigger className="w-40 h-9">
+                        <SelectTrigger className="w-44 h-9">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="spent">Total spent</SelectItem>
-                          <SelectItem value="bookings">Bookings</SelectItem>
+                          <SelectItem value="name">Athlete (A–Z)</SelectItem>
+                          <SelectItem value="school">School</SelectItem>
                           <SelectItem value="open">Open</SelectItem>
                           <SelectItem value="completed">Completed</SelectItem>
+                          <SelectItem value="pending">Pending</SelectItem>
+                          <SelectItem value="bookings">Bookings</SelectItem>
+                          <SelectItem value="spent">Total spent</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -3594,26 +3854,71 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
                           <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider w-10">
                             #
                           </th>
-                          <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
-                            Athlete
+                          <th className="text-left py-3 px-4">
+                            <AdminSortColBtn
+                              label="Athlete"
+                              active={youthLbSort.key === 'name'}
+                              dir={youthLbSort.dir}
+                              onClick={() => toggleYouthLbSort('name')}
+                            />
                           </th>
-                          <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
-                            School
+                          <th className="text-left py-3 px-4">
+                            <AdminSortColBtn
+                              label="School"
+                              active={youthLbSort.key === 'school'}
+                              dir={youthLbSort.dir}
+                              onClick={() => toggleYouthLbSort('school')}
+                            />
                           </th>
-                          <th className="text-center py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
-                            Open
+                          <th className="text-center py-3 px-4">
+                            <div className="flex justify-center">
+                              <AdminSortColBtn
+                                label="Open"
+                                active={youthLbSort.key === 'open'}
+                                dir={youthLbSort.dir}
+                                onClick={() => toggleYouthLbSort('open')}
+                              />
+                            </div>
                           </th>
-                          <th className="text-center py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
-                            Completed
+                          <th className="text-center py-3 px-4">
+                            <div className="flex justify-center">
+                              <AdminSortColBtn
+                                label="Completed"
+                                active={youthLbSort.key === 'completed'}
+                                dir={youthLbSort.dir}
+                                onClick={() => toggleYouthLbSort('completed')}
+                              />
+                            </div>
                           </th>
-                          <th className="text-center py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
-                            Pending
+                          <th className="text-center py-3 px-4">
+                            <div className="flex justify-center">
+                              <AdminSortColBtn
+                                label="Pending"
+                                active={youthLbSort.key === 'pending'}
+                                dir={youthLbSort.dir}
+                                onClick={() => toggleYouthLbSort('pending')}
+                              />
+                            </div>
                           </th>
-                          <th className="text-center py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
-                            Bookings
+                          <th className="text-center py-3 px-4">
+                            <div className="flex justify-center">
+                              <AdminSortColBtn
+                                label="Bookings"
+                                active={youthLbSort.key === 'bookings'}
+                                dir={youthLbSort.dir}
+                                onClick={() => toggleYouthLbSort('bookings')}
+                              />
+                            </div>
                           </th>
-                          <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
-                            Spent
+                          <th className="text-right py-3 px-4">
+                            <div className="flex justify-end">
+                              <AdminSortColBtn
+                                label="Spent"
+                                active={youthLbSort.key === 'spent'}
+                                dir={youthLbSort.dir}
+                                onClick={() => toggleYouthLbSort('spent')}
+                              />
+                            </div>
                           </th>
                           <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
                             Actions
@@ -3722,23 +4027,55 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
                     <table className="w-full text-sm">
                       <thead className="bg-muted/50">
                         <tr>
-                          <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
-                            Name
+                          <th className="text-left py-3 px-4">
+                            <AdminSortColBtn
+                              label="Name"
+                              active={youthDirSort.key === 'name'}
+                              dir={youthDirSort.dir}
+                              onClick={() => toggleYouthDirSort('name')}
+                            />
                           </th>
-                          <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
-                            School
+                          <th className="text-left py-3 px-4">
+                            <AdminSortColBtn
+                              label="School"
+                              active={youthDirSort.key === 'school'}
+                              dir={youthDirSort.dir}
+                              onClick={() => toggleYouthDirSort('school')}
+                            />
                           </th>
-                          <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
-                            Parent
+                          <th className="text-left py-3 px-4">
+                            <AdminSortColBtn
+                              label="Parent"
+                              active={youthDirSort.key === 'parent'}
+                              dir={youthDirSort.dir}
+                              onClick={() => toggleYouthDirSort('parent')}
+                            />
                           </th>
-                          <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
-                            Total spent
+                          <th className="text-right py-3 px-4">
+                            <div className="flex justify-end">
+                              <AdminSortColBtn
+                                label="Total spent"
+                                active={youthDirSort.key === 'spent'}
+                                dir={youthDirSort.dir}
+                                onClick={() => toggleYouthDirSort('spent')}
+                              />
+                            </div>
                           </th>
-                          <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
-                            Level
+                          <th className="text-left py-3 px-4">
+                            <AdminSortColBtn
+                              label="Level"
+                              active={youthDirSort.key === 'level'}
+                              dir={youthDirSort.dir}
+                              onClick={() => toggleYouthDirSort('level')}
+                            />
                           </th>
-                          <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
-                            Joined
+                          <th className="text-left py-3 px-4">
+                            <AdminSortColBtn
+                              label="Joined"
+                              active={youthDirSort.key === 'joined'}
+                              dir={youthDirSort.dir}
+                              onClick={() => toggleYouthDirSort('joined')}
+                            />
                           </th>
                         </tr>
                       </thead>
@@ -3757,7 +4094,7 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
                             </td>
                           </tr>
                         ) : (
-                          kidsList.map((k) => {
+                          sortedKidsDirectory.map((k) => {
                             const agg = spendByYouthIdAll.get(k.id);
                             return (
                               <tr key={k.id} className="hover:bg-muted/30 transition-colors">
@@ -3915,19 +4252,38 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
                     <table className="w-full text-sm">
                       <thead className="bg-muted/50">
                         <tr>
-                          <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
-                            Athlete
+                          <th className="text-left py-3 px-4">
+                            <AdminSortColBtn
+                              label="Athlete"
+                              active={wrestlerTotalsSort.key === 'name'}
+                              dir={wrestlerTotalsSort.dir}
+                              onClick={() => toggleWrestlerTotalsSort('name')}
+                            />
                           </th>
-                          <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
-                            Sessions
+                          <th className="text-right py-3 px-4">
+                            <div className="flex justify-end">
+                              <AdminSortColBtn
+                                label="Sessions"
+                                active={wrestlerTotalsSort.key === 'sessions'}
+                                dir={wrestlerTotalsSort.dir}
+                                onClick={() => toggleWrestlerTotalsSort('sessions')}
+                              />
+                            </div>
                           </th>
-                          <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
-                            Total
+                          <th className="text-right py-3 px-4">
+                            <div className="flex justify-end">
+                              <AdminSortColBtn
+                                label="Total"
+                                active={wrestlerTotalsSort.key === 'total'}
+                                dir={wrestlerTotalsSort.dir}
+                                onClick={() => toggleWrestlerTotalsSort('total')}
+                              />
+                            </div>
                           </th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border">
-                        {athleteSpendByWrestlerRows.length === 0 ? (
+                        {sortedAthleteSpendByWrestlerRows.length === 0 ? (
                           <tr>
                             <td colSpan={3} className="py-8 text-center text-muted-foreground text-sm">
                               No spending in this period for the current filters.
@@ -3935,7 +4291,7 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
                           </tr>
                         ) : (
                           <>
-                            {athleteSpendByWrestlerRows.map((row) => (
+                            {sortedAthleteSpendByWrestlerRows.map((row) => (
                               <tr key={row.youth_wrestler_id} className="hover:bg-muted/30">
                                 <td className="py-3 px-4 font-medium">{row.name}</td>
                                 <td className="py-3 px-4 text-right tabular-nums">{row.sessions}</td>
@@ -3969,23 +4325,57 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
                     <table className="w-full text-sm">
                       <thead className="bg-muted/50 sticky top-0 z-10">
                         <tr>
-                          <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
-                            Session date
+                          <th className="text-left py-3 px-4">
+                            <AdminSortColBtn
+                              label="Session date"
+                              active={athleteSpendLineSort.key === 'date'}
+                              dir={athleteSpendLineSort.dir}
+                              onClick={() => toggleAthleteSpendLineSort('date')}
+                            />
                           </th>
-                          <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
-                            Athlete
+                          <th className="text-left py-3 px-4">
+                            <AdminSortColBtn
+                              label="Athlete"
+                              active={athleteSpendLineSort.key === 'athlete'}
+                              dir={athleteSpendLineSort.dir}
+                              onClick={() => toggleAthleteSpendLineSort('athlete')}
+                            />
                           </th>
-                          <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
-                            Coach
+                          <th className="text-left py-3 px-4">
+                            <AdminSortColBtn
+                              label="Coach"
+                              active={athleteSpendLineSort.key === 'coach'}
+                              dir={athleteSpendLineSort.dir}
+                              onClick={() => toggleAthleteSpendLineSort('coach')}
+                            />
                           </th>
-                          <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
-                            Facility
+                          <th className="text-left py-3 px-4">
+                            <AdminSortColBtn
+                              label="Facility"
+                              active={athleteSpendLineSort.key === 'facility'}
+                              dir={athleteSpendLineSort.dir}
+                              onClick={() => toggleAthleteSpendLineSort('facility')}
+                            />
                           </th>
-                          <th className="text-center py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
-                            Status
+                          <th className="text-center py-3 px-4">
+                            <div className="flex justify-center">
+                              <AdminSortColBtn
+                                label="Status"
+                                active={athleteSpendLineSort.key === 'status'}
+                                dir={athleteSpendLineSort.dir}
+                                onClick={() => toggleAthleteSpendLineSort('status')}
+                              />
+                            </div>
                           </th>
-                          <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
-                            Paid
+                          <th className="text-right py-3 px-4">
+                            <div className="flex justify-end">
+                              <AdminSortColBtn
+                                label="Paid"
+                                active={athleteSpendLineSort.key === 'paid'}
+                                dir={athleteSpendLineSort.dir}
+                                onClick={() => toggleAthleteSpendLineSort('paid')}
+                              />
+                            </div>
                           </th>
                           <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
                             Link
@@ -4000,7 +4390,7 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
                             </td>
                           </tr>
                         ) : (
-                          filteredAthleteSpendLines.map((line) => {
+                          sortedFilteredAthleteSpendLines.map((line) => {
                             const kid = kidsList.find((kk) => kk.id === line.youth_wrestler_id);
                             const aname = kid
                               ? `${kid.first_name} ${kid.last_name}`.trim()
@@ -4408,6 +4798,8 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
           if (!open) {
             setEditingAthleteId(null);
             setAthletePhotoError(null);
+            setCoachCredentialsJson('');
+            setCoachCredentialsJsonError(null);
           }
         }}
       >
@@ -4513,6 +4905,59 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
+                  <Label htmlFor="weight_class">Weight class</Label>
+                  <Input
+                    id="weight_class"
+                    placeholder="e.g. 157 lbs"
+                    value={athleteEditForm.weight_class || ''}
+                    onChange={(e) =>
+                      setAthleteEditForm({ ...athleteEditForm, weight_class: e.target.value || null })
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="year">Grad year</Label>
+                  <Input
+                    id="year"
+                    placeholder="e.g. 2024"
+                    value={athleteEditForm.year || ''}
+                    onChange={(e) => setAthleteEditForm({ ...athleteEditForm, year: e.target.value || null })}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="bio">Bio</Label>
+                <Textarea
+                  id="bio"
+                  placeholder="Coaching experience, style, achievements…"
+                  maxLength={500}
+                  rows={5}
+                  value={athleteEditForm.bio || ''}
+                  onChange={(e) => setAthleteEditForm({ ...athleteEditForm, bio: e.target.value || null })}
+                />
+                <p className="text-xs text-muted-foreground">{(athleteEditForm.bio || '').length}/500</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="credentials_json">Credentials (JSON object)</Label>
+                <Textarea
+                  id="credentials_json"
+                  className="font-mono text-xs min-h-[100px]"
+                  placeholder='{"Certification": "USA Wrestling Level 2"}'
+                  value={coachCredentialsJson}
+                  onChange={(e) => {
+                    setCoachCredentialsJson(e.target.value);
+                    setCoachCredentialsJsonError(null);
+                  }}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Key = credential title, value = short description. Use {'{}'} for none.
+                </p>
+                {coachCredentialsJsonError ? (
+                  <p className="text-xs text-destructive">{coachCredentialsJsonError}</p>
+                ) : null}
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
                   <Label htmlFor="venmo">Venmo Handle</Label>
                   <Input
                     id="venmo"
@@ -4535,7 +4980,14 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
                 <Label htmlFor="facility">Primary Facility</Label>
                 <Select
                   value={athleteEditForm.facility_id || ''}
-                  onValueChange={(v) => setAthleteEditForm({ ...athleteEditForm, facility_id: v || null })}
+                  onValueChange={(v) =>
+                    setAthleteEditForm({
+                      ...athleteEditForm,
+                      facility_id: v || null,
+                      secondary_facility_id:
+                        athleteEditForm.secondary_facility_id === v ? null : athleteEditForm.secondary_facility_id,
+                    })
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select facility" />
@@ -4546,6 +4998,66 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="secondary_facility">Secondary Facility (optional)</Label>
+                <Select
+                  value={athleteEditForm.secondary_facility_id || '__none__'}
+                  onValueChange={(v) =>
+                    setAthleteEditForm({
+                      ...athleteEditForm,
+                      secondary_facility_id: v === '__none__' ? null : v,
+                    })
+                  }
+                >
+                  <SelectTrigger id="secondary_facility">
+                    <SelectValue placeholder="None" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">None</SelectItem>
+                    {facilities
+                      .filter((f) => f.id !== athleteEditForm.facility_id)
+                      .map((f) => (
+                        <SelectItem key={f.id} value={f.id}>
+                          {f.name} ({f.school})
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="photo_focus_x">Photo focus X (0–100)</Label>
+                  <Input
+                    id="photo_focus_x"
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={athleteEditForm.photo_focus_x}
+                    onChange={(e) =>
+                      setAthleteEditForm({
+                        ...athleteEditForm,
+                        photo_focus_x: Math.min(100, Math.max(0, Number(e.target.value) || 50)),
+                      })
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="photo_focus_y">Photo focus Y (0–100)</Label>
+                  <Input
+                    id="photo_focus_y"
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={athleteEditForm.photo_focus_y}
+                    onChange={(e) =>
+                      setAthleteEditForm({
+                        ...athleteEditForm,
+                        photo_focus_y: Math.min(100, Math.max(0, Number(e.target.value) || 15)),
+                      })
+                    }
+                  />
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 <input

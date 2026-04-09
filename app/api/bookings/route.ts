@@ -259,7 +259,17 @@ export async function POST(req: NextRequest) {
         if (session.session_mode) successParams.set('mode', session.session_mode);
         
         const amountCents = Math.round(stripeChargeAmount * 100);
-        const metadata: Record<string, string> = { session_id: session.id, app: 'the-guild', test_mode: testModePenny ? 'true' : 'false' };
+        const metadata: Record<string, string> = {
+          business: 'guild',
+          channel: 'bookings',
+          category: 'booking',
+          session_type: sessionType,
+          coach_id: athleteIdNorm,
+          platform_fee_pct: '20',
+          session_id: session.id,
+          app: 'the-guild',
+          test_mode: testModePenny ? 'true' : 'false',
+        };
 
         const stripeSession = await stripe.checkout.sessions.create({
           mode: 'payment',
