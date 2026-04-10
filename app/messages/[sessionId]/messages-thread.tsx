@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import Link from 'next/link';
-import { ArrowLeft, Send } from 'lucide-react';
+import { Send } from 'lucide-react';
+import { BackLink } from '@/components/back-link';
 import { formatEST } from '@/lib/format-date';
 
 export type MessageRow = {
@@ -82,13 +82,7 @@ export function MessagesThread({
   return (
     <div className="container mx-auto px-4 py-8 max-w-2xl">
       <div className="mb-6">
-        <Link
-          href={backHref}
-          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          {backLabel}
-        </Link>
+        <BackLink fallbackHref={backHref} label={backLabel} />
       </div>
 
       <Card>

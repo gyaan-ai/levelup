@@ -3,6 +3,7 @@ import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
 import Link from 'next/link';
+import { BackLink } from '@/components/back-link';
 import { Button } from '@/components/ui/button';
 import { Users, Plus } from 'lucide-react';
 import { startOfWeek, endOfWeek, addWeeks } from 'date-fns';
@@ -94,9 +95,9 @@ export default async function SmallGroupSessionsPage({
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
-        <Link href="/dashboard" className="text-sm text-muted-foreground hover:text-foreground mb-4 inline-block">
-          ← Back to Dashboard
-        </Link>
+        <div className="mb-4">
+          <BackLink fallbackHref="/dashboard" label="Back to Dashboard" />
+        </div>
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <h1 className="text-3xl font-bold flex items-center gap-2">

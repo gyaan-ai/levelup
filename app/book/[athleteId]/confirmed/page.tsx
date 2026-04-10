@@ -5,6 +5,7 @@ import { getTenantByDomain } from '@/config/tenants';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+import { BackLink } from '@/components/back-link';
 import { formatEST } from '@/lib/format-date';
 import { CheckCircle, Calendar, MapPin, Copy, Share2 } from 'lucide-react';
 import { SchoolLogo } from '@/components/school-logo';
@@ -132,9 +133,11 @@ export default async function BookingConfirmedPage({
                 <Button asChild variant="outline" className="w-full">
                   <Link href="/training">Book another session</Link>
                 </Button>
-                <Button asChild variant="outline" className="w-full">
-                  <Link href="/bookings">Done — Back to My bookings</Link>
-                </Button>
+                <BackLink
+                  fallbackHref="/bookings"
+                  label="Done — Back to My bookings"
+                  className="inline-flex h-10 w-full items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium ring-offset-background hover:bg-accent hover:text-accent-foreground"
+                />
               </div>
             </>
           )}
@@ -155,9 +158,11 @@ export default async function BookingConfirmedPage({
                 <Button asChild variant="outline" className="w-full">
                   <Link href="/training">Book another session</Link>
                 </Button>
-                <Button asChild variant="outline" className="w-full">
-                  <Link href="/bookings">Done — Back to My bookings</Link>
-                </Button>
+                <BackLink
+                  fallbackHref="/bookings"
+                  label="Done — Back to My bookings"
+                  className="inline-flex h-10 w-full items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium ring-offset-background hover:bg-accent hover:text-accent-foreground"
+                />
               </div>
             </>
           )}
@@ -177,9 +182,11 @@ export default async function BookingConfirmedPage({
                 <Button asChild variant="outline" className="w-full">
                   <Link href="/training">Book another session</Link>
                 </Button>
-                <Button asChild variant="outline" className="w-full">
-                  <Link href="/bookings">Done — Back to My bookings</Link>
-                </Button>
+                <BackLink
+                  fallbackHref="/bookings"
+                  label="Done — Back to My bookings"
+                  className="inline-flex h-10 w-full items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium ring-offset-background hover:bg-accent hover:text-accent-foreground"
+                />
               </div>
             </>
           )}

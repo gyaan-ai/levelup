@@ -1,6 +1,7 @@
 import { redirect, notFound } from 'next/navigation';
 import { headers } from 'next/headers';
 import Link from 'next/link';
+import { BackLink } from '@/components/back-link';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
@@ -300,12 +301,9 @@ export default async function SessionDetailPage({
 
   return (
     <div className="container mx-auto px-4 py-6 max-w-lg">
-      <Link
-        href="/bookings"
-        className="text-sm text-muted-foreground hover:text-foreground mb-4 inline-block"
-      >
-        ← Back to My bookings
-      </Link>
+      <div className="mb-4">
+        <BackLink fallbackHref="/bookings" label="Back to My bookings" />
+      </div>
 
       <Card>
         <CardHeader className="pb-2">

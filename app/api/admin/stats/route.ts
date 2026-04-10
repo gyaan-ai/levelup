@@ -1,0 +1,78 @@
+import { createAdminClient } from '@/lib/supabase/admin';
+import { NextResponse } from 'next/server';
+
+export const dynamic = 'force-dynamic';
+
+/** RecruitNC (or other integrations) send this header; Guild validates it. */
+const GUILD_API_SECRET = process.env.GUILD_API_SECRET ?? '';
+
+type Period = 'today' | 'this_week' | 'this_month' | 'this_year';
+
+function getPeriodWindow(period: Period): { start: Date; end: Date } {
+  const now = new Date();
+  const tod = (d: Date) => new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+
+  switch (period) {
+    case 'today':
+      return { start: tod(now), end: now };
+    case 'this_week': {
+      const day = now.getUTCDay();
+      const monday = tod(now);
+      monday.setUTCDate(monday.getUTCDate() - ((day + 6) % 7));
+      return { start: monday, end: now };
+    }
+    case 'this_month':
+      return { start: new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1)), end: now };
+    case 'this_year':
+      return { start: new Date(Date.UTC(now.getUTCFullYear(), 0, 1)), end: now };
+  }
+}
+
+export async function GET(request: Request) {
+  const secret = request.headers.get('x-guild-api-secret') ?? '';
+  if (!GUILD_API_SECRET || secret !== GUILD_API_SECRET) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  const { searchParams } = new URL(request.url);
+  const period = (searchParams.get('period') ?? 'this_week') as Period;
+  const { start, end } = getPeriodWindow(period);
+
+  const supabase = createAdminClient('guild');
+
+  const { data: sessions, error } = await supabase
+    .from('sessions')
+    .select('id, total_price, session_type, status')
+    .eq('status', 'completed')
+    .gte('created_at', start.toISOString())
+    .lte('created_at', end.toISOString());
+
+  if (error) {
+    console.error('[guild/stats]', error.message);
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  const rows = sessions ?? [];
+  const SESSION_TYPES = ['1-on-1', '2-athlete', 'group'] as const;
+
+  const bySessionType = Object.fromEntries(
+    SESSION_TYPES.map((type) => {
+      const matching = rows.filter((s) => s.session_type === type);
+      return [
+        type,
+        {
+          count: matching.length,
+          revenue: matching.reduce((acc, r) => acc + Number(r.total_price ?? 0), 0),
+        },
+      ];
+    })
+  );
+
+  return NextResponse.json({
+    period,
+    bookingCount: rows.length,
+    bookingRevenue: rows.reduce((acc, r) => acc + Number(r.total_price ?? 0), 0),
+    bySessionType,
+    dataAvailable: true,
+  });
+}

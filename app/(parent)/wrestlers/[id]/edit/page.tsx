@@ -25,8 +25,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
+import { BackLink } from '@/components/back-link';
 import { useAuth } from '@/lib/auth/use-auth';
 
 const youthWrestlerSchema = z.object({
@@ -235,10 +235,9 @@ export default function EditYouthWrestlerPage() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-2xl">
-      <Link href={`/wrestlers/${id}`} className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-6">
-        <ArrowLeft className="h-4 w-4 mr-2" />
-        Back to Profile
-      </Link>
+      <div className="mb-6">
+        <BackLink fallbackHref={`/wrestlers/${id}`} label="Back to Profile" />
+      </div>
 
       <Card>
         <CardHeader>

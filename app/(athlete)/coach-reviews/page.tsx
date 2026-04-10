@@ -3,9 +3,8 @@ import { headers, cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
 import { Card, CardContent } from '@/components/ui/card';
-import { Star, ArrowLeft } from 'lucide-react';
-import Link from 'next/link';
-import { Button } from '@/components/ui/button';
+import { Star } from 'lucide-react';
+import { BackLink } from '@/components/back-link';
 
 export const dynamic = 'force-dynamic';
 
@@ -52,11 +51,7 @@ export default async function CoachReviewsPage() {
   return (
     <div className="container mx-auto px-4 py-5 pb-24 md:py-8 max-w-2xl">
       <div className="flex items-center gap-3 mb-6">
-        <Link href="/athlete-dashboard">
-          <Button variant="ghost" size="icon" className="h-10 w-10">
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-        </Link>
+        <BackLink fallbackHref="/athlete-dashboard" label="Back" />
         <div>
           <h1 className="text-xl font-bold">Reviews</h1>
           <p className="text-sm text-muted-foreground">

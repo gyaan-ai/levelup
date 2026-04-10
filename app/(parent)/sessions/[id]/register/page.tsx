@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import Link from 'next/link';
+import { BackLink } from '@/components/back-link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SessionRegisterClient } from './register-client';
 import { User, Calendar, MapPin, Users } from 'lucide-react';
@@ -166,9 +167,9 @@ export default async function SessionRegisterPage({
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-lg">
-      <Link href="/find-training" className="text-sm text-muted-foreground hover:text-foreground mb-4 inline-block">
-        ← Back to Dashboard
-      </Link>
+      <div className="mb-4">
+        <BackLink fallbackHref="/find-training" label="Back to Training" />
+      </div>
       <Card className="mb-6">
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">

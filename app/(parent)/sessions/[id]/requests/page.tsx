@@ -2,7 +2,7 @@ import { redirect, notFound } from 'next/navigation';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
-import Link from 'next/link';
+import { BackLink } from '@/components/back-link';
 import { SessionRequestsClient, type RawRequestItem } from '../session-requests-client';
 
 export default async function SessionRequestsPage({
@@ -50,9 +50,9 @@ export default async function SessionRequestsPage({
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-2xl">
-      <Link href="/dashboard" className="text-sm text-muted-foreground hover:text-foreground mb-4 inline-block">
-        ← Back to Dashboard
-      </Link>
+      <div className="mb-4">
+        <BackLink fallbackHref="/dashboard" label="Back to Dashboard" />
+      </div>
       <h1 className="text-2xl font-bold mb-2">Join Requests</h1>
       <p className="text-muted-foreground mb-6">
         {isPartnerOpen ? 'Partner' : 'Small group'} session with {athlete?.first_name} {athlete?.last_name}. Approve or decline based on skill level, weight, etc.

@@ -1,10 +1,9 @@
 'use client';
 
-import Link from 'next/link';
 import useSWR from 'swr';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Wallet, ArrowLeft, Clock, CreditCard, Gift, RefreshCcw, Calendar } from 'lucide-react';
+import { Wallet, Clock, CreditCard, Gift, RefreshCcw, Calendar } from 'lucide-react';
+import { BackLink } from '@/components/back-link';
 import { formatEST } from '@/lib/format-date';
 
 const fetcher = (url: string) => fetch(url).then(r => r.json());
@@ -71,11 +70,7 @@ export default function WalletPage() {
   return (
     <div className="container max-w-2xl py-8 px-4 space-y-6">
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" asChild>
-          <Link href="/account">
-            <ArrowLeft className="h-5 w-5" />
-          </Link>
-        </Button>
+        <BackLink fallbackHref="/account" label="Back" />
         <h1 className="text-2xl font-bold">My Wallet</h1>
       </div>
 

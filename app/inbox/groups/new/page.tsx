@@ -5,8 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
+import { BackLink } from '@/components/back-link';
 
 export default function NewGroupPage() {
   const router = useRouter();
@@ -41,13 +40,9 @@ export default function NewGroupPage() {
 
   return (
     <div className="p-4 max-w-md mx-auto">
-      <Link
-        href="/inbox"
-        className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-4"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Back
-      </Link>
+      <div className="mb-4">
+        <BackLink fallbackHref="/inbox" label="Back" />
+      </div>
       <Card>
         <CardHeader>
           <CardTitle>New group</CardTitle>

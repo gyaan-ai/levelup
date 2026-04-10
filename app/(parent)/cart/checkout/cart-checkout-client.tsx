@@ -7,7 +7,8 @@ import useSWR from 'swr';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { ShoppingCart, X, ArrowLeft, CreditCard, Loader2, Wallet, Tag, Check, AlertCircle } from 'lucide-react';
+import { ShoppingCart, X, CreditCard, Loader2, Wallet, Tag, Check, AlertCircle } from 'lucide-react';
+import { BackLink } from '@/components/back-link';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useCart } from '@/lib/cart-context';
@@ -186,12 +187,11 @@ export function CartCheckoutClient({
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href="/training" className="gap-2">
-            <ArrowLeft className="h-4 w-4" />
-            Back to Training
-          </Link>
-        </Button>
+        <BackLink
+          fallbackHref="/training"
+          label="Back to Training"
+          className="inline-flex h-9 items-center justify-center rounded-md px-3 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
+        />
       </div>
 
       <Card>

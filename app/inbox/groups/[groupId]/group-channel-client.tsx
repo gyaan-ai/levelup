@@ -1,11 +1,11 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Send, Users, UserPlus, Pencil, Smile } from 'lucide-react';
+import { Send, Users, UserPlus, Pencil, Smile } from 'lucide-react';
+import { BackLink } from '@/components/back-link';
 import { formatEST } from '@/lib/format-date';
 
 const EMOJI_QUICK = ['👍', '❤️', '😂', '🔥', '💪', '✅', '👀', '🙌'];
@@ -189,9 +189,7 @@ export function GroupChannelClient({
     <div className="flex flex-1 min-w-0 h-full">
       <div className="flex-1 flex flex-col min-w-0">
         <div className="p-3 border-b border-border flex items-center gap-2">
-          <Link href="/inbox" className="text-muted-foreground hover:text-foreground">
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
+          <BackLink fallbackHref="/inbox" label="Back" className="shrink-0" />
           <h1 className="font-semibold truncate">{groupName}</h1>
         </div>
 

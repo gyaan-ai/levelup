@@ -27,7 +27,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { RequestFacilityBlock } from '@/components/request-facility-block';
-import { ArrowLeft, Globe, Lock } from 'lucide-react';
+import { Globe, Lock } from 'lucide-react';
+import { BackLink } from '@/components/back-link';
 import Link from 'next/link';
 
 const profileSchema = z.object({
@@ -259,10 +260,7 @@ export default function ProfilePage() {
   return (
     <div className="container mx-auto px-4 py-8 max-w-2xl">
       <div className="flex flex-wrap items-center gap-4 mb-6">
-        <Link href="/athlete-dashboard" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Dashboard
-        </Link>
+        <BackLink fallbackHref="/athlete-dashboard" label="Back to Dashboard" />
         <Link href="/inbox" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
           Inbox
         </Link>

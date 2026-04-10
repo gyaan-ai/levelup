@@ -1,11 +1,9 @@
 import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
-import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
-import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
+import { BackLink } from '@/components/back-link';
 import { FocusAreasClient } from './focus-areas-client';
 
 export default async function AdminFocusAreasPage() {
@@ -38,12 +36,13 @@ export default async function AdminFocusAreasPage() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-xl">
-      <Link href="/admin">
-        <Button variant="ghost" size="sm" className="mb-4 -ml-2">
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Admin
-        </Button>
-      </Link>
+      <div className="mb-4 -ml-2">
+        <BackLink
+          fallbackHref="/admin"
+          label="Back to Admin"
+          className="inline-flex h-9 items-center justify-center rounded-md px-3 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
+        />
+      </div>
       <h1 className="text-2xl font-bold mb-1">Session topics</h1>
       <p className="text-muted-foreground text-sm mb-6">
         Add or edit topics here. They appear when creating or editing a small group session (you can choose up to 2 focus areas per session). Use <strong>Admin → Create session</strong> or <strong>Edit</strong> on a session to set focus areas.

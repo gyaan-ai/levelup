@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import Link from 'next/link';
+import { BackLink } from '@/components/back-link';
 import { GuildIndependentContractorAgreement } from '@/components/guild-independent-contractor-agreement';
 import { PrintPageButton } from '@/components/print-page-button';
 
@@ -14,9 +14,11 @@ export default function CoachAgreementPage() {
       <div className="mx-auto max-w-3xl px-4 py-10">
         <div className="mb-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-muted-foreground">
-            <Link href="/signup/coach" className="text-primary underline-offset-4 hover:underline">
-              Back to coach application
-            </Link>
+            <BackLink
+              fallbackHref="/signup/coach"
+              label="Back to coach application"
+              className="text-primary underline-offset-4 hover:underline"
+            />
           </p>
           <PrintPageButton />
         </div>

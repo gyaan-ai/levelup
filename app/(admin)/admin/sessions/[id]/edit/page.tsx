@@ -1,13 +1,11 @@
 import { redirect, notFound } from 'next/navigation';
 import { headers } from 'next/headers';
-import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import { formatEST } from '@/lib/format-date';
 import { EditSessionForm } from './edit-session-form';
-import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
+import { BackLink } from '@/components/back-link';
 
 export default async function AdminEditSessionPage({
   params,
@@ -73,12 +71,13 @@ export default async function AdminEditSessionPage({
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-lg">
-      <Link href="/admin">
-        <Button variant="ghost" size="sm" className="mb-4 -ml-2">
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Admin
-        </Button>
-      </Link>
+      <div className="mb-4 -ml-2">
+        <BackLink
+          fallbackHref="/admin"
+          label="Back to Admin"
+          className="inline-flex h-9 items-center justify-center rounded-md px-3 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
+        />
+      </div>
       <h1 className="text-2xl font-bold mb-1">Edit session</h1>
       <p className="text-muted-foreground text-sm mb-6">
         {coach ? `${(coach as { first_name?: string }).first_name ?? ''} ${(coach as { last_name?: string }).last_name ?? ''}`.trim() : '—'}

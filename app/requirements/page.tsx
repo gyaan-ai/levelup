@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CheckCircle } from 'lucide-react';
 import Link from 'next/link';
+import { BackLink } from '@/components/back-link';
 
 export const metadata = {
   title: 'Requirements | The Guild',
@@ -35,9 +36,11 @@ export default function RequirementsPage() {
             </Link>
           </p>
           <p>
-            <Link href="/" className="text-muted-foreground hover:text-accent hover:underline text-sm">
-              ← Back to home
-            </Link>
+            <BackLink
+              fallbackHref="/"
+              label="Back to home"
+              className="text-muted-foreground hover:text-accent hover:underline text-sm"
+            />
           </p>
         </CardContent>
       </Card>

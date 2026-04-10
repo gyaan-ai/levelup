@@ -6,8 +6,8 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Star, ArrowLeft, User, Calendar, MessageSquare } from 'lucide-react';
+import { Star, User, Calendar, MessageSquare } from 'lucide-react';
+import { BackLink } from '@/components/back-link';
 import { formatEST } from '@/lib/format-date';
 import { ProfileImage } from '@/components/profile-image';
 
@@ -127,12 +127,13 @@ export default async function AdminReviewsPage() {
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
       <div className="mb-6">
-        <Link href="/admin">
-          <Button variant="ghost" size="sm" className="mb-4">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Admin
-          </Button>
-        </Link>
+        <div className="mb-4">
+          <BackLink
+            fallbackHref="/admin"
+            label="Back to Admin"
+            className="inline-flex h-9 items-center justify-center rounded-md px-3 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
+          />
+        </div>
         <h1 className="text-3xl font-bold font-serif text-foreground">Reviews</h1>
         <p className="text-muted-foreground mt-1">
           All coach reviews by parent

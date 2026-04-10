@@ -3,7 +3,7 @@ import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
-import Link from 'next/link';
+import { BackLink } from '@/components/back-link';
 import { CoachCreateSessionForm } from './coach-create-session-form';
 import { getRecommendedPricesForCoach } from '@/lib/coach-session-pricing';
 
@@ -54,9 +54,9 @@ export default async function CoachCreateSessionPage() {
 
   return (
     <div className="container mx-auto px-4 py-5 pb-24 md:py-8 max-w-xl">
-      <Link href="/coach-sessions" className="text-sm text-muted-foreground hover:text-foreground mb-4 inline-block">
-        ← Back to Sessions
-      </Link>
+      <div className="mb-4">
+        <BackLink fallbackHref="/coach-sessions" label="Back to Sessions" />
+      </div>
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-foreground">Create Session</h1>
         <p className="text-muted-foreground text-sm mt-1">

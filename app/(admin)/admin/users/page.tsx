@@ -3,7 +3,7 @@ import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
-import Link from 'next/link';
+import { BackLink } from '@/components/back-link';
 import { AdminUsersClient, type AdminUserRow } from './users-client';
 
 export default async function AdminUsersPage() {
@@ -112,9 +112,9 @@ export default async function AdminUsersPage() {
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <Link href="/admin" className="text-sm text-muted-foreground hover:text-foreground mb-4 inline-block">
-        ← Back to Admin
-      </Link>
+      <div className="mb-4">
+        <BackLink fallbackHref="/admin" label="Back to Admin" />
+      </div>
       <div className="mb-8">
         <h1 className="text-3xl font-bold font-serif text-foreground">User Management</h1>
         <p className="text-muted-foreground mt-1">

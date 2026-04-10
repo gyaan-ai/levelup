@@ -15,7 +15,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ArrowLeft, User, Calendar, Trash2, Loader2, Heart } from 'lucide-react';
+import { User, Calendar, Trash2, Loader2, Heart } from 'lucide-react';
+import { BackLink } from '@/components/back-link';
 import { SchoolLogo } from '@/components/school-logo';
 import { CoachSessionBadge } from '@/components/coach-session-badge';
 import { ProfileImage } from '@/components/profile-image';
@@ -175,13 +176,9 @@ export function BrowseAthletesClient({ initialAthletes, isAdmin, initialYouthWre
     <div className={embedded ? '' : 'container mx-auto px-4 py-8'}>
       {!embedded && (
         <>
-          <Link 
-            href="/dashboard" 
-            className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-6"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Home
-          </Link>
+          <div className="mb-6">
+            <BackLink fallbackHref="/dashboard" label="Back to Home" />
+          </div>
           <div className="mb-8">
             <h1 className="text-3xl font-serif font-bold mb-2 text-foreground">Browse Elite Coaches</h1>
             <p className="text-muted-foreground">

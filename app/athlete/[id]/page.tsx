@@ -9,7 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import { ArrowLeft, Star, User, MapPin, Award, Shield, CheckCircle, MessageCircle, DollarSign, Pencil, Calendar, Users, ChevronRight } from 'lucide-react';
+import { Star, User, MapPin, Award, Shield, CheckCircle, MessageCircle, DollarSign, Pencil, Calendar, Users, ChevronRight } from 'lucide-react';
+import { BackLink } from '@/components/back-link';
 import { formatEST } from '@/lib/format-date';
 import { SessionTypeBadge } from '@/components/session-type-badge';
 import { SchoolLogo } from '@/components/school-logo';
@@ -218,13 +219,9 @@ export default async function AthleteProfilePage({
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-5xl">
-      <Link 
-        href="/browse" 
-        className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-6"
-      >
-        <ArrowLeft className="h-4 w-4 mr-2" />
-        Back to Browse
-      </Link>
+      <div className="mb-6">
+        <BackLink fallbackHref="/browse" label="Back to Browse" />
+      </div>
 
       {/* Hero Section */}
       <Card className="mb-6 relative">

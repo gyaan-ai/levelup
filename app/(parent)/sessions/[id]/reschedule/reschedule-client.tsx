@@ -6,7 +6,8 @@ import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
-import { ArrowLeft, User } from 'lucide-react';
+import { User } from 'lucide-react';
+import { BackLink } from '@/components/back-link';
 import { SchoolLogo } from '@/components/school-logo';
 import { startOfDay } from 'date-fns';
 import { formatEST } from '@/lib/format-date';
@@ -132,13 +133,9 @@ export function RescheduleClient({
 
   return (
     <div className="container mx-auto px-4 py-6 sm:py-8 max-w-xl">
-      <Link
-        href="/dashboard"
-        className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-6"
-      >
-        <ArrowLeft className="h-4 w-4 mr-2" />
-        Back to Dashboard
-      </Link>
+      <div className="mb-6">
+        <BackLink fallbackHref="/dashboard" label="Back to Dashboard" />
+      </div>
 
       <div className="mb-6">
         <h1 className="text-2xl font-serif font-bold text-foreground">Reschedule Session</h1>

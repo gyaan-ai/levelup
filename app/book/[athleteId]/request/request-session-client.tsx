@@ -14,7 +14,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
+import { BackLink } from '@/components/back-link';
 import { ProfileImage } from '@/components/profile-image';
 import { SchoolLogo } from '@/components/school-logo';
 import type { YouthWrestler } from '@/types';
@@ -105,13 +106,9 @@ export function RequestSessionClient({
   if (youthWrestlers.length === 0) {
     return (
       <div className="container mx-auto px-4 py-6 sm:py-8 max-w-lg">
-        <Link
-          href={`/book/${athlete.id}`}
-          className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-4"
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to booking
-        </Link>
+        <div className="mb-4">
+          <BackLink fallbackHref={`/book/${athlete.id}`} label="Back to booking" />
+        </div>
         <Card>
           <CardHeader>
             <CardTitle>Add a wrestler first</CardTitle>
@@ -133,13 +130,9 @@ export function RequestSessionClient({
 
   return (
     <div className="container mx-auto px-4 py-6 sm:py-8 max-w-lg">
-      <Link
-        href={`/book/${athlete.id}`}
-        className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-4"
-      >
-        <ArrowLeft className="h-4 w-4 mr-2" />
-        Back to booking
-      </Link>
+      <div className="mb-4">
+        <BackLink fallbackHref={`/book/${athlete.id}`} label="Back to booking" />
+      </div>
 
       <div className="flex items-center gap-4 mb-6">
         <ProfileImage

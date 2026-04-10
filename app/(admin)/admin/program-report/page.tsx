@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
-import Link from 'next/link';
+import { BackLink } from '@/components/back-link';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
@@ -100,9 +100,11 @@ export default async function ProgramReportPage({
         <p className="text-muted-foreground text-sm">
           No coach programs (schools) found yet. Add schools on coach profiles, then return here.
         </p>
-        <Link href="/admin" className="text-[#B89D60] font-medium underline">
-          Back to admin
-        </Link>
+        <BackLink
+          fallbackHref="/admin"
+          label="Back to admin"
+          className="text-[#B89D60] font-medium underline"
+        />
       </div>
     );
   }
