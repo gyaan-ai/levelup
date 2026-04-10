@@ -28,6 +28,22 @@ function getPeriodWindow(period: Period): { start: Date; end: Date } {
   }
 }
 
+type SessionParticipantRow = { amount_paid?: number | null };
+type SessionStatsRow = {
+  id: string;
+  session_type?: string | null;
+  status?: string | null;
+  athlete_payment?: number | null;
+  session_participants?: SessionParticipantRow[] | null;
+};
+
+function sessionRevenue(s: SessionStatsRow): number {
+  return (s.session_participants ?? []).reduce(
+    (sum, p) => sum + Number(p.amount_paid ?? 0),
+    0
+  );
+}
+
 export async function GET(request: Request) {
   const secret = request.headers.get('x-guild-api-secret') ?? '';
   if (!GUILD_API_SECRET || secret !== GUILD_API_SECRET) {
@@ -42,7 +58,15 @@ export async function GET(request: Request) {
 
   const { data: sessions, error } = await supabase
     .from('sessions')
-    .select('id, total_price, session_type, status')
+    .select(`
+      id,
+      session_type,
+      status,
+      athlete_payment,
+      session_participants (
+        amount_paid
+      )
+    `)
     .eq('status', 'completed')
     .gte('created_at', start.toISOString())
     .lte('created_at', end.toISOString());
@@ -52,7 +76,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const rows = sessions ?? [];
+  const rows = (sessions ?? []) as SessionStatsRow[];
   const SESSION_TYPES = ['1-on-1', '2-athlete', 'group'] as const;
 
   const bySessionType = Object.fromEntries(
@@ -62,16 +86,22 @@ export async function GET(request: Request) {
         type,
         {
           count: matching.length,
-          revenue: matching.reduce((acc, r) => acc + Number(r.total_price ?? 0), 0),
+          revenue: matching.reduce((sum, s) => sum + sessionRevenue(s), 0),
         },
       ];
     })
   );
 
+  const totalRevenue = rows.reduce((sum, s) => sum + sessionRevenue(s), 0);
+  const totalCoachPayout = rows.reduce((sum, s) => sum + Number(s.athlete_payment ?? 0), 0);
+  const platformFee = totalRevenue - totalCoachPayout;
+
   return NextResponse.json({
     period,
     bookingCount: rows.length,
-    bookingRevenue: rows.reduce((acc, r) => acc + Number(r.total_price ?? 0), 0),
+    bookingRevenue: totalRevenue,
+    coachPayout: totalCoachPayout,
+    platformFee,
     bySessionType,
     dataAvailable: true,
   });
