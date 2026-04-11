@@ -16,8 +16,9 @@ Then open the production URL (and on mobile, use a **new incognito/private** tab
 
 ## 2. Confirm production is this repo
 
-- In Vercel → **Settings** → **Git**: confirm the connected repo and branch (e.g. `main`) are the ones you push to.
-- For the deployment you’re testing, check **Deployments** → click the deployment → **Source** and confirm the commit is the one you expect.
+- **Settings** → **Git**: confirm the connected repo is the one you push to (e.g. `gyaan-ai/levelup`).
+- **Settings** → **Environments** → **Production** → **Branch tracking**: must be **`main`** (or whatever branch should ship to Production). This is **not** on the Git page — it lives under **Environments**.
+- For the deployment you’re testing: **Deployments** → open the deployment → **Source** and confirm the commit.
 
 ## 3. After a deploy, verify the new build
 
