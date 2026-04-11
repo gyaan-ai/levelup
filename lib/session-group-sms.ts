@@ -303,3 +303,73 @@ export async function getSessionSmsPhonesForPersonalText(
     skippedAthletes,
   };
 }
+
+const SESSION_ID_CHUNK = 200;
+const YOUTH_ID_CHUNK = 200;
+
+/**
+ * Distinct athlete (youth) cells for anyone who has ever been on `session_participants`
+ * for a session owned by `coachAthleteId`. Deduped by normalized number; same formatting as
+ * per-session athlete paste (`formatPhoneForSmsPaste`).
+ */
+export async function getCoachAllTimeAthletePhonesForPersonalText(
+  admin: Admin,
+  coachAthleteId: string
+): Promise<{ commaAll: string; athleteCount: number; skippedNoPhone: number }> {
+  const { data: sessRows, error: sessErr } = await admin
+    .from('sessions')
+    .select('id')
+    .eq('athlete_id', coachAthleteId);
+  if (sessErr) throw new Error(sessErr.message);
+  const sessionIds = (sessRows ?? []).map((r) => r.id as string);
+  if (sessionIds.length === 0) {
+    return { commaAll: '', athleteCount: 0, skippedNoPhone: 0 };
+  }
+
+  const ywIds = new Set<string>();
+  for (let i = 0; i < sessionIds.length; i += SESSION_ID_CHUNK) {
+    const chunk = sessionIds.slice(i, i + SESSION_ID_CHUNK);
+    const { data: parts, error: pErr } = await admin
+      .from('session_participants')
+      .select('youth_wrestler_id')
+      .in('session_id', chunk);
+    if (pErr) throw new Error(pErr.message);
+    for (const p of parts ?? []) {
+      const id = (p as { youth_wrestler_id?: string | null }).youth_wrestler_id;
+      if (id) ywIds.add(id);
+    }
+  }
+
+  const ids = [...ywIds];
+  if (ids.length === 0) {
+    return { commaAll: '', athleteCount: 0, skippedNoPhone: 0 };
+  }
+
+  let skippedNoPhone = 0;
+  const e164Unique = new Set<string>();
+
+  for (let i = 0; i < ids.length; i += YOUTH_ID_CHUNK) {
+    const chunk = ids.slice(i, i + YOUTH_ID_CHUNK);
+    const { data: yws, error: yErr } = await admin.from('youth_wrestlers').select('phone').in('id', chunk);
+    if (yErr) throw new Error(yErr.message);
+    for (const yw of yws ?? []) {
+      const e164 = normalizePhone((yw as { phone?: string | null }).phone ?? undefined);
+      if (!e164) {
+        skippedNoPhone += 1;
+        continue;
+      }
+      e164Unique.add(e164);
+    }
+  }
+
+  const commaAll = [...e164Unique]
+    .sort((a, b) => a.localeCompare(b))
+    .map((e) => formatPhoneForSmsPaste(e))
+    .join('\n');
+
+  return {
+    commaAll,
+    athleteCount: e164Unique.size,
+    skippedNoPhone,
+  };
+}

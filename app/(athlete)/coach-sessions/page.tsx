@@ -6,6 +6,7 @@ import { isProfileComplete } from '@/lib/athletes';
 import { Athlete } from '@/types';
 import { CoachSessionsClient } from './coach-sessions-client';
 import type { CoachSession } from '@/app/(athlete)/athlete-dashboard/coach-schedule-card';
+import { CopyCoachAllAthletePhonesButton } from '@/components/copy-coach-all-athlete-phones-button';
 
 export const dynamic = 'force-dynamic';
 
@@ -81,10 +82,15 @@ export default async function CoachSessionsPage({
 
   return (
     <div className="container mx-auto px-4 py-5 pb-8 md:py-8 max-w-full">
-      <h1 className="text-2xl font-bold text-foreground md:text-3xl mb-1">My sessions</h1>
-      <p className="text-muted-foreground text-sm md:text-base mb-6">
-        Open sessions, who signed up, your payout · Requests · Past
-      </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-6">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold text-foreground md:text-3xl mb-1">My sessions</h1>
+          <p className="text-muted-foreground text-sm md:text-base">
+            Open sessions, who signed up, your payout · Requests · Past
+          </p>
+        </div>
+        <CopyCoachAllAthletePhonesButton className="min-h-[44px] touch-manipulation shrink-0 w-full sm:w-auto" />
+      </div>
       <CoachSessionsClient
         initialTab={tab}
         upcomingSessions={(upcoming ?? []) as CoachSession[]}
