@@ -4,17 +4,19 @@
 
 @layer base {
   :root {
-    --guild-black: #000000;
-    --guild-gold: #B89D60;
-    --guild-gold-dark: #9A8550;
-    --guild-gold-light: #C9B078;
+    /* Antique gold - muted museum bronze aesthetic */
+    --guild-navy: #0A1628;
+    --guild-navy-light: #121F33;
+    --guild-gold: #D4AF37;
+    --guild-gold-dark: #78350F;
+    --guild-gold-light: #B8963C;
 
-    --primary: var(--guild-black);
+    --primary: var(--guild-navy);
     --accent: var(--guild-gold);
     --accent-hover: var(--guild-gold-dark);
 
-    /* App-wide dark theme with gold accents */
-    --background: 0 0% 7%;
+    /* App-wide dark theme with gold accents - PURE BLACK */
+    --background: 0 0% 0%;
     --foreground: 0 0% 95%;
     --card: 0 0% 11%;
     --card-foreground: 0 0% 95%;
@@ -31,10 +33,17 @@
     --input: 0 0% 18%;
     --ring: 43 40% 50%;
     --radius: 0.5rem;
+    
+    /* Chart colors */
+    --chart-1: 43 40% 55%;
+    --chart-2: 199 89% 48%;
+    --chart-3: 142 71% 45%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 27 87% 67%;
   }
 
   .dark {
-    --background: 0 0% 7%;
+    --background: 0 0% 0%;
     --foreground: 0 0% 95%;
     --card: 0 0% 11%;
     --card-foreground: 0 0% 95%;
@@ -49,6 +58,13 @@
     --border: 0 0% 20%;
     --input: 0 0% 18%;
     --ring: 43 40% 50%;
+    
+    /* Chart colors */
+    --chart-1: 43 40% 55%;
+    --chart-2: 199 89% 48%;
+    --chart-3: 142 71% 45%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 27 87% 67%;
   }
 }
 
@@ -97,15 +113,15 @@
 }
 
 .gold-glow {
-  box-shadow: 0 0 20px rgba(184, 157, 96, 0.4);
+  box-shadow: 0 0 20px rgba(212, 175, 55, 0.4);
 }
 
 .gold-glow-hover:hover {
-  box-shadow: 0 0 30px rgba(184, 157, 96, 0.6);
+  box-shadow: 0 0 30px rgba(212, 175, 55, 0.6);
 }
 
 .gold-shimmer {
-  background: linear-gradient(90deg, #9A8550 0%, #B89D60 50%, #C9B078 100%);
+  background: linear-gradient(90deg, #78350F 0%, #D4AF37 50%, #B8963C 100%);
   background-size: 200% auto;
   animation: shimmer 3s linear infinite;
 }

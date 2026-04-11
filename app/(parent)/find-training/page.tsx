@@ -55,7 +55,7 @@ export default async function FindTrainingPage({
     facility_id: string;
     athletes?: { id: string; first_name?: string; last_name?: string; school?: string } | null;
     facilities?: { id: string; name?: string; address?: string } | null;
-    session_participants?: Array<{ youth_wrestlers?: { id: string; first_name?: string; last_name?: string; photo_url?: string } | null } | null>;
+    session_participants?: Array<{ id?: string; youth_wrestler_id?: string; roster_first_name?: string; roster_last_name?: string; roster_photo_url?: string; youth_wrestlers?: { id: string; first_name?: string; last_name?: string; photo_url?: string } | null } | null>;
   }> = [];
 
   const dateParam = sp.date;
@@ -161,6 +161,7 @@ export default async function FindTrainingPage({
     .eq('active', true)
     .order('school', { ascending: true });
 
+  // Participant names are fetched client-side via /api/sessions/participant-names
   const sessionCoachIds = [...new Set(sessions.map((s) => s.athlete_id).filter(Boolean))];
   const findTrainingReviewStatsMap = await fetchCoachReviewStatsMap(supabase, sessionCoachIds);
   const sessionsWithReviewStats = patchSessionsWithCoachReviewStats(sessions, findTrainingReviewStatsMap);

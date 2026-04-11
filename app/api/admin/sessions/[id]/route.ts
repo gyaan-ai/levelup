@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import { APP_TIMEZONE } from '@/lib/format-date';
+import { notifySessionScheduledFollowers } from '@/lib/notify-session-scheduled-followers';
 
 /**
  * PATCH - Admin updates a session (focus_area, join_policy, max_participants, price_per_participant).
@@ -28,7 +29,8 @@ export async function PATCH(
     const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
     if (userData?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-    const body = (await req.json()) as {
+    let body: {
+      session_type?: 'small_group' | 'partner' | 'private';
       focus_area?: string | null;
       focus_area_2?: string | null;
       join_policy?: 'public' | 'private' | 'invite_only';
@@ -36,27 +38,40 @@ export async function PATCH(
       price_per_participant?: number;
       scheduledDate?: string;
       scheduledTime?: string;
+      published?: boolean;
     };
+    try {
+      body = await req.json();
+    } catch {
+      return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
+    }
 
     const admin = createAdminClient(tenant.slug);
 
     const { data: session, error: fetchErr } = await admin
       .from('sessions')
-      .select('id, status, session_type')
+      .select('id, status, session_type, athlete_id, scheduled_datetime, partner_invite_code')
       .eq('id', sessionId)
       .single();
-
+    
     if (fetchErr || !session) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
-    if (session.status !== 'scheduled' && session.status !== 'pending_payment') {
+    // Allow admin to edit any session that isn't cancelled
+    if (session.status === 'cancelled') {
       return NextResponse.json(
-        { error: 'Only scheduled or pending-payment sessions can be edited' },
+        { error: 'Cancelled sessions cannot be edited' },
         { status: 400 }
       );
     }
 
     const updates: Record<string, unknown> = {};
+    if (body.session_type !== undefined && ['small_group', 'partner', 'private'].includes(body.session_type)) {
+      // Map UI values to DB constraint values: '1-on-1', '2-athlete', 'group'
+      updates.session_type = body.session_type === 'small_group' ? 'group' : body.session_type === 'partner' ? '2-athlete' : '1-on-1';
+      // Also update session_mode based on type
+      updates.session_mode = body.session_type === 'private' ? 'private' : 'partner-invite';
+    }
     if (body.focus_area !== undefined) {
       updates.focus_area = body.focus_area === '' || body.focus_area == null
         ? null
@@ -87,6 +102,9 @@ export async function PATCH(
       const utcDate = fromZonedTime(localIso, APP_TIMEZONE);
       updates.scheduled_datetime = utcDate.toISOString();
     }
+    
+    // published column doesn't exist in DB - skip this logic
+    const isNewlyPublished = false;
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ ok: true });
@@ -102,6 +120,16 @@ export async function PATCH(
     if (updateErr) {
       return NextResponse.json({ error: updateErr.message }, { status: 500 });
     }
+    
+    // If session was just published, notify followers
+    if (isNewlyPublished && session.athlete_id && session.partner_invite_code) {
+      void notifySessionScheduledFollowers(tenant.slug, session.athlete_id, {
+        sessionId,
+        scheduledDatetime: (updates.scheduled_datetime as string) || session.scheduled_datetime,
+        joinUrlPath: `/join/${session.partner_invite_code}`,
+      });
+    }
+    
     return NextResponse.json({ ok: true });
   } catch (e) {
     console.error('Admin session PATCH error:', e);

@@ -21,10 +21,14 @@ export type CoachSession = {
   price_per_participant?: number | null;
   session_type?: string;
   session_mode?: string;
+  focus_area?: string | null;
+  focus_area_2?: string | null;
+  partner_invite_code?: string | null;
+  join_policy?: string | null;
   status: string;
   current_participants?: number;
   max_participants?: number;
-  facilities?: { name?: string } | { name?: string }[] | null;
+  facilities?: { id?: string; name?: string } | { id?: string; name?: string }[] | null;
   session_participants?: Array<{
     youth_wrestler_id?: string | null;
     youth_wrestlers?: { id: string; first_name?: string; last_name?: string } | { id: string; first_name?: string; last_name?: string }[] | null;

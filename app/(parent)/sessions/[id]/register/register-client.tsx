@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useMemo, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -34,19 +34,47 @@ interface SessionRegisterClientProps {
   percentOff?: number;
   youthWrestlers: YouthWrestlerItem[];
   initialWrestlerId?: string;
+  checkoutUsesSavedAccountDiscount?: boolean;
 }
 
-export function SessionRegisterClient({ sessionId, isOwner, isSmallGroup = false, pricePerParticipant, priceAfterDiscount, percentOff, youthWrestlers, initialWrestlerId = '' }: SessionRegisterClientProps) {
+export function SessionRegisterClient({
+  sessionId,
+  isOwner,
+  isSmallGroup = false,
+  pricePerParticipant,
+  priceAfterDiscount,
+  percentOff,
+  youthWrestlers,
+  initialWrestlerId = '',
+  checkoutUsesSavedAccountDiscount = false,
+}: SessionRegisterClientProps) {
   const router = useRouter();
   const [selectedWrestlerId, setSelectedWrestlerId] = useState(initialWrestlerId);
   const [promoCode, setPromoCode] = useState('');
   const [codeApplied, setCodeApplied] = useState(false);
+  const [localPromoPercent, setLocalPromoPercent] = useState<number | null>(null);
   const [applyingCode, setApplyingCode] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const submitLock = useRef(false);
 
-  const displayPrice = priceAfterDiscount ?? pricePerParticipant;
+  const displayPrice = useMemo(() => {
+    if (isOwner) return pricePerParticipant;
+    if (checkoutUsesSavedAccountDiscount) {
+      return priceAfterDiscount ?? pricePerParticipant;
+    }
+    if (codeApplied && localPromoPercent != null && localPromoPercent >= 1) {
+      return pricePerParticipant * (1 - localPromoPercent / 100);
+    }
+    return pricePerParticipant;
+  }, [
+    isOwner,
+    checkoutUsesSavedAccountDiscount,
+    priceAfterDiscount,
+    pricePerParticipant,
+    codeApplied,
+    localPromoPercent,
+  ]);
 
   const selectedWrestler = youthWrestlers.find((yw) => yw.id === selectedWrestlerId);
   const selectedHasCell = selectedWrestler?.hasValidCell !== false;
@@ -57,17 +85,32 @@ export function SessionRegisterClient({ sessionId, isOwner, isSmallGroup = false
     setError(null);
     setApplyingCode(true);
     try {
-      const redeemRes = await fetch('/api/redeem-discount-code', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: codeTrimmed }),
-      });
-      const data = await redeemRes.json();
-      if (redeemRes.ok && (data.success || data.alreadyUsed)) {
-        setCodeApplied(true);
-        router.refresh();
+      if (checkoutUsesSavedAccountDiscount) {
+        const redeemRes = await fetch('/api/redeem-discount-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: codeTrimmed }),
+        });
+        const data = await redeemRes.json();
+        if (redeemRes.ok && (data.success || data.alreadyUsed)) {
+          setCodeApplied(true);
+          router.refresh();
+        } else {
+          setError(data.error || 'Invalid or expired promo code');
+        }
       } else {
-        setError(data.error || 'Invalid or expired promo code');
+        const res = await fetch('/api/checkout/validate-promo-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: codeTrimmed.toUpperCase() }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setError(data.error || 'Invalid or expired promo code');
+          return;
+        }
+        setLocalPromoPercent(data.percent_off);
+        setCodeApplied(true);
       }
     } catch {
       setError('Could not apply code. Try again.');
@@ -92,26 +135,20 @@ export function SessionRegisterClient({ sessionId, isOwner, isSmallGroup = false
     setLoading(true);
     try {
       const codeTrimmed = promoCode.trim();
-      if (codeTrimmed && !isOwner && !codeApplied) {
-        const redeemRes = await fetch('/api/redeem-discount-code', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code: codeTrimmed }),
-        });
-        const redeemData = await redeemRes.json();
-        if (!redeemRes.ok && !redeemData.alreadyUsed) {
-          setError(redeemData.error || 'Invalid or expired promo code');
-          setLoading(false);
-          submitLock.current = false;
-          return;
-        }
-        if (redeemRes.ok && (redeemData.success || redeemData.alreadyUsed)) setCodeApplied(true);
+      if (!isOwner && codeTrimmed && !codeApplied) {
+        setError('Click Apply to confirm your promo code before paying.');
+        setLoading(false);
+        submitLock.current = false;
+        return;
       }
 
       const res = await fetch(`/api/sessions/${sessionId}/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ youthWrestlerId: selectedWrestlerId }),
+        body: JSON.stringify({
+          youthWrestlerId: selectedWrestlerId,
+          promoCode: !isOwner && codeApplied ? codeTrimmed.toUpperCase() : undefined,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -153,6 +190,13 @@ export function SessionRegisterClient({ sessionId, isOwner, isSmallGroup = false
       </div>
     );
   }
+
+  const showSavedDiscountLine =
+    !isOwner && checkoutUsesSavedAccountDiscount && percentOff != null && isSmallGroup;
+  const showImplicitAllowlistLine =
+    !isOwner && !checkoutUsesSavedAccountDiscount && percentOff != null && isSmallGroup && !codeApplied;
+  const showPromoAppliedLine =
+    !isOwner && !checkoutUsesSavedAccountDiscount && codeApplied && localPromoPercent != null && isSmallGroup;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
@@ -198,16 +242,25 @@ export function SessionRegisterClient({ sessionId, isOwner, isSmallGroup = false
       </div>
       {!isOwner && (
         <div className="space-y-2">
-          <Label htmlFor="promo">Promo code (optional)</Label>
+          <Label htmlFor="promo">
+            {checkoutUsesSavedAccountDiscount ? 'Promo code (optional)' : 'Promo code (discount only if valid code applied)'}
+          </Label>
           <div className="flex gap-2">
             <Input
               id="promo"
               type="text"
               placeholder=""
               value={promoCode}
-              onChange={(e) => { setPromoCode(e.target.value.toUpperCase()); setError(null); setCodeApplied(false); }}
+              onChange={(e) => {
+                setPromoCode(e.target.value.toUpperCase());
+                setError(null);
+                setCodeApplied(false);
+                setLocalPromoPercent(null);
+              }}
               className="uppercase flex-1"
               autoComplete="off"
+              name="guild-session-register-promo"
+              data-lpignore="true"
             />
             <Button
               type="button"
@@ -218,9 +271,21 @@ export function SessionRegisterClient({ sessionId, isOwner, isSmallGroup = false
               {applyingCode ? 'Applying…' : 'Apply'}
             </Button>
           </div>
-          {isSmallGroup && percentOff != null && (
+          {showSavedDiscountLine && (
             <p className="text-sm text-green-600 dark:text-green-400 font-medium">
-              {codeApplied ? `Code applied. You get ${percentOff}% off — pay & register below.` : `Your ${percentOff}% discount applies — pay & register below.`}
+              {codeApplied
+                ? `Code applied. You get ${percentOff}% off — pay & register below.`
+                : `Your account has a ${percentOff}% family discount — the price below reflects it.`}
+            </p>
+          )}
+          {showImplicitAllowlistLine && (
+            <p className="text-sm text-green-600 dark:text-green-400 font-medium">
+              {`Your approved family rate is included — ${percentOff}% off below. You do not need to enter a promo code.`}
+            </p>
+          )}
+          {showPromoAppliedLine && (
+            <p className="text-sm text-green-600 dark:text-green-400 font-medium">
+              {`Code applied. You get ${localPromoPercent}% off — pay & register below.`}
             </p>
           )}
         </div>

@@ -17,16 +17,17 @@ export type SessionCoachPayoutFields = {
   participant_amount_paid_sum?: number | null;
 };
 
-export function coachPayoutUsd(session: SessionCoachPayoutFields): number {
+export function coachPayoutUsd(session: SessionCoachPayoutFields, payoutRate?: number): number {
+  const rate = payoutRate ?? COACH_REVENUE_FRACTION;
   if (session.athlete_payment != null && Number(session.athlete_payment) > 0) {
     return Math.round(Number(session.athlete_payment) * 100) / 100;
   }
   const paidSum =
     session.participant_amount_paid_sum != null ? Number(session.participant_amount_paid_sum) : 0;
   if (!Number.isNaN(paidSum) && paidSum > 0) {
-    return Math.round(paidSum * COACH_REVENUE_FRACTION * 100) / 100;
+    return Math.round(paidSum * rate * 100) / 100;
   }
   const per = Number(session.price_per_participant ?? 0);
   const n = Number(session.current_participants ?? 0);
-  return Math.round(per * COACH_REVENUE_FRACTION * n * 100) / 100;
+  return Math.round(per * rate * n * 100) / 100;
 }

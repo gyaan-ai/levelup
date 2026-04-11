@@ -7,6 +7,7 @@ import { User } from '@supabase/supabase-js';
 import { VIEW_AS_COOKIE_NAME } from '@/lib/auth/view-as-cookie';
 
 const VIEW_AS_STORAGE_KEY = 'levelup_view_as_role';
+const VIEW_AS_COACH_ID_KEY = 'levelup_view_as_coach_id';
 
 function syncViewAsCookie(role: ViewAsRole | null) {
   if (typeof document === 'undefined') return;
@@ -26,7 +27,10 @@ interface AuthContextType {
   viewAsRole: ViewAsRole | null;
   /** Role to use for UI (nav, etc.). For admins with viewAsRole set, this is viewAsRole; else userRole. */
   effectiveRole: 'parent' | 'coach' | 'admin' | 'youth_wrestler' | null;
+  /** When admin views as a specific coach, this is the coach's athlete ID */
+  viewAsCoachId: string | null;
   setViewAsRole: (role: ViewAsRole | null) => void;
+  setViewAsCoachId: (coachId: string | null) => void;
   loading: boolean;
   signOut: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -44,6 +48,7 @@ export function AuthProvider({
   const [user, setUser] = useState<User | null>(null);
   const [userRole, setUserRole] = useState<'parent' | 'coach' | 'admin' | 'youth_wrestler' | null>(null);
   const [viewAsRole, setViewAsRoleState] = useState<ViewAsRole | null>(null);
+  const [viewAsCoachId, setViewAsCoachIdState] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
   const supabase = createClient(tenantSlug);
@@ -54,6 +59,28 @@ export function AuthProvider({
       if (role) window.localStorage.setItem(VIEW_AS_STORAGE_KEY, role);
       else window.localStorage.removeItem(VIEW_AS_STORAGE_KEY);
       syncViewAsCookie(role);
+    }
+    // Clear coach ID when switching away from coach role
+    if (role !== 'coach') {
+      setViewAsCoachIdState(null);
+      if (typeof window !== 'undefined') {
+        window.localStorage.removeItem(VIEW_AS_COACH_ID_KEY);
+        document.cookie = `levelup_view_as_coach_id=; path=/; max-age=0`;
+      }
+    }
+  }, []);
+
+  const setViewAsCoachId = useCallback((coachId: string | null) => {
+    setViewAsCoachIdState(coachId);
+    if (typeof window !== 'undefined') {
+      if (coachId) {
+        window.localStorage.setItem(VIEW_AS_COACH_ID_KEY, coachId);
+        // Sync to cookie for server-side access
+        document.cookie = `levelup_view_as_coach_id=${encodeURIComponent(coachId)}; path=/; max-age=31536000; SameSite=Lax`;
+      } else {
+        window.localStorage.removeItem(VIEW_AS_COACH_ID_KEY);
+        document.cookie = `levelup_view_as_coach_id=; path=/; max-age=0`;
+      }
     }
   }, []);
 
@@ -111,6 +138,10 @@ export function AuthProvider({
         setViewAsRoleState(stored);
         syncViewAsCookie(stored);
       }
+      const storedCoachId = window.localStorage.getItem(VIEW_AS_COACH_ID_KEY);
+      if (storedCoachId) {
+        setViewAsCoachIdState(storedCoachId);
+      }
     }
   }, []);
 
@@ -128,7 +159,16 @@ export function AuthProvider({
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      // Password reset emails sometimes fall back to Site URL (/) when /reset-password is not
+      // in Supabase "Redirect URLs". Recovery still establishes a session on whatever page loads;
+      // send users to the reset form so they can set a new password.
+      if (event === 'PASSWORD_RECOVERY' && typeof window !== 'undefined') {
+        const p = window.location.pathname;
+        if (p !== '/reset-password' && !p.startsWith('/reset-password/')) {
+          router.replace('/reset-password');
+        }
+      }
       setUser(session?.user ?? null);
       if (session?.user) {
         fetchUserRole(session.user.id).finally(() => setLoading(false));
@@ -139,22 +179,24 @@ export function AuthProvider({
     });
 
     return () => subscription.unsubscribe();
-  }, [tenantSlug, supabase, fetchUserRole]);
+  }, [tenantSlug, supabase, fetchUserRole, router]);
 
   const signOut = async () => {
     await supabase.auth.signOut();
     setUser(null);
     setUserRole(null);
     setViewAsRoleState(null);
+    setViewAsCoachIdState(null);
     if (typeof window !== 'undefined') {
       window.localStorage.removeItem(VIEW_AS_STORAGE_KEY);
+      window.localStorage.removeItem(VIEW_AS_COACH_ID_KEY);
       syncViewAsCookie(null);
     }
     router.push('/login');
   };
 
   return (
-    <AuthContext.Provider value={{ user, userRole, viewAsRole, effectiveRole, setViewAsRole, loading, signOut, refreshUser }}>
+    <AuthContext.Provider value={{ user, userRole, viewAsRole, effectiveRole, viewAsCoachId, setViewAsRole, setViewAsCoachId, loading, signOut, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

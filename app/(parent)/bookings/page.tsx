@@ -128,18 +128,20 @@ export default async function MyBookingsPage() {
   const coachIdsForReviewStats = [...new Set(all.map((s) => s.athlete_id).filter(Boolean) as string[])];
   const bookingsReviewStatsMap = await fetchCoachReviewStatsMap(supabase, coachIdsForReviewStats);
 
-  const pastSessionIds = past.map((s) => s.id);
-  const { data: myReviews } = pastSessionIds.length > 0
-    ? await supabase
-        .from('reviews')
-        .select('session_id')
-        .eq('parent_id', user.id)
-        .in('session_id', pastSessionIds)
-    : { data: [] };
-  const reviewedSessionIds = new Set((myReviews ?? []).map((r: { session_id: string }) => r.session_id));
+  const { data: myReviewsForCoaches } = await supabase
+    .from('reviews')
+    .select('athlete_id')
+    .eq('parent_id', user.id);
+  const reviewedCoachIds = new Set(
+    (myReviewsForCoaches ?? [])
+      .map((r: { athlete_id?: string | null }) => r.athlete_id)
+      .filter((id): id is string => Boolean(id))
+  );
 
   // All participant names per session (admin fetch so we show all kids on the card, not just current user's)
   let allParticipantsBySession: Record<string, string[]> = {};
+  /** Row count per session from session_participants (source of truth when sessions.current_participants is stale). */
+  const participantCountBySession: Record<string, number> = {};
   if (familySessionIds.length > 0) {
     const admin = createAdminClient(tenant.slug);
     const { data: allParts } = await admin
@@ -148,6 +150,10 @@ export default async function MyBookingsPage() {
       .in('session_id', familySessionIds);
     for (const p of allParts ?? []) {
       const row = p as { session_id: string; youth_wrestlers?: { first_name?: string; last_name?: string } | null };
+      const sid = row.session_id;
+      if (sid) {
+        participantCountBySession[sid] = (participantCountBySession[sid] ?? 0) + 1;
+      }
       const yw = row.youth_wrestlers;
       const name = yw ? `${yw.first_name ?? ''} ${yw.last_name ?? ''}`.trim() : null;
       if (name && row.session_id) {
@@ -231,7 +237,10 @@ export default async function MyBookingsPage() {
     session_mode: s.session_mode,
     focus_area: s.focus_area ?? null,
     focus_area_2: (s as { focus_area_2?: string | null }).focus_area_2 ?? null,
-    current_participants: s.current_participants ?? 0,
+    current_participants: Math.max(
+      Number(s.current_participants) || 0,
+      participantCountBySession[s.id] ?? 0
+    ),
     max_participants: s.max_participants ?? 1,
     partner_invite_code: s.partner_invite_code,
     isTentative: isTentative(s),
@@ -241,7 +250,7 @@ export default async function MyBookingsPage() {
     facility_id: facilityId(s),
     wrestlers: wrestlers(s),
     primaryWrestlerId: primaryWrestlerId(s),
-    hasReviewed: s.status === 'completed' ? reviewedSessionIds.has(s.id) : undefined,
+    hasReviewed: s.status === 'completed' ? reviewedCoachIds.has(coach(s).id) : undefined,
   });
 
   const thisWeekSessions = thisWeek.map(transformSession);
@@ -250,20 +259,19 @@ export default async function MyBookingsPage() {
   const pastSessions = past.map(transformSession);
 
   return (
-    <div className="container mx-auto px-4 py-5 pb-8 md:py-8 max-w-full" data-page="my-bookings-full" data-bookings-version="full-with-reviews">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-foreground md:text-3xl mb-1">My bookings</h1>
-        <p className="text-muted-foreground text-sm md:text-base">
-          Upcoming and past. Use the <strong>Past</strong> tab to see completed sessions and leave feedback.
-        </p>
+    <div className="min-h-screen pb-24">
+      <div className="px-4 pt-6 pb-4">
+        <h1 className="text-2xl font-bold text-foreground">My Bookings</h1>
+        <p className="text-zinc-400 text-sm mt-0.5">Upcoming sessions and past training</p>
       </div>
-
+      <div className="px-4">
       <BookingsTabsClient
         thisWeek={thisWeekSessions}
         thisMonth={thisMonthSessions}
         later={laterSessions}
         closed={pastSessions}
       />
+      </div>
     </div>
   );
 }

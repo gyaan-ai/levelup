@@ -1,7 +1,8 @@
 'use client';
 
 import * as React from 'react';
-import { ChevronLeft } from 'lucide-react';
+import Link from 'next/link';
+import { ChevronLeft, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -21,6 +22,8 @@ export interface OnboardingWizardProps {
   wizardTitle?: string;
   wizardDescription?: string;
   className?: string;
+  exitHref?: string;
+  exitLabel?: string;
 }
 
 export function OnboardingWizard({
@@ -39,9 +42,24 @@ export function OnboardingWizard({
   wizardTitle,
   wizardDescription,
   className,
+  exitHref,
+  exitLabel = 'Exit',
 }: OnboardingWizardProps) {
   return (
     <div className={cn('container mx-auto px-4 py-6 sm:py-8 max-w-xl', className)}>
+      {/* Exit link - always visible to escape */}
+      {exitHref && (
+        <div className="flex justify-end mb-4">
+          <Link
+            href={exitHref}
+            className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1"
+          >
+            <X className="h-4 w-4" />
+            {exitLabel}
+          </Link>
+        </div>
+      )}
+
       {/* Step dots - minimal, mobile-first */}
       <div className="flex justify-center gap-1.5 mb-8 sm:mb-10">
         {Array.from({ length: totalSteps }).map((_, i) => (

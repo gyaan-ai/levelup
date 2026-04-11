@@ -1,10 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
+import { getUserCreditBalance, getUserCredits, getCreditHistory } from '@/lib/credits';
 
 // GET /api/credits - Get current user's credit balance and history
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
     const headersList = await headers();
     const host = headersList.get('host') || '';
@@ -21,29 +22,29 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get all credits for this user
-    const { data: credits, error } = await supabase
-      .from('credits')
-      .select('*')
-      .eq('parent_id', user.id)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      console.error('Failed to fetch credits:', error);
-      return NextResponse.json({ error: 'Failed to fetch credits' }, { status: 500 });
-    }
-
-    // Calculate total available balance (non-expired credits with remaining > 0)
-    const now = new Date();
-    const availableCredits = (credits || []).filter(c => 
-      c.remaining > 0 && (!c.expires_at || new Date(c.expires_at) > now)
-    );
-    const totalBalance = availableCredits.reduce((sum, c) => sum + Number(c.remaining), 0);
+    const [balance, credits, history] = await Promise.all([
+      getUserCreditBalance(user.id),
+      getUserCredits(user.id),
+      getCreditHistory(user.id),
+    ]);
 
     return NextResponse.json({
-      balance: totalBalance,
-      credits: credits || [],
-      availableCredits,
+      balance,
+      credits: credits.map(c => ({
+        id: c.id,
+        amount: Number(c.amount),
+        reason: c.reason,
+        sourceType: c.source_type,
+        expiresAt: c.expires_at,
+        createdAt: c.created_at,
+      })),
+      history: history.map(h => ({
+        id: h.id,
+        amount: Number(h.amount),
+        type: h.type,
+        description: h.description,
+        createdAt: h.created_at,
+      })),
     });
   } catch (e) {
     console.error('Credits API error:', e);

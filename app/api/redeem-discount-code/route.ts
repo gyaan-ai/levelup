@@ -4,11 +4,13 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import { resolveDiscountPercentOff } from '@/lib/discount-codes';
+import { family10CodeBlockedForEmail } from '@/lib/family-auto-discount';
 
 /**
  * POST - Parent redeems a discount code after signup (e.g. they forgot at signup).
  * Body: { code: string }
  * Percent-off codes (e.g. FAMILY10) grant `parent_percentage_discounts`. Early-adopter free sessions are disabled.
+ * When FAMILY10_REDEEM_ALLOWLIST_ONLY=true, only emails in FAMILY10_AUTO_PARENT_EMAILS may redeem FAMILY10.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -54,6 +56,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'This discount code is no longer active' }, { status: 400 });
     }
 
+    if (family10CodeBlockedForEmail(codeNormalized, user.email)) {
+      return NextResponse.json(
+        { error: 'This discount code is not available for your account.' },
+        { status: 400 }
+      );
+    }
+
     const max = codeRow.max_redemptions;
     const current = codeRow.redemptions ?? 0;
     if (max != null && current >= max) {
@@ -70,7 +79,18 @@ export async function POST(req: NextRequest) {
         .eq('parent_id', user.id)
         .maybeSingle();
       if (existingPct) {
-        return NextResponse.json({ success: true, alreadyUsed: true, message: 'You already have a discount.' }, { status: 200 });
+        // Already has discount - fetch and return the existing percent_off
+        const { data: existingDiscount } = await admin
+          .from('parent_percentage_discounts')
+          .select('percent_off')
+          .eq('parent_id', user.id)
+          .single();
+        return NextResponse.json({ 
+          success: true, 
+          alreadyUsed: true, 
+          percent_off: existingDiscount?.percent_off ?? percentOff,
+          message: 'You already have a discount.' 
+        }, { status: 200 });
       }
       const { error: insErr } = await admin.from('parent_percentage_discounts').insert({
         parent_id: user.id,
@@ -79,7 +99,7 @@ export async function POST(req: NextRequest) {
       });
       if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 });
       await admin.from('discount_codes').update({ redemptions: current + 1, updated_at: new Date().toISOString() }).eq('id', codeRow.id);
-      return NextResponse.json({ success: true, message: `Code applied. You get ${percentOff}% off all sessions.` });
+      return NextResponse.json({ success: true, percent_off: percentOff, message: `Code applied. You get ${percentOff}% off all sessions.` });
     }
 
     return NextResponse.json(

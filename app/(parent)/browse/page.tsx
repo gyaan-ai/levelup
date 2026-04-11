@@ -13,7 +13,7 @@ import {
 export const metadata = {
   title: 'Browse Elite Coaches | The Guild',
   description:
-    'Train with NCAA wrestlers and elite coaches in your community. View profiles, credentials, and reviews. Book private technique sessions.',
+    'Train with NCAA wrestlers and elite coaches in your community. View profiles, bios, and reviews. Book private technique sessions.',
 };
 
 export default async function BrowsePage({

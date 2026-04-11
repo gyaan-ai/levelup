@@ -77,8 +77,8 @@ export const tenants: Record<string, TenantConfig> = {
       textSecondary: "#6B7280",
     },
 
-    logo: "/logos/guild-g.png",
-    stateOrgLogo: "/logos/guild-g.png",
+    logo: "/logos/guild-bronze.jpg",
+    stateOrgLogo: "/logos/guild-bronze.jpg",
     favicon: "/favicons/guild.ico",
     tagline: "Mastery. Technique. Access the Elite.",
     secondaryTagline: "Elite wrestling technique instruction",
@@ -143,6 +143,20 @@ function hostMatchesConfiguredAppUrl(host: string): boolean {
   }
 }
 
+/**
+ * Public hostname for tenant detection (and share links). Prefer X-Forwarded-Host
+ * so API routes match middleware when Host is an internal/upstream value.
+ */
+export function resolveHostnameFromHeaders(h: Headers): string {
+  const xf = h.get('x-forwarded-host');
+  if (xf) {
+    const first = xf.split(',')[0]?.trim().split(':')[0] ?? '';
+    if (first) return first.toLowerCase();
+  }
+  const host = h.get('host') || '';
+  return host.split(':')[0].toLowerCase();
+}
+
 export function getTenantByDomain(hostname: string): TenantConfig | null {
   const host = hostname.split(':')[0].toLowerCase();
   // Primary domain and localhost for dev
@@ -169,4 +183,16 @@ export function getTenantConfig(slug: string): TenantConfig {
     throw new Error(`Tenant not found: ${slug}`);
   }
   return tenant;
+}
+
+/**
+ * Prefer middleware-set x-tenant-slug so API routes use the same tenant as the edge
+ * even if Host / forwarded headers differ (e.g. proxies, preview URLs).
+ */
+export function getTenantFromRequestHeaders(headersList: Headers): TenantConfig | null {
+  const fromSlug = headersList.get('x-tenant-slug')?.trim() || '';
+  if (fromSlug && tenants[fromSlug]) {
+    return tenants[fromSlug];
+  }
+  return getTenantByDomain(resolveHostnameFromHeaders(headersList));
 }

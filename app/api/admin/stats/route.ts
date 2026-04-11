@@ -67,10 +67,9 @@ export async function GET(request: Request) {
         amount_paid
       )
     `)
-    .in('status', ['scheduled', 'completed'])
-    .is('cancelled_at', null)
-    .gte('scheduled_datetime', start.toISOString())
-    .lte('scheduled_datetime', end.toISOString());
+    .eq('status', 'completed')
+    .gte('created_at', start.toISOString())
+    .lte('created_at', end.toISOString());
 
   if (error) {
     console.error('[guild/stats]', error.message);

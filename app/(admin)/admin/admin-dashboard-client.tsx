@@ -4,8 +4,10 @@ import { useState, useRef, useEffect, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -26,14 +28,11 @@ import {
   Calendar,
   Users,
   DollarSign,
-  BarChart3,
   Search,
   Wallet,
   CreditCard,
-  MapPin,
-  Package,
-  ClipboardList,
   Copy,
+  CopyPlus,
   Check,
   Pencil,
   Plus,
@@ -43,42 +42,122 @@ import {
   Trash2,
   Building2,
   ExternalLink,
-  Tag,
-  Gauge,
-  List,
   Smartphone,
+  LayoutDashboard,
+  Gauge,
+  TrendingUp,
+  TrendingDown,
+  Star,
+  ChevronRight,
+  Menu,
+  X,
+  Trophy,
+  ArrowUpDown,
+  ChevronUp,
+  ChevronDown,
+  MessageSquare,
+  Phone,
+  Bell,
+  History,
 } from 'lucide-react';
 import Link from 'next/link';
 import { ProfileImage } from '@/components/profile-image';
 import { CapacityBadge } from '@/components/capacity-badge';
+import { SessionTypeBadge } from '@/components/session-type-badge';
 import { formatEST, APP_TIMEZONE } from '@/lib/format-date';
 import { formatInTimeZone, toZonedTime } from 'date-fns-tz';
-import { startOfWeek, endOfWeek, addWeeks } from 'date-fns';
+import { startOfWeek, startOfMonth, startOfYear, subDays, endOfWeek, addWeeks } from 'date-fns';
 import { CopySessionPhonesButton } from '@/components/copy-session-phones-button';
 import { CoachTextGroupDialog } from '@/components/coach-text-group-dialog';
-import { AdminCockpitView } from './admin-cockpit-view';
 import { showSessionSmsCopyAndTextGroup } from '@/lib/session-sms-tools';
+import { AdminCockpitView } from './admin-cockpit-view';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { coachPayoutUsd } from '@/lib/coach-session-payout';
+import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  ResponsiveContainer,
+  XAxis,
+  YAxis,
+  Tooltip,
+} from 'recharts';
+
+/** Payout history presets use the date stored in athlete_payout_date (Eastern calendar day). */
+type PayoutHistoryPeriodPreset = 'week' | 'month' | 'last30' | 'ytd' | 'all' | 'custom';
+
+function payoutDateBoundsForPreset(preset: PayoutHistoryPeriodPreset): { from: string; to: string } | null {
+  if (preset === 'all' || preset === 'custom') return null;
+  const now = new Date();
+  const todayStr = formatInTimeZone(now, APP_TIMEZONE, 'yyyy-MM-dd');
+  const zoned = toZonedTime(now, APP_TIMEZONE);
+  if (preset === 'week') {
+    const ws = startOfWeek(zoned, { weekStartsOn: 0 });
+    return { from: formatInTimeZone(ws, APP_TIMEZONE, 'yyyy-MM-dd'), to: todayStr };
+  }
+  if (preset === 'month') {
+    const ms = startOfMonth(zoned);
+    return { from: formatInTimeZone(ms, APP_TIMEZONE, 'yyyy-MM-dd'), to: todayStr };
+  }
+  if (preset === 'last30') {
+    const d = subDays(zoned, 29);
+    return { from: formatInTimeZone(d, APP_TIMEZONE, 'yyyy-MM-dd'), to: todayStr };
+  }
+  if (preset === 'ytd') {
+    const ys = startOfYear(zoned);
+    return { from: formatInTimeZone(ys, APP_TIMEZONE, 'yyyy-MM-dd'), to: todayStr };
+  }
+  return null;
+}
 
 export type AdminSession = {
   id: string;
   athlete_id: string;
   scheduled_datetime: string;
   status: string;
+  duration_minutes: number;
   total_price: number;
   athlete_payment: number;
   org_fee: number;
   stripe_fee: number;
   session_type?: string;
   session_mode?: string;
+  join_policy?: string;
+  focus_area?: string | null;
+  focus_area_2?: string | null;
   partner_invite_code?: string | null;
   current_participants: number;
   max_participants: number;
+  price_per_participant: number;
   parent_id: string;
   parent_email: string;
   athlete_name: string;
   athlete_school: string;
+  facility_id: string;
   facility_name: string;
+  /** Sum of session_participants.amount_paid - what parents actually paid (from Stripe) */
+  participant_amount_paid_sum: number;
+  /** Drop-in amount (participants with null youth_wrestler_id) */
+  drop_in_amount?: number;
+  /** Number of drop-ins */
+  drop_in_count?: number;
+  /** Sum of actual Stripe fees from session_participants.stripe_fee */
+  stripe_fee_sum?: number;
+  /** When the coach was marked paid for this session (YYYY-MM-DD from DB) */
+  athlete_payout_date?: string | null;
 };
+
+function sessionPayoutAmountUsd(s: AdminSession): number {
+  const stored = Number(s.athlete_payment ?? 0);
+  if (stored > 0) return Math.round(stored * 100) / 100;
+  return coachPayoutUsd({
+    athlete_payment: s.athlete_payment,
+    price_per_participant: s.price_per_participant,
+    current_participants: s.current_participants,
+    participant_amount_paid_sum: s.participant_amount_paid_sum,
+  });
+}
 
 export type AdminUser = {
   id: string;
@@ -109,10 +188,9 @@ export type AthleteReport = {
   school: string;
   session_count: number;
   total_earnings: number;
+  active: boolean;
   completed_count: number;
-  /** From athletes.average_rating — same as public coach profile */
   average_rating?: number | null;
-  /** From athletes.review_count */
   review_count?: number;
 };
 
@@ -137,7 +215,67 @@ export type CreditRecord = {
   expires_at?: string | null;
 };
 
-type TabId = 'cockpit' | 'sessions' | 'users' | 'billing' | 'athletes' | 'kids' | 'payouts' | 'credits' | 'facility_requests';
+/** Per youth wrestler row on a session (from session_participants.amount_paid). */
+export type YouthSessionSpendLine = {
+  youth_wrestler_id: string;
+  session_id: string;
+  amount_paid: number;
+  scheduled_datetime: string;
+  session_status: string;
+  /** Session type (private, group, …) for admin filters. */
+  session_type?: string;
+  coach_name: string;
+  facility_name: string;
+};
+
+type AdminSortDir = 'asc' | 'desc';
+
+function AdminSortColBtn({
+  label,
+  active,
+  dir,
+  onClick,
+  className = '',
+}: {
+  label: string;
+  active: boolean;
+  dir: AdminSortDir;
+  onClick: () => void;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`inline-flex items-center gap-1 font-medium text-muted-foreground text-xs uppercase tracking-wider hover:text-foreground transition-colors ${className}`}
+    >
+      {label}
+      {active ? (
+        dir === 'asc' ? (
+          <ChevronUp className="h-3.5 w-3.5 shrink-0 text-[#B89D60]" />
+        ) : (
+          <ChevronDown className="h-3.5 w-3.5 shrink-0 text-[#B89D60]" />
+        )
+      ) : (
+        <ArrowUpDown className="h-3.5 w-3.5 shrink-0 opacity-35" />
+      )}
+    </button>
+  );
+}
+
+type SectionId = 'overview' | 'bookings' | 'money' | 'people';
+type SubSectionId = 
+  | 'dashboard' 
+  | 'cockpit'
+  | 'sessions' 
+  | 'payments' 
+  | 'payouts' 
+  | 'credits' 
+  | 'coaches' 
+  | 'athletes' 
+  | 'parents' 
+  | 'requests'
+  | 'messages';
 
 type Props = {
   sessions: AdminSession[];
@@ -147,7 +285,297 @@ type Props = {
   coachPayouts: CoachPayout[];
   credits: CreditRecord[];
   usersError?: string | null;
+  /** Parent-paid session rows per youth wrestler (Stripe / recorded amounts). */
+  youthSessionSpendLines: YouthSessionSpendLine[];
 };
+
+// Sidebar Navigation Item Component
+function NavItem({ 
+  icon: Icon, 
+  label, 
+  active, 
+  onClick,
+  badge,
+}: { 
+  icon: React.ElementType; 
+  label: string; 
+  active: boolean; 
+  onClick: () => void;
+  badge?: number;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-all ${
+        active
+          ? 'bg-[#B89D60]/15 text-[#B89D60]'
+          : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+      }`}
+    >
+      <Icon className="h-4 w-4 shrink-0" />
+      <span className="flex-1 text-left">{label}</span>
+      {badge !== undefined && badge > 0 && (
+        <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-[#B89D60]/20 text-[#B89D60]">
+          {badge}
+        </span>
+      )}
+      {active && <ChevronRight className="h-4 w-4 shrink-0 opacity-50" />}
+    </button>
+  );
+}
+
+// Message Log Section Component
+function MessageLogSection() {
+  const [messages, setMessages] = useState<Array<{
+    id: string;
+    created_at: string;
+    channel: 'sms' | 'notification';
+    recipient_phone?: string;
+    recipient_label?: string;
+    message_type: string;
+    title?: string;
+    body?: string;
+    status: string;
+    error_detail?: string;
+  }>>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<'all' | 'sms' | 'notification'>('all');
+  const [total, setTotal] = useState(0);
+
+  useEffect(() => {
+    setLoading(true);
+    const channelParam = filter === 'all' ? '' : `&channel=${filter}`;
+    fetch(`/api/admin/message-log?limit=100${channelParam}`)
+      .then((r) => r.json())
+      .then((data) => {
+        setMessages(data.messages || []);
+        setTotal(data.total || 0);
+      })
+      .catch(() => setMessages([]))
+      .finally(() => setLoading(false));
+  }, [filter]);
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-purple-500/10">
+            <MessageSquare className="h-5 w-5 text-purple-500" />
+          </div>
+          <div>
+            <h2 className="text-lg font-semibold">Message Log</h2>
+            <p className="text-sm text-muted-foreground">{total} messages sent</p>
+          </div>
+        </div>
+        <div className="flex gap-2">
+          <Button
+            variant={filter === 'all' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setFilter('all')}
+          >
+            All
+          </Button>
+          <Button
+            variant={filter === 'sms' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setFilter('sms')}
+          >
+            <Phone className="h-3.5 w-3.5 mr-1" />
+            SMS
+          </Button>
+          <Button
+            variant={filter === 'notification' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setFilter('notification')}
+          >
+            <Bell className="h-3.5 w-3.5 mr-1" />
+            Alerts
+          </Button>
+        </div>
+      </div>
+
+      {/* Summary */}
+      <div className="grid grid-cols-2 gap-4">
+        <Card className="p-4">
+          <div className="flex items-center gap-3">
+            <Phone className="h-5 w-5 text-emerald-500" />
+            <div>
+              <p className="text-2xl font-bold tabular-nums">
+                {messages.filter((m) => m.channel === 'sms').length}
+              </p>
+              <p className="text-xs text-muted-foreground">SMS Texts</p>
+            </div>
+          </div>
+        </Card>
+        <Card className="p-4">
+          <div className="flex items-center gap-3">
+            <Bell className="h-5 w-5 text-blue-500" />
+            <div>
+              <p className="text-2xl font-bold tabular-nums">
+                {messages.filter((m) => m.channel === 'notification').length}
+              </p>
+              <p className="text-xs text-muted-foreground">In-App Alerts</p>
+            </div>
+          </div>
+        </Card>
+      </div>
+
+      {/* Messages Table */}
+      <Card>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="border-b bg-muted/50">
+                <tr>
+                  <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Type</th>
+                  <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Recipient</th>
+                  <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Message</th>
+                  <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Status</th>
+                  <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Sent</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {loading ? (
+                  <tr>
+                    <td colSpan={5} className="py-8 text-center">
+                      <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+                    </td>
+                  </tr>
+                ) : messages.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="py-8 text-center text-muted-foreground">
+                      No messages found
+                    </td>
+                  </tr>
+                ) : (
+                  messages.map((m) => (
+                    <tr key={m.id} className="hover:bg-muted/30">
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-2">
+                          {m.channel === 'sms' ? (
+                            <Badge variant="outline" className="border-emerald-600 bg-emerald-600/20 text-emerald-400">
+                              <Phone className="h-3 w-3 mr-1" />
+                              SMS
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="border-blue-600 bg-blue-600/20 text-blue-400">
+                              <Bell className="h-3 w-3 mr-1" />
+                              Alert
+                            </Badge>
+                          )}
+                        </div>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="text-sm">
+                          {m.recipient_label || m.recipient_phone || 'Unknown'}
+                        </div>
+                        {m.recipient_phone && m.recipient_label && (
+                          <div className="text-xs text-muted-foreground">{m.recipient_phone}</div>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 max-w-xs">
+                        {m.title && <div className="font-medium text-sm truncate">{m.title}</div>}
+                        <div className="text-sm text-muted-foreground truncate">{m.body || '-'}</div>
+                        <div className="text-xs text-muted-foreground mt-0.5">{m.message_type}</div>
+                      </td>
+                      <td className="py-3 px-4">
+                        {m.status === 'sent' ? (
+                          <Badge variant="outline" className="border-emerald-600 bg-emerald-600/20 text-emerald-400">Sent</Badge>
+                        ) : m.status === 'failed' ? (
+                          <Badge variant="outline" className="border-red-600 bg-red-600/20 text-red-400" title={m.error_detail}>Failed</Badge>
+                        ) : (
+                          <Badge variant="outline">{m.status}</Badge>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-sm text-muted-foreground whitespace-nowrap">
+                        {new Date(m.created_at).toLocaleString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          hour: 'numeric',
+                          minute: '2-digit',
+                        })}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// KPI Card Component
+function KpiCard({
+  title,
+  value,
+  change,
+  trend,
+  icon: Icon,
+  prefix = '',
+  chartData,
+}: {
+  title: string;
+  value: string | number;
+  change?: string;
+  trend?: 'up' | 'down' | 'neutral';
+  icon: React.ElementType;
+  prefix?: string;
+  chartData?: { value: number }[];
+}) {
+  const chartColor = trend === 'down' ? '#ef4444' : '#B89D60';
+  
+  return (
+    <Card className="relative overflow-hidden">
+      <CardContent className="p-5">
+        <div className="flex items-start justify-between">
+          <div className="space-y-1">
+            <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{title}</p>
+            <p className="text-2xl font-semibold tabular-nums">
+              {prefix}{typeof value === 'number' ? value.toLocaleString() : value}
+            </p>
+            {change && (
+              <div className={`flex items-center gap-1 text-xs font-medium ${
+                trend === 'up' ? 'text-emerald-500' : trend === 'down' ? 'text-red-500' : 'text-muted-foreground'
+              }`}>
+                {trend === 'up' && <TrendingUp className="h-3 w-3" />}
+                {trend === 'down' && <TrendingDown className="h-3 w-3" />}
+                {change}
+              </div>
+            )}
+          </div>
+          <div className="p-2 rounded-lg bg-[#B89D60]/10">
+            <Icon className="h-5 w-5 text-[#B89D60]" />
+          </div>
+        </div>
+        {chartData && chartData.length > 0 && (
+          <div className="mt-3 h-10 -mx-1">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={chartData}>
+                <defs>
+                  <linearGradient id={`gradient-${title}`} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={chartColor} stopOpacity={0.3} />
+                    <stop offset="100%" stopColor={chartColor} stopOpacity={0} />
+                  </linearGradient>
+                </defs>
+                <Area
+                  type="monotone"
+                  dataKey="value"
+                  stroke={chartColor}
+                  strokeWidth={1.5}
+                  fill={`url(#gradient-${title})`}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
 
 export function AdminDashboardClient({
   sessions,
@@ -157,45 +585,314 @@ export function AdminDashboardClient({
   coachPayouts,
   credits,
   usersError,
+  youthSessionSpendLines = [],
 }: Props) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const tabParam = searchParams.get('tab') as TabId | null;
+  const sectionParam = searchParams.get('section') as SectionId | null;
+  const subParam = searchParams.get('sub') as SubSectionId | null;
   const editAthleteId = searchParams.get('edit');
-  const [tab, setTab] = useState<TabId>(tabParam && ['cockpit', 'sessions', 'users', 'billing', 'payouts', 'credits', 'facility_requests', 'athletes', 'kids'].includes(tabParam) ? tabParam : 'cockpit');
+  
+  const [section, setSection] = useState<SectionId>(sectionParam || 'overview');
+  const [subSection, setSubSection] = useState<SubSectionId>(subParam || 'dashboard');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  
   const [markingAthleteId, setMarkingAthleteId] = useState<string | null>(null);
   const [recordingAthleteId, setRecordingAthleteId] = useState<string | null>(null);
   const [customPayoutAmount, setCustomPayoutAmount] = useState('');
-  /** Per-coach total payout (editable); resets when server totals change */
   const [payoutTotalByAthlete, setPayoutTotalByAthlete] = useState<Record<string, string>>({});
   const payoutListKey = coachPayouts.map((p) => `${p.athlete_id}:${p.amount}`).join('|');
+  
   useEffect(() => {
     setPayoutTotalByAthlete(
       Object.fromEntries(coachPayouts.map((p) => [p.athlete_id, p.amount.toFixed(2)]))
     );
   }, [payoutListKey]);
+  
   const [sessionDateFrom, setSessionDateFrom] = useState('');
   const [sessionDateTo, setSessionDateTo] = useState('');
-  /** scheduled | pending_payment */
   const [sessionStatusFilter, setSessionStatusFilter] = useState<'all' | 'open' | 'completed' | 'cancelled_other'>('all');
   const [sessionTypeFilter, setSessionTypeFilter] = useState<string>('all');
   const [sessionCoachFilter, setSessionCoachFilter] = useState<string>('all');
   const [copiedSessionId, setCopiedSessionId] = useState<string | null>(null);
+  const [duplicatingSessionId, setDuplicatingSessionId] = useState<string | null>(null);
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
   const [sessionDeleteLoading, setSessionDeleteLoading] = useState(false);
+  // Roster modal state
+  const [rosterSessionId, setRosterSessionId] = useState<string | null>(null);
+  const [rosterData, setRosterData] = useState<Array<{
+    id: string;
+    wrestlerName: string;
+    photoUrl: string | null;
+    parentEmail: string | null;
+    paid: boolean;
+    amountPaid: number;
+    isDropIn: boolean;
+    /** Manual / drop-in rows without Stripe PI — safe for admin delete */
+    canDelete?: boolean;
+    /** Card payment on the source session — transfer does not create a new Stripe charge */
+    hasStripePayment?: boolean;
+    createdAt: string;
+  }>>([]);
   const [sessionCompletingId, setSessionCompletingId] = useState<string | null>(null);
   const [textGroupAdminSession, setTextGroupAdminSession] = useState<AdminSession | null>(null);
   const [userRoleFilter, setUserRoleFilter] = useState<string>('all');
   const [userSearch, setUserSearch] = useState('');
   const [athleteSearch, setAthleteSearch] = useState('');
+  const [leaderboardTimeFilter, setLeaderboardTimeFilter] = useState<'all' | '7d' | '30d' | '90d'>('all');
+  const [leaderboardTypeFilter, setLeaderboardTypeFilter] = useState<string>('all');
+  const [leaderboardSchoolFilter, setLeaderboardSchoolFilter] = useState<string>('all');
+  const [leaderboardSort, setLeaderboardSort] = useState<'earnings' | 'sessions' | 'rating' | 'open'>('earnings');
+  
+  // Financial filters
+  const [financeTimeFilter, setFinanceTimeFilter] = useState<'all' | '7d' | '30d' | '90d' | 'ytd'>('all');
+  const [financeTypeFilter, setFinanceTypeFilter] = useState<string>('all');
+  const [financeSchoolFilter, setFinanceSchoolFilter] = useState<string>('all');
+
+  const [payoutTab, setPayoutTab] = useState<'pending' | 'history'>('pending');
+  const [historyCoachFilter, setHistoryCoachFilter] = useState<string>('all');
+  const [historyPayoutFrom, setHistoryPayoutFrom] = useState('');
+  const [historyPayoutTo, setHistoryPayoutTo] = useState('');
+  const [historySearch, setHistorySearch] = useState('');
+  const [payoutHistoryPeriod, setPayoutHistoryPeriod] = useState<PayoutHistoryPeriodPreset>('all');
+  const [athletesSubTab, setAthletesSubTab] = useState<'leaderboard' | 'directory' | 'spending'>(
+    'leaderboard'
+  );
+  const [youthLeaderboardTimeFilter, setYouthLeaderboardTimeFilter] = useState<
+    'all' | '7d' | '30d' | '90d'
+  >('all');
+  const [youthLeaderboardTypeFilter, setYouthLeaderboardTypeFilter] = useState<string>('all');
+  const [youthLeaderboardSchoolFilter, setYouthLeaderboardSchoolFilter] = useState<string>('all');
+  type YouthLbSortKey = 'name' | 'school' | 'open' | 'completed' | 'pending' | 'bookings' | 'spent';
+  const [youthLbSort, setYouthLbSort] = useState<{ key: YouthLbSortKey; dir: AdminSortDir }>({
+    key: 'spent',
+    dir: 'desc',
+  });
+  const [youthLeaderboardSearch, setYouthLeaderboardSearch] = useState('');
+  type YouthDirSortKey = 'name' | 'school' | 'parent' | 'spent' | 'level' | 'joined';
+  const [youthDirSort, setYouthDirSort] = useState<{ key: YouthDirSortKey; dir: AdminSortDir }>({
+    key: 'name',
+    dir: 'asc',
+  });
+  type WrestlerTotalsSortKey = 'name' | 'sessions' | 'total';
+  const [wrestlerTotalsSort, setWrestlerTotalsSort] = useState<{
+    key: WrestlerTotalsSortKey;
+    dir: AdminSortDir;
+  }>({ key: 'total', dir: 'desc' });
+  type AthleteSpendLineSortKey = 'date' | 'athlete' | 'coach' | 'facility' | 'status' | 'paid';
+  const [athleteSpendLineSort, setAthleteSpendLineSort] = useState<{
+    key: AthleteSpendLineSortKey;
+    dir: AdminSortDir;
+  }>({ key: 'date', dir: 'desc' });
+  const [athleteSpendPeriod, setAthleteSpendPeriod] = useState<PayoutHistoryPeriodPreset>('all');
+  const [athleteSpendDateFrom, setAthleteSpendDateFrom] = useState('');
+  const [athleteSpendDateTo, setAthleteSpendDateTo] = useState('');
+  const [athleteSpendWrestlerFilter, setAthleteSpendWrestlerFilter] = useState('all');
+  const [athleteSpendSearch, setAthleteSpendSearch] = useState('');
+
+  const toggleYouthLbSort = (key: YouthLbSortKey) => {
+    setYouthLbSort((prev) => {
+      if (prev.key === key) return { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' };
+      const isNumeric = key !== 'name' && key !== 'school';
+      return { key, dir: isNumeric ? 'desc' : 'asc' };
+    });
+  };
+  const toggleYouthDirSort = (key: YouthDirSortKey) => {
+    setYouthDirSort((prev) => {
+      if (prev.key === key) return { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' };
+      const descFirst = key === 'spent' || key === 'joined';
+      return { key, dir: descFirst ? 'desc' : 'asc' };
+    });
+  };
+  const toggleWrestlerTotalsSort = (key: WrestlerTotalsSortKey) => {
+    setWrestlerTotalsSort((prev) => {
+      if (prev.key === key) return { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' };
+      const isNumeric = key !== 'name';
+      return { key, dir: isNumeric ? 'desc' : 'asc' };
+    });
+  };
+  const toggleAthleteSpendLineSort = (key: AthleteSpendLineSortKey) => {
+    setAthleteSpendLineSort((prev) => {
+      if (prev.key === key) return { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' };
+      const descFirst =
+        key === 'date' || key === 'paid';
+      return { key, dir: descFirst ? 'desc' : 'asc' };
+    });
+  };
+
+  // Fetch roster for a session via API
+  const [rosterLoading, setRosterLoading] = useState(false);
+  const [parentCheckoutCopied, setParentCheckoutCopied] = useState(false);
+  const openRoster = async (sessionId: string) => {
+    setRosterSessionId(sessionId);
+    setRosterLoading(true);
+    try {
+      const res = await fetch(`/api/admin/sessions/${sessionId}/roster`);
+      const data = await res.json();
+      setRosterData(data.roster || []);
+    } catch {
+      setRosterData([]);
+    } finally {
+      setRosterLoading(false);
+    }
+  };
+  
+  // Transfer registration state
+  const [transferringParticipant, setTransferringParticipant] = useState<{
+    id: string;
+    wrestlerName: string;
+    amountPaid: number;
+    hasStripePayment?: boolean;
+  } | null>(null);
+  const [transferTargetSessionId, setTransferTargetSessionId] = useState<string>('');
+  const [transferTargetSearch, setTransferTargetSearch] = useState('');
+  const [transferLoading, setTransferLoading] = useState(false);
+  const [deletingParticipantId, setDeletingParticipantId] = useState<string | null>(null);
+
+  const transferTargetOptions = useMemo(() => {
+    const q = transferTargetSearch.trim().toLowerCase();
+    const now = Date.now();
+    const todayEastern = formatEST(new Date(), 'yyyy-MM-dd');
+    /** Future sessions, or any session still on today's Eastern calendar (late-night roster moves after start time). */
+    const isEligibleTransferTarget = (scheduledDatetime: string) => {
+      const t = new Date(scheduledDatetime).getTime();
+      if (t > now) return true;
+      return formatEST(new Date(scheduledDatetime), 'yyyy-MM-dd') === todayEastern;
+    };
+    return sessions
+      .filter((s) => s.id !== rosterSessionId && isEligibleTransferTarget(s.scheduled_datetime))
+      .filter((s) => s.status === 'scheduled' || s.status === 'pending_payment')
+      .filter((s) => {
+        if (!q) return true;
+        const hay = `${s.athlete_name} ${s.athlete_school} ${s.facility_name} ${formatEST(
+          new Date(s.scheduled_datetime),
+          'MMM d yyyy h:mm a'
+        )}`.toLowerCase();
+        return hay.includes(q);
+      })
+      .sort(
+        (a, b) =>
+          new Date(a.scheduled_datetime).getTime() - new Date(b.scheduled_datetime).getTime()
+      );
+  }, [sessions, rosterSessionId, transferTargetSearch]);
+  
+  const handleTransferRegistration = async () => {
+    if (!transferringParticipant || !rosterSessionId || !transferTargetSessionId) return;
+
+    if (transferringParticipant.hasStripePayment) {
+      const ok = window.confirm(
+        'This wrestler was charged with Stripe on the SOURCE session. Moving them does not send money to the new coach automatically. After the move, use “Copy parent checkout link” on the TARGET session if the parent still needs to pay that coach, or reconcile manually.'
+      );
+      if (!ok) return;
+    }
+
+    setTransferLoading(true);
+    try {
+      const res = await fetch('/api/admin/sessions/transfer-registration', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          participantId: transferringParticipant.id,
+          fromSessionId: rosterSessionId,
+          toSessionId: transferTargetSessionId,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || 'Transfer failed');
+        return;
+      }
+      alert(`Successfully transferred ${transferringParticipant.wrestlerName} with $${transferringParticipant.amountPaid} payment preserved`);
+      setTransferringParticipant(null);
+      setTransferTargetSessionId('');
+      setTransferTargetSearch('');
+      router.refresh();
+      openRoster(rosterSessionId);
+    } catch (err) {
+      alert('Transfer failed: ' + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setTransferLoading(false);
+    }
+  };
+
+  const handleRemoveRosterParticipant = async (
+    participantId: string,
+    wrestlerName: string,
+    row: { hasStripePayment?: boolean; canDelete?: boolean; isDropIn?: boolean }
+  ) => {
+    if (!rosterSessionId) return;
+    const paidStripe =
+      row.hasStripePayment === true ||
+      (row.hasStripePayment === undefined && row.canDelete === false && !row.isDropIn);
+    if (paidStripe) {
+      const ok = window.confirm(
+        `Remove ${wrestlerName} from this roster? This signup was paid with Stripe. Deleting only removes the roster row—it does not refund the card. Refund in Stripe separately if needed. Continue?`
+      );
+      if (!ok) return;
+    } else {
+      if (!confirm(`Remove ${wrestlerName} from this session?`)) return;
+    }
+    setDeletingParticipantId(participantId);
+    try {
+      const res = await fetch(
+        `/api/admin/sessions/${rosterSessionId}/participants/${participantId}`,
+        paidStripe
+          ? {
+              method: 'DELETE',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ acknowledgePaidRemoval: true }),
+            }
+          : { method: 'DELETE' }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        alert((data as { error?: string }).error || 'Remove failed');
+        return;
+      }
+      router.refresh();
+      await openRoster(rosterSessionId);
+    } catch (err) {
+      alert('Remove failed: ' + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setDeletingParticipantId(null);
+    }
+  };
+
+  // Manual payment entry
+  const [showManualPaymentDialog, setShowManualPaymentDialog] = useState(false);
+  const [manualPaymentForm, setManualPaymentForm] = useState({
+    sessionId: '',
+    amount: '',
+    paymentMethod: 'cash' as 'cash' | 'check' | 'venmo' | 'other',
+    notes: '',
+  });
+  const [savingManualPayment, setSavingManualPayment] = useState(false);
+  
+  // Drop-in payment entry
+  const [showDropInDialog, setShowDropInDialog] = useState(false);
+  const [dropInSession, setDropInSession] = useState<AdminSession | null>(null);
+  const [dropInForm, setDropInForm] = useState({
+    youthWrestlerId: '' as string,
+    wrestlerName: '',
+    parentName: '',
+    parentPhone: '',
+    amountPaid: '',
+    paymentMethod: 'cash' as 'cash' | 'venmo' | 'zelle' | 'other',
+  });
+  const [savingDropIn, setSavingDropIn] = useState(false);
+  const [wrestlerSearchResults, setWrestlerSearchResults] = useState<Array<{ id: string; first_name: string; last_name: string; photo_url?: string }>>([]);
+  const [wrestlerSearchQuery, setWrestlerSearchQuery] = useState('');
+  const [searchingWrestlers, setSearchingWrestlers] = useState(false);
   const [editingAthleteId, setEditingAthleteId] = useState<string | null>(null);
   const hasOpenedEditFromUrl = useRef(false);
+  
   useEffect(() => {
-    if (editAthleteId && tab === 'athletes' && !hasOpenedEditFromUrl.current) {
+    if (editAthleteId && section === 'people' && subSection === 'coaches' && !hasOpenedEditFromUrl.current) {
       hasOpenedEditFromUrl.current = true;
       openAthleteEdit(editAthleteId);
     }
-  }, [editAthleteId, tab]);
+  }, [editAthleteId, section, subSection]);
+  
   const [athleteEditForm, setAthleteEditForm] = useState<{
     first_name: string;
     last_name: string;
@@ -205,7 +902,6 @@ export function AdminDashboardClient({
     year: string | null;
     weight_class: string | null;
     bio: string | null;
-    credentials: Record<string, unknown> | null;
     photo_url: string | null;
     photo_focus_x: number;
     photo_focus_y: number;
@@ -216,7 +912,9 @@ export function AdminDashboardClient({
   const [facilities, setFacilities] = useState<{ id: string; name: string; school: string }[]>([]);
   const [athleteEditSaving, setAthleteEditSaving] = useState(false);
   const [athletePhotoUploading, setAthletePhotoUploading] = useState(false);
+  const [athletePhotoError, setAthletePhotoError] = useState<string | null>(null);
   const [deactivatingId, setDeactivatingId] = useState<string | null>(null);
+  const [approvingId, setApprovingId] = useState<string | null>(null);
   const [deletingAthleteId, setDeletingAthleteId] = useState<string | null>(null);
   const athletePhotoInputRef = useRef<HTMLInputElement>(null);
   const [facilityRequests, setFacilityRequests] = useState<Array<{
@@ -250,6 +948,23 @@ export function AdminDashboardClient({
   }>>([]);
   const [kidsLoading, setKidsLoading] = useState(false);
   const [linkingKidId, setLinkingKidId] = useState<string | null>(null);
+
+  // Navigation change handler
+  const handleNavChange = (newSection: SectionId, newSubSection?: SubSectionId) => {
+    setSection(newSection);
+    if (newSubSection) {
+      setSubSection(newSubSection);
+    } else {
+      // Set default sub-section for each section
+      switch (newSection) {
+        case 'overview': setSubSection('dashboard'); break;
+        case 'bookings': setSubSection('sessions'); break;
+        case 'money': setSubSection('payments'); break;
+        case 'people': setSubSection('coaches'); break;
+      }
+    }
+    setMobileMenuOpen(false);
+  };
 
   const setPresetThisWeek = () => {
     const z = toZonedTime(new Date(), APP_TIMEZONE);
@@ -310,7 +1025,6 @@ export function AdminDashboardClient({
       }
 
       if (sessionTypeFilter !== 'all' && (s.session_type ?? '') !== sessionTypeFilter) return false;
-
       if (sessionCoachFilter !== 'all' && s.athlete_id !== sessionCoachFilter) return false;
 
       return true;
@@ -324,6 +1038,31 @@ export function AdminDashboardClient({
     sessionCoachFilter,
   ]);
 
+  /** Sum spots and collected $ for the current filter (matches table rows). */
+  const sessionListTotals = useMemo(() => {
+    let booked = 0;
+    let capacity = 0;
+    let collected = 0;
+    for (const s of filteredSessions) {
+      const cur = Number(s.current_participants) || 0;
+      const max = Math.max(1, Number(s.max_participants) || 1);
+      booked += cur;
+      capacity += max;
+      collected += Number(s.participant_amount_paid_sum) || 0;
+    }
+    const openings = Math.max(0, capacity - booked);
+    return { booked, capacity, openings, collected };
+  }, [filteredSessions]);
+
+  const sessionsTotalsScopeLabel =
+    sessionStatusFilter === 'all'
+      ? 'All statuses'
+      : sessionStatusFilter === 'open'
+        ? 'Open (scheduled & pending payment)'
+        : sessionStatusFilter === 'completed'
+          ? 'Completed'
+          : 'Cancelled / other';
+
   const filteredUsers = users.filter((u) => {
     if (userRoleFilter !== 'all' && u.role !== userRoleFilter) return false;
     if (userSearch) {
@@ -332,6 +1071,424 @@ export function AdminDashboardClient({
     }
     return true;
   });
+
+  // Compute leaderboard data from sessions
+  const leaderboardData = useMemo(() => {
+    const now = new Date();
+    const cutoff = leaderboardTimeFilter === '7d' 
+      ? new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+      : leaderboardTimeFilter === '30d'
+      ? new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+      : leaderboardTimeFilter === '90d'
+      ? new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
+      : null;
+
+    // Filter sessions by time and type
+    const filteredSess = sessions.filter(s => {
+      if (cutoff && new Date(s.scheduled_datetime) < cutoff) return false;
+      if (leaderboardTypeFilter !== 'all' && s.session_type !== leaderboardTypeFilter) return false;
+      return true;
+    });
+
+    // Aggregate by coach
+    const coachMap = new Map<string, {
+      athlete_id: string;
+      athlete_name: string;
+      school: string;
+      total_earnings: number;
+      session_count: number;
+      completed_count: number;
+      open_count: number;
+      pending_payment_count: number;
+      average_rating: number | null;
+      review_count: number;
+      active: boolean;
+    }>();
+
+    for (const s of filteredSess) {
+      const existing = coachMap.get(s.athlete_id) || {
+        athlete_id: s.athlete_id,
+        athlete_name: s.athlete_name,
+        school: s.athlete_school,
+        total_earnings: 0,
+        session_count: 0,
+        completed_count: 0,
+        open_count: 0,
+        pending_payment_count: 0,
+        average_rating: null,
+        review_count: 0,
+        active: false,
+      };
+      
+      existing.session_count += 1;
+      existing.total_earnings += Number(s.athlete_payment) || 0;
+      
+      if (s.status === 'completed') existing.completed_count += 1;
+      if (s.status === 'scheduled') existing.open_count += 1;
+      if (s.status === 'pending_payment') existing.pending_payment_count += 1;
+      
+      coachMap.set(s.athlete_id, existing);
+    }
+
+    // Merge with athlete reports for ratings and active status
+    for (const report of athleteReports) {
+      const existing = coachMap.get(report.athlete_id);
+      if (existing) {
+        existing.average_rating = report.average_rating ?? null;
+        existing.review_count = report.review_count ?? 0;
+        existing.active = report.active ?? false;
+      } else if (leaderboardTimeFilter === 'all') {
+        // Include coaches with no sessions in this period only for 'all'
+        coachMap.set(report.athlete_id, {
+          athlete_id: report.athlete_id,
+          athlete_name: report.athlete_name,
+          school: report.school,
+          total_earnings: report.total_earnings,
+          session_count: report.session_count,
+          completed_count: report.completed_count,
+          open_count: 0,
+          pending_payment_count: 0,
+          average_rating: report.average_rating ?? null,
+          review_count: report.review_count ?? 0,
+          active: report.active ?? false,
+        });
+      }
+    }
+
+    // Convert to array
+    let result = Array.from(coachMap.values());
+
+    // Apply school filter
+    if (leaderboardSchoolFilter !== 'all') {
+      if (leaderboardSchoolFilter === 'non-affiliated') {
+        // Non-affiliated = empty school or common non-NCAA indicators
+        result = result.filter(a => 
+          !a.school || 
+          a.school.trim() === '' || 
+          a.school.toLowerCase() === 'non-affiliated' ||
+          a.school.toLowerCase() === 'independent' ||
+          a.school.toLowerCase() === 'n/a'
+        );
+      } else {
+        result = result.filter(a => a.school === leaderboardSchoolFilter);
+      }
+    }
+
+    // Apply search filter
+    if (athleteSearch) {
+      const q = athleteSearch.toLowerCase();
+      result = result.filter(a => 
+        a.athlete_name.toLowerCase().includes(q) ||
+        a.school.toLowerCase().includes(q)
+      );
+    }
+
+    // Sort
+    result.sort((a, b) => {
+      switch (leaderboardSort) {
+        case 'earnings': return b.total_earnings - a.total_earnings;
+        case 'sessions': return b.session_count - a.session_count;
+        case 'rating': return (b.average_rating ?? 0) - (a.average_rating ?? 0);
+        case 'open': return b.open_count - a.open_count;
+        default: return 0;
+      }
+    });
+
+    return result;
+  }, [sessions, athleteReports, leaderboardTimeFilter, leaderboardTypeFilter, leaderboardSchoolFilter, leaderboardSort, athleteSearch]);
+  
+  // Get unique schools for the filter dropdown
+  const uniqueSchools = useMemo(() => {
+    const schools = new Set<string>();
+    for (const report of athleteReports) {
+      if (report.school && report.school.trim() !== '') {
+        schools.add(report.school);
+      }
+    }
+    return Array.from(schools).sort();
+  }, [athleteReports]);
+
+  /** Kid (high school) schools for youth leaderboard filter */
+  const uniqueYouthSchools = useMemo(() => {
+    const schools = new Set<string>();
+    for (const k of kidsList) {
+      if (k.school && k.school.trim() !== '') schools.add(k.school.trim());
+    }
+    return Array.from(schools).sort();
+  }, [kidsList]);
+
+  /** Youth athlete leaderboard (session lines per kid), mirrors coach leaderboard filters */
+  const youthLeaderboardData = useMemo(() => {
+    const now = new Date();
+    const cutoff =
+      youthLeaderboardTimeFilter === '7d'
+        ? new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+        : youthLeaderboardTimeFilter === '30d'
+          ? new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+          : youthLeaderboardTimeFilter === '90d'
+            ? new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
+            : null;
+
+    const lines = youthSessionSpendLines.filter((line) => {
+      if (cutoff && new Date(line.scheduled_datetime) < cutoff) return false;
+      if (youthLeaderboardTypeFilter !== 'all') {
+        const t = (line.session_type ?? '').trim();
+        if (t !== youthLeaderboardTypeFilter) return false;
+      }
+      return true;
+    });
+
+    const byYouth = new Map<
+      string,
+      {
+        youth_wrestler_id: string;
+        name: string;
+        school: string;
+        total_spent: number;
+        booking_count: number;
+        open_count: number;
+        pending_payment_count: number;
+        completed_count: number;
+      }
+    >();
+
+    for (const line of lines) {
+      const id = line.youth_wrestler_id;
+      const kid = kidsList.find((k) => k.id === id);
+      const name = kid
+        ? `${kid.first_name} ${kid.last_name}`.trim()
+        : `Wrestler ${id.slice(0, 8)}…`;
+      const school = kid?.school?.trim() ?? '';
+
+      const prev =
+        byYouth.get(id) ??
+        {
+          youth_wrestler_id: id,
+          name,
+          school,
+          total_spent: 0,
+          booking_count: 0,
+          open_count: 0,
+          pending_payment_count: 0,
+          completed_count: 0,
+        };
+
+      prev.booking_count += 1;
+      prev.total_spent = Math.round((prev.total_spent + line.amount_paid) * 100) / 100;
+      if (line.session_status === 'scheduled') prev.open_count += 1;
+      else if (line.session_status === 'pending_payment') prev.pending_payment_count += 1;
+      else if (line.session_status === 'completed') prev.completed_count += 1;
+
+      byYouth.set(id, { ...prev, name, school });
+    }
+
+    if (youthLeaderboardTimeFilter === 'all') {
+      for (const k of kidsList) {
+        if (byYouth.has(k.id)) continue;
+        byYouth.set(k.id, {
+          youth_wrestler_id: k.id,
+          name: `${k.first_name} ${k.last_name}`.trim(),
+          school: k.school?.trim() ?? '',
+          total_spent: 0,
+          booking_count: 0,
+          open_count: 0,
+          pending_payment_count: 0,
+          completed_count: 0,
+        });
+      }
+    }
+
+    let result = Array.from(byYouth.values());
+
+    if (youthLeaderboardSchoolFilter !== 'all') {
+      if (youthLeaderboardSchoolFilter === 'non-affiliated') {
+        result = result.filter(
+          (a) =>
+            !a.school ||
+            a.school.trim() === '' ||
+            a.school.toLowerCase() === 'non-affiliated' ||
+            a.school.toLowerCase() === 'independent' ||
+            a.school.toLowerCase() === 'n/a'
+        );
+      } else {
+        result = result.filter((a) => a.school === youthLeaderboardSchoolFilter);
+      }
+    }
+
+    if (youthLeaderboardSearch.trim()) {
+      const q = youthLeaderboardSearch.toLowerCase().trim();
+      result = result.filter(
+        (a) =>
+          a.name.toLowerCase().includes(q) ||
+          a.school.toLowerCase().includes(q) ||
+          a.youth_wrestler_id.toLowerCase().includes(q)
+      );
+    }
+
+    const { key: lbKey, dir: lbDir } = youthLbSort;
+    result.sort((a, b) => {
+      const tieName = () => a.name.localeCompare(b.name);
+      const strCmp = (sa: string, sb: string) => {
+        const c = sa.localeCompare(sb);
+        return lbDir === 'desc' ? -c : c;
+      };
+      const numCmp = (na: number, nb: number) => {
+        const d = na - nb;
+        if (d !== 0) return lbDir === 'desc' ? -d : d;
+        return tieName();
+      };
+      switch (lbKey) {
+        case 'name':
+          return strCmp(a.name.toLowerCase(), b.name.toLowerCase());
+        case 'school':
+          return strCmp((a.school || '').toLowerCase(), (b.school || '').toLowerCase());
+        case 'open':
+          return numCmp(a.open_count, b.open_count);
+        case 'completed':
+          return numCmp(a.completed_count, b.completed_count);
+        case 'pending':
+          return numCmp(a.pending_payment_count, b.pending_payment_count);
+        case 'bookings':
+          return numCmp(a.booking_count, b.booking_count);
+        case 'spent':
+          return numCmp(a.total_spent, b.total_spent);
+        default:
+          return 0;
+      }
+    });
+
+    return result;
+  }, [
+    youthSessionSpendLines,
+    kidsList,
+    youthLeaderboardTimeFilter,
+    youthLeaderboardTypeFilter,
+    youthLeaderboardSchoolFilter,
+    youthLbSort,
+    youthLeaderboardSearch,
+  ]);
+
+  // Computed financial data with filters
+  const financeData = useMemo(() => {
+    const now = new Date();
+    const yearStart = new Date(now.getFullYear(), 0, 1);
+    const cutoff = financeTimeFilter === '7d' 
+      ? new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+      : financeTimeFilter === '30d'
+      ? new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+      : financeTimeFilter === '90d'
+      ? new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000)
+      : financeTimeFilter === 'ytd'
+      ? yearStart
+      : null;
+
+    // Filter sessions by time and type
+    const filteredSess = sessions.filter(s => {
+      if (cutoff && new Date(s.scheduled_datetime) < cutoff) return false;
+      if (financeTypeFilter !== 'all' && s.session_type !== financeTypeFilter) return false;
+      if (financeSchoolFilter !== 'all') {
+        if (financeSchoolFilter === 'non-affiliated') {
+          if (s.athlete_school && s.athlete_school.trim() !== '' && 
+              s.athlete_school.toLowerCase() !== 'non-affiliated' &&
+              s.athlete_school.toLowerCase() !== 'independent' &&
+              s.athlete_school.toLowerCase() !== 'n/a') return false;
+        } else {
+          if (s.athlete_school !== financeSchoolFilter) return false;
+        }
+      }
+      return true;
+    });
+
+    // Calculate aggregates following GAAP accounting rules:
+    // - Revenue = only from COMPLETED sessions (money EARNED)
+    // - Deposits = collected for future sessions (liability until delivered)
+    // - Coach Payouts = only for COMPLETED sessions (not owed until service delivered)
+    let completedRevenue = 0; // Revenue from completed sessions (earned)
+    let depositsCollected = 0; // Prepaid for future sessions (liability)
+    let coachPayoutsEarned = 0; // Coach payouts for completed sessions only
+    let coachPayoutsPending = 0; // What will be owed when scheduled sessions complete
+    let actualStripeFees = 0; // Sum of actual Stripe fees from payments
+    let openBookings = 0;
+    let completedSessions = 0;
+    let pendingPayment = 0;
+    let cancelledSessions = 0;
+
+    // Group by coach for breakdown
+    const coachBreakdown = new Map<string, { name: string; school: string; revenue: number; payout: number; sessions: number; open: number }>();
+
+    for (const s of filteredSess) {
+      // participant_amount_paid_sum = what parents ACTUALLY paid
+      // athlete_payment = what coach earns for this session
+      const parentsPaid = Number(s.participant_amount_paid_sum) || 0;
+      const coachPaid = Number(s.athlete_payment) || 0;
+      
+      if (s.status === 'completed') {
+        // COMPLETED = Revenue earned, coach payout owed
+        completedRevenue += parentsPaid;
+        coachPayoutsEarned += coachPaid;
+        actualStripeFees += Number(s.stripe_fee_sum ?? 0);
+      } else if (s.status === 'scheduled' || s.status === 'pending_payment') {
+        // FUTURE = Deposits collected (liability), coach payout pending
+        depositsCollected += parentsPaid;
+        coachPayoutsPending += coachPaid;
+      }
+
+      if (s.status === 'scheduled') openBookings += 1;
+      if (s.status === 'completed') completedSessions += 1;
+      if (s.status === 'pending_payment') pendingPayment += 1;
+      if (s.status === 'cancelled') cancelledSessions += 1;
+
+      // Coach breakdown - only count COMPLETED sessions for earned revenue/payouts
+      const existing = coachBreakdown.get(s.athlete_id) || {
+        name: s.athlete_name,
+        school: s.athlete_school,
+        revenue: 0,
+        payout: 0,
+        sessions: 0,
+        open: 0,
+      };
+      if (s.status === 'completed') {
+        existing.revenue += parentsPaid;
+        existing.payout += coachPaid;
+        existing.sessions += 1;
+      }
+      if (s.status === 'scheduled') existing.open += 1;
+      coachBreakdown.set(s.athlete_id, existing);
+    }
+
+    // Gross Revenue = only COMPLETED sessions (earned revenue per GAAP)
+    const grossRevenue = completedRevenue;
+    // Guild Net = Revenue - Coach Payouts for completed sessions
+    const guildNet = grossRevenue - coachPayoutsEarned;
+    // Stripe fees are stored from actual balance transactions (fetched at checkout time)
+    // We don't use Stripe for payouts - payouts are manual (Zelle/Venmo)
+    const stripeFees = actualStripeFees;
+    // Guild Profit = Guild Net after Stripe fees
+    const guildProfit = guildNet - stripeFees;
+
+    // Sort coach breakdown by revenue
+    const coachBreakdownArray = Array.from(coachBreakdown.entries())
+      .map(([id, data]) => ({ athlete_id: id, ...data }))
+      .sort((a, b) => b.revenue - a.revenue);
+
+    return {
+      grossRevenue, // Earned revenue (completed only)
+      stripeRevenue: completedRevenue, // For backward compat
+      cashRevenue: 0, // Would need separate tracking
+      depositsCollected, // Prepaid for future sessions
+      coachPayouts: coachPayoutsEarned, // Payouts for completed sessions
+      coachPayoutsPending, // What will be owed for scheduled sessions
+      guildNet,
+      stripeFees,
+      guildProfit,
+      openBookings,
+      completedSessions,
+      pendingPayment,
+      cancelledSessions,
+      totalSessions: filteredSess.length,
+      coachBreakdown: coachBreakdownArray,
+    };
+  }, [sessions, financeTimeFilter, financeTypeFilter, financeSchoolFilter]);
 
   const filteredAthletes = athleteReports.filter((a) => {
     if (!athleteSearch) return true;
@@ -345,6 +1502,7 @@ export function AdminDashboardClient({
   const openAthleteEdit = async (athleteId: string) => {
     setEditingAthleteId(athleteId);
     setAthleteEditForm(null);
+    setAthletePhotoError(null);
     try {
       const [athleteRes, facilitiesRes] = await Promise.all([
         fetch(`/api/admin/athletes/${athleteId}`),
@@ -366,7 +1524,6 @@ export function AdminDashboardClient({
         year: a.year ?? null,
         weight_class: a.weight_class ?? null,
         bio: a.bio ?? null,
-        credentials: a.credentials ?? null,
         photo_url: a.photo_url ?? null,
         photo_focus_x: typeof a.photo_focus_x === 'number' ? a.photo_focus_x : 50,
         photo_focus_y: typeof a.photo_focus_y === 'number' ? a.photo_focus_y : 15,
@@ -397,7 +1554,6 @@ export function AdminDashboardClient({
           year: athleteEditForm.year || null,
           weight_class: athleteEditForm.weight_class || null,
           bio: athleteEditForm.bio || null,
-          credentials: athleteEditForm.credentials,
           photo_url: athleteEditForm.photo_url,
           photo_focus_x: athleteEditForm.photo_focus_x,
           photo_focus_y: athleteEditForm.photo_focus_y,
@@ -418,17 +1574,33 @@ export function AdminDashboardClient({
     }
   };
 
-  const handleDeactivateAthlete = async (athleteId: string) => {
-    if (!confirm('Deactivate this coach? They will be hidden from Browse and cannot receive new bookings.')) return;
-    setDeactivatingId(athleteId);
+const handleToggleApproval = async (athleteId: string, currentActive: boolean) => {
+    const action = currentActive ? 'unapprove' : 'approve';
+    if (!confirm(`${currentActive ? 'Unapprove' : 'Approve'} this coach? ${currentActive ? 'They will be hidden from Browse.' : 'They will be visible on Browse.'}`)) return;
+    setApprovingId(athleteId);
     try {
       const res = await fetch(`/api/admin/athletes/${athleteId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ active: false }),
+        body: JSON.stringify({ active: !currentActive }),
       });
       if (res.ok) router.refresh();
     } finally {
+      setApprovingId(null);
+    }
+  };
+
+  const handleDeactivateAthlete = async (athleteId: string) => {
+  if (!confirm('Deactivate this coach? They will be hidden from Browse and cannot receive new bookings.')) return;
+  setDeactivatingId(athleteId);
+  try {
+  const res = await fetch(`/api/admin/athletes/${athleteId}`, {
+  method: 'PATCH',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ active: false }),
+  });
+  if (res.ok) router.refresh();
+  } finally {
       setDeactivatingId(null);
     }
   };
@@ -449,6 +1621,135 @@ export function AdminDashboardClient({
     }
   };
 
+  // Duplicate a session (creates new session with same settings, for next week by default)
+  const handleDuplicateSession = async (session: AdminSession) => {
+    setDuplicatingSessionId(session.id);
+    try {
+      // Calculate next week's date (same day of week)
+      const originalDate = new Date(session.scheduled_datetime);
+      const nextWeek = new Date(originalDate);
+      nextWeek.setDate(nextWeek.getDate() + 7);
+      
+      const scheduledDate = nextWeek.toISOString().split('T')[0];
+      const scheduledTime = originalDate.toTimeString().slice(0, 5);
+      
+      const res = await fetch('/api/admin/sessions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          athleteId: session.athlete_id,
+          facilityId: session.facility_id,
+          scheduledDate,
+          scheduledTime,
+          durationMinutes: session.duration_minutes || 60,
+          maxParticipants: session.max_participants || 6,
+          pricePerParticipant: session.price_per_participant || 30,
+          sessionType: session.session_type === 'group' ? 'small_group' : session.session_type === '2-athlete' ? 'partner' : 'private',
+          joinPolicy: session.join_policy || 'public',
+          focusArea: session.focus_area || undefined,
+          focusArea2: session.focus_area_2 || undefined,
+        }),
+      });
+      
+      if (res.ok) {
+        router.refresh();
+        alert(`Session duplicated for ${nextWeek.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}`);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || 'Failed to duplicate session');
+      }
+    } catch {
+      alert('Failed to duplicate session');
+    } finally {
+      setDuplicatingSessionId(null);
+    }
+  };
+
+  // Handle drop-in payment recording
+  const handleRecordDropIn = async () => {
+    if (!dropInSession || (!dropInForm.wrestlerName && !dropInForm.youthWrestlerId) || !dropInForm.amountPaid) {
+      alert('Please select or enter a wrestler and amount paid');
+      return;
+    }
+    setSavingDropIn(true);
+    try {
+      const res = await fetch('/api/admin/drop-in', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: dropInSession.id,
+          youthWrestlerId: dropInForm.youthWrestlerId || null,
+          wrestlerName: dropInForm.wrestlerName,
+          parentName: dropInForm.parentName,
+          parentPhone: dropInForm.parentPhone,
+          amountPaid: parseFloat(dropInForm.amountPaid),
+          paymentMethod: dropInForm.paymentMethod,
+          tenantSlug: 'guild',
+        }),
+      });
+      if (res.ok) {
+        router.refresh();
+        setShowDropInDialog(false);
+        setDropInSession(null);
+        setDropInForm({ youthWrestlerId: '', wrestlerName: '', parentName: '', parentPhone: '', amountPaid: '', paymentMethod: 'cash' });
+        setWrestlerSearchQuery('');
+        setWrestlerSearchResults([]);
+        alert('Drop-in recorded successfully!');
+      } else {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || 'Failed to record drop-in');
+      }
+    } catch {
+      alert('Failed to record drop-in');
+    } finally {
+      setSavingDropIn(false);
+    }
+  };
+
+  // Search for existing wrestlers
+  const searchWrestlers = async (query: string) => {
+    setWrestlerSearchQuery(query);
+    if (query.length < 2) {
+      setWrestlerSearchResults([]);
+      return;
+    }
+    setSearchingWrestlers(true);
+    try {
+      const res = await fetch(`/api/admin/search-wrestlers?q=${encodeURIComponent(query)}&tenant=guild`);
+      const data = await res.json();
+      setWrestlerSearchResults(data.wrestlers || []);
+    } catch {
+      setWrestlerSearchResults([]);
+    } finally {
+      setSearchingWrestlers(false);
+    }
+  };
+
+  const selectWrestler = (wrestler: { id: string; first_name: string; last_name: string }) => {
+    setDropInForm({
+      ...dropInForm,
+      youthWrestlerId: wrestler.id,
+      wrestlerName: `${wrestler.first_name} ${wrestler.last_name}`,
+    });
+    setWrestlerSearchQuery('');
+    setWrestlerSearchResults([]);
+  };
+
+  const openDropInDialog = (session: AdminSession) => {
+    setDropInSession(session);
+    setDropInForm({ 
+      youthWrestlerId: '',
+      wrestlerName: '', 
+      parentName: '', 
+      parentPhone: '', 
+      amountPaid: session.price_per_participant?.toString() || '', 
+      paymentMethod: 'cash' 
+    });
+    setWrestlerSearchQuery('');
+    setWrestlerSearchResults([]);
+    setShowDropInDialog(true);
+  };
+
   const statusBadge = (status: string) => {
     const isOpen = status === 'scheduled' || status === 'pending_payment';
     const isClosed = status === 'completed' || status === 'cancelled' || status === 'no-show';
@@ -456,28 +1757,16 @@ export function AdminDashboardClient({
     return (
       <Badge
         variant={isClosed ? 'destructive' : 'outline'}
-        className={isOpen ? 'border-green-600 bg-green-600 text-white hover:bg-green-600 hover:text-white' : undefined}
+        className={isOpen ? 'border-emerald-600 bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/20 hover:text-emerald-400' : undefined}
       >
         {label}
       </Badge>
     );
   };
 
-  const tabs: { id: TabId; label: string; icon: React.ReactNode }[] = [
-    { id: 'cockpit', label: 'Cockpit', icon: <Gauge className="h-4 w-4" /> },
-    { id: 'sessions', label: 'Sessions', icon: <Calendar className="h-4 w-4" /> },
-    { id: 'users', label: 'Users', icon: <Users className="h-4 w-4" /> },
-    { id: 'billing', label: 'Billing', icon: <DollarSign className="h-4 w-4" /> },
-    { id: 'payouts', label: 'Coach payouts', icon: <Wallet className="h-4 w-4" /> },
-    { id: 'credits', label: 'Credits', icon: <CreditCard className="h-4 w-4" /> },
-    { id: 'facility_requests', label: 'Facility requests', icon: <Building2 className="h-4 w-4" /> },
-    { id: 'athletes', label: 'Coaches', icon: <BarChart3 className="h-4 w-4" /> },
-    { id: 'kids', label: 'Athletes', icon: <User className="h-4 w-4" /> },
-  ];
-
-  // Fetch kids when tab is selected
+  // Fetch kids when People > Athletes is selected
   useEffect(() => {
-    if (tab !== 'kids') return;
+    if (section !== 'people' || subSection !== 'athletes') return;
     setKidsLoading(true);
     fetch('/api/admin/youth-wrestlers')
       .then((r) => r.json())
@@ -486,11 +1775,11 @@ export function AdminDashboardClient({
       })
       .catch(() => setKidsList([]))
       .finally(() => setKidsLoading(false));
-  }, [tab]);
+  }, [section, subSection]);
 
-  // Fetch facility requests when tab is selected
+  // Fetch facility requests when People > Requests is selected
   useEffect(() => {
-    if (tab !== 'facility_requests') return;
+    if (section !== 'people' || subSection !== 'requests') return;
     setFacilityRequestsLoading(true);
     fetch('/api/admin/facility-requests')
       .then((r) => r.json())
@@ -499,583 +1788,445 @@ export function AdminDashboardClient({
       })
       .catch(() => setFacilityRequests([]))
       .finally(() => setFacilityRequestsLoading(false));
-  }, [tab]);
+  }, [section, subSection]);
 
-  const quickLinks = [
-    { href: '/admin/facilities', label: 'Facilities', icon: MapPin },
-    { href: '/admin/products', label: 'Products', icon: Package },
-    { href: '/admin/early-access', label: 'Early Access', icon: ClipboardList },
-    { href: '/admin/discount-codes', label: 'Discount codes', icon: Tag },
-    { href: '/admin/users', label: 'User Management', icon: Users },
-    { href: '/admin/sessions/create', label: 'Create session', icon: Calendar },
-    { href: '/admin/focus-areas', label: 'Session topics', icon: List },
-  ];
+  // Calculate metrics
+  const openSessions = sessions.filter(s => s.status === 'scheduled' || s.status === 'pending_payment').length;
+  const pendingPayments = sessions.filter(s => s.status === 'pending_payment').length;
+  const totalCoachPayoutsDue = coachPayouts.reduce((sum, p) => sum + p.amount, 0);
+  const pendingFacilityRequests = facilityRequests.filter(r => r.status === 'pending').length;
 
-  return (
-    <div className="space-y-6">
-      {textGroupAdminSession && (
-        <CoachTextGroupDialog
-          sessionId={textGroupAdminSession.id}
-          open={!!textGroupAdminSession}
-          onOpenChange={(open) => {
-            if (!open) setTextGroupAdminSession(null);
-          }}
-          sessionLabel={`${formatEST(new Date(textGroupAdminSession.scheduled_datetime), 'EEE, MMM d · h:mm a')} · ${textGroupAdminSession.facility_name}`}
-          onSent={() => router.refresh()}
-        />
-      )}
-      <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-4 border-b border-border pb-4">
-        <div className="flex flex-wrap gap-2">
-          {tabs.map((t) => (
-            <Button
-              key={t.id}
-              variant={tab === t.id ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setTab(t.id)}
-              className="gap-2"
-            >
-              {t.icon}
-              {t.label}
-            </Button>
-          ))}
-        </div>
-        <div className="flex flex-wrap items-center gap-2 border-t border-border pt-4 sm:border-l sm:border-t-0 sm:pt-0 sm:pl-4">
-          {quickLinks.map(({ href, label, icon: Icon }) => (
-            <Link
-              key={href}
-              href={href}
-              className="inline-flex items-center gap-2 px-3 py-2 text-sm font-medium text-muted-foreground hover:text-foreground border border-border rounded-md hover:bg-muted/50"
-            >
-              <Icon className="h-4 w-4 shrink-0" />
-              {label}
-            </Link>
-          ))}
-        </div>
-      </div>
+  const payoutHistoryCoachOptions = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const s of sessions) {
+      if (s.status !== 'completed' || !s.athlete_payout_date) continue;
+      if (!m.has(s.athlete_id)) m.set(s.athlete_id, s.athlete_name);
+    }
+    return Array.from(m.entries()).sort((a, b) => a[1].localeCompare(b[1]));
+  }, [sessions]);
 
-      {tab === 'cockpit' && <AdminCockpitView />}
+  const effectivePayoutHistoryBounds = useMemo(() => {
+    if (payoutHistoryPeriod === 'custom') {
+      return {
+        from: historyPayoutFrom || null,
+        to: historyPayoutTo || null,
+      };
+    }
+    const b = payoutDateBoundsForPreset(payoutHistoryPeriod);
+    return b ? { from: b.from, to: b.to } : { from: null, to: null };
+  }, [payoutHistoryPeriod, historyPayoutFrom, historyPayoutTo]);
 
-      {tab === 'sessions' && (
-        <Card>
-          <CardHeader>
-            <CardTitle>All sessions</CardTitle>
-            <CardDescription>
-              Newest first ({sessions.length} loaded). Dates use {APP_TIMEZONE.replace('_', ' ')}. After creating a session, use{' '}
-              <strong className="text-foreground">Refresh</strong> if the list looks stale. Use &quot;Copy link&quot; for join URLs; for groups use{' '}
-              <strong className="text-foreground">Copy Cell #s</strong> or <strong className="text-foreground">Text group</strong>.
-            </CardDescription>
-            <div className="flex flex-wrap gap-3 pt-3 items-center">
-              <Link href="/admin/sessions/create">
-                <Button size="sm" className="gap-2">
-                  <Plus className="h-4 w-4" />
-                  Add session
-                </Button>
-              </Link>
-              <Button type="button" variant="outline" size="sm" className="gap-2" onClick={() => router.refresh()}>
-                Refresh list
-              </Button>
-              <span className="text-sm text-muted-foreground">
-                Showing {filteredSessions.length} of {sessions.length}
-              </span>
-            </div>
-            <div className="flex flex-wrap gap-3 pt-2 items-end">
-              <div className="flex items-center gap-2">
-                <label className="text-sm text-muted-foreground whitespace-nowrap">From</label>
-                <Input
-                  type="date"
-                  value={sessionDateFrom}
-                  onChange={(e) => setSessionDateFrom(e.target.value)}
-                  className="w-40"
-                />
+  const payoutHistoryRows = useMemo(() => {
+    const q = historySearch.trim().toLowerCase();
+    const { from: boundFrom, to: boundTo } = effectivePayoutHistoryBounds;
+    return sessions
+      .filter((s) => s.status === 'completed' && s.athlete_payout_date)
+      .filter((s) => {
+        if (historyCoachFilter !== 'all' && s.athlete_id !== historyCoachFilter) return false;
+        if (q && !(s.athlete_name || '').toLowerCase().includes(q)) return false;
+        const pd = (s.athlete_payout_date || '').slice(0, 10);
+        if (boundFrom && pd < boundFrom) return false;
+        if (boundTo && pd > boundTo) return false;
+        return true;
+      })
+      .map((s) => ({ session: s, payoutAmount: sessionPayoutAmountUsd(s) }))
+      .sort((a, b) => {
+        const da = a.session.athlete_payout_date || '';
+        const db = b.session.athlete_payout_date || '';
+        if (da !== db) return db.localeCompare(da);
+        return (
+          new Date(b.session.scheduled_datetime).getTime() -
+          new Date(a.session.scheduled_datetime).getTime()
+        );
+      });
+  }, [sessions, effectivePayoutHistoryBounds, historyCoachFilter, historySearch]);
+
+  const payoutByCoachRows = useMemo(() => {
+    const q = historySearch.trim().toLowerCase();
+    const { from: boundFrom, to: boundTo } = effectivePayoutHistoryBounds;
+    const map = new Map<
+      string,
+      { athlete_id: string; name: string; school: string; total: number; sessionCount: number }
+    >();
+    for (const s of sessions) {
+      if (s.status !== 'completed' || !s.athlete_payout_date) continue;
+      const pd = (s.athlete_payout_date || '').slice(0, 10);
+      if (boundFrom && pd < boundFrom) continue;
+      if (boundTo && pd > boundTo) continue;
+      if (historyCoachFilter !== 'all' && s.athlete_id !== historyCoachFilter) continue;
+      if (q && !(s.athlete_name || '').toLowerCase().includes(q)) continue;
+      const amt = sessionPayoutAmountUsd(s);
+      const prev = map.get(s.athlete_id);
+      if (prev) {
+        prev.total = Math.round((prev.total + amt) * 100) / 100;
+        prev.sessionCount += 1;
+      } else {
+        map.set(s.athlete_id, {
+          athlete_id: s.athlete_id,
+          name: s.athlete_name,
+          school: s.athlete_school,
+          total: amt,
+          sessionCount: 1,
+        });
+      }
+    }
+    return Array.from(map.values()).sort(
+      (a, b) => b.total - a.total || a.name.localeCompare(b.name)
+    );
+  }, [sessions, effectivePayoutHistoryBounds, historyCoachFilter, historySearch]);
+
+  const payoutByCoachGrandTotal = useMemo(
+    () => payoutByCoachRows.reduce((sum, r) => sum + r.total, 0),
+    [payoutByCoachRows]
+  );
+
+  const payoutHistoryTotal = useMemo(
+    () => payoutHistoryRows.reduce((sum, r) => sum + r.payoutAmount, 0),
+    [payoutHistoryRows]
+  );
+
+  const paidSessionsCount = useMemo(
+    () => sessions.filter((s) => s.status === 'completed' && s.athlete_payout_date).length,
+    [sessions]
+  );
+
+  const spendByYouthIdAll = useMemo(() => {
+    const m = new Map<string, { total: number; count: number }>();
+    for (const line of youthSessionSpendLines) {
+      const prev = m.get(line.youth_wrestler_id) ?? { total: 0, count: 0 };
+      prev.total += line.amount_paid;
+      prev.count += 1;
+      m.set(line.youth_wrestler_id, {
+        total: Math.round(prev.total * 100) / 100,
+        count: prev.count,
+      });
+    }
+    return m;
+  }, [youthSessionSpendLines]);
+
+  const sortedKidsDirectory = useMemo(() => {
+    const list = [...kidsList];
+    const { key, dir } = youthDirSort;
+    list.sort((ka, kb) => {
+      const aggA = spendByYouthIdAll.get(ka.id);
+      const aggB = spendByYouthIdAll.get(kb.id);
+      const spentA = aggA?.total ?? 0;
+      const spentB = aggB?.total ?? 0;
+      const nameA = `${ka.first_name} ${ka.last_name}`.toLowerCase();
+      const nameB = `${kb.first_name} ${kb.last_name}`.toLowerCase();
+      const tieName = () => nameA.localeCompare(nameB);
+      const strCmp = (sa: string, sb: string) => {
+        const c = sa.localeCompare(sb);
+        return dir === 'desc' ? -c : c;
+      };
+      switch (key) {
+        case 'name':
+          return strCmp(nameA, nameB);
+        case 'school':
+          return strCmp((ka.school ?? '').toLowerCase(), (kb.school ?? '').toLowerCase());
+        case 'parent':
+          return strCmp((ka.parent_email ?? '').toLowerCase(), (kb.parent_email ?? '').toLowerCase());
+        case 'spent': {
+          const d = spentA - spentB;
+          if (d !== 0) return dir === 'desc' ? -d : d;
+          return tieName();
+        }
+        case 'level':
+          return strCmp((ka.skill_level ?? '').toLowerCase(), (kb.skill_level ?? '').toLowerCase());
+        case 'joined': {
+          const t = new Date(ka.created_at).getTime() - new Date(kb.created_at).getTime();
+          if (t !== 0) return dir === 'desc' ? -t : t;
+          return tieName();
+        }
+        default:
+          return 0;
+      }
+    });
+    return list;
+  }, [kidsList, spendByYouthIdAll, youthDirSort]);
+
+  const totalYouthSpendAllTime = useMemo(
+    () => Math.round(youthSessionSpendLines.reduce((s, l) => s + l.amount_paid, 0) * 100) / 100,
+    [youthSessionSpendLines]
+  );
+
+  const effectiveAthleteSpendBounds = useMemo(() => {
+    if (athleteSpendPeriod === 'custom') {
+      return { from: athleteSpendDateFrom || null, to: athleteSpendDateTo || null };
+    }
+    const b = payoutDateBoundsForPreset(athleteSpendPeriod);
+    return b ? { from: b.from, to: b.to } : { from: null, to: null };
+  }, [athleteSpendPeriod, athleteSpendDateFrom, athleteSpendDateTo]);
+
+  const filteredAthleteSpendLines = useMemo(() => {
+    const bounds = effectiveAthleteSpendBounds;
+    const q = athleteSpendSearch.trim().toLowerCase();
+    return youthSessionSpendLines.filter((line) => {
+      const sd = formatInTimeZone(new Date(line.scheduled_datetime), APP_TIMEZONE, 'yyyy-MM-dd');
+      if (bounds.from && sd < bounds.from) return false;
+      if (bounds.to && sd > bounds.to) return false;
+      if (athleteSpendWrestlerFilter !== 'all' && line.youth_wrestler_id !== athleteSpendWrestlerFilter)
+        return false;
+      if (q) {
+        const kid = kidsList.find((k) => k.id === line.youth_wrestler_id);
+        const name = kid ? `${kid.first_name} ${kid.last_name}`.toLowerCase() : '';
+        const hay = `${name} ${line.coach_name} ${line.facility_name} ${line.session_id}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [
+    youthSessionSpendLines,
+    effectiveAthleteSpendBounds,
+    athleteSpendWrestlerFilter,
+    athleteSpendSearch,
+    kidsList,
+  ]);
+
+  const athleteSpendByWrestlerRows = useMemo(() => {
+    const map = new Map<string, { name: string; total: number; sessions: number }>();
+    for (const line of filteredAthleteSpendLines) {
+      const kid = kidsList.find((k) => k.id === line.youth_wrestler_id);
+      const name = kid
+        ? `${kid.first_name} ${kid.last_name}`.trim()
+        : `Wrestler ${line.youth_wrestler_id.slice(0, 8)}…`;
+      const prev = map.get(line.youth_wrestler_id);
+      if (prev) {
+        prev.total = Math.round((prev.total + line.amount_paid) * 100) / 100;
+        prev.sessions += 1;
+      } else {
+        map.set(line.youth_wrestler_id, { name, total: line.amount_paid, sessions: 1 });
+      }
+    }
+    return Array.from(map.entries()).map(([youth_wrestler_id, v]) => ({ youth_wrestler_id, ...v }));
+  }, [filteredAthleteSpendLines, kidsList]);
+
+  const sortedAthleteSpendByWrestlerRows = useMemo(() => {
+    const rows = [...athleteSpendByWrestlerRows];
+    const { key, dir } = wrestlerTotalsSort;
+    rows.sort((a, b) => {
+      const tieName = () => a.name.localeCompare(b.name);
+      const strCmp = (sa: string, sb: string) => {
+        const c = sa.localeCompare(sb);
+        return dir === 'desc' ? -c : c;
+      };
+      switch (key) {
+        case 'name':
+          return strCmp(a.name.toLowerCase(), b.name.toLowerCase());
+        case 'sessions': {
+          const d = a.sessions - b.sessions;
+          if (d !== 0) return dir === 'desc' ? -d : d;
+          return tieName();
+        }
+        case 'total': {
+          const d = a.total - b.total;
+          if (d !== 0) return dir === 'desc' ? -d : d;
+          return tieName();
+        }
+        default:
+          return 0;
+      }
+    });
+    return rows;
+  }, [athleteSpendByWrestlerRows, wrestlerTotalsSort]);
+
+  const sortedFilteredAthleteSpendLines = useMemo(() => {
+    const lines = [...filteredAthleteSpendLines];
+    const { key, dir } = athleteSpendLineSort;
+    const athleteName = (line: YouthSessionSpendLine) => {
+      const kid = kidsList.find((k) => k.id === line.youth_wrestler_id);
+      return kid ? `${kid.first_name} ${kid.last_name}`.trim().toLowerCase() : '';
+    };
+    lines.sort((a, b) => {
+      const tieDate = () =>
+        new Date(a.scheduled_datetime).getTime() - new Date(b.scheduled_datetime).getTime();
+      const strCmp = (sa: string, sb: string) => {
+        const c = sa.localeCompare(sb);
+        return dir === 'desc' ? -c : c;
+      };
+      switch (key) {
+        case 'date': {
+          const t = tieDate();
+          if (t !== 0) return dir === 'desc' ? -t : t;
+          return a.session_id.localeCompare(b.session_id);
+        }
+        case 'athlete': {
+          const c = athleteName(a).localeCompare(athleteName(b));
+          if (c !== 0) return dir === 'desc' ? -c : c;
+          const t = tieDate();
+          return dir === 'desc' ? -t : t;
+        }
+        case 'coach': {
+          const c = (a.coach_name ?? '').toLowerCase().localeCompare((b.coach_name ?? '').toLowerCase());
+          if (c !== 0) return dir === 'desc' ? -c : c;
+          const t = tieDate();
+          return dir === 'desc' ? -t : t;
+        }
+        case 'facility': {
+          const c = (a.facility_name ?? '').toLowerCase().localeCompare((b.facility_name ?? '').toLowerCase());
+          if (c !== 0) return dir === 'desc' ? -c : c;
+          const t = tieDate();
+          return dir === 'desc' ? -t : t;
+        }
+        case 'status': {
+          const c = (a.session_status ?? '').localeCompare(b.session_status ?? '');
+          if (c !== 0) return dir === 'desc' ? -c : c;
+          const t = tieDate();
+          return dir === 'desc' ? -t : t;
+        }
+        case 'paid': {
+          const d = a.amount_paid - b.amount_paid;
+          if (d !== 0) return dir === 'desc' ? -d : d;
+          const t = tieDate();
+          return dir === 'desc' ? -t : t;
+        }
+        default:
+          return 0;
+      }
+    });
+    return lines;
+  }, [filteredAthleteSpendLines, athleteSpendLineSort, kidsList]);
+
+  const athleteSpendFilteredTotal = useMemo(
+    () => Math.round(filteredAthleteSpendLines.reduce((s, l) => s + l.amount_paid, 0) * 100) / 100,
+    [filteredAthleteSpendLines]
+  );
+
+  const wrestlerSpendFilterOptions = useMemo(() => {
+    const ids = [...new Set(youthSessionSpendLines.map((l) => l.youth_wrestler_id))].sort();
+    return ids.map((id) => {
+      const kid = kidsList.find((k) => k.id === id);
+      const label = kid
+        ? `${kid.first_name} ${kid.last_name}`.trim()
+        : `Unknown (${id.slice(0, 8)}…)`;
+      return { id, label };
+    });
+  }, [youthSessionSpendLines, kidsList]);
+
+  // Generate chart data from sessions
+  const revenueChartData = useMemo(() => {
+    const last7Days = [...Array(7)].map((_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - (6 - i));
+      return formatInTimeZone(d, APP_TIMEZONE, 'yyyy-MM-dd');
+    });
+    return last7Days.map(date => {
+      const dayRevenue = sessions
+        .filter(s => formatInTimeZone(new Date(s.scheduled_datetime), APP_TIMEZONE, 'yyyy-MM-dd') === date && s.status === 'completed')
+        .reduce((sum, s) => sum + s.total_price, 0);
+      return { value: dayRevenue };
+    });
+  }, [sessions]);
+
+  const bookingsChartData = useMemo(() => {
+    const last7Days = [...Array(7)].map((_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - (6 - i));
+      return formatInTimeZone(d, APP_TIMEZONE, 'yyyy-MM-dd');
+    });
+    return last7Days.map(date => {
+      const dayBookings = sessions
+        .filter(s => formatInTimeZone(new Date(s.scheduled_datetime), APP_TIMEZONE, 'yyyy-MM-dd') === date)
+        .length;
+      return { value: dayBookings };
+    });
+  }, [sessions]);
+
+  // Render section content
+  const renderContent = () => {
+    // OVERVIEW SECTION
+    if (section === 'overview') {
+      // Show Cockpit (trends view) if subSection is cockpit
+      if (subSection === 'cockpit') {
+        return <AdminCockpitView />;
+      }
+      
+      return (
+        <div className="space-y-6">
+          {/* Hero KPIs - Proper Accounting */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <KpiCard
+              title="Earned Revenue"
+              value={financeData.grossRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              prefix="$"
+              icon={DollarSign}
+              trend="up"
+              change={financeData.depositsCollected > 0 ? `+$${financeData.depositsCollected.toFixed(0)} prepaid` : 'Completed sessions'}
+              chartData={revenueChartData}
+            />
+            <KpiCard
+              title="App Net Profit"
+              value={financeData.guildProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              prefix="$"
+              icon={financeData.guildProfit >= 0 ? TrendingUp : TrendingDown}
+              trend={financeData.guildProfit >= 0 ? 'up' : 'down'}
+              change={`${((financeData.guildNet / financeData.grossRevenue) * 100 || 0).toFixed(1)}% margin`}
+            />
+            <KpiCard
+              title="Coach Payouts"
+              value={financeData.coachPayouts.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              prefix="$"
+              icon={Wallet}
+              trend="neutral"
+              change={financeData.coachPayoutsPending > 0 ? `+$${financeData.coachPayoutsPending.toFixed(0)} pending` : `${coachPayouts.length} coaches`}
+            />
+            <KpiCard
+              title="Open Bookings"
+              value={openSessions}
+              icon={Calendar}
+              trend={openSessions > 0 ? 'up' : 'neutral'}
+              change={`${pendingPayments} pending payment`}
+              chartData={bookingsChartData}
+            />
+          </div>
+
+          {/* Quick Stats Row */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <Card className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-emerald-500/10">
+                  <Users className="h-4 w-4 text-emerald-500" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Coaches</p>
+                  <p className="text-lg font-semibold">{athleteReports.length}</p>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <label className="text-sm text-muted-foreground whitespace-nowrap">To</label>
-                <Input
-                  type="date"
-                  value={sessionDateTo}
-                  onChange={(e) => setSessionDateTo(e.target.value)}
-                  className="w-40"
-                />
+            </Card>
+            <Card className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-blue-500/10">
+                  <User className="h-4 w-4 text-blue-500" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Parents</p>
+                  <p className="text-lg font-semibold">{users.filter(u => u.role === 'parent').length}</p>
+                </div>
               </div>
-              <Button type="button" variant="secondary" size="sm" onClick={setPresetThisWeek}>
-                This week
-              </Button>
-              <Button type="button" variant="secondary" size="sm" onClick={setPresetNextWeek}>
-                Next week
-              </Button>
-              <Button type="button" variant="ghost" size="sm" onClick={clearSessionFilters}>
-                Clear filters
-              </Button>
-            </div>
-            <div className="flex flex-wrap gap-3 pt-2 items-end">
-              <div className="space-y-1 min-w-[140px]">
-                <label className="text-xs font-medium text-muted-foreground">Status</label>
-                <Select value={sessionStatusFilter} onValueChange={(v) => setSessionStatusFilter(v as typeof sessionStatusFilter)}>
-                  <SelectTrigger className="w-[180px] h-9">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All statuses</SelectItem>
-                    <SelectItem value="open">Open (scheduled / pending payment)</SelectItem>
-                    <SelectItem value="completed">Completed</SelectItem>
-                    <SelectItem value="cancelled_other">Cancelled / no-show / other</SelectItem>
-                  </SelectContent>
-                </Select>
+            </Card>
+            <Card className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-amber-500/10">
+                  <Star className="h-4 w-4 text-amber-500" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Avg Rating</p>
+                  <p className="text-lg font-semibold">
+                    {(athleteReports.reduce((sum, a) => sum + (a.average_rating || 0), 0) / athleteReports.filter(a => a.average_rating).length || 0).toFixed(1)}
+                  </p>
+                </div>
               </div>
-              <div className="space-y-1 min-w-[140px]">
-                <label className="text-xs font-medium text-muted-foreground">Session type</label>
-                <Select value={sessionTypeFilter} onValueChange={setSessionTypeFilter}>
-                  <SelectTrigger className="w-[200px] h-9">
-                    <SelectValue placeholder="All types" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All types</SelectItem>
-                    {sessionTypesForFilter.map((t) => (
-                      <SelectItem key={t} value={t}>
-                        {t}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            </Card>
+            <Card className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-purple-500/10">
+                  <CreditCard className="h-4 w-4 text-purple-500" />
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground">Active Credits</p>
+                  <p className="text-lg font-semibold">{credits.filter(c => c.remaining > 0).length}</p>
+                </div>
               </div>
-              <div className="space-y-1 min-w-[160px]">
-                <label className="text-xs font-medium text-muted-foreground">Coach</label>
-                <Select value={sessionCoachFilter} onValueChange={setSessionCoachFilter}>
-                  <SelectTrigger className="w-[min(100%,240px)] h-9">
-                    <SelectValue placeholder="All coaches" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All coaches</SelectItem>
-                    {coachesForFilter.map(([id, name]) => (
-                      <SelectItem key={id} value={id}>
-                        {name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-2 font-medium">Date / Time</th>
-                    <th className="text-left py-2 font-medium">Coach</th>
-                    <th className="text-left py-2 font-medium">Parent</th>
-                    <th className="text-left py-2 font-medium">Facility</th>
-                    <th className="text-left py-2 font-medium">Status</th>
-                    <th className="text-right py-2 font-medium">Spots</th>
-                    <th className="text-right py-2 font-medium">Total</th>
-                    <th className="text-right py-2 font-medium">Coach $</th>
-                    <th className="text-right py-2 font-medium">Share link</th>
-                    <th className="text-right py-2 font-medium">Cells / SMS</th>
-                    <th className="text-right py-2 font-medium">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredSessions.length === 0 ? (
-                    <tr>
-                      <td colSpan={11} className="py-8 text-center text-muted-foreground">
-                        No sessions match these filters. Click &quot;Clear filters&quot; or &quot;Refresh list&quot;.
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredSessions.map((s) => {
-                      const shareUrl = s.partner_invite_code
-                        ? `${typeof window !== 'undefined' ? window.location.origin : ''}/join/${s.partner_invite_code}`
-                        : null;
-                      const handleCopy = () => {
-                        if (!shareUrl) return;
-                        navigator.clipboard.writeText(shareUrl);
-                        setCopiedSessionId(s.id);
-                        setTimeout(() => setCopiedSessionId(null), 2000);
-                      };
-                      return (
-                      <tr key={s.id} className="border-b last:border-0">
-                        <td className="py-2">
-                          {formatEST(new Date(s.scheduled_datetime), 'MMM d, yyyy')}
-                          <br />
-                          <span className="text-muted-foreground">
-                            {formatEST(new Date(s.scheduled_datetime), 'h:mm a')}
-                          </span>
-                        </td>
-                        <td className="py-2">
-                          <div>{s.athlete_name}</div>
-                          <div className="text-muted-foreground">{s.athlete_school}</div>
-                        </td>
-                        <td className="py-2">
-                          <a
-                            href={`mailto:${s.parent_email}`}
-                            className="text-accent hover:underline"
-                          >
-                            {s.parent_email}
-                          </a>
-                        </td>
-                        <td className="py-2">{s.facility_name}</td>
-                        <td className="py-2">{statusBadge(s.status)}</td>
-                        <td className="py-2 text-right">
-                          <CapacityBadge
-                            current={s.current_participants}
-                            max={s.max_participants ?? 1}
-                            label=""
-                          />
-                        </td>
-                        <td className="py-2 text-right">${Number(s.total_price).toFixed(2)}</td>
-                        <td className="py-2 text-right">${Number(s.athlete_payment).toFixed(2)}</td>
-                        <td className="py-2 text-right">
-                          {shareUrl ? (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              className="h-8 gap-1 text-accent hover:text-accent"
-                              onClick={handleCopy}
-                            >
-                              {copiedSessionId === s.id ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
-                              {copiedSessionId === s.id ? 'Copied' : 'Copy link'}
-                            </Button>
-                          ) : (
-                            <span className="text-muted-foreground text-xs">—</span>
-                          )}
-                        </td>
-                        <td className="py-2 text-right align-top">
-                          {showSessionSmsCopyAndTextGroup(s) ? (
-                            <div className="flex flex-col gap-1 items-end">
-                              <CopySessionPhonesButton sessionId={s.id} className="h-8 text-xs px-2" />
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="h-8 gap-1 text-xs px-2 border-accent/50 text-accent"
-                                onClick={() => setTextGroupAdminSession(s)}
-                              >
-                                <Smartphone className="h-3.5 w-3.5" />
-                                Text group
-                              </Button>
-                            </div>
-                          ) : (
-                            <span className="text-muted-foreground text-xs">—</span>
-                          )}
-                        </td>
-                        <td className="py-2 text-right">
-                          <div className="flex items-center justify-end gap-2 flex-wrap">
-                            <Link href={`/admin/sessions/${s.id}/edit`} className="text-accent hover:underline text-sm">
-                              Edit
-                            </Link>
-                            {(s.status === 'scheduled' || s.status === 'pending_payment') && (
-                              <>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="h-8"
-                                  disabled={sessionCompletingId === s.id}
-                                  onClick={async () => {
-                                    setSessionCompletingId(s.id);
-                                    try {
-                                      const res = await fetch(`/api/sessions/${s.id}/complete`, { method: 'POST' });
-                                      if (res.ok) router.refresh();
-                                    } finally {
-                                      setSessionCompletingId(null);
-                                    }
-                                  }}
-                                >
-                                  {sessionCompletingId === s.id ? 'Marking…' : 'Mark complete'}
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                                  onClick={() => setSessionToDelete(s.id)}
-                                >
-                                  Delete
-                                </Button>
-                              </>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );})
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      <Dialog open={!!sessionToDelete} onOpenChange={(open) => !open && setSessionToDelete(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete session?</DialogTitle>
-            <DialogDescription>
-              This will permanently delete this session and all participants. This cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setSessionToDelete(null)} disabled={sessionDeleteLoading}>
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={async () => {
-                if (!sessionToDelete) return;
-                setSessionDeleteLoading(true);
-                try {
-                  const res = await fetch(`/api/admin/sessions/${sessionToDelete}`, { method: 'DELETE' });
-                  const data = await res.json();
-                  if (!res.ok) {
-                    alert(data.error || 'Failed to delete session');
-                    return;
-                  }
-                  setSessionToDelete(null);
-                  router.refresh();
-                } catch {
-                  alert('Failed to delete session');
-                } finally {
-                  setSessionDeleteLoading(false);
-                }
-              }}
-              disabled={sessionDeleteLoading}
-            >
-              {sessionDeleteLoading ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  Deleting…
-                </>
-              ) : (
-                'Delete'
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {tab === 'users' && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Users by role</CardTitle>
-            <CardDescription>
-              All users with role, created date, and last login. Use User Management to edit role, archive, or sync emails from Auth.
-            </CardDescription>
-            <div className="flex flex-wrap gap-4 pt-2">
-              <Select value={userRoleFilter} onValueChange={setUserRoleFilter}>
-                <SelectTrigger className="w-40">
-                  <SelectValue placeholder="Role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All roles</SelectItem>
-                  <SelectItem value="parent">Parent</SelectItem>
-                  <SelectItem value="coach">Coach</SelectItem>
-                  <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="youth_wrestler">Athlete</SelectItem>
-                </SelectContent>
-              </Select>
-              <div className="relative flex-1 max-w-xs">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search by email..."
-                  value={userSearch}
-                  onChange={(e) => setUserSearch(e.target.value)}
-                  className="pl-8"
-                />
-              </div>
-              <span className="text-sm text-muted-foreground">
-                {filteredUsers.length} users
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={syncingEmails}
-                onClick={async () => {
-                  setSyncingEmails(true);
-                  try {
-                    const res = await fetch('/api/admin/users/sync-emails', { method: 'POST' });
-                    const data = await res.json().catch(() => ({}));
-                    if (res.ok && data.success) {
-                      router.refresh();
-                      if (data.updated > 0) alert(`Synced ${data.updated} email(s) from Auth.`);
-                      else alert('Emails already in sync.');
-                    } else {
-                      alert(data.error || 'Sync failed');
-                    }
-                  } finally {
-                    setSyncingEmails(false);
-                  }
-                }}
-              >
-                {syncingEmails ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Sync emails from Auth'}
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-2 font-medium">Email</th>
-                    <th className="text-left py-2 font-medium">Role</th>
-                    <th className="text-left py-2 font-medium">Created</th>
-                    <th className="text-left py-2 font-medium">Last login</th>
-                    <th className="text-right py-2 font-medium">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredUsers.length === 0 ? (
-                    <tr>
-                      <td colSpan={5} className="py-8 text-center">
-                        {usersError ? (
-                          <span className="text-destructive">{usersError}</span>
-                        ) : users.length === 0 ? (
-                          <span className="text-muted-foreground">No users in database.</span>
-                        ) : (
-                          <span className="text-muted-foreground">No users match filters.</span>
-                        )}
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredUsers.map((u) => (
-                      <tr key={u.id} className="border-b last:border-0">
-                        <td className="py-2">
-                          <a
-                            href={`mailto:${u.email}`}
-                            className="text-accent hover:underline"
-                          >
-                            {u.email}
-                          </a>
-                        </td>
-                        <td className="py-2">
-                          <Badge variant="outline">{u.role}</Badge>
-                        </td>
-                        <td className="py-2 text-muted-foreground">
-                          {formatEST(new Date(u.created_at), 'MMM d, yyyy')}
-                        </td>
-                        <td className="py-2 text-muted-foreground">
-                          {u.last_login_at
-                            ? formatEST(new Date(u.last_login_at), 'MMM d, yyyy h:mm a')
-                            : '—'}
-                        </td>
-                        <td className="py-2 text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <Link href="/admin/users">
-                              <Button variant="ghost" size="sm" className="text-xs">
-                                Manage
-                              </Button>
-                            </Link>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="text-destructive hover:text-destructive"
-                              title="Delete user"
-                              disabled={deletingUserId === u.id}
-                              onClick={async () => {
-                                if (!confirm(`Delete ${u.email}? This removes their account and related data. You cannot delete your own account.`)) return;
-                                setDeletingUserId(u.id);
-                                try {
-                                  const res = await fetch(`/api/admin/users/${u.id}`, { method: 'DELETE' });
-                                  const data = await res.json().catch(() => ({}));
-                                  if (res.ok) {
-                                    router.refresh();
-                                  } else {
-                                    alert(data.error || 'Delete failed');
-                                  }
-                                } finally {
-                                  setDeletingUserId(null);
-                                }
-                              }}
-                            >
-                              {deletingUserId === u.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {tab === 'billing' && (
-        <div className="space-y-4">
-          <p className="text-sm text-muted-foreground">
-            All-time totals plus upcoming/open scheduled dollars. For today / this week / this month (revenue booked, new users, bookings), use <strong>Cockpit</strong>.
-          </p>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription>Total revenue (all time)</CardDescription>
-                <CardTitle className="text-2xl">
-                  ${billing.totalRevenue.toFixed(2)}
-                </CardTitle>
-              </CardHeader>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription>Org fees (all time)</CardDescription>
-                <CardTitle className="text-2xl">
-                  ${billing.totalOrgFees.toFixed(2)}
-                </CardTitle>
-              </CardHeader>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription>Stripe fees (all time)</CardDescription>
-                <CardTitle className="text-2xl">
-                  ${billing.totalStripeFees.toFixed(2)}
-                </CardTitle>
-              </CardHeader>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription>Coach payouts (all time)</CardDescription>
-                <CardTitle className="text-2xl">
-                  ${billing.totalAthletePayments.toFixed(2)}
-                </CardTitle>
-              </CardHeader>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription>Upcoming/open revenue</CardDescription>
-                <CardTitle className="text-2xl">
-                  ${billing.upcomingOpenRevenue.toFixed(2)}
-                </CardTitle>
-              </CardHeader>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription>Upcoming/open coach payouts</CardDescription>
-                <CardTitle className="text-2xl">
-                  ${billing.upcomingOpenAthletePayments.toFixed(2)}
-                </CardTitle>
-              </CardHeader>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription>Upcoming/open org fees</CardDescription>
-                <CardTitle className="text-2xl">
-                  ${billing.upcomingOpenOrgFees.toFixed(2)}
-                </CardTitle>
-              </CardHeader>
-            </Card>
-            <Card>
-              <CardHeader className="pb-2">
-                <CardDescription>Upcoming/open Stripe fees</CardDescription>
-                <CardTitle className="text-2xl">
-                  ${billing.upcomingOpenStripeFees.toFixed(2)}
-                </CardTitle>
-              </CardHeader>
-            </Card>
-            <Card className="md:col-span-2">
-              <CardHeader className="pb-2">
-                <CardDescription>Sessions (all time)</CardDescription>
-                <CardTitle className="text-2xl">{billing.sessionCount} total</CardTitle>
-                <p className="text-sm text-muted-foreground pt-1">
-                  {billing.completedCount} completed · {billing.pendingPaymentCount} pending payment
-                </p>
-              </CardHeader>
             </Card>
             <Card className="md:col-span-2">
               <CardHeader className="pb-2">
@@ -1087,729 +2238,3145 @@ export function AdminDashboardClient({
               </CardHeader>
             </Card>
           </div>
-        </div>
-      )}
 
-      {tab === 'payouts' && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Coach payouts (manual)</CardTitle>
-            <CardDescription>
-              <strong>Total to pay</strong> defaults from each session (booked amount or roster estimate). <strong>Edit the number in the row</strong> if you paid a different total (cash, adjustment, etc.), then <strong>Mark paid</strong>. For a <em>flat dollar amount on every unpaid session</em> for that coach, use <strong>Record $X &amp; mark paid</strong> with the field below.
-            </CardDescription>
-            <div className="flex flex-wrap items-center gap-3 pt-2">
-              <label className="text-sm text-muted-foreground">Record custom payout amount:</label>
-              <Input
-                type="number"
-                min={0}
-                step={5}
-                placeholder="50"
-                value={customPayoutAmount}
-                onChange={(e) => setCustomPayoutAmount(e.target.value)}
-                className="w-24"
-              />
-              <span className="text-sm text-muted-foreground">per session</span>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-2 font-medium">Coach</th>
-                    <th className="text-left py-2 font-medium">School</th>
-                    <th className="text-right py-2 font-medium">Total to pay</th>
-                    <th className="text-left py-2 font-medium">Venmo</th>
-                    <th className="text-left py-2 font-medium">Zelle</th>
-                    <th className="text-right py-2 font-medium">Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {coachPayouts.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="py-8 text-center text-muted-foreground">
-                        No unpaid completed sessions.
-                      </td>
-                    </tr>
-                  ) : (
-                    coachPayouts.map((p) => {
-                      const customAmount = parseFloat(customPayoutAmount);
-                      const hasCustom = !Number.isNaN(customAmount) && customAmount >= 0;
-                      return (
-                      <tr key={p.athlete_id} className="border-b last:border-0">
-                        <td className="py-2">
-                          <Link
-                            href={`/athlete/${p.athlete_id}`}
-                            className="text-accent hover:underline font-medium"
-                          >
-                            {p.name}
-                          </Link>
-                        </td>
-                        <td className="py-2 text-muted-foreground">{p.school}</td>
-                        <td className="py-2 text-right">
-                          <div className="flex justify-end">
-                            <Input
-                              type="number"
-                              min={0}
-                              step={0.01}
-                              className="w-28 h-9 text-right tabular-nums"
-                              aria-label={`Total payout for ${p.name}`}
-                              value={payoutTotalByAthlete[p.athlete_id] ?? p.amount.toFixed(2)}
-                              onChange={(e) =>
-                                setPayoutTotalByAthlete((prev) => ({
-                                  ...prev,
-                                  [p.athlete_id]: e.target.value,
-                                }))
-                              }
-                            />
-                          </div>
-                        </td>
-                        <td className="py-2 text-muted-foreground">
-                          {p.venmo_handle ? `@${p.venmo_handle}` : '—'}
-                        </td>
-                        <td className="py-2 text-muted-foreground">
-                          {p.zelle_email ?? '—'}
-                        </td>
-                        <td className="py-2 text-right">
-                          <div className="flex items-center justify-end gap-2 flex-wrap">
-                            {hasCustom && (
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                disabled={recordingAthleteId === p.athlete_id}
-                                onClick={async () => {
-                                  setRecordingAthleteId(p.athlete_id);
-                                  try {
-                                    const r = await fetch('/api/admin/record-session-payout', {
-                                      method: 'POST',
-                                      headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify({ athleteId: p.athlete_id, amount: customAmount }),
-                                    });
-                                    const data = await r.json().catch(() => ({}));
-                                    if (r.ok && data.success) {
-                                      router.refresh();
-                                    } else {
-                                      console.error('Record payout failed:', data.error ?? r.statusText);
-                                    }
-                                  } finally {
-                                    setRecordingAthleteId(null);
-                                  }
-                                }}
-                              >
-                                {recordingAthleteId === p.athlete_id ? 'Recording…' : `Record $${customAmount} & mark paid`}
-                              </Button>
-                            )}
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              disabled={markingAthleteId === p.athlete_id}
-                              onClick={async () => {
-                                setMarkingAthleteId(p.athlete_id);
-                                try {
-                                  const raw = payoutTotalByAthlete[p.athlete_id];
-                                  const parsed =
-                                    raw != null && raw !== '' ? parseFloat(raw) : p.amount;
-                                  const total =
-                                    !Number.isNaN(parsed) && parsed >= 0 ? parsed : p.amount;
-                                  const r = await fetch('/api/admin/mark-payout-paid', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ athleteId: p.athlete_id, amount: total }),
-                                  });
-                                  const data = await r.json().catch(() => ({}));
-                                  if (r.ok && data.success) {
-                                    router.refresh();
-                                  } else {
-                                    console.error('Mark paid failed:', data.error ?? r.statusText);
-                                  }
-                                } finally {
-                                  setMarkingAthleteId(null);
-                                }
-                              }}
-                            >
-                              {markingAthleteId === p.athlete_id ? 'Marking…' : 'Mark paid'}
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    );})
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {tab === 'credits' && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Account Credits</CardTitle>
-            <CardDescription>
-              Credits issued from cancellations or promotions. Parents can use these for future bookings.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-2 font-medium">Parent</th>
-                    <th className="text-left py-2 font-medium">Source</th>
-                    <th className="text-right py-2 font-medium">Original</th>
-                    <th className="text-right py-2 font-medium">Remaining</th>
-                    <th className="text-left py-2 font-medium">Created</th>
-                    <th className="text-left py-2 font-medium">Description</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {credits.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="py-8 text-center text-muted-foreground">
-                        No credits issued yet.
-                      </td>
-                    </tr>
-                  ) : (
-                    credits.map((c) => (
-                      <tr key={c.id} className="border-b last:border-0">
-                        <td className="py-2">
-                          <a
-                            href={`mailto:${c.parent_email}`}
-                            className="text-accent hover:underline"
-                          >
-                            {c.parent_email}
-                          </a>
-                        </td>
-                        <td className="py-2">
-                          <Badge variant="outline">
-                            {c.source === 'cancellation' && 'Cancellation'}
-                            {c.source === 'coach_cancellation' && 'Coach cancelled'}
-                            {c.source === 'admin_grant' && 'Admin grant'}
-                            {c.source === 'promotion' && 'Promotion'}
-                          </Badge>
-                        </td>
-                        <td className="py-2 text-right">${Number(c.amount).toFixed(2)}</td>
-                        <td className="py-2 text-right font-medium">
-                          ${Number(c.remaining).toFixed(2)}
-                          {c.remaining === 0 && (
-                            <span className="text-muted-foreground ml-1">(used)</span>
-                          )}
-                        </td>
-                        <td className="py-2 text-muted-foreground">
-                          {formatEST(new Date(c.created_at), 'MMM d, yyyy')}
-                        </td>
-                        <td className="py-2 text-muted-foreground text-xs max-w-xs truncate">
-                          {c.description ?? '—'}
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-            {credits.length > 0 && (
-              <div className="mt-4 pt-4 border-t flex gap-8">
-                <div>
-                  <p className="text-sm text-muted-foreground">Total issued</p>
-                  <p className="text-xl font-bold">
-                    ${credits.reduce((sum, c) => sum + Number(c.amount), 0).toFixed(2)}
-                  </p>
+          {/* Revenue Breakdown & Payouts Due */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium">Revenue Breakdown</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between py-2 border-b border-border">
+                    <span className="text-sm text-muted-foreground">Gross Revenue</span>
+                    <span className="text-sm font-medium">${financeData.grossRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-border">
+                    <span className="text-sm text-muted-foreground">Coach Payments</span>
+                    <span className="text-sm font-medium text-red-400">-${financeData.coachPayouts.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex items-center justify-between py-2 border-b border-border">
+                    <span className="text-sm text-muted-foreground">Stripe Fees <span className="text-xs text-amber-500">(est.)</span></span>
+                    <span className="text-sm font-medium text-red-400">-${financeData.stripeFees.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex items-center justify-between py-2">
+                    <span className="text-sm font-medium">Net Profit</span>
+                    <span className={`text-lg font-semibold ${financeData.guildProfit >= 0 ? 'text-[#B89D60]' : 'text-red-500'}`}>${financeData.guildProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Outstanding</p>
-                  <p className="text-xl font-bold text-accent">
-                    ${credits.reduce((sum, c) => sum + Number(c.remaining), 0).toFixed(2)}
-                  </p>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
+              </CardContent>
+            </Card>
 
-      {tab === 'facility_requests' && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Facility requests</CardTitle>
-            <CardDescription>
-              Coaches can request facilities not on the list. Approve to create the facility and assign it to the coach.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {facilityRequestsLoading ? (
-              <div className="flex items-center justify-center py-8">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              </div>
-            ) : facilityRequests.length === 0 ? (
-              <p className="text-muted-foreground py-4">No facility requests.</p>
-            ) : (
+            <Card>
+              <CardHeader className="pb-2 flex flex-row items-center justify-between">
+                <CardTitle className="text-sm font-medium">Payouts Due</CardTitle>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-[#B89D60] hover:text-[#B89D60]"
+                  onClick={() => handleNavChange('money', 'payouts')}
+                >
+                  View all
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {totalCoachPayoutsDue > 0 ? (
+                  <div className="space-y-3">
+                    {coachPayouts.slice(0, 4).map((p) => (
+                      <div key={p.athlete_id} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                        <div>
+                          <p className="text-sm font-medium">{p.name}</p>
+                          <p className="text-xs text-muted-foreground">{p.school}</p>
+                        </div>
+                        <span className="text-sm font-medium text-[#B89D60]">${p.amount.toFixed(2)}</span>
+                      </div>
+                    ))}
+                    <div className="pt-2 border-t border-border">
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm font-medium">Total Due</span>
+                        <span className="text-lg font-semibold text-[#B89D60]">${totalCoachPayoutsDue.toFixed(2)}</span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground py-4 text-center">No payouts due</p>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Recent Sessions */}
+          <Card>
+            <CardHeader className="pb-2 flex flex-row items-center justify-between">
+              <CardTitle className="text-sm font-medium">Recent Bookings</CardTitle>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-[#B89D60] hover:text-[#B89D60]"
+                onClick={() => handleNavChange('bookings', 'sessions')}
+              >
+                View all
+                <ChevronRight className="h-4 w-4 ml-1" />
+              </Button>
+            </CardHeader>
+            <CardContent className="p-0">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b">
-                      <th className="text-left py-2 font-medium">Requested facility</th>
-                      <th className="text-left py-2 font-medium">School</th>
-                      <th className="text-left py-2 font-medium">Requested by</th>
-                      <th className="text-left py-2 font-medium">Status</th>
-                      <th className="text-left py-2 font-medium">Created</th>
-                      <th className="text-right py-2 font-medium">Actions</th>
+                  <thead className="bg-muted/30">
+                    <tr>
+                      <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Date</th>
+                      <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Coach</th>
+                      <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Status</th>
+                      <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Revenue</th>
                     </tr>
                   </thead>
-                  <tbody>
-                    {facilityRequests.map((r) => (
-                      <tr key={r.id} className="border-b last:border-0">
-                        <td className="py-2 font-medium">{r.name}</td>
-                        <td className="py-2 text-muted-foreground">{r.school}</td>
-                        <td className="py-2">
-                          <Link href={`/athlete/${r.requested_by_athlete_id}`} className="text-accent hover:underline">
-                            {r.coach_name}
-                          </Link>
-                          {r.coach_school && <span className="text-muted-foreground ml-1">({r.coach_school})</span>}
+                  <tbody className="divide-y divide-border">
+                    {sessions.slice(0, 5).map((s) => (
+                      <tr key={s.id} className="hover:bg-muted/20 transition-colors">
+                        <td className="py-3 px-4">
+                          <div className="font-medium">{formatEST(new Date(s.scheduled_datetime), 'MMM d')}</div>
+                          <div className="text-xs text-muted-foreground">{formatEST(new Date(s.scheduled_datetime), 'h:mm a')}</div>
                         </td>
-                        <td className="py-2">
-                          <Badge variant={r.status === 'pending' ? 'secondary' : r.status === 'approved' ? 'default' : 'outline'}>
-                            {r.status}
-                          </Badge>
+                        <td className="py-3 px-4">
+                          <div className="font-medium">{s.athlete_name}</div>
                         </td>
-                        <td className="py-2 text-muted-foreground">{formatEST(new Date(r.created_at), 'MMM d, yyyy')}</td>
-                        <td className="py-2 text-right">
-                          {r.status === 'pending' && (
-                            <div className="flex justify-end gap-1">
-                              <Button
-                                size="sm"
-                                variant="default"
-                                disabled={facilityRequestActionId === r.id}
-                                onClick={async () => {
-                                  setFacilityRequestActionId(r.id);
-                                  try {
-                                    const res = await fetch(`/api/admin/facility-requests/${r.id}`, {
-                                      method: 'PATCH',
-                                      headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify({ action: 'approve' }),
-                                    });
-                                    const data = await res.json().catch(() => ({}));
-                                    if (res.ok) {
-                                      setFacilityRequests((prev) => prev.map((x) => (x.id === r.id ? { ...x, status: 'approved' } : x)));
-                                      router.refresh();
-                                    } else {
-                                      alert(data.error || 'Approve failed');
-                                    }
-                                  } finally {
-                                    setFacilityRequestActionId(null);
-                                  }
-                                }}
-                              >
-                                {facilityRequestActionId === r.id ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Approve'}
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                disabled={facilityRequestActionId === r.id}
-                                onClick={async () => {
-                                  setFacilityRequestActionId(r.id);
-                                  try {
-                                    const res = await fetch(`/api/admin/facility-requests/${r.id}`, {
-                                      method: 'PATCH',
-                                      headers: { 'Content-Type': 'application/json' },
-                                      body: JSON.stringify({ action: 'reject' }),
-                                    });
-                                    if (res.ok) {
-                                      setFacilityRequests((prev) => prev.map((x) => (x.id === r.id ? { ...x, status: 'rejected' } : x)));
-                                      router.refresh();
-                                    }
-                                  } finally {
-                                    setFacilityRequestActionId(null);
-                                  }
-                                }}
-                              >
-                                Reject
-                              </Button>
-                            </div>
-                          )}
-                        </td>
+                        <td className="py-3 px-4">{statusBadge(s.status)}</td>
+                        <td className="py-3 px-4 text-right font-medium tabular-nums">${s.total_price.toFixed(2)}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
+            </CardContent>
+          </Card>
+        </div>
+      );
+    }
 
-      {tab === 'athletes' && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Coaches</CardTitle>
-            <CardDescription>
-              Same coaches as on Browse Coaches. Edit profiles, visibility (show/hide on browse), and view sessions and earnings.{' '}
-              <strong className="text-foreground">Overall rating and full parent reviews</strong> (anonymous on the site) are on each coach&apos;s{' '}
-              <strong className="text-foreground">public profile</strong> — tap the coach name or open{' '}
-              <code className="rounded bg-muted px-1 py-0.5 text-xs">/athlete/[id]</code>. Rating and count below match that page.
-            </CardDescription>
-            <div className="flex flex-wrap items-center gap-4 pt-2">
-              <Button variant="outline" size="sm" asChild>
-                <Link href="/browse">View Browse Coaches page</Link>
+    // BOOKINGS SECTION
+    if (section === 'bookings') {
+      return (
+        <div className="space-y-6">
+          {/* Header with Create Button */}
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold">Sessions</h2>
+              <p className="text-sm text-muted-foreground">{filteredSessions.length} sessions found</p>
+            </div>
+            <Link href="/admin/sessions/create">
+              <Button className="bg-[#B89D60] hover:bg-[#9A8550] text-black">
+                <Plus className="h-4 w-4 mr-2" />
+                Create Session
               </Button>
-              <div className="relative flex-1 max-w-xs">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            </Link>
+          </div>
+
+          {/* Filters */}
+          <Card className="p-4">
+            <p className="text-xs text-muted-foreground mb-3">
+              <span className="font-medium text-foreground">Filters</span> apply to the table and to the summary totals below (same date range, status, and coach).
+            </p>
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2">
                 <Input
-                  placeholder="Search by name or school..."
-                  value={athleteSearch}
-                  onChange={(e) => setAthleteSearch(e.target.value)}
-                  className="pl-8"
+                  type="date"
+                  value={sessionDateFrom}
+                  onChange={(e) => setSessionDateFrom(e.target.value)}
+                  className="w-36 h-9 text-sm"
+                  placeholder="From"
+                />
+                <span className="text-muted-foreground">to</span>
+                <Input
+                  type="date"
+                  value={sessionDateTo}
+                  onChange={(e) => setSessionDateTo(e.target.value)}
+                  className="w-36 h-9 text-sm"
+                  placeholder="To"
                 />
               </div>
-              <span className="text-sm text-muted-foreground">
-                {filteredAthletes.length} coaches
-              </span>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground shrink-0">Status</span>
+              <Select value={sessionStatusFilter} onValueChange={(v) => setSessionStatusFilter(v as typeof sessionStatusFilter)}>
+                <SelectTrigger className="w-[11rem] h-9">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All statuses</SelectItem>
+                  <SelectItem value="open">Open (upcoming)</SelectItem>
+                  <SelectItem value="completed">Completed (past)</SelectItem>
+                  <SelectItem value="cancelled_other">Cancelled/Other</SelectItem>
+                </SelectContent>
+              </Select>
+              </div>
+
+              <Select value={sessionCoachFilter} onValueChange={setSessionCoachFilter}>
+                <SelectTrigger className="w-40 h-9">
+                  <SelectValue placeholder="Coach" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All coaches</SelectItem>
+                  {coachesForFilter.map(([id, name]) => (
+                    <SelectItem key={id} value={id}>{name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <div className="flex items-center gap-2 ml-auto">
+                <Button variant="outline" size="sm" onClick={setPresetThisWeek}>This week</Button>
+                <Button variant="outline" size="sm" onClick={setPresetNextWeek}>Next week</Button>
+                <Button variant="ghost" size="sm" onClick={clearSessionFilters}>Clear</Button>
+              </div>
             </div>
-          </CardHeader>
-          <CardContent>
+          </Card>
+
+          {sessions.length > 0 && (
+            <div className="rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
+                Summary (matches filters above)
+              </p>
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+                <div>
+                  <span className="text-muted-foreground">Bookings </span>
+                  <span className="font-semibold tabular-nums text-foreground">{sessionListTotals.booked}</span>
+                  <span className="text-muted-foreground"> / </span>
+                  <span className="font-semibold tabular-nums text-foreground">{sessionListTotals.capacity}</span>
+                  <span className="text-muted-foreground"> spots</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Openings </span>
+                  <span className="font-semibold tabular-nums text-foreground">{sessionListTotals.openings}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground">Collected </span>
+                  <span className="font-semibold tabular-nums text-foreground">${sessionListTotals.collected.toFixed(2)}</span>
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground border-t border-border/60 mt-3 pt-3 leading-relaxed">
+                <span className="font-medium text-foreground">Totals scope: </span>
+                {sessionsTotalsScopeLabel}
+                {sessionStatusFilter === 'all' ? (
+                  <>
+                    {' '}
+                    · Including completed is useful for revenue and historical fill. Set Status to{' '}
+                    <span className="text-foreground font-medium">Open (upcoming)</span> for upcoming capacity only, or{' '}
+                    <span className="text-foreground font-medium">Completed (past)</span> for past sessions only.
+                  </>
+                ) : sessionStatusFilter === 'open' ? (
+                  <> · Upcoming / bookable sessions only (spots and openings are forward-looking).</>
+                ) : sessionStatusFilter === 'completed' ? (
+                  <> · Past sessions only (collected is historical).</>
+                ) : (
+                  <> · Cancelled, no-show, and other non-open states.</>
+                )}
+              </p>
+            </div>
+          )}
+
+          {/* Sessions Table */}
+          <Card className="overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-2 font-medium">Coach</th>
-                    <th className="text-left py-2 font-medium">School</th>
-                    <th className="text-right py-2 font-medium">Rating</th>
-                    <th className="text-right py-2 font-medium">Reviews</th>
-                    <th className="text-right py-2 font-medium">Sessions</th>
-                    <th className="text-right py-2 font-medium">Completed</th>
-                    <th className="text-right py-2 font-medium">Total earnings</th>
-                    <th className="text-right py-2 font-medium w-24">Actions</th>
+                <thead className="bg-muted/50">
+                  <tr>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Date / Time</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Type</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Coach</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Facility</th>
+                    <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Status</th>
+                    <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Spots</th>
+                    <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Collected</th>
+                    <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
-                <tbody>
-                  {filteredAthletes.length === 0 ? (
+                <tbody className="divide-y divide-border">
+                  {filteredSessions.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="py-8 text-center text-muted-foreground">
-                        No athletes match filters.
+                      <td colSpan={8} className="py-12 text-center text-muted-foreground">
+                        <div className="flex flex-col items-center gap-2">
+                          <Calendar className="h-8 w-8 text-muted-foreground/50" />
+                          <p>No sessions found</p>
+                          <p className="text-xs">Try adjusting your filters</p>
+                        </div>
                       </td>
                     </tr>
                   ) : (
-                    filteredAthletes.map((a) => (
-                      <tr key={a.athlete_id} className="border-b last:border-0">
-                        <td className="py-2">
-                          <Link
-                            href={`/athlete/${a.athlete_id}`}
-                            className="text-accent hover:underline font-medium"
-                            title="Open public profile — full reviews &quot;What parents say&quot;"
-                          >
-                            {a.athlete_name}
-                          </Link>
-                        </td>
-                        <td className="py-2 text-muted-foreground">{a.school}</td>
-                        <td className="py-2 text-right tabular-nums">
-                          {a.average_rating != null && Number(a.average_rating) > 0
-                            ? Number(a.average_rating).toFixed(1)
-                            : '—'}
-                        </td>
-                        <td className="py-2 text-right tabular-nums">{a.review_count ?? 0}</td>
-                        <td className="py-2 text-right">{a.session_count}</td>
-                        <td className="py-2 text-right">{a.completed_count}</td>
-                        <td className="py-2 text-right font-medium">
-                          ${a.total_earnings.toFixed(2)}
-                        </td>
-                        <td className="py-2 text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            <Button variant="ghost" size="icon" onClick={() => openAthleteEdit(a.athlete_id)} title="Edit coach">
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" onClick={() => handleDeactivateAthlete(a.athlete_id)} disabled={deactivatingId === a.athlete_id} title="Deactivate (hide from Browse)">
-                              {deactivatingId === a.athlete_id ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserX className="h-4 w-4 text-destructive" />}
-                            </Button>
-                            <Button variant="ghost" size="icon" onClick={() => handleDeleteAthlete(a.athlete_id)} disabled={deletingAthleteId === a.athlete_id} title="Delete coach (admin only)">
-                              {deletingAthleteId === a.athlete_id ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4 text-destructive" />}
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
+                    filteredSessions.map((s) => {
+                      const isInviteOnly = s.join_policy === 'invite_only';
+                      const shareUrl = s.partner_invite_code
+                        ? `${typeof window !== 'undefined' ? window.location.origin : ''}/join/${s.partner_invite_code}`
+                        : null;
+                      const handleCopy = async () => {
+                        try {
+                          if (isInviteOnly) {
+                            // Fetch invite link from API for invite-only sessions
+                            const res = await fetch(`/api/admin/sessions/${s.id}/invite-link`);
+                            const data = await res.json();
+                            if (data.inviteUrl) {
+                              await navigator.clipboard.writeText(data.inviteUrl);
+                              setCopiedSessionId(s.id);
+                              setTimeout(() => setCopiedSessionId(null), 2000);
+                            }
+                          } else if (shareUrl) {
+                            await navigator.clipboard.writeText(shareUrl);
+                            setCopiedSessionId(s.id);
+                            setTimeout(() => setCopiedSessionId(null), 2000);
+                          }
+                        } catch {
+                          // Ignore errors
+                        }
+                      };
+                      return (
+                        <tr key={s.id} className="hover:bg-muted/30 transition-colors">
+                          <td className="py-3 px-4">
+                            <div className="font-medium">{formatEST(new Date(s.scheduled_datetime), 'MMM d, yyyy')}</div>
+                            <div className="text-xs text-muted-foreground">{formatEST(new Date(s.scheduled_datetime), 'h:mm a')}</div>
+                          </td>
+                          <td className="py-3 px-4">
+                            <SessionTypeBadge sessionType={s.session_type} sessionMode={s.session_mode} />
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="font-medium">{s.athlete_name}</div>
+                            <div className="text-xs text-muted-foreground">{s.athlete_school}</div>
+                          </td>
+                          <td className="py-3 px-4 text-sm">{s.facility_name}</td>
+                          <td className="py-3 px-4">{statusBadge(s.status)}</td>
+                          <td className="py-3 px-4 text-right">
+                            <button
+                              onClick={() => openRoster(s.id)}
+                              className="hover:opacity-80 transition-opacity cursor-pointer"
+                              title="View roster"
+                            >
+                              <CapacityBadge current={s.current_participants} max={s.max_participants ?? 1} label="" />
+                            </button>
+                          </td>
+<td className="py-3 px-4 text-right font-medium tabular-nums">
+                                <div className="flex items-center justify-end gap-1.5">
+                                  <span>${s.participant_amount_paid_sum.toFixed(2)}</span>
+                                  {(s.drop_in_count ?? 0) > 0 && (
+                                    <span 
+                                      className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 text-xs font-bold cursor-help"
+                                      title={`${s.drop_in_count} drop-in${(s.drop_in_count ?? 0) > 1 ? 's' : ''}: $${(s.drop_in_amount ?? 0).toFixed(2)}`}
+                                    >
+                                      $
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                          <td className="py-3 px-4 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              {shareUrl && (
+                                <Button variant="ghost" size="sm" className="h-8" onClick={handleCopy} title="Copy share link">
+                                  {copiedSessionId === s.id ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
+                                </Button>
+                              )}
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                className="h-8" 
+                                onClick={() => handleDuplicateSession(s)}
+                                disabled={duplicatingSessionId === s.id}
+                                title="Duplicate session (next week)"
+                              >
+                                {duplicatingSessionId === s.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <CopyPlus className="h-3.5 w-3.5" />}
+                              </Button>
+                              {showSessionSmsCopyAndTextGroup(s) && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8"
+                                  onClick={() => setTextGroupAdminSession(s)}
+                                >
+                                  <Smartphone className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8"
+                                onClick={() => openDropInDialog(s)}
+                                title="Record drop-in payment"
+                              >
+                                <DollarSign className="h-3.5 w-3.5" />
+                              </Button>
+                              <Link href={`/admin/sessions/${s.id}/edit`}>
+                                <Button variant="ghost" size="sm" className="h-8 text-[#B89D60]">
+                                  <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                              </Link>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          </Card>
+        </div>
+      );
+    }
 
-      {tab === 'kids' && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Athletes</CardTitle>
-            <CardDescription>
-              Youth athletes on the platform. Same card view as My Coaches.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {kidsLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-              </div>
-            ) : kidsList.length === 0 ? (
-              <div className="py-12 text-center text-muted-foreground">
-                No athletes yet.
-              </div>
-            ) : (
-              <div className="grid gap-4 sm:grid-cols-2">
-                {kidsList.map((k) => (
-                  <Card key={k.id}>
-                    <CardContent className="p-4 flex items-center gap-4">
-                      <ProfileImage
-                        src={k.photo_url}
-                        alt={`${k.first_name} ${k.last_name}`}
-                        focusX={k.photo_focus_x}
-                        focusY={k.photo_focus_y}
-                        className="w-14 h-14 shrink-0"
-                        fallbackIconClassName="h-7 w-7 text-muted-foreground"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold truncate">
-                          {k.first_name} {k.last_name}
-                        </p>
-                        {(k.school || k.weight_class) && (
-                          <p className="text-sm text-muted-foreground truncate">
-                            {[k.school, k.weight_class].filter(Boolean).join(' · ') || '—'}
-                          </p>
-                        )}
-                        <p className="text-xs text-muted-foreground truncate" title={k.parent_email}>
-                          {k.parent_email}
-                        </p>
-                      </div>
-                      <div className="flex flex-col gap-2">
-                        <Button variant="outline" size="sm" asChild>
-                          <Link href={`/wrestlers/${k.id}`}>
-                            <ExternalLink className="h-3.5 w-3.5 mr-1.5" />
-                            Profile
-                          </Link>
-                        </Button>
-                        <Button variant="ghost" size="sm" asChild>
-                          <Link href={`/wrestlers/${k.id}/edit`}>Edit</Link>
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          disabled={linkingKidId === k.id}
-                          onClick={async () => {
-                            setLinkingKidId(k.id);
-                            try {
-                              const res = await fetch(`/api/admin/youth-wrestlers/${k.id}/link-parent`, { method: 'POST' });
-                              const data = await res.json();
-                              if (!res.ok) {
-                                alert(data.error || 'Failed to link');
-                                return;
-                              }
-                              alert(data.message ?? 'Linked to your account. Use “View as Parent” to see them in My Wrestlers.');
-                            } catch {
-                              alert('Something went wrong');
-                            } finally {
-                              setLinkingKidId(null);
-                            }
-                          }}
-                        >
-                          {linkingKidId === k.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Link to my account'}
-                        </Button>
-                      </div>
-                    </CardContent>
+    // MONEY SECTION
+    if (section === 'money') {
+      // Payouts sub-section
+      if (subSection === 'payouts') {
+        return (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-lg font-semibold">Coach payouts</h2>
+              <p className="text-sm text-muted-foreground">
+                Pay coaches outside the app (Venmo, Zelle, etc.), then mark paid here. History lists every session
+                already marked paid.
+              </p>
+            </div>
+
+            <Tabs value={payoutTab} onValueChange={(v) => setPayoutTab(v as 'pending' | 'history')} className="w-full">
+              <TabsList className="grid w-full max-w-md grid-cols-2">
+                <TabsTrigger value="pending" className="gap-2">
+                  <Wallet className="h-4 w-4" />
+                  Pending
+                  {coachPayouts.filter((p) => p.amount > 0).length > 0 && (
+                    <span className="ml-1 rounded-full bg-[#B89D60]/25 px-2 py-0.5 text-xs">
+                      {coachPayouts.filter((p) => p.amount > 0).length}
+                    </span>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger value="history" className="gap-2">
+                  <History className="h-4 w-4" />
+                  History
+                  {paidSessionsCount > 0 && (
+                    <span className="ml-1 rounded-full bg-muted px-2 py-0.5 text-xs">{paidSessionsCount}</span>
+                  )}
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="pending" className="mt-6 space-y-6">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <Card className="p-4">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider">Total due</p>
+                    <p className="text-2xl font-semibold text-[#B89D60]">${totalCoachPayoutsDue.toFixed(2)}</p>
                   </Card>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      )}
+                  <Card className="p-4">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider">Coaches to pay</p>
+                    <p className="text-2xl font-semibold">{coachPayouts.filter((p) => p.amount > 0).length}</p>
+                  </Card>
+                  <Card className="p-4">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider">Completed sessions (all)</p>
+                    <p className="text-2xl font-semibold">{billing.completedCount}</p>
+                  </Card>
+                </div>
 
-      <Dialog open={!!editingAthleteId} onOpenChange={(open) => { if (!open) { setEditingAthleteId(null); setAthleteEditForm(null); } }}>
-        <DialogContent className="max-h-[90vh] flex flex-col">
-          <DialogHeader className="shrink-0">
-            <DialogTitle>Edit coach</DialogTitle>
-            <DialogDescription>Edit every aspect of this coach profile. Deactivated coaches are hidden from Browse.</DialogDescription>
-          </DialogHeader>
-          <div className="min-h-0 overflow-y-auto pr-2 -mr-2">
-          {athleteEditForm ? (
-            <form onSubmit={saveAthleteEdit} className="space-y-4">
-              {/* Admin: change coach photo */}
-              {editingAthleteId && (
-                <div className="flex items-center gap-4">
-                  <div className="w-20 h-20 rounded-full border-2 border-border overflow-hidden shrink-0">
-                    <ProfileImage
-                      src={athleteEditForm.photo_url}
-                      alt="Coach"
-                      focusX={athleteEditForm.photo_focus_x}
-                      focusY={athleteEditForm.photo_focus_y}
-                      className="w-full h-full"
-                      fallbackIconClassName="h-8 w-8 text-muted-foreground"
+                <Card className="overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-muted/50">
+                        <tr>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            Coach
+                          </th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            School
+                          </th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            Payment info
+                          </th>
+                          <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            Amount
+                          </th>
+                          <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            Actions
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {coachPayouts.length === 0 ? (
+                          <tr>
+                            <td colSpan={5} className="py-12 text-center text-muted-foreground">
+                              <Wallet className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
+                              <p>No payouts due</p>
+                              <p className="text-xs mt-2 max-w-sm mx-auto">
+                                Completed sessions with no payout date appear here. Mark sessions complete first, then
+                                pay the coach and click Mark paid.
+                              </p>
+                            </td>
+                          </tr>
+                        ) : (
+                          coachPayouts.map((p) => (
+                            <tr key={p.athlete_id} className="hover:bg-muted/30 transition-colors">
+                              <td className="py-3 px-4 font-medium">{p.name}</td>
+                              <td className="py-3 px-4 text-muted-foreground">{p.school}</td>
+                              <td className="py-3 px-4">
+                                {p.venmo_handle && (
+                                  <div className="flex items-center gap-1 text-sm">
+                                    <span className="text-muted-foreground">Venmo:</span>
+                                    <span className="font-medium">{p.venmo_handle}</span>
+                                  </div>
+                                )}
+                                {p.zelle_email && (
+                                  <div className="flex items-center gap-1 text-sm">
+                                    <span className="text-muted-foreground">Zelle:</span>
+                                    <span className="font-medium">{p.zelle_email}</span>
+                                  </div>
+                                )}
+                                {!p.venmo_handle && !p.zelle_email && (
+                                  <span className="text-muted-foreground text-xs">No payment info</span>
+                                )}
+                              </td>
+                              <td className="py-3 px-4 text-right">
+                                <Input
+                                  type="number"
+                                  step="0.01"
+                                  className="w-24 h-8 text-right ml-auto"
+                                  value={payoutTotalByAthlete[p.athlete_id] ?? p.amount.toFixed(2)}
+                                  onChange={(e) =>
+                                    setPayoutTotalByAthlete((prev) => ({
+                                      ...prev,
+                                      [p.athlete_id]: e.target.value,
+                                    }))
+                                  }
+                                />
+                              </td>
+                              <td className="py-3 px-4 text-right">
+                                <Button
+                                  size="sm"
+                                  className="bg-[#B89D60] hover:bg-[#9A8550] text-black h-8"
+                                  disabled={markingAthleteId === p.athlete_id}
+                                  onClick={async () => {
+                                    setMarkingAthleteId(p.athlete_id);
+                                    const amount = parseFloat(
+                                      payoutTotalByAthlete[p.athlete_id] || p.amount.toString()
+                                    );
+                                    try {
+                                      const res = await fetch('/api/admin/mark-payout-paid', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ athlete_id: p.athlete_id, amount }),
+                                      });
+                                      if (res.ok) router.refresh();
+                                      else {
+                                        const data = await res.json().catch(() => ({}));
+                                        alert(data.error || 'Could not mark payout paid');
+                                      }
+                                    } finally {
+                                      setMarkingAthleteId(null);
+                                    }
+                                  }}
+                                >
+                                  {markingAthleteId === p.athlete_id ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                  ) : (
+                                    'Mark paid'
+                                  )}
+                                </Button>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="history" className="mt-6 space-y-4">
+                <div className="flex flex-col gap-4">
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-end">
+                    <div className="lg:col-span-3">
+                      <Label className="text-xs text-muted-foreground">Time period</Label>
+                      <Select
+                        value={payoutHistoryPeriod}
+                        onValueChange={(v) => setPayoutHistoryPeriod(v as PayoutHistoryPeriodPreset)}
+                      >
+                        <SelectTrigger className="mt-1">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All time</SelectItem>
+                          <SelectItem value="week">This week</SelectItem>
+                          <SelectItem value="month">This month</SelectItem>
+                          <SelectItem value="last30">Last 30 days</SelectItem>
+                          <SelectItem value="ytd">Year to date</SelectItem>
+                          <SelectItem value="custom">Custom range…</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-[11px] text-muted-foreground mt-1 leading-snug">
+                        Filter by payout date (when marked paid). Week starts Sunday ({APP_TIMEZONE}).
+                      </p>
+                    </div>
+                    {payoutHistoryPeriod === 'custom' && (
+                      <>
+                        <div className="lg:col-span-2">
+                          <Label className="text-xs text-muted-foreground">Payout date from</Label>
+                          <Input
+                            type="date"
+                            className="mt-1"
+                            value={historyPayoutFrom}
+                            onChange={(e) => setHistoryPayoutFrom(e.target.value)}
+                          />
+                        </div>
+                        <div className="lg:col-span-2">
+                          <Label className="text-xs text-muted-foreground">Payout date to</Label>
+                          <Input
+                            type="date"
+                            className="mt-1"
+                            value={historyPayoutTo}
+                            onChange={(e) => setHistoryPayoutTo(e.target.value)}
+                          />
+                        </div>
+                      </>
+                    )}
+                    <div className="lg:col-span-2">
+                      <Label className="text-xs text-muted-foreground">Coach</Label>
+                      <Select value={historyCoachFilter} onValueChange={setHistoryCoachFilter}>
+                        <SelectTrigger className="mt-1">
+                          <SelectValue placeholder="All coaches" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All coaches</SelectItem>
+                          {payoutHistoryCoachOptions.map(([id, name]) => (
+                            <SelectItem key={id} value={id}>
+                              {name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="lg:col-span-2">
+                      <Label className="text-xs text-muted-foreground">Search coach</Label>
+                      <Input
+                        className="mt-1"
+                        placeholder="Name…"
+                        value={historySearch}
+                        onChange={(e) => setHistorySearch(e.target.value)}
+                      />
+                    </div>
+                    <div className="lg:col-span-1 flex justify-end">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="mt-6 lg:mt-0"
+                        onClick={() => {
+                          setPayoutHistoryPeriod('all');
+                          setHistoryCoachFilter('all');
+                          setHistoryPayoutFrom('');
+                          setHistoryPayoutTo('');
+                          setHistorySearch('');
+                        }}
+                      >
+                        Clear filters
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Card className="p-4">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider">Filtered total</p>
+                    <p className="text-2xl font-semibold tabular-nums">${payoutHistoryTotal.toFixed(2)}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {payoutHistoryRows.length} session row(s) · matches detail table below
+                    </p>
+                  </Card>
+                  <Card className="p-4">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider">All-time paid sessions</p>
+                    <p className="text-2xl font-semibold">{paidSessionsCount}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Sessions with a payout date set (not filtered)</p>
+                  </Card>
+                </div>
+
+                <Card className="overflow-hidden">
+                  <div className="px-4 py-3 border-b border-border bg-muted/30">
+                    <h3 className="text-sm font-semibold">Totals by coach</h3>
+                    <p className="text-xs text-muted-foreground">
+                      Same time period and coach/search filters as below. Grand total ${payoutByCoachGrandTotal.toFixed(2)}.
+                    </p>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-muted/50">
+                        <tr>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            Coach
+                          </th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            School
+                          </th>
+                          <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            Sessions
+                          </th>
+                          <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            Total paid
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {payoutByCoachRows.length === 0 ? (
+                          <tr>
+                            <td colSpan={4} className="py-8 text-center text-muted-foreground text-sm">
+                              No payouts in this period for the current filters.
+                            </td>
+                          </tr>
+                        ) : (
+                          <>
+                            {payoutByCoachRows.map((row) => (
+                              <tr key={row.athlete_id} className="hover:bg-muted/30">
+                                <td className="py-3 px-4 font-medium">{row.name}</td>
+                                <td className="py-3 px-4 text-muted-foreground">{row.school}</td>
+                                <td className="py-3 px-4 text-right tabular-nums">{row.sessionCount}</td>
+                                <td className="py-3 px-4 text-right tabular-nums font-medium">
+                                  ${row.total.toFixed(2)}
+                                </td>
+                              </tr>
+                            ))}
+                            <tr className="bg-muted/40 font-medium">
+                              <td className="py-3 px-4" colSpan={2}>
+                                Total
+                              </td>
+                              <td className="py-3 px-4 text-right tabular-nums">
+                                {payoutByCoachRows.reduce((s, r) => s + r.sessionCount, 0)}
+                              </td>
+                              <td className="py-3 px-4 text-right tabular-nums">
+                                ${payoutByCoachGrandTotal.toFixed(2)}
+                              </td>
+                            </tr>
+                          </>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+
+                <Card className="overflow-hidden">
+                  <div className="overflow-x-auto max-h-[min(70vh,720px)] overflow-y-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-muted/50 sticky top-0 z-10">
+                        <tr>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            Paid date
+                          </th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            Coach
+                          </th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            School
+                          </th>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            Session
+                          </th>
+                          <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            Amount
+                          </th>
+                          <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            Link
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {payoutHistoryRows.length === 0 ? (
+                          <tr>
+                            <td colSpan={6} className="py-12 text-center text-muted-foreground">
+                              <History className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
+                              <p>No payout history matches the filters</p>
+                              <p className="text-xs mt-2 max-w-md mx-auto">
+                                Rows appear after you mark a coach paid on the Pending tab. Adjust filters or clear them
+                                to see all recorded payouts.
+                              </p>
+                            </td>
+                          </tr>
+                        ) : (
+                          payoutHistoryRows.map(({ session: s, payoutAmount }) => (
+                            <tr key={s.id} className="hover:bg-muted/30 transition-colors">
+                              <td className="py-3 px-4 whitespace-nowrap text-muted-foreground">
+                                {(s.athlete_payout_date || '').slice(0, 10) || '—'}
+                              </td>
+                              <td className="py-3 px-4 font-medium">{s.athlete_name}</td>
+                              <td className="py-3 px-4 text-muted-foreground">{s.athlete_school}</td>
+                              <td className="py-3 px-4">
+                                <div className="text-muted-foreground text-xs">
+                                  {formatEST(new Date(s.scheduled_datetime), 'MMM d, yyyy h:mm a')}
+                                </div>
+                                <div className="text-xs text-muted-foreground/80 truncate max-w-[200px]">
+                                  {s.facility_name}
+                                </div>
+                              </td>
+                              <td className="py-3 px-4 text-right tabular-nums font-medium">
+                                ${payoutAmount.toFixed(2)}
+                              </td>
+                              <td className="py-3 px-4 text-right">
+                                <Link href={`/admin/sessions/${s.id}/edit`}>
+                                  <Button variant="ghost" size="sm" className="h-8 gap-1 text-[#B89D60]">
+                                    <Pencil className="h-3.5 w-3.5" />
+                                    Edit
+                                  </Button>
+                                </Link>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+              </TabsContent>
+            </Tabs>
+          </div>
+        );
+      }
+
+      // Credits sub-section
+      if (subSection === 'credits') {
+        return (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-lg font-semibold">Parent Credits</h2>
+              <p className="text-sm text-muted-foreground">View and manage credit balances</p>
+            </div>
+
+            <Card className="overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/50">
+                    <tr>
+                      <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Parent</th>
+                      <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Source</th>
+                      <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Original</th>
+                      <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Remaining</th>
+                      <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Created</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {credits.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="py-12 text-center text-muted-foreground">
+                          <CreditCard className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
+                          <p>No credits found</p>
+                        </td>
+                      </tr>
+                    ) : (
+                      credits.map((c) => (
+                        <tr key={c.id} className="hover:bg-muted/30 transition-colors">
+                          <td className="py-3 px-4 font-medium">{c.parent_email}</td>
+                          <td className="py-3 px-4">
+                            <Badge variant="outline">{c.source}</Badge>
+                          </td>
+                          <td className="py-3 px-4 text-right tabular-nums">${c.amount.toFixed(2)}</td>
+                          <td className="py-3 px-4 text-right tabular-nums font-medium text-[#B89D60]">${c.remaining.toFixed(2)}</td>
+                          <td className="py-3 px-4 text-muted-foreground">{formatEST(new Date(c.created_at), 'MMM d, yyyy')}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          </div>
+        );
+      }
+
+      // Messages sub-section
+      if (subSection === 'messages') {
+        return <MessageLogSection />;
+      }
+
+      // Default: Payments overview with filters
+      return (
+        <div className="space-y-6">
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-[#B89D60]/10">
+                <DollarSign className="h-5 w-5 text-[#B89D60]" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold">Financial Overview</h2>
+                <p className="text-sm text-muted-foreground">Guild revenue, coach payouts, and open bookings</p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => setSubSection('payouts')}
+              >
+                <Wallet className="h-4 w-4 mr-2" />
+                Process Payouts
+                {totalCoachPayoutsDue > 0 && (
+                  <Badge className="ml-2 bg-[#B89D60]/20 text-[#B89D60]">${totalCoachPayoutsDue.toFixed(0)}</Badge>
+                )}
+              </Button>
+            </div>
+          </div>
+
+          {/* Filters */}
+          <Card className="p-4">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-muted-foreground uppercase">Time:</span>
+                <div className="flex items-center rounded-lg border border-border bg-muted/30 p-1">
+                  {(['all', '7d', '30d', '90d', 'ytd'] as const).map((period) => (
+                    <button
+                      key={period}
+                      onClick={() => setFinanceTimeFilter(period)}
+                      className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                        financeTimeFilter === period
+                          ? 'bg-[#B89D60] text-black'
+                          : 'text-muted-foreground hover:text-foreground'
+                      }`}
+                    >
+                      {period === 'all' ? 'All Time' : period === 'ytd' ? 'YTD' : period}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-muted-foreground uppercase">Type:</span>
+                <Select value={financeTypeFilter} onValueChange={setFinanceTypeFilter}>
+                  <SelectTrigger className="w-36 h-9">
+                    <SelectValue placeholder="All types" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Types</SelectItem>
+                    {sessionTypesForFilter.map((t) => (
+                      <SelectItem key={t} value={t}>{t}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-muted-foreground uppercase">School:</span>
+                <Select value={financeSchoolFilter} onValueChange={setFinanceSchoolFilter}>
+                  <SelectTrigger className="w-40 h-9">
+                    <SelectValue placeholder="All schools" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Schools</SelectItem>
+                    <SelectItem value="non-affiliated">Non-Affiliated</SelectItem>
+                    {uniqueSchools.map((school) => (
+                      <SelectItem key={school} value={school}>{school}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {(financeTimeFilter !== 'all' || financeTypeFilter !== 'all' || financeSchoolFilter !== 'all') && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="text-xs"
+                  onClick={() => {
+                    setFinanceTimeFilter('all');
+                    setFinanceTypeFilter('all');
+                    setFinanceSchoolFilter('all');
+                  }}
+                >
+                  Clear filters
+                </Button>
+              )}
+            </div>
+          </Card>
+
+          {/* Financial Summary */}
+          <Card className="p-6">
+            <h3 className="text-sm font-semibold mb-4 text-muted-foreground uppercase tracking-wider">Revenue Breakdown</h3>
+            <div className="space-y-4">
+              {/* Gross Revenue */}
+              <div className="flex items-center justify-between py-2 border-b border-border">
+                <div className="flex items-center gap-3">
+                  <DollarSign className="h-5 w-5 text-[#B89D60]" />
+                  <div>
+                    <p className="font-medium">Gross Revenue</p>
+                    <p className="text-xs text-muted-foreground">Total collected from parents (Stripe + Cash)</p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-xl font-bold">${financeData.grossRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+                  <div className="flex gap-2 text-xs text-muted-foreground">
+                    <span>Stripe: ${financeData.stripeRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    {financeData.cashRevenue > 0 && (
+                      <span className="text-emerald-500">Cash: ${financeData.cashRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Coach Payouts */}
+              <div className="flex items-center justify-between py-2 border-b border-border">
+                <div className="flex items-center gap-3">
+                  <Wallet className="h-5 w-5 text-blue-500" />
+                  <div>
+                    <p className="font-medium">Coach Payouts</p>
+                    <p className="text-xs text-muted-foreground">Recorded payments to coaches (athlete_payment)</p>
+                  </div>
+                </div>
+                <p className="text-xl font-bold text-blue-400">-${financeData.coachPayouts.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+              </div>
+
+              {/* Guild Net */}
+              <div className="flex items-center justify-between py-2 border-b border-border bg-emerald-500/5 -mx-6 px-6">
+                <div className="flex items-center gap-3">
+                  <TrendingUp className="h-5 w-5 text-emerald-500" />
+                  <div>
+                    <p className="font-medium">Guild Net</p>
+                    <p className="text-xs text-muted-foreground">Gross Revenue - Coach Payouts</p>
+                  </div>
+                </div>
+                <p className={`text-xl font-bold ${financeData.guildNet >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+                  ${financeData.guildNet.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+              </div>
+
+              {/* Stripe Fees (Estimated) */}
+              <div className="flex items-center justify-between py-2 border-b border-border">
+                <div className="flex items-center gap-3">
+                  <CreditCard className="h-5 w-5 text-red-400" />
+                  <div>
+                    <p className="font-medium">Stripe Fees <span className="text-xs text-amber-500 ml-1">(estimated)</span></p>
+                    <p className="text-xs text-muted-foreground">~2.9% + $0.30 per transaction on Stripe payments</p>
+                  </div>
+                </div>
+                <p className="text-xl font-bold text-red-400">-${financeData.stripeFees.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+              </div>
+
+              {/* Guild Profit */}
+              <div className="flex items-center justify-between py-3 bg-[#B89D60]/10 -mx-6 px-6 rounded-b-lg">
+                <div className="flex items-center gap-3">
+                  <TrendingUp className="h-5 w-5 text-[#B89D60]" />
+                  <div>
+                    <p className="font-semibold">Guild Profit</p>
+                    <p className="text-xs text-muted-foreground">Guild Net - Stripe Fees (estimated)</p>
+                  </div>
+                </div>
+                <p className={`text-2xl font-bold ${financeData.guildProfit >= 0 ? 'text-[#B89D60]' : 'text-red-500'}`}>
+                  ${financeData.guildProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+              </div>
+            </div>
+          </Card>
+
+          {/* Bookings Summary */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            <Card className="p-4">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Open Bookings</p>
+              <p className="text-xl font-semibold mt-1 text-emerald-500">{financeData.openBookings}</p>
+            </Card>
+            <Card className="p-4">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Completed</p>
+              <p className="text-xl font-semibold mt-1">{financeData.completedSessions}</p>
+            </Card>
+            <Card className="p-4">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Pending Payment</p>
+              <p className="text-xl font-semibold mt-1 text-amber-500">{financeData.pendingPayment}</p>
+            </Card>
+            <Card className="p-4">
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Cancelled</p>
+              <p className="text-xl font-semibold mt-1 text-muted-foreground">{financeData.cancelledSessions}</p>
+            </Card>
+          </div>
+
+          {/* Revenue Breakdown by Coach */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm font-medium">Revenue by Coach</CardTitle>
+              <CardDescription>Top performers based on current filters</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/50">
+                    <tr>
+                      <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Coach</th>
+                      <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">School</th>
+                      <th className="text-center py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Sessions</th>
+                      <th className="text-center py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Open</th>
+                      <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Revenue</th>
+                      <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Coach Payout</th>
+                      <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Guild Net</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {financeData.coachBreakdown.length === 0 ? (
+                      <tr>
+<td colSpan={8} className="py-12 text-center text-muted-foreground">
+                          <DollarSign className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
+                          <p>No financial data for selected filters</p>
+                        </td>
+                      </tr>
+                    ) : (
+                      financeData.coachBreakdown.slice(0, 10).map((coach, idx) => (
+                        <tr key={coach.athlete_id} className="hover:bg-muted/30 transition-colors">
+                          <td className="py-3 px-4">
+                            <div className="flex items-center gap-2">
+                              {idx < 3 && (
+                                <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold ${
+                                  idx === 0 ? 'bg-[#B89D60] text-black' :
+                                  idx === 1 ? 'bg-gray-400 text-black' :
+                                  'bg-amber-700 text-white'
+                                }`}>
+                                  {idx + 1}
+                                </div>
+                              )}
+                              <span className="font-medium">{coach.name}</span>
+                            </div>
+                          </td>
+                          <td className="py-3 px-4 text-muted-foreground">{coach.school}</td>
+                          <td className="py-3 px-4 text-center tabular-nums">{coach.sessions}</td>
+                          <td className="py-3 px-4 text-center">
+                            {coach.open > 0 ? (
+                              <Badge variant="outline" className="border-emerald-600 bg-emerald-600/20 text-emerald-400">{coach.open}</Badge>
+                            ) : (
+                              <span className="text-muted-foreground">0</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-right tabular-nums font-medium">
+                            ${coach.revenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                          <td className="py-3 px-4 text-right tabular-nums text-blue-400">
+                            ${coach.payout.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                          <td className="py-3 px-4 text-right tabular-nums font-semibold text-[#B89D60]">
+                            ${(coach.revenue - coach.payout).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                  {financeData.coachBreakdown.length > 0 && (
+                    <tfoot className="border-t-2 border-border bg-muted/30">
+                      <tr className="font-semibold">
+                        <td className="py-3 px-4" colSpan={2}>Total ({financeData.coachBreakdown.length} coaches)</td>
+                        <td className="py-3 px-4 text-center tabular-nums">{financeData.completedSessions + financeData.pendingPayment}</td>
+                        <td className="py-3 px-4 text-center tabular-nums">{financeData.openBookings}</td>
+                        <td className="py-3 px-4 text-right tabular-nums">${financeData.grossRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        <td className="py-3 px-4 text-right tabular-nums text-blue-400">${financeData.coachPayouts.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        <td className="py-3 px-4 text-right tabular-nums text-[#B89D60]">${financeData.guildNet.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                      </tr>
+                    </tfoot>
+                  )}
+                </table>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Quick Actions */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Button 
+              variant="outline" 
+              className="h-auto p-4 justify-start"
+              onClick={() => setSubSection('payouts')}
+            >
+              <Wallet className="h-5 w-5 mr-3 text-[#B89D60]" />
+              <div className="text-left">
+                <div className="font-medium">Process Coach Payouts</div>
+                <div className="text-xs text-muted-foreground">{coachPayouts.filter(p => p.amount > 0).length} coaches awaiting payment</div>
+              </div>
+              {totalCoachPayoutsDue > 0 && (
+                <Badge className="ml-auto bg-[#B89D60]/20 text-[#B89D60]">${totalCoachPayoutsDue.toFixed(0)}</Badge>
+              )}
+            </Button>
+            <Button 
+              variant="outline" 
+              className="h-auto p-4 justify-start"
+              onClick={() => setSubSection('credits')}
+            >
+              <CreditCard className="h-5 w-5 mr-3 text-blue-500" />
+              <div className="text-left">
+                <div className="font-medium">Parent Credits</div>
+                <div className="text-xs text-muted-foreground">{credits.filter(c => c.remaining > 0).length} active credits</div>
+              </div>
+            </Button>
+            <Button
+              variant="outline"
+              className="h-auto p-4 justify-start"
+              onClick={() => setSubSection('messages')}
+            >
+              <MessageSquare className="h-5 w-5 mr-3 text-purple-500" />
+              <div className="text-left">
+                <div className="font-medium">Message Log</div>
+                <div className="text-xs text-muted-foreground">SMS &amp; notifications sent</div>
+              </div>
+            </Button>
+          </div>
+        </div>
+      );
+    }
+
+    // PEOPLE SECTION
+    if (section === 'people') {
+      // Coaches Leaderboard sub-section
+      if (subSection === 'coaches') {
+        const totalOpenBookings = leaderboardData.reduce((sum, c) => sum + c.open_count, 0);
+        const totalPendingPayment = leaderboardData.reduce((sum, c) => sum + c.pending_payment_count, 0);
+        const totalEarnings = leaderboardData.reduce((sum, c) => sum + c.total_earnings, 0);
+
+        return (
+          <div className="space-y-6">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-[#B89D60]/10">
+                  <Trophy className="h-5 w-5 text-[#B89D60]" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold">Coach Leaderboard</h2>
+                  <p className="text-sm text-muted-foreground">{leaderboardData.length} coaches</p>
+                </div>
+              </div>
+              <Link
+                href="/admin/program-report"
+                className="text-sm font-medium text-[#B89D60] hover:underline inline-flex items-center gap-1 shrink-0"
+              >
+                Program report (print / PDF)
+                <ExternalLink className="h-3.5 w-3.5" />
+              </Link>
+            </div>
+
+            {/* Summary Cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              <Card className="p-4">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Earnings</p>
+                <p className="text-xl font-semibold mt-1 text-[#B89D60]">${totalEarnings.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</p>
+              </Card>
+              <Card className="p-4">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Open Bookings</p>
+                <p className="text-xl font-semibold mt-1">{totalOpenBookings}</p>
+              </Card>
+              <Card className="p-4">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Pending Payment</p>
+                <p className="text-xl font-semibold mt-1 text-amber-500">{totalPendingPayment}</p>
+              </Card>
+              <Card className="p-4">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Active Coaches</p>
+                <p className="text-xl font-semibold mt-1">{leaderboardData.filter(c => c.open_count > 0).length}</p>
+              </Card>
+            </div>
+
+            {/* Filters */}
+            <Card className="p-4">
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-medium text-muted-foreground uppercase">Time:</span>
+                  <div className="flex items-center rounded-lg border border-border bg-muted/30 p-1">
+                    {(['all', '7d', '30d', '90d'] as const).map((period) => (
+                      <button
+                        key={period}
+                        onClick={() => setLeaderboardTimeFilter(period)}
+                        className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                          leaderboardTimeFilter === period
+                            ? 'bg-[#B89D60] text-black'
+                            : 'text-muted-foreground hover:text-foreground'
+                        }`}
+                      >
+                        {period === 'all' ? 'All Time' : period}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+<div className="flex items-center gap-2">
+  <span className="text-xs font-medium text-muted-foreground uppercase">Type:</span>
+  <Select value={leaderboardTypeFilter} onValueChange={setLeaderboardTypeFilter}>
+  <SelectTrigger className="w-36 h-9">
+  <SelectValue placeholder="All types" />
+  </SelectTrigger>
+  <SelectContent>
+  <SelectItem value="all">All Types</SelectItem>
+  {sessionTypesForFilter.map((t) => (
+  <SelectItem key={t} value={t}>{t}</SelectItem>
+  ))}
+  </SelectContent>
+  </Select>
+  </div>
+
+  <div className="flex items-center gap-2">
+  <span className="text-xs font-medium text-muted-foreground uppercase">School:</span>
+  <Select value={leaderboardSchoolFilter} onValueChange={setLeaderboardSchoolFilter}>
+  <SelectTrigger className="w-40 h-9">
+  <SelectValue placeholder="All schools" />
+  </SelectTrigger>
+  <SelectContent>
+  <SelectItem value="all">All Schools</SelectItem>
+  <SelectItem value="non-affiliated">Non-Affiliated</SelectItem>
+  {uniqueSchools.map((school) => (
+  <SelectItem key={school} value={school}>{school}</SelectItem>
+  ))}
+  </SelectContent>
+  </Select>
+  </div>
+  
+  <div className="flex items-center gap-2">
+  <span className="text-xs font-medium text-muted-foreground uppercase">Sort:</span>
+                  <Select value={leaderboardSort} onValueChange={(v) => setLeaderboardSort(v as typeof leaderboardSort)}>
+                    <SelectTrigger className="w-36 h-9">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="earnings">Earnings</SelectItem>
+                      <SelectItem value="sessions">Sessions</SelectItem>
+                      <SelectItem value="rating">Rating</SelectItem>
+                      <SelectItem value="open">Open Bookings</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="relative flex-1 min-w-[200px]">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search coaches..."
+                    className="pl-9"
+                    value={athleteSearch}
+                    onChange={(e) => setAthleteSearch(e.target.value)}
+                  />
+                </div>
+              </div>
+            </Card>
+
+            {/* Leaderboard Table */}
+            <Card className="overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/50">
+                    <tr>
+                      <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider w-10">#</th>
+                      <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Coach</th>
+                      <th className="text-center py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Status</th>
+                      <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">School</th>
+                      <th className="text-center py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Rating</th>
+                      <th className="text-center py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Open</th>
+                      <th className="text-center py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Completed</th>
+                      <th className="text-center py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Pending $</th>
+                      <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Earnings</th>
+                      <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {leaderboardData.length === 0 ? (
+                      <tr>
+                        <td colSpan={10} className="py-12 text-center text-muted-foreground">
+                          <Trophy className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
+                          <p>No coaches found</p>
+                        </td>
+                      </tr>
+                    ) : (
+                      leaderboardData.map((a, idx) => (
+                        <tr key={a.athlete_id} className="hover:bg-muted/30 transition-colors">
+                          <td className="py-3 px-4">
+                            {idx < 3 ? (
+                              <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                                idx === 0 ? 'bg-[#B89D60] text-black' :
+                                idx === 1 ? 'bg-gray-400 text-black' :
+                                'bg-amber-700 text-white'
+                              }`}>
+                                {idx + 1}
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground pl-1.5">{idx + 1}</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 font-medium">{a.athlete_name}</td>
+                          <td className="py-3 px-4 text-center">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className={`h-7 px-2 text-xs font-medium ${a.active ? 'text-emerald-500 hover:text-emerald-400' : 'text-amber-500 hover:text-amber-400'}`}
+                              disabled={approvingId === a.athlete_id}
+                              onClick={() => handleToggleApproval(a.athlete_id, a.active)}
+                            >
+                              {approvingId === a.athlete_id ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                              ) : (
+                                <Badge variant={a.active ? 'default' : 'outline'} className={a.active ? 'bg-emerald-600 hover:bg-emerald-500' : 'border-amber-500 text-amber-500'}>
+                                  {a.active ? 'Approved' : 'Pending'}
+                                </Badge>
+                              )}
+                            </Button>
+                          </td>
+                          <td className="py-3 px-4 text-muted-foreground">{a.school}</td>
+                          <td className="py-3 px-4 text-center">
+                            {a.average_rating ? (
+                              <div className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-amber-500/10">
+                                <Star className="h-3.5 w-3.5 text-amber-500 fill-amber-500" />
+                                <span className="font-medium">{a.average_rating.toFixed(1)}</span>
+                                <span className="text-muted-foreground text-xs">({a.review_count})</span>
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground">-</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-center">
+                            {a.open_count > 0 ? (
+                              <Badge variant="outline" className="border-emerald-600 bg-emerald-600/20 text-emerald-400">{a.open_count}</Badge>
+                            ) : (
+                              <span className="text-muted-foreground">0</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-center tabular-nums">{a.completed_count}</td>
+                          <td className="py-3 px-4 text-center">
+                            {a.pending_payment_count > 0 ? (
+                              <Badge variant="outline" className="border-amber-500 bg-amber-500/20 text-amber-400">{a.pending_payment_count}</Badge>
+                            ) : (
+                              <span className="text-muted-foreground">0</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-right tabular-nums font-semibold text-[#B89D60]">
+                            ${a.total_earnings.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <div className="flex items-center justify-end gap-1">
+                              <Button variant="ghost" size="sm" className="h-8" onClick={() => openAthleteEdit(a.athlete_id)}>
+                                <Pencil className="h-3.5 w-3.5" />
+                              </Button>
+                              <Link href={`/coaches/${a.athlete_id}`} target="_blank">
+                                <Button variant="ghost" size="sm" className="h-8">
+                                  <ExternalLink className="h-3.5 w-3.5" />
+                                </Button>
+                              </Link>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 text-red-500 hover:text-red-400"
+                                disabled={deactivatingId === a.athlete_id}
+                                onClick={() => handleDeactivateAthlete(a.athlete_id)}
+                              >
+                                {deactivatingId === a.athlete_id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <UserX className="h-3.5 w-3.5" />}
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          </div>
+        );
+      }
+
+      // Athletes (Youth Wrestlers) sub-section
+      if (subSection === 'athletes') {
+        const youthLbTotalSpent = youthLeaderboardData.reduce((s, a) => s + a.total_spent, 0);
+        const youthLbTotalOpen = youthLeaderboardData.reduce((s, a) => s + a.open_count, 0);
+        const youthLbTotalPending = youthLeaderboardData.reduce((s, a) => s + a.pending_payment_count, 0);
+        const youthLbActiveWithOpen = youthLeaderboardData.filter((a) => a.open_count > 0).length;
+
+        return (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-lg font-semibold">Youth athletes</h2>
+              <p className="text-sm text-muted-foreground">
+                Leaderboard shows bookings and parent-paid totals by session date. Directory and Spending are below.
+              </p>
+            </div>
+
+            <Tabs
+              value={athletesSubTab}
+              onValueChange={(v) =>
+                setAthletesSubTab(v as 'leaderboard' | 'directory' | 'spending')
+              }
+              className="w-full"
+            >
+              <TabsList className="grid w-full max-w-2xl grid-cols-3">
+                <TabsTrigger value="leaderboard" className="gap-1">
+                  <Trophy className="h-3.5 w-3.5" />
+                  Leaderboard
+                </TabsTrigger>
+                <TabsTrigger value="directory">Directory</TabsTrigger>
+                <TabsTrigger value="spending" className="gap-2">
+                  <DollarSign className="h-4 w-4" />
+                  Spending
+                  {youthSessionSpendLines.length > 0 && (
+                    <span className="ml-1 rounded-full bg-muted px-2 py-0.5 text-xs">
+                      {youthSessionSpendLines.length}
+                    </span>
+                  )}
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="leaderboard" className="mt-6 space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 rounded-lg bg-[#B89D60]/10">
+                      <Trophy className="h-5 w-5 text-[#B89D60]" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-semibold">Athlete leaderboard</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {youthLeaderboardData.length} athlete{youthLeaderboardData.length !== 1 ? 's' : ''} in view
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <Card className="p-4">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total spent</p>
+                    <p className="text-xl font-semibold mt-1 text-[#B89D60] tabular-nums">
+                      ${youthLbTotalSpent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                  </Card>
+                  <Card className="p-4">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Open bookings</p>
+                    <p className="text-xl font-semibold mt-1 tabular-nums">{youthLbTotalOpen}</p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">Scheduled session spots</p>
+                  </Card>
+                  <Card className="p-4">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Pending payment</p>
+                    <p className="text-xl font-semibold mt-1 text-amber-500 tabular-nums">{youthLbTotalPending}</p>
+                  </Card>
+                  <Card className="p-4">
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">With open spots</p>
+                    <p className="text-xl font-semibold mt-1 tabular-nums">{youthLbActiveWithOpen}</p>
+                  </Card>
+                </div>
+
+                <Card className="p-4">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium text-muted-foreground uppercase">Time:</span>
+                      <div className="flex items-center rounded-lg border border-border bg-muted/30 p-1">
+                        {(['all', '7d', '30d', '90d'] as const).map((period) => (
+                          <button
+                            key={period}
+                            type="button"
+                            onClick={() => setYouthLeaderboardTimeFilter(period)}
+                            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                              youthLeaderboardTimeFilter === period
+                                ? 'bg-[#B89D60] text-black'
+                                : 'text-muted-foreground hover:text-foreground'
+                            }`}
+                          >
+                            {period === 'all' ? 'All Time' : period}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium text-muted-foreground uppercase">Type:</span>
+                      <Select value={youthLeaderboardTypeFilter} onValueChange={setYouthLeaderboardTypeFilter}>
+                        <SelectTrigger className="w-36 h-9">
+                          <SelectValue placeholder="All types" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Types</SelectItem>
+                          {sessionTypesForFilter.map((t) => (
+                            <SelectItem key={t} value={t}>
+                              {t}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium text-muted-foreground uppercase">School:</span>
+                      <Select value={youthLeaderboardSchoolFilter} onValueChange={setYouthLeaderboardSchoolFilter}>
+                        <SelectTrigger className="w-40 h-9">
+                          <SelectValue placeholder="All schools" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Schools</SelectItem>
+                          <SelectItem value="non-affiliated">Non-Affiliated</SelectItem>
+                          {uniqueYouthSchools.map((school) => (
+                            <SelectItem key={school} value={school}>
+                              {school}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium text-muted-foreground uppercase">Sort:</span>
+                      <Select
+                        value={youthLbSort.key}
+                        onValueChange={(v) => {
+                          const key = v as YouthLbSortKey;
+                          const isNumeric = key !== 'name' && key !== 'school';
+                          setYouthLbSort({ key, dir: isNumeric ? 'desc' : 'asc' });
+                        }}
+                      >
+                        <SelectTrigger className="w-44 h-9">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="name">Athlete (A–Z)</SelectItem>
+                          <SelectItem value="school">School</SelectItem>
+                          <SelectItem value="open">Open</SelectItem>
+                          <SelectItem value="completed">Completed</SelectItem>
+                          <SelectItem value="pending">Pending</SelectItem>
+                          <SelectItem value="bookings">Bookings</SelectItem>
+                          <SelectItem value="spent">Total spent</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="relative flex-1 min-w-[200px]">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Search athletes…"
+                        className="pl-9"
+                        value={youthLeaderboardSearch}
+                        onChange={(e) => setYouthLeaderboardSearch(e.target.value)}
+                      />
+                    </div>
+                  </div>
+                </Card>
+
+                <Card className="overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-muted/50">
+                        <tr>
+                          <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider w-10">
+                            #
+                          </th>
+                          <th className="text-left py-3 px-4">
+                            <AdminSortColBtn
+                              label="Athlete"
+                              active={youthLbSort.key === 'name'}
+                              dir={youthLbSort.dir}
+                              onClick={() => toggleYouthLbSort('name')}
+                            />
+                          </th>
+                          <th className="text-left py-3 px-4">
+                            <AdminSortColBtn
+                              label="School"
+                              active={youthLbSort.key === 'school'}
+                              dir={youthLbSort.dir}
+                              onClick={() => toggleYouthLbSort('school')}
+                            />
+                          </th>
+                          <th className="text-center py-3 px-4">
+                            <div className="flex justify-center">
+                              <AdminSortColBtn
+                                label="Open"
+                                active={youthLbSort.key === 'open'}
+                                dir={youthLbSort.dir}
+                                onClick={() => toggleYouthLbSort('open')}
+                              />
+                            </div>
+                          </th>
+                          <th className="text-center py-3 px-4">
+                            <div className="flex justify-center">
+                              <AdminSortColBtn
+                                label="Completed"
+                                active={youthLbSort.key === 'completed'}
+                                dir={youthLbSort.dir}
+                                onClick={() => toggleYouthLbSort('completed')}
+                              />
+                            </div>
+                          </th>
+                          <th className="text-center py-3 px-4">
+                            <div className="flex justify-center">
+                              <AdminSortColBtn
+                                label="Pending"
+                                active={youthLbSort.key === 'pending'}
+                                dir={youthLbSort.dir}
+                                onClick={() => toggleYouthLbSort('pending')}
+                              />
+                            </div>
+                          </th>
+                          <th className="text-center py-3 px-4">
+                            <div className="flex justify-center">
+                              <AdminSortColBtn
+                                label="Bookings"
+                                active={youthLbSort.key === 'bookings'}
+                                dir={youthLbSort.dir}
+                                onClick={() => toggleYouthLbSort('bookings')}
+                              />
+                            </div>
+                          </th>
+                          <th className="text-right py-3 px-4">
+                            <div className="flex justify-end">
+                              <AdminSortColBtn
+                                label="Spent"
+                                active={youthLbSort.key === 'spent'}
+                                dir={youthLbSort.dir}
+                                onClick={() => toggleYouthLbSort('spent')}
+                              />
+                            </div>
+                          </th>
+                          <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            Actions
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {kidsLoading ? (
+                          <tr>
+                            <td colSpan={9} className="py-12 text-center">
+                              <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+                            </td>
+                          </tr>
+                        ) : youthLeaderboardData.length === 0 ? (
+                          <tr>
+                            <td colSpan={9} className="py-12 text-center text-muted-foreground">
+                              <User className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
+                              <p>No athletes match these filters</p>
+                            </td>
+                          </tr>
+                        ) : (
+                          youthLeaderboardData.map((a, idx) => (
+                            <tr key={a.youth_wrestler_id} className="hover:bg-muted/30 transition-colors">
+                              <td className="py-3 px-4">
+                                {idx < 3 ? (
+                                  <div
+                                    className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                                      idx === 0
+                                        ? 'bg-[#B89D60] text-black'
+                                        : idx === 1
+                                          ? 'bg-gray-400 text-black'
+                                          : 'bg-amber-700 text-white'
+                                    }`}
+                                  >
+                                    {idx + 1}
+                                  </div>
+                                ) : (
+                                  <span className="text-muted-foreground pl-1.5">{idx + 1}</span>
+                                )}
+                              </td>
+                              <td className="py-3 px-4 font-medium">{a.name}</td>
+                              <td className="py-3 px-4 text-muted-foreground">{a.school || '—'}</td>
+                              <td className="py-3 px-4 text-center">
+                                {a.open_count > 0 ? (
+                                  <Badge
+                                    variant="outline"
+                                    className="border-emerald-600 bg-emerald-600/20 text-emerald-400"
+                                  >
+                                    {a.open_count}
+                                  </Badge>
+                                ) : (
+                                  <span className="text-muted-foreground">0</span>
+                                )}
+                              </td>
+                              <td className="py-3 px-4 text-center tabular-nums">{a.completed_count}</td>
+                              <td className="py-3 px-4 text-center">
+                                {a.pending_payment_count > 0 ? (
+                                  <Badge
+                                    variant="outline"
+                                    className="border-amber-500 bg-amber-500/20 text-amber-400"
+                                  >
+                                    {a.pending_payment_count}
+                                  </Badge>
+                                ) : (
+                                  <span className="text-muted-foreground">0</span>
+                                )}
+                              </td>
+                              <td className="py-3 px-4 text-center tabular-nums">{a.booking_count}</td>
+                              <td className="py-3 px-4 text-right tabular-nums font-semibold text-[#B89D60]">
+                                ${a.total_spent.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </td>
+                              <td className="py-3 px-4 text-right">
+                                <Link href={`/wrestlers/${a.youth_wrestler_id}`} target="_blank">
+                                  <Button variant="ghost" size="sm" className="h-8">
+                                    <ExternalLink className="h-3.5 w-3.5" />
+                                  </Button>
+                                </Link>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="directory" className="mt-6 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Card className="p-4">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider">Total spent (all kids)</p>
+                    <p className="text-2xl font-semibold tabular-nums text-[#B89D60]">
+                      ${totalYouthSpendAllTime.toFixed(2)}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">Sum of parent payments on sessions</p>
+                  </Card>
+                  <Card className="p-4">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider">Paid session lines</p>
+                    <p className="text-2xl font-semibold">{youthSessionSpendLines.length}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Wrestler rows on sessions with amount</p>
+                  </Card>
+                </div>
+
+                <Card className="overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-muted/50">
+                        <tr>
+                          <th className="text-left py-3 px-4">
+                            <AdminSortColBtn
+                              label="Name"
+                              active={youthDirSort.key === 'name'}
+                              dir={youthDirSort.dir}
+                              onClick={() => toggleYouthDirSort('name')}
+                            />
+                          </th>
+                          <th className="text-left py-3 px-4">
+                            <AdminSortColBtn
+                              label="School"
+                              active={youthDirSort.key === 'school'}
+                              dir={youthDirSort.dir}
+                              onClick={() => toggleYouthDirSort('school')}
+                            />
+                          </th>
+                          <th className="text-left py-3 px-4">
+                            <AdminSortColBtn
+                              label="Parent"
+                              active={youthDirSort.key === 'parent'}
+                              dir={youthDirSort.dir}
+                              onClick={() => toggleYouthDirSort('parent')}
+                            />
+                          </th>
+                          <th className="text-right py-3 px-4">
+                            <div className="flex justify-end">
+                              <AdminSortColBtn
+                                label="Total spent"
+                                active={youthDirSort.key === 'spent'}
+                                dir={youthDirSort.dir}
+                                onClick={() => toggleYouthDirSort('spent')}
+                              />
+                            </div>
+                          </th>
+                          <th className="text-left py-3 px-4">
+                            <AdminSortColBtn
+                              label="Level"
+                              active={youthDirSort.key === 'level'}
+                              dir={youthDirSort.dir}
+                              onClick={() => toggleYouthDirSort('level')}
+                            />
+                          </th>
+                          <th className="text-left py-3 px-4">
+                            <AdminSortColBtn
+                              label="Joined"
+                              active={youthDirSort.key === 'joined'}
+                              dir={youthDirSort.dir}
+                              onClick={() => toggleYouthDirSort('joined')}
+                            />
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {kidsLoading ? (
+                          <tr>
+                            <td colSpan={6} className="py-12 text-center">
+                              <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+                            </td>
+                          </tr>
+                        ) : kidsList.length === 0 ? (
+                          <tr>
+                            <td colSpan={6} className="py-12 text-center text-muted-foreground">
+                              <User className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
+                              <p>No athletes found</p>
+                            </td>
+                          </tr>
+                        ) : (
+                          sortedKidsDirectory.map((k) => {
+                            const agg = spendByYouthIdAll.get(k.id);
+                            return (
+                              <tr key={k.id} className="hover:bg-muted/30 transition-colors">
+                                <td className="py-3 px-4">
+                                  <div className="flex items-center gap-3">
+                                    <ProfileImage
+                                      src={k.photo_url}
+                                      focusX={k.photo_focus_x}
+                                      focusY={k.photo_focus_y}
+                                      alt={`${k.first_name} ${k.last_name}`}
+                                      className="h-8 w-8 rounded-full"
+                                    />
+                                    <span className="font-medium">
+                                      {k.first_name} {k.last_name}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className="py-3 px-4 text-muted-foreground">{k.school || '-'}</td>
+                                <td className="py-3 px-4 text-muted-foreground">{k.parent_email}</td>
+                                <td className="py-3 px-4 text-right tabular-nums font-medium">
+                                  ${(agg?.total ?? 0).toFixed(2)}
+                                  {agg && agg.count > 0 && (
+                                    <span className="block text-[11px] text-muted-foreground font-normal">
+                                      {agg.count} session line{agg.count === 1 ? '' : 's'}
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="py-3 px-4">
+                                  {k.skill_level && <Badge variant="outline">{k.skill_level}</Badge>}
+                                </td>
+                                <td className="py-3 px-4 text-muted-foreground">
+                                  {formatEST(new Date(k.created_at), 'MMM d, yyyy')}
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="spending" className="mt-6 space-y-4">
+                <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-end">
+                  <div className="lg:col-span-3">
+                    <Label className="text-xs text-muted-foreground">Session date</Label>
+                    <Select
+                      value={athleteSpendPeriod}
+                      onValueChange={(v) => setAthleteSpendPeriod(v as PayoutHistoryPeriodPreset)}
+                    >
+                      <SelectTrigger className="mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All time</SelectItem>
+                        <SelectItem value="week">This week</SelectItem>
+                        <SelectItem value="month">This month</SelectItem>
+                        <SelectItem value="last30">Last 30 days</SelectItem>
+                        <SelectItem value="ytd">Year to date</SelectItem>
+                        <SelectItem value="custom">Custom range…</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-[11px] text-muted-foreground mt-1">
+                      Filters by session date ({APP_TIMEZONE}).
+                    </p>
+                  </div>
+                  {athleteSpendPeriod === 'custom' && (
+                    <>
+                      <div className="lg:col-span-2">
+                        <Label className="text-xs text-muted-foreground">From</Label>
+                        <Input
+                          type="date"
+                          className="mt-1"
+                          value={athleteSpendDateFrom}
+                          onChange={(e) => setAthleteSpendDateFrom(e.target.value)}
+                        />
+                      </div>
+                      <div className="lg:col-span-2">
+                        <Label className="text-xs text-muted-foreground">To</Label>
+                        <Input
+                          type="date"
+                          className="mt-1"
+                          value={athleteSpendDateTo}
+                          onChange={(e) => setAthleteSpendDateTo(e.target.value)}
+                        />
+                      </div>
+                    </>
+                  )}
+                  <div className="lg:col-span-2">
+                    <Label className="text-xs text-muted-foreground">Athlete</Label>
+                    <Select value={athleteSpendWrestlerFilter} onValueChange={setAthleteSpendWrestlerFilter}>
+                      <SelectTrigger className="mt-1">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All athletes</SelectItem>
+                        {wrestlerSpendFilterOptions.map((o) => (
+                          <SelectItem key={o.id} value={o.id}>
+                            {o.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="lg:col-span-2">
+                    <Label className="text-xs text-muted-foreground">Search</Label>
+                    <Input
+                      className="mt-1"
+                      placeholder="Name, coach, facility…"
+                      value={athleteSpendSearch}
+                      onChange={(e) => setAthleteSpendSearch(e.target.value)}
                     />
                   </div>
-                  <div>
-                    <p className="text-sm font-medium mb-1">Profile photo</p>
-                    <input
-                      ref={athletePhotoInputRef}
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={async (e) => {
-                        const file = e.target.files?.[0];
-                        if (!file || !editingAthleteId) return;
-                        setAthletePhotoUploading(true);
-                        try {
-                          const formData = new FormData();
-                          formData.append('file', file);
-                          const res = await fetch(`/api/admin/athletes/${editingAthleteId}/upload-photo`, {
-                            method: 'POST',
-                            body: formData,
-                          });
-                          const data = await res.json().catch(() => ({}));
-                          if (res.ok && data.photoUrl) {
-                            setAthleteEditForm((p) => p ? { ...p, photo_url: data.photoUrl } : null);
-                            router.refresh();
-                          } else {
-                            console.error('Photo upload failed:', data.error ?? res.statusText);
-                          }
-                        } finally {
-                          setAthletePhotoUploading(false);
-                          e.target.value = '';
-                        }
-                      }}
-                    />
+                  <div className="lg:col-span-1 flex justify-end">
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
-                      disabled={athletePhotoUploading}
-                      onClick={() => athletePhotoInputRef.current?.click()}
+                      className="mt-6 lg:mt-0"
+                      onClick={() => {
+                        setAthleteSpendPeriod('all');
+                        setAthleteSpendDateFrom('');
+                        setAthleteSpendDateTo('');
+                        setAthleteSpendWrestlerFilter('all');
+                        setAthleteSpendSearch('');
+                      }}
                     >
-                      {athletePhotoUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Change photo'}
+                      Clear
                     </Button>
                   </div>
                 </div>
-              )}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>First name</Label>
-                  <Input value={athleteEditForm.first_name} onChange={(e) => setAthleteEditForm((p) => p ? { ...p, first_name: e.target.value } : null)} />
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Card className="p-4">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider">Filtered total</p>
+                    <p className="text-2xl font-semibold tabular-nums">${athleteSpendFilteredTotal.toFixed(2)}</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {filteredAthleteSpendLines.length} session line(s)
+                    </p>
+                  </Card>
+                  <Card className="p-4">
+                    <p className="text-xs text-muted-foreground uppercase tracking-wider">All-time total</p>
+                    <p className="text-2xl font-semibold tabular-nums">${totalYouthSpendAllTime.toFixed(2)}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Not affected by filters above</p>
+                  </Card>
                 </div>
-                <div className="space-y-2">
-                  <Label>Last name</Label>
-                  <Input value={athleteEditForm.last_name} onChange={(e) => setAthleteEditForm((p) => p ? { ...p, last_name: e.target.value } : null)} />
-                </div>
+
+                <Card className="overflow-hidden">
+                  <div className="px-4 py-3 border-b border-border bg-muted/30">
+                    <h3 className="text-sm font-semibold">Totals by athlete</h3>
+                    <p className="text-xs text-muted-foreground">Same filters as session lines below.</p>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-muted/50">
+                        <tr>
+                          <th className="text-left py-3 px-4">
+                            <AdminSortColBtn
+                              label="Athlete"
+                              active={wrestlerTotalsSort.key === 'name'}
+                              dir={wrestlerTotalsSort.dir}
+                              onClick={() => toggleWrestlerTotalsSort('name')}
+                            />
+                          </th>
+                          <th className="text-right py-3 px-4">
+                            <div className="flex justify-end">
+                              <AdminSortColBtn
+                                label="Sessions"
+                                active={wrestlerTotalsSort.key === 'sessions'}
+                                dir={wrestlerTotalsSort.dir}
+                                onClick={() => toggleWrestlerTotalsSort('sessions')}
+                              />
+                            </div>
+                          </th>
+                          <th className="text-right py-3 px-4">
+                            <div className="flex justify-end">
+                              <AdminSortColBtn
+                                label="Total"
+                                active={wrestlerTotalsSort.key === 'total'}
+                                dir={wrestlerTotalsSort.dir}
+                                onClick={() => toggleWrestlerTotalsSort('total')}
+                              />
+                            </div>
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {sortedAthleteSpendByWrestlerRows.length === 0 ? (
+                          <tr>
+                            <td colSpan={3} className="py-8 text-center text-muted-foreground text-sm">
+                              No spending in this period for the current filters.
+                            </td>
+                          </tr>
+                        ) : (
+                          <>
+                            {sortedAthleteSpendByWrestlerRows.map((row) => (
+                              <tr key={row.youth_wrestler_id} className="hover:bg-muted/30">
+                                <td className="py-3 px-4 font-medium">{row.name}</td>
+                                <td className="py-3 px-4 text-right tabular-nums">{row.sessions}</td>
+                                <td className="py-3 px-4 text-right tabular-nums font-medium">
+                                  ${row.total.toFixed(2)}
+                                </td>
+                              </tr>
+                            ))}
+                            <tr className="bg-muted/40 font-medium">
+                              <td className="py-3 px-4">Total</td>
+                              <td className="py-3 px-4 text-right tabular-nums">
+                                {athleteSpendByWrestlerRows.reduce((s, r) => s + r.sessions, 0)}
+                              </td>
+                              <td className="py-3 px-4 text-right tabular-nums">
+                                ${athleteSpendFilteredTotal.toFixed(2)}
+                              </td>
+                            </tr>
+                          </>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+
+                <Card className="overflow-hidden">
+                  <div className="px-4 py-3 border-b border-border bg-muted/30">
+                    <h3 className="text-sm font-semibold">Session lines</h3>
+                    <p className="text-xs text-muted-foreground">Each row is one wrestler on one session.</p>
+                  </div>
+                  <div className="overflow-x-auto max-h-[min(65vh,640px)] overflow-y-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-muted/50 sticky top-0 z-10">
+                        <tr>
+                          <th className="text-left py-3 px-4">
+                            <AdminSortColBtn
+                              label="Session date"
+                              active={athleteSpendLineSort.key === 'date'}
+                              dir={athleteSpendLineSort.dir}
+                              onClick={() => toggleAthleteSpendLineSort('date')}
+                            />
+                          </th>
+                          <th className="text-left py-3 px-4">
+                            <AdminSortColBtn
+                              label="Athlete"
+                              active={athleteSpendLineSort.key === 'athlete'}
+                              dir={athleteSpendLineSort.dir}
+                              onClick={() => toggleAthleteSpendLineSort('athlete')}
+                            />
+                          </th>
+                          <th className="text-left py-3 px-4">
+                            <AdminSortColBtn
+                              label="Coach"
+                              active={athleteSpendLineSort.key === 'coach'}
+                              dir={athleteSpendLineSort.dir}
+                              onClick={() => toggleAthleteSpendLineSort('coach')}
+                            />
+                          </th>
+                          <th className="text-left py-3 px-4">
+                            <AdminSortColBtn
+                              label="Facility"
+                              active={athleteSpendLineSort.key === 'facility'}
+                              dir={athleteSpendLineSort.dir}
+                              onClick={() => toggleAthleteSpendLineSort('facility')}
+                            />
+                          </th>
+                          <th className="text-center py-3 px-4">
+                            <div className="flex justify-center">
+                              <AdminSortColBtn
+                                label="Status"
+                                active={athleteSpendLineSort.key === 'status'}
+                                dir={athleteSpendLineSort.dir}
+                                onClick={() => toggleAthleteSpendLineSort('status')}
+                              />
+                            </div>
+                          </th>
+                          <th className="text-right py-3 px-4">
+                            <div className="flex justify-end">
+                              <AdminSortColBtn
+                                label="Paid"
+                                active={athleteSpendLineSort.key === 'paid'}
+                                dir={athleteSpendLineSort.dir}
+                                onClick={() => toggleAthleteSpendLineSort('paid')}
+                              />
+                            </div>
+                          </th>
+                          <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">
+                            Link
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {filteredAthleteSpendLines.length === 0 ? (
+                          <tr>
+                            <td colSpan={7} className="py-10 text-center text-muted-foreground text-sm">
+                              No lines match. Load athletes or widen filters.
+                            </td>
+                          </tr>
+                        ) : (
+                          sortedFilteredAthleteSpendLines.map((line) => {
+                            const kid = kidsList.find((kk) => kk.id === line.youth_wrestler_id);
+                            const aname = kid
+                              ? `${kid.first_name} ${kid.last_name}`.trim()
+                              : `Unknown (${line.youth_wrestler_id.slice(0, 8)}…)`;
+                            return (
+                              <tr key={`${line.session_id}-${line.youth_wrestler_id}`} className="hover:bg-muted/30">
+                                <td className="py-3 px-4 whitespace-nowrap text-muted-foreground text-xs">
+                                  {formatEST(new Date(line.scheduled_datetime), 'MMM d, yyyy h:mm a')}
+                                </td>
+                                <td className="py-3 px-4 font-medium">{aname}</td>
+                                <td className="py-3 px-4 text-muted-foreground">{line.coach_name}</td>
+                                <td className="py-3 px-4 text-muted-foreground max-w-[180px] truncate">
+                                  {line.facility_name}
+                                </td>
+                                <td className="py-3 px-4 text-center">
+                                  <Badge variant="outline" className="text-xs">
+                                    {line.session_status}
+                                  </Badge>
+                                </td>
+                                <td className="py-3 px-4 text-right tabular-nums font-medium">
+                                  ${line.amount_paid.toFixed(2)}
+                                </td>
+                                <td className="py-3 px-4 text-right">
+                                  <Link href={`/admin/sessions/${line.session_id}/edit`}>
+                                    <Button variant="ghost" size="sm" className="h-8 gap-1 text-[#B89D60]">
+                                      <Pencil className="h-3.5 w-3.5" />
+                                      Edit
+                                    </Button>
+                                  </Link>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </Card>
+              </TabsContent>
+            </Tabs>
+          </div>
+        );
+      }
+
+      // Parents sub-section
+      if (subSection === 'parents') {
+        return (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold">Users</h2>
+                <p className="text-sm text-muted-foreground">{filteredUsers.length} users</p>
               </div>
-              <div className="space-y-2">
-                <Label>School</Label>
-                <Input value={athleteEditForm.school} onChange={(e) => setAthleteEditForm((p) => p ? { ...p, school: e.target.value } : null)} placeholder="e.g. NC State" />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Photo focus X (0–100)</Label>
+              <div className="flex items-center gap-3">
+                <Select value={userRoleFilter} onValueChange={setUserRoleFilter}>
+                  <SelectTrigger className="w-32 h-9">
+                    <SelectValue placeholder="Role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All roles</SelectItem>
+                    <SelectItem value="parent">Parent</SelectItem>
+                    <SelectItem value="admin">Admin</SelectItem>
+                  </SelectContent>
+                </Select>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
-                    type="number"
-                    min={0}
-                    max={100}
-                    value={athleteEditForm.photo_focus_x}
-                    onChange={(e) => setAthleteEditForm((p) => p ? { ...p, photo_focus_x: Math.min(100, Math.max(0, parseInt(e.target.value, 10) || 50)) } : null)}
+                    placeholder="Search users..."
+                    className="pl-9 w-64"
+                    value={userSearch}
+                    onChange={(e) => setUserSearch(e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <Card className="overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/50">
+                    <tr>
+                      <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Email</th>
+                      <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Role</th>
+                      <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Created</th>
+                      <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Last Login</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {usersError ? (
+                      <tr>
+                        <td colSpan={4} className="py-12 text-center text-red-500">{usersError}</td>
+                      </tr>
+                    ) : filteredUsers.length === 0 ? (
+                      <tr>
+                        <td colSpan={4} className="py-12 text-center text-muted-foreground">
+                          <Users className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
+                          <p>No users found</p>
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredUsers.map((u) => (
+                        <tr key={u.id} className="hover:bg-muted/30 transition-colors">
+                          <td className="py-3 px-4 font-medium">{u.email}</td>
+                          <td className="py-3 px-4">
+                            <Badge variant={u.role === 'admin' ? 'default' : 'outline'}>{u.role}</Badge>
+                          </td>
+                          <td className="py-3 px-4 text-muted-foreground">{formatEST(new Date(u.created_at), 'MMM d, yyyy')}</td>
+                          <td className="py-3 px-4 text-muted-foreground">
+                            {u.last_login_at ? formatEST(new Date(u.last_login_at), 'MMM d, yyyy') : '-'}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          </div>
+        );
+      }
+
+      // Facility Requests sub-section
+      if (subSection === 'requests') {
+        return (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-lg font-semibold">Facility Requests</h2>
+              <p className="text-sm text-muted-foreground">Review and approve new facility requests</p>
+            </div>
+
+            <Card className="overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted/50">
+                    <tr>
+                      <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Facility</th>
+                      <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Requested By</th>
+                      <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Status</th>
+                      <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Date</th>
+                      <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {facilityRequestsLoading ? (
+                      <tr>
+                        <td colSpan={5} className="py-12 text-center">
+                          <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+                        </td>
+                      </tr>
+                    ) : facilityRequests.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="py-12 text-center text-muted-foreground">
+                          <Building2 className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
+                          <p>No facility requests</p>
+                        </td>
+                      </tr>
+                    ) : (
+                      facilityRequests.map((r) => (
+                        <tr key={r.id} className="hover:bg-muted/30 transition-colors">
+                          <td className="py-3 px-4">
+                            <div className="font-medium">{r.name}</div>
+                            <div className="text-xs text-muted-foreground">{r.school}</div>
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="font-medium">{r.coach_name}</div>
+                            <div className="text-xs text-muted-foreground">{r.coach_school}</div>
+                          </td>
+                          <td className="py-3 px-4">
+                            <Badge variant={r.status === 'pending' ? 'outline' : r.status === 'approved' ? 'default' : 'destructive'}>
+                              {r.status}
+                            </Badge>
+                          </td>
+                          <td className="py-3 px-4 text-muted-foreground">{formatEST(new Date(r.created_at), 'MMM d, yyyy')}</td>
+                          <td className="py-3 px-4 text-right">
+                            {r.status === 'pending' && (
+                              <div className="flex items-center justify-end gap-2">
+                                <Button
+                                  size="sm"
+                                  className="h-8 bg-emerald-600 hover:bg-emerald-700"
+                                  disabled={facilityRequestActionId === r.id}
+                                  onClick={async () => {
+                                    setFacilityRequestActionId(r.id);
+                                    try {
+                                      await fetch(`/api/admin/facility-requests/${r.id}`, {
+                                        method: 'PATCH',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ status: 'approved' }),
+                                      });
+                                      setFacilityRequests(prev => prev.map(req => req.id === r.id ? { ...req, status: 'approved' } : req));
+                                    } finally {
+                                      setFacilityRequestActionId(null);
+                                    }
+                                  }}
+                                >
+                                  {facilityRequestActionId === r.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Approve'}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-8 border-red-500/50 text-red-500"
+                                  disabled={facilityRequestActionId === r.id}
+                                  onClick={async () => {
+                                    setFacilityRequestActionId(r.id);
+                                    try {
+                                      await fetch(`/api/admin/facility-requests/${r.id}`, {
+                                        method: 'PATCH',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ status: 'rejected' }),
+                                      });
+                                      setFacilityRequests(prev => prev.map(req => req.id === r.id ? { ...req, status: 'rejected' } : req));
+                                    } finally {
+                                      setFacilityRequestActionId(null);
+                                    }
+                                  }}
+                                >
+                                  Reject
+                                </Button>
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          </div>
+        );
+      }
+    }
+
+    return null;
+  };
+
+  return (
+    <div className="flex min-h-[calc(100vh-4rem)]">
+      {/* Mobile Menu Toggle */}
+      <button
+        className="lg:hidden fixed bottom-4 right-4 z-50 p-3 rounded-full bg-[#B89D60] text-black shadow-lg"
+        onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+      >
+        {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+      </button>
+
+      {/* Sidebar Navigation */}
+      <aside className={`
+        fixed lg:sticky top-0 left-0 z-40 h-screen lg:h-auto
+        w-64 bg-card border-r border-border
+        transform transition-transform duration-200 ease-in-out
+        ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+      `}>
+        <div className="p-4 space-y-6 h-full overflow-y-auto">
+          {/* Create Session Button */}
+          <Link href="/admin/sessions/create" className="block">
+            <Button className="w-full bg-[#B89D60] hover:bg-[#9A8550] text-black">
+              <Plus className="h-4 w-4 mr-2" />
+              Create Session
+            </Button>
+          </Link>
+
+          {/* Overview Section */}
+          <div className="space-y-1">
+            <p className="px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Overview</p>
+            <NavItem
+              icon={LayoutDashboard}
+              label="Dashboard"
+              active={section === 'overview' && subSection !== 'cockpit'}
+              onClick={() => handleNavChange('overview', 'dashboard')}
+            />
+            <NavItem
+              icon={Gauge}
+              label="Cockpit"
+              active={section === 'overview' && subSection === 'cockpit'}
+              onClick={() => handleNavChange('overview', 'cockpit')}
+            />
+          </div>
+
+          {/* Bookings Section */}
+          <div className="space-y-1">
+            <p className="px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Bookings</p>
+            <NavItem
+              icon={Calendar}
+              label="Sessions"
+              active={section === 'bookings'}
+              onClick={() => handleNavChange('bookings')}
+              badge={openSessions}
+            />
+          </div>
+
+          {/* Money Section */}
+          <div className="space-y-1">
+            <p className="px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Money</p>
+            <NavItem
+              icon={DollarSign}
+              label="Overview"
+              active={section === 'money' && subSection === 'payments'}
+              onClick={() => handleNavChange('money', 'payments')}
+            />
+            <NavItem
+              icon={Wallet}
+              label="Payouts"
+              active={section === 'money' && subSection === 'payouts'}
+              onClick={() => handleNavChange('money', 'payouts')}
+              badge={coachPayouts.filter(p => p.amount > 0).length}
+            />
+<NavItem
+  icon={CreditCard}
+  label="Credits"
+  active={section === 'money' && subSection === 'credits'}
+  onClick={() => handleNavChange('money', 'credits')}
+  />
+              <NavItem
+                icon={MessageSquare}
+                label="Messages"
+                active={section === 'money' && subSection === 'messages'}
+                onClick={() => handleNavChange('money', 'messages')}
+              />
+          </div>
+
+          {/* People Section */}
+          <div className="space-y-1">
+            <p className="px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">People</p>
+            <NavItem
+              icon={Star}
+              label="Coaches"
+              active={section === 'people' && subSection === 'coaches'}
+              onClick={() => handleNavChange('people', 'coaches')}
+            />
+            <NavItem
+              icon={User}
+              label="Athletes"
+              active={section === 'people' && subSection === 'athletes'}
+              onClick={() => handleNavChange('people', 'athletes')}
+            />
+            <NavItem
+              icon={Users}
+              label="Users"
+              active={section === 'people' && subSection === 'parents'}
+              onClick={() => handleNavChange('people', 'parents')}
+            />
+            <NavItem
+              icon={Building2}
+              label="Facility Requests"
+              active={section === 'people' && subSection === 'requests'}
+              onClick={() => handleNavChange('people', 'requests')}
+              badge={pendingFacilityRequests}
+            />
+          </div>
+
+          {/* Quick Links */}
+          <div className="space-y-1 pt-4 border-t border-border">
+            <p className="px-3 text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">Quick Links</p>
+            <Link href="/admin/coach-applications" className="block px-3 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+              Coach Applications
+            </Link>
+            <Link href="/admin/facilities" className="block px-3 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+              Facilities
+            </Link>
+            <Link href="/admin/products" className="block px-3 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+              Products
+            </Link>
+            <Link href="/admin/discount-codes" className="block px-3 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+              Discount Codes
+            </Link>
+            <Link href="/admin/focus-areas" className="block px-3 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+              Session Topics
+            </Link>
+            <Link href="/admin/reviews" className="block px-3 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+              Reviews
+            </Link>
+          </div>
+        </div>
+      </aside>
+
+      {/* Mobile Overlay */}
+      {mobileMenuOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-30 lg:hidden"
+          onClick={() => setMobileMenuOpen(false)}
+        />
+      )}
+
+      {/* Main Content */}
+      <main className="flex-1 p-6 lg:p-8 overflow-x-hidden">
+        {textGroupAdminSession && (
+          <CoachTextGroupDialog
+            sessionId={textGroupAdminSession.id}
+            open={!!textGroupAdminSession}
+            onOpenChange={(open) => {
+              if (!open) setTextGroupAdminSession(null);
+            }}
+            sessionLabel={`${formatEST(new Date(textGroupAdminSession.scheduled_datetime), 'EEE, MMM d · h:mm a')} · ${textGroupAdminSession.facility_name}`}
+            onSent={() => router.refresh()}
+          />
+        )}
+        
+        {renderContent()}
+      </main>
+
+      {/* Coach Edit Dialog */}
+      <Dialog
+        open={!!editingAthleteId}
+        onOpenChange={(open) => {
+          if (!open) {
+            setEditingAthleteId(null);
+            setAthletePhotoError(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Coach</DialogTitle>
+            <DialogDescription>Update coach profile information</DialogDescription>
+          </DialogHeader>
+          {!athleteEditForm ? (
+            <div className="py-8 flex items-center justify-center">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <form onSubmit={saveAthleteEdit} className="space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4 border-b border-border pb-4">
+                {athleteEditForm.photo_url ? (
+                  <img
+                    src={athleteEditForm.photo_url}
+                    alt=""
+                    className="w-20 h-20 rounded-full object-cover border border-border shrink-0"
+                  />
+                ) : (
+                  <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center text-xs text-muted-foreground shrink-0 border border-dashed border-border">
+                    No photo
+                  </div>
+                )}
+                <div className="flex flex-col gap-2">
+                  <input
+                    ref={athletePhotoInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = '';
+                      if (!file || !editingAthleteId) return;
+                      setAthletePhotoError(null);
+                      setAthletePhotoUploading(true);
+                      try {
+                        const fd = new FormData();
+                        fd.append('file', file);
+                        const res = await fetch(`/api/admin/athletes/${editingAthleteId}/upload-photo`, {
+                          method: 'POST',
+                          body: fd,
+                        });
+                        const data = await res.json().catch(() => ({}));
+                        if (!res.ok) {
+                          setAthletePhotoError(typeof data.error === 'string' ? data.error : 'Upload failed');
+                          return;
+                        }
+                        if (data.photoUrl) {
+                          setAthleteEditForm((prev) => (prev ? { ...prev, photo_url: data.photoUrl } : null));
+                        }
+                      } catch {
+                        setAthletePhotoError('Upload failed');
+                      } finally {
+                        setAthletePhotoUploading(false);
+                      }
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-fit"
+                    disabled={athletePhotoUploading}
+                    onClick={() => athletePhotoInputRef.current?.click()}
+                  >
+                    {athletePhotoUploading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                    Upload photo
+                  </Button>
+                  <p className="text-xs text-muted-foreground">JPG, PNG, or WebP · max 5MB · replaces current profile photo</p>
+                  {athletePhotoError ? (
+                    <p className="text-xs text-destructive">{athletePhotoError}</p>
+                  ) : null}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="first_name">First Name</Label>
+                  <Input
+                    id="first_name"
+                    value={athleteEditForm.first_name}
+                    onChange={(e) => setAthleteEditForm({ ...athleteEditForm, first_name: e.target.value })}
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Photo focus Y (0–100)</Label>
+                  <Label htmlFor="last_name">Last Name</Label>
                   <Input
-                    type="number"
-                    min={0}
-                    max={100}
-                    value={athleteEditForm.photo_focus_y}
-                    onChange={(e) => setAthleteEditForm((p) => p ? { ...p, photo_focus_y: Math.min(100, Math.max(0, parseInt(e.target.value, 10) || 50)) } : null)}
+                    id="last_name"
+                    value={athleteEditForm.last_name}
+                    onChange={(e) => setAthleteEditForm({ ...athleteEditForm, last_name: e.target.value })}
                   />
                 </div>
               </div>
-              <p className="text-xs text-muted-foreground">Lower Y = face higher in frame (fix head cut off). 50,50 = center.</p>
               <div className="space-y-2">
-                <Label>Weight class</Label>
-                <Input value={athleteEditForm.weight_class ?? ''} onChange={(e) => setAthleteEditForm((p) => p ? { ...p, weight_class: e.target.value || null } : null)} placeholder="e.g. 157 lbs" />
-              </div>
-              <div className="space-y-2">
-                <Label>Bio</Label>
-                <textarea
-                  className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                  value={athleteEditForm.bio ?? ''}
-                  onChange={(e) => setAthleteEditForm((p) => p ? { ...p, bio: e.target.value || null } : null)}
-                  placeholder="Coach bio..."
-                  rows={3}
+                <Label htmlFor="school">School</Label>
+                <Input
+                  id="school"
+                  value={athleteEditForm.school}
+                  onChange={(e) => setAthleteEditForm({ ...athleteEditForm, school: e.target.value })}
                 />
               </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="weight_class">Weight class</Label>
+                  <Input
+                    id="weight_class"
+                    placeholder="e.g. 157 lbs"
+                    value={athleteEditForm.weight_class || ''}
+                    onChange={(e) =>
+                      setAthleteEditForm({ ...athleteEditForm, weight_class: e.target.value || null })
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="year">Grad year</Label>
+                  <Input
+                    id="year"
+                    placeholder="e.g. 2024"
+                    value={athleteEditForm.year || ''}
+                    onChange={(e) => setAthleteEditForm({ ...athleteEditForm, year: e.target.value || null })}
+                  />
+                </div>
+              </div>
               <div className="space-y-2">
-                <Label>Primary facility</Label>
+                <Label htmlFor="bio">Bio</Label>
+                <Textarea
+                  id="bio"
+                  placeholder="Coaching experience, style, achievements…"
+                  maxLength={500}
+                  rows={5}
+                  value={athleteEditForm.bio || ''}
+                  onChange={(e) => setAthleteEditForm({ ...athleteEditForm, bio: e.target.value || null })}
+                />
+                <p className="text-xs text-muted-foreground">{(athleteEditForm.bio || '').length}/500</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="venmo">Venmo Handle</Label>
+                  <Input
+                    id="venmo"
+                    value={athleteEditForm.venmo_handle || ''}
+                    onChange={(e) => setAthleteEditForm({ ...athleteEditForm, venmo_handle: e.target.value })}
+                    placeholder="@username"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="zelle">Zelle Email</Label>
+                  <Input
+                    id="zelle"
+                    value={athleteEditForm.zelle_email || ''}
+                    onChange={(e) => setAthleteEditForm({ ...athleteEditForm, zelle_email: e.target.value })}
+                    placeholder="email@example.com"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="facility">Primary Facility</Label>
                 <Select
-                  value={athleteEditForm.facility_id ?? 'none'}
-                  onValueChange={(v) => setAthleteEditForm((p) => p ? { ...p, facility_id: v === 'none' ? null : v } : null)}
+                  value={athleteEditForm.facility_id || ''}
+                  onValueChange={(v) =>
+                    setAthleteEditForm({
+                      ...athleteEditForm,
+                      facility_id: v || null,
+                      secondary_facility_id:
+                        athleteEditForm.secondary_facility_id === v ? null : athleteEditForm.secondary_facility_id,
+                    })
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select facility" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">None</SelectItem>
                     {facilities.map((f) => (
-                      <SelectItem key={f.id} value={f.id}>{f.name} — {f.school}</SelectItem>
+                      <SelectItem key={f.id} value={f.id}>{f.name} ({f.school})</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>Secondary facility</Label>
+                <Label htmlFor="secondary_facility">Secondary Facility (optional)</Label>
                 <Select
-                  value={athleteEditForm.secondary_facility_id ?? 'none'}
-                  onValueChange={(v) => setAthleteEditForm((p) => p ? { ...p, secondary_facility_id: v === 'none' ? null : v } : null)}
+                  value={athleteEditForm.secondary_facility_id || '__none__'}
+                  onValueChange={(v) =>
+                    setAthleteEditForm({
+                      ...athleteEditForm,
+                      secondary_facility_id: v === '__none__' ? null : v,
+                    })
+                  }
                 >
-                  <SelectTrigger>
+                  <SelectTrigger id="secondary_facility">
                     <SelectValue placeholder="None" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">None</SelectItem>
-                    {facilities.map((f) => (
-                      <SelectItem key={f.id} value={f.id}>{f.name} — {f.school}</SelectItem>
-                    ))}
+                    <SelectItem value="__none__">None</SelectItem>
+                    {facilities
+                      .filter((f) => f.id !== athleteEditForm.facility_id)
+                      .map((f) => (
+                        <SelectItem key={f.id} value={f.id}>
+                          {f.name} ({f.school})
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label>Year (e.g. Senior)</Label>
-                <Select
-                  value={athleteEditForm.year ?? 'none'}
-                  onValueChange={(v) => setAthleteEditForm((p) => p ? { ...p, year: v === 'none' ? null : v } : null)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">None</SelectItem>
-                    <SelectItem value="Freshman">Freshman</SelectItem>
-                    <SelectItem value="Sophomore">Sophomore</SelectItem>
-                    <SelectItem value="Junior">Junior</SelectItem>
-                    <SelectItem value="Senior">Senior</SelectItem>
-                    <SelectItem value="5th Year">5th Year</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="photo_focus_x">Photo focus X (0–100)</Label>
+                  <Input
+                    id="photo_focus_x"
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={athleteEditForm.photo_focus_x}
+                    onChange={(e) =>
+                      setAthleteEditForm({
+                        ...athleteEditForm,
+                        photo_focus_x: Math.min(100, Math.max(0, Number(e.target.value) || 50)),
+                      })
+                    }
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="photo_focus_y">Photo focus Y (0–100)</Label>
+                  <Input
+                    id="photo_focus_y"
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={athleteEditForm.photo_focus_y}
+                    onChange={(e) =>
+                      setAthleteEditForm({
+                        ...athleteEditForm,
+                        photo_focus_y: Math.min(100, Math.max(0, Number(e.target.value) || 15)),
+                      })
+                    }
+                  />
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
-                  id="athlete-active"
+                  id="active"
                   checked={athleteEditForm.active}
-                  onChange={(e) => setAthleteEditForm((p) => p ? { ...p, active: e.target.checked } : null)}
-                  className="rounded border-input"
+                  onChange={(e) => setAthleteEditForm({ ...athleteEditForm, active: e.target.checked })}
+                  className="rounded"
                 />
-                <Label htmlFor="athlete-active">Active (visible in Browse)</Label>
+                <Label htmlFor="active">Active (visible on browse page)</Label>
               </div>
               <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => { setEditingAthleteId(null); setAthleteEditForm(null); }}>Cancel</Button>
-                <Button type="submit" disabled={athleteEditSaving}>{athleteEditSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save'}</Button>
+                <Button type="button" variant="outline" onClick={() => setEditingAthleteId(null)}>Cancel</Button>
+                <Button type="submit" className="bg-[#B89D60] hover:bg-[#9A8550] text-black" disabled={athleteEditSaving}>
+                  {athleteEditSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                  Save Changes
+                </Button>
               </DialogFooter>
             </form>
-          ) : (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Drop-In Payment Dialog */}
+      <Dialog open={showDropInDialog} onOpenChange={(open) => !open && setShowDropInDialog(false)}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Record Drop-In Payment</DialogTitle>
+            <DialogDescription>
+              {dropInSession && (
+                <>Record a cash/manual payment for {dropInSession.athlete_name}&apos;s session on {formatEST(new Date(dropInSession.scheduled_datetime), 'MMM d, h:mm a')}</>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            {/* Wrestler Search */}
+            <div className="grid gap-2">
+              <Label>Search Existing Wrestler</Label>
+              <div className="relative">
+                <Input
+                  placeholder="Type to search wrestlers..."
+                  value={wrestlerSearchQuery}
+                  onChange={(e) => searchWrestlers(e.target.value)}
+                />
+                {searchingWrestlers && (
+                  <Loader2 className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-zinc-400" />
+                )}
+                {wrestlerSearchResults.length > 0 && (
+                  <div className="absolute z-10 w-full mt-1 bg-zinc-900 border border-zinc-700 rounded-md shadow-lg max-h-48 overflow-auto">
+                    {wrestlerSearchResults.map((w) => (
+                      <button
+                        key={w.id}
+                        type="button"
+                        className="w-full px-3 py-2 text-left hover:bg-zinc-800 flex items-center gap-2"
+                        onClick={() => selectWrestler(w)}
+                      >
+                        {w.photo_url ? (
+                          <img src={w.photo_url} alt="" className="w-6 h-6 rounded-full object-cover" />
+                        ) : (
+                          <div className="w-6 h-6 rounded-full bg-zinc-700 flex items-center justify-center text-xs">
+                            {w.first_name?.[0]}{w.last_name?.[0]}
+                          </div>
+                        )}
+                        <span>{w.first_name} {w.last_name}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {dropInForm.youthWrestlerId && (
+                <p className="text-sm text-emerald-400">Selected: {dropInForm.wrestlerName}</p>
+              )}
+            </div>
+
+            <div className="relative flex items-center gap-2 py-2">
+              <div className="flex-1 border-t border-zinc-700" />
+              <span className="text-xs text-zinc-500">OR enter manually</span>
+              <div className="flex-1 border-t border-zinc-700" />
+            </div>
+
+            <div className="grid gap-2">
+              <Label htmlFor="wrestlerName">Wrestler Name {!dropInForm.youthWrestlerId && '*'}</Label>
+              <Input
+                id="wrestlerName"
+                placeholder="Enter wrestler's name"
+                value={dropInForm.wrestlerName}
+                onChange={(e) => setDropInForm({ ...dropInForm, wrestlerName: e.target.value, youthWrestlerId: '' })}
+                disabled={!!dropInForm.youthWrestlerId}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="parentName">Parent Name</Label>
+              <Input
+                id="parentName"
+                placeholder="Enter parent's name (optional for existing wrestlers)"
+                value={dropInForm.parentName}
+                onChange={(e) => setDropInForm({ ...dropInForm, parentName: e.target.value })}
+                disabled={!!dropInForm.youthWrestlerId}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="parentPhone">Parent Phone</Label>
+              <Input
+                id="parentPhone"
+                placeholder="(555) 555-5555"
+                value={dropInForm.parentPhone}
+                onChange={(e) => setDropInForm({ ...dropInForm, parentPhone: e.target.value })}
+                disabled={!!dropInForm.youthWrestlerId}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-2">
+                <Label htmlFor="amountPaid">Amount Paid *</Label>
+                <Input
+                  id="amountPaid"
+                  type="number"
+                  placeholder="30.00"
+                  value={dropInForm.amountPaid}
+                  onChange={(e) => setDropInForm({ ...dropInForm, amountPaid: e.target.value })}
+                />
+              </div>
+              <div className="grid gap-2">
+                <Label htmlFor="paymentMethod">Payment Method</Label>
+                <Select
+                  value={dropInForm.paymentMethod}
+                  onValueChange={(v) => setDropInForm({ ...dropInForm, paymentMethod: v as 'cash' | 'venmo' | 'zelle' | 'other' })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">Cash</SelectItem>
+                    <SelectItem value="venmo">Venmo</SelectItem>
+                    <SelectItem value="zelle">Zelle</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setShowDropInDialog(false)}>Cancel</Button>
+            <Button 
+              type="button" 
+              className="bg-[#B89D60] hover:bg-[#9A8550] text-black" 
+              onClick={handleRecordDropIn}
+              disabled={savingDropIn || (!dropInForm.wrestlerName && !dropInForm.youthWrestlerId) || !dropInForm.amountPaid}
+            >
+              {savingDropIn ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Record Payment
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Session Roster Modal */}
+      <Dialog open={!!rosterSessionId} onOpenChange={(open) => !open && setRosterSessionId(null)}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Session Roster
+            </DialogTitle>
+            <DialogDescription>
+              {rosterSessionId && (() => {
+                const sess = sessions.find(s => s.id === rosterSessionId);
+                return sess ? `${sess.athlete_name} - ${formatEST(new Date(sess.scheduled_datetime), 'MMM d, yyyy h:mm a')}` : '';
+              })()}
+            </DialogDescription>
+          </DialogHeader>
+          {rosterSessionId && (
+            <div className="rounded-lg border border-border bg-muted/40 p-3 space-y-2 text-sm">
+              <p className="font-medium text-foreground">Pay a parent (Stripe) for this session</p>
+              <p className="text-muted-foreground text-xs leading-relaxed">
+                Parent or admin opens the link, picks the wrestler, and pays the coach for this session. The parent must be linked to the kid (primary or{' '}
+                <code className="text-[11px]">youth_wrestler_parents</code>) or use the primary parent account.
+              </p>
+              <div className="flex flex-wrap gap-2 pt-1">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  className="gap-1.5"
+                  onClick={async () => {
+                    const url = `${window.location.origin}/sessions/${rosterSessionId}/register`;
+                    try {
+                      await navigator.clipboard.writeText(url);
+                      setParentCheckoutCopied(true);
+                      setTimeout(() => setParentCheckoutCopied(false), 2000);
+                    } catch {
+                      window.prompt('Copy this URL:', url);
+                    }
+                  }}
+                >
+                  {parentCheckoutCopied ? (
+                    <>
+                      <Check className="h-3.5 w-3.5" /> Copied
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-3.5 w-3.5" /> Copy parent checkout link
+                    </>
+                  )}
+                </Button>
+                <Button type="button" variant="outline" size="sm" className="gap-1.5" asChild>
+                  <a href={`/sessions/${rosterSessionId}/register`} target="_blank" rel="noreferrer">
+                    <ExternalLink className="h-3.5 w-3.5" />
+                    Open register
+                  </a>
+                </Button>
+              </div>
+              <p className="text-muted-foreground text-xs pt-1 border-t border-border/60">
+                <strong className="text-foreground">Move a kid to another coach:</strong> use Transfer on a wrestler, then run checkout on the{' '}
+                <em>target</em> session if they still need to pay that coach.
+              </p>
             </div>
           )}
+          <div className="py-4">
+            {rosterLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : rosterData.length === 0 ? (
+              <p className="text-center text-muted-foreground py-8">No participants registered</p>
+            ) : (
+              <div className="space-y-3">
+                {rosterData.map((p, idx) => (
+                  <div key={p.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                    <div className="font-medium text-muted-foreground w-6">{idx + 1}.</div>
+                    {p.photoUrl ? (
+                      <img src={p.photoUrl} alt="" className="w-10 h-10 rounded-full object-cover" />
+                    ) : (
+                      <div className="w-10 h-10 rounded-full bg-zinc-700 flex items-center justify-center text-sm font-medium">
+                        {p.wrestlerName.split(' ').map(n => n[0]).join('').slice(0, 2)}
+                      </div>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="font-medium flex items-center gap-2">
+                        {p.wrestlerName}
+                        {p.isDropIn && (
+                          <Badge variant="outline" className="text-xs border-amber-600 text-amber-400">Drop-in</Badge>
+                        )}
+                      </div>
+                      {p.parentEmail && (
+                        <div className="text-sm text-muted-foreground truncate">{p.parentEmail}</div>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="text-right">
+                        <div className="font-medium tabular-nums">${Number(p.amountPaid || 0).toFixed(2)}</div>
+                        {p.paid ? (
+                          <Badge variant="outline" className="text-xs border-emerald-600 bg-emerald-600/20 text-emerald-400">Paid</Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-xs border-amber-600 bg-amber-600/20 text-amber-400">Pending</Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-xs text-red-400 hover:text-red-300"
+                          disabled={deletingParticipantId === p.id}
+                          onClick={() => handleRemoveRosterParticipant(p.id, p.wrestlerName, p)}
+                        >
+                          {deletingParticipantId === p.id ? (
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          ) : (
+                            'Remove'
+                          )}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="text-xs text-blue-400 hover:text-blue-300"
+                          onClick={() => {
+                            setTransferTargetSearch('');
+                            setTransferTargetSessionId('');
+                            setTransferringParticipant({
+                              id: p.id,
+                              wrestlerName: p.wrestlerName,
+                              amountPaid: p.amountPaid,
+                              hasStripePayment: p.hasStripePayment,
+                            });
+                          }}
+                        >
+                          Transfer
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            
+            {/* Transfer participant form */}
+            {transferringParticipant && (
+              <div className="mt-4 p-4 rounded-lg border border-blue-600/50 bg-blue-600/10">
+                <div className="font-medium text-blue-400 mb-2">
+                  Transfer {transferringParticipant.wrestlerName} (${transferringParticipant.amountPaid} paid)
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="transferTargetSearch">Find session (coach, facility, date)</Label>
+                  <Input
+                    id="transferTargetSearch"
+                    className="bg-zinc-800 border-zinc-700"
+                    placeholder={"e.g. O'Neill or Apr 6"}
+                    value={transferTargetSearch}
+                    onChange={(e) => setTransferTargetSearch(e.target.value)}
+                  />
+                  <Label htmlFor="transferTarget">Move to Session</Label>
+                  <select
+                    id="transferTarget"
+                    className="w-full rounded-md border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm"
+                    value={transferTargetSessionId}
+                    onChange={(e) => setTransferTargetSessionId(e.target.value)}
+                  >
+                    <option value="">Select a session...</option>
+                    {transferTargetOptions.map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.athlete_name} — {formatEST(new Date(s.scheduled_datetime), 'MMM d h:mm a')} ·{' '}
+                        {s.facility_name} ({s.current_participants}/{s.max_participants})
+                      </option>
+                    ))}
+                  </select>
+                  {transferTargetOptions.length === 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      No matching open sessions (scheduled / pending payment, still upcoming). Search by coach name or date. Past sessions cannot be transfer targets here.
+                    </p>
+                  )}
+                </div>
+                <div className="flex gap-2 mt-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setTransferringParticipant(null);
+                      setTransferTargetSessionId('');
+                      setTransferTargetSearch('');
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    disabled={!transferTargetSessionId || transferLoading}
+                    onClick={handleTransferRegistration}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    {transferLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Confirm Transfer'}
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setRosterSessionId(null); setTransferringParticipant(null); }}>Close</Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

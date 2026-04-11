@@ -1,6 +1,4 @@
-import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { BackLink } from '@/components/back-link';
 
 export default function ReviewNotFound() {
   return (
@@ -11,12 +9,11 @@ export default function ReviewNotFound() {
           This link may be outdated, the session may not be marked complete yet, or there may be a temporary issue. Go back to My bookings and try &quot;Leave feedback&quot; again from there.
         </p>
         <div className="flex flex-col gap-2 pt-2">
-          <Button asChild className="w-full sm:w-auto">
-            <Link href="/bookings" className="inline-flex items-center gap-2">
-              <ArrowLeft className="h-4 w-4" />
-              Back to My bookings
-            </Link>
-          </Button>
+          <BackLink
+            fallbackHref="/bookings"
+            label="Back to My bookings"
+            className="inline-flex h-10 w-full sm:w-auto items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          />
           <p className="text-xs text-muted-foreground pt-2">
             If it keeps happening, contact support and mention you were trying to leave feedback for a session.
           </p>

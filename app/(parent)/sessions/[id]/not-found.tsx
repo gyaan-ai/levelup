@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import { BackLink } from '@/components/back-link';
 
 export default function SessionNotFound() {
   return (
@@ -8,12 +8,11 @@ export default function SessionNotFound() {
         This session may have been cancelled, or the link might be wrong. If you opened this from My
         bookings, try refreshing that page and opening View again.
       </p>
-      <Link
-        href="/bookings"
+      <BackLink
+        fallbackHref="/bookings"
+        label="Back to My bookings"
         className="text-sm text-accent hover:underline"
-      >
-        ← Back to My bookings
-      </Link>
+      />
     </div>
   );
 }

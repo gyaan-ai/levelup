@@ -4,6 +4,25 @@ import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  ChartContainer,
+  ChartTooltip,
+  ChartTooltipContent,
+} from '@/components/ui/chart';
+import {
+  AreaChart,
+  Area,
+  BarChart,
+  Bar,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  ResponsiveContainer,
+  Legend,
+} from 'recharts';
 import {
   Users,
   UserPlus,
@@ -12,11 +31,15 @@ import {
   DollarSign,
   Wallet,
   TrendingUp,
+  TrendingDown,
   Loader2,
   Gauge,
   ClipboardList,
   Eye,
   Star,
+  ArrowUpRight,
+  ArrowDownRight,
+  Activity,
 } from 'lucide-react';
 import { formatEST } from '@/lib/format-date';
 import Link from 'next/link';
@@ -65,11 +88,9 @@ export type CockpitData = {
   }[];
   earlyAccess: { id: string; email: string; name: string; created_at: string }[];
   payoutsPaid: number;
-  /** Sum of coach payouts marked paid, all time (any payout date) */
   payoutsPaidAllTime?: number;
   payoutsPaidList: { session_id: string; amount: number; coach_name: string }[];
   revenueThatDay: number;
-  /** Per-period signup economics: count, gross from parents, session-level coach/Stripe/Guild */
   bookingEconomics?: {
     bookingCount: number;
     gross: number;
@@ -80,18 +101,20 @@ export type CockpitData = {
   };
   pageViews?: number;
   visitors?: number;
+  // Credits (liability)
+  outstandingCredits?: number;
+  creditsIssuedInRange?: number;
+  creditsUsedInRange?: number;
   trends: {
     parents: number[];
     coaches: number[];
     athletes: number[];
     sessions: number[];
     bookings: number[];
-    /** Gross parent payments (sum amount_paid) per trend bucket */
     bookingGross?: number[];
     earlyAccess: number[];
     reviews: number[];
   };
-  /** All-time row counts at end of each trend bucket (same keys as trends; bookingGross = cumulative $) */
   trendCumulativeTotals?: {
     parents: number[];
     coaches: number[];
@@ -161,15 +184,6 @@ function formatChartCurrency(n: number): string {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n);
 }
 
-function niceYMax(max: number): number {
-  if (max <= 0) return 5;
-  const step = Math.pow(10, Math.floor(Math.log10(max)));
-  const n = Math.ceil(max / step);
-  if (n <= 1) return Math.max(5, step);
-  return n * step;
-}
-
-/** Additive series: month 1 + month 3 → second point shows 4 */
 function runningSum(values: number[]): number[] {
   let s = 0;
   return values.map((v) => {
@@ -178,273 +192,262 @@ function runningSum(values: number[]): number[] {
   });
 }
 
-/** Line + points: visible on dark backgrounds */
-const ACTIVITY_LINE_STROKE = '#38bdf8';
-const ACTIVITY_LINE_POINT_FILL = '#38bdf8';
-const ACTIVITY_BAR_CLASS = 'bg-sky-500/90 hover:bg-sky-400';
-
-function TrendLineChart({
-  values,
-  labels,
-  metricLabel,
-  mode,
-  valueFormat = 'number',
-}: {
-  values: number[];
-  labels: string[];
-  metricLabel: string;
-  /** runningTotal = 1+3+… additive; perPeriod = each bucket alone */
-  mode: 'runningTotal' | 'perPeriod';
-  valueFormat?: 'number' | 'currency';
-}) {
-  const raw = values.slice(0, labels.length);
-  const vals = mode === 'runningTotal' ? runningSum(raw) : raw;
-  const maxVal = Math.max(0, ...vals, 0);
-  const yMax = niceYMax(maxVal);
-  const chartHeight = 240;
-  const chartWidth = 720;
-  const padL = 44;
-  const padR = 12;
-  const padT = 12;
-  const padB = 36;
-  const innerW = chartWidth - padL - padR;
-  const innerH = chartHeight - padT - padB;
-  const n = vals.length;
-  const yTicks = yMax <= 0 ? [0] : [0, ...(yMax <= 5 ? [yMax] : [Math.floor(yMax / 2), yMax])];
-
-  const xPos = (i: number) => {
-    if (n <= 1) return padL + innerW / 2;
-    return padL + (i / (n - 1)) * innerW;
-  };
-  const yPos = (v: number) => {
-    if (yMax <= 0) return padT + innerH;
-    return padT + innerH - (v / yMax) * innerH;
-  };
-
-  const points = vals.map((v, i) => `${xPos(i)},${yPos(v)}`).join(' ');
-
-  return (
-    <div className="space-y-2">
-      <p className="text-sm text-muted-foreground">
-        {metricLabel} ·{' '}
-        {mode === 'runningTotal'
-          ? 'running total in this window (each period adds to the last)'
-          : 'new in each period only'}
-      </p>
-      <div className="w-full overflow-x-auto">
-        <svg
-          viewBox={`0 0 ${chartWidth} ${chartHeight}`}
-          className="w-full min-w-[320px] h-[240px]"
-          role="img"
-          aria-label={`${metricLabel} trend`}
-        >
-          {/* grid */}
-          {yTicks.map((t) => {
-            const y = yPos(t);
-            return (
-              <line
-                key={t}
-                x1={padL}
-                y1={y}
-                x2={chartWidth - padR}
-                y2={y}
-                className="stroke-muted"
-                strokeOpacity={0.35}
-                strokeWidth={1}
-                strokeDasharray="4 4"
-              />
-            );
-          })}
-          {/* Y-axis labels */}
-          {[...yTicks].reverse().map((t) => (
-            <text
-              key={`y-${t}`}
-              x={padL - 4}
-              y={yPos(t) + 4}
-              textAnchor="end"
-              className="fill-muted-foreground text-[11px] font-medium tabular-nums"
-            >
-              {valueFormat === 'currency' ? formatChartCurrency(t) : t}
-            </text>
-          ))}
-          {/* Line */}
-          {n > 0 && yMax > 0 && (
-            <polyline
-              fill="none"
-              stroke={ACTIVITY_LINE_STROKE}
-              strokeWidth={2.5}
-              strokeLinejoin="round"
-              strokeLinecap="round"
-              points={points}
-            />
-          )}
-          {/* Points */}
-          {vals.map((v, i) => (
-            <circle
-              key={i}
-              cx={xPos(i)}
-              cy={yPos(v)}
-              r={4}
-              fill={ACTIVITY_LINE_POINT_FILL}
-              stroke="#0369a1"
-              strokeWidth={1.5}
-            />
-          ))}
-          {/* X labels */}
-          {labels.map((l, i) => (
-            <text
-              key={i}
-              x={xPos(i)}
-              y={chartHeight - 8}
-              textAnchor="middle"
-              className="fill-muted-foreground text-[10px] font-medium"
-            >
-              {l.length > 12 ? `${l.slice(0, 10)}…` : l}
-            </text>
-          ))}
-        </svg>
-      </div>
-    </div>
-  );
-}
-
-function StandardBarChart({
-  values,
-  labels,
-  metricLabel,
-  mode,
-  valueFormat = 'number',
-}: {
-  values: number[];
-  labels: string[];
-  metricLabel: string;
-  mode: 'runningTotal' | 'perPeriod';
-  valueFormat?: 'number' | 'currency';
-}) {
-  const raw = values.slice(0, labels.length);
-  const vals = mode === 'runningTotal' ? runningSum(raw) : raw;
-  const maxVal = Math.max(0, ...vals);
-  const yMax = niceYMax(maxVal);
-  const chartHeight = 240;
-  const yTicks = yMax <= 0 ? [0] : [0, ...(yMax <= 5 ? [yMax] : [Math.floor(yMax / 2), yMax])];
-
-  return (
-    <div className="space-y-2">
-      <p className="text-sm text-muted-foreground">
-        {metricLabel} ·{' '}
-        {mode === 'runningTotal'
-          ? 'running total in this window (each period adds to the last)'
-          : 'new in each period only'}
-      </p>
-      <div className="flex gap-4 overflow-x-auto pb-2">
-        {/* Y-axis */}
-        <div className="flex flex-col justify-between shrink-0 text-right pr-2 border-r border-border" style={{ height: chartHeight }}>
-          {[...yTicks].reverse().map((t) => (
-            <span key={t} className="text-xs font-medium tabular-nums text-muted-foreground">
-              {valueFormat === 'currency' ? formatChartCurrency(t) : t}
-            </span>
-          ))}
-        </div>
-        {/* Chart + X-axis */}
-        <div className="flex-1 min-w-0">
-          <div className="flex gap-1 items-end" style={{ height: chartHeight }}>
-            {vals.map((v, i) => {
-              const barHeightPx = yMax > 0 ? Math.max(2, (v / yMax) * chartHeight) : 0;
-              return (
-                <div
-                  key={i}
-                  className="flex-1 min-w-[20px] max-w-[48px] flex flex-col items-center justify-end gap-0.5"
-                  style={{ height: chartHeight }}
-                  title={`${labels[i] ?? '—'}: ${valueFormat === 'currency' ? formatChartCurrency(v) : v}`}
-                >
-                  <div
-                    className={`w-full rounded-t transition-colors min-h-[2px] flex-shrink-0 ${ACTIVITY_BAR_CLASS}`}
-                    style={{ height: barHeightPx }}
-                  />
-                </div>
-              );
-            })}
-          </div>
-          <div className="flex gap-1 mt-1">
-            {labels.map((l, i) => (
-              <div key={i} className="flex-1 min-w-[20px] max-w-[48px] text-center">
-                <span className="text-[10px] font-medium text-muted-foreground truncate block">{l}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+// Chart colors - computed values for Recharts
+const CHART_COLORS = {
+  gold: '#B89D60',
+  goldLight: '#C9B078',
+  blue: '#3B82F6',
+  emerald: '#10B981',
+  violet: '#8B5CF6',
+  orange: '#F97316',
+  rose: '#F43F5E',
+  cyan: '#06B6D4',
+  slate: '#64748B',
+};
 
 const GROWTH_LINE_SPECS: { id: keyof NonNullable<CockpitData['trendCumulativeTotals']>; label: string; color: string }[] = [
-  { id: 'bookings', label: 'Bookings', color: '#dc2626' },
-  { id: 'bookingGross', label: 'Gross booked ($)', color: '#059669' },
-  { id: 'athletes', label: 'Athletes (kids)', color: '#16a34a' },
-  { id: 'coaches', label: 'Coaches', color: '#7c3aed' },
-  { id: 'parents', label: 'Parents', color: '#2563eb' },
-  { id: 'sessions', label: 'Sessions', color: '#ea580c' },
-  { id: 'earlyAccess', label: 'Early access', color: '#64748b' },
-  { id: 'reviews', label: 'Reviews', color: '#c026d3' },
+  { id: 'bookings', label: 'Bookings', color: CHART_COLORS.rose },
+  { id: 'bookingGross', label: 'Gross ($)', color: CHART_COLORS.emerald },
+  { id: 'athletes', label: 'Athletes', color: CHART_COLORS.cyan },
+  { id: 'coaches', label: 'Coaches', color: CHART_COLORS.violet },
+  { id: 'parents', label: 'Parents', color: CHART_COLORS.blue },
+  { id: 'sessions', label: 'Sessions', color: CHART_COLORS.orange },
+  { id: 'earlyAccess', label: 'Early access', color: CHART_COLORS.slate },
+  { id: 'reviews', label: 'Reviews', color: CHART_COLORS.gold },
 ];
 
+// Metric KPI card with sparkline-style mini chart
+function MetricCard({
+  label,
+  value,
+  icon: Icon,
+  trend,
+  trendLabel,
+  sparklineData,
+  variant = 'default',
+}: {
+  label: string;
+  value: string | number;
+  icon: React.ElementType;
+  trend?: 'up' | 'down' | 'neutral';
+  trendLabel?: string;
+  sparklineData?: number[];
+  variant?: 'default' | 'highlight' | 'muted';
+}) {
+  const sparkMax = sparklineData ? Math.max(...sparklineData, 1) : 1;
+  
+  return (
+    <Card className={`relative overflow-hidden transition-all hover:shadow-md ${
+      variant === 'highlight' 
+        ? 'border-[#B89D60]/30 bg-gradient-to-br from-[#B89D60]/5 to-transparent' 
+        : variant === 'muted'
+        ? 'border-dashed bg-muted/20'
+        : ''
+    }`}>
+      <CardHeader className="pb-2 pt-4 px-4">
+        <div className="flex items-center justify-between gap-2">
+          <CardDescription className="text-xs font-medium text-muted-foreground">{label}</CardDescription>
+          <span className={`rounded-lg p-2 ${variant === 'highlight' ? 'bg-[#B89D60]/10' : 'bg-muted/50'}`}>
+            <Icon className={`h-4 w-4 ${variant === 'highlight' ? 'text-[#B89D60]' : 'text-muted-foreground'}`} />
+          </span>
+        </div>
+        <div className="flex items-end justify-between gap-2 mt-1">
+          <CardTitle className="text-2xl font-bold tabular-nums">{value}</CardTitle>
+          {trend && trendLabel && (
+            <span className={`flex items-center gap-0.5 text-xs font-medium ${
+              trend === 'up' ? 'text-emerald-500' : trend === 'down' ? 'text-rose-500' : 'text-muted-foreground'
+            }`}>
+              {trend === 'up' ? <ArrowUpRight className="h-3 w-3" /> : trend === 'down' ? <ArrowDownRight className="h-3 w-3" /> : null}
+              {trendLabel}
+            </span>
+          )}
+        </div>
+      </CardHeader>
+      {sparklineData && sparklineData.length > 1 && (
+        <div className="absolute bottom-0 left-0 right-0 h-8 opacity-30">
+          <svg viewBox={`0 0 ${sparklineData.length * 10} 32`} className="w-full h-full" preserveAspectRatio="none">
+            <defs>
+              <linearGradient id={`spark-${label.replace(/\s/g, '')}`} x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={variant === 'highlight' ? CHART_COLORS.gold : CHART_COLORS.blue} stopOpacity="0.3" />
+                <stop offset="100%" stopColor={variant === 'highlight' ? CHART_COLORS.gold : CHART_COLORS.blue} stopOpacity="0" />
+              </linearGradient>
+            </defs>
+            <path
+              d={`M0,32 ${sparklineData.map((v, i) => `L${i * 10},${32 - (v / sparkMax) * 28}`).join(' ')} L${(sparklineData.length - 1) * 10},32 Z`}
+              fill={`url(#spark-${label.replace(/\s/g, '')})`}
+            />
+            <path
+              d={`M0,${32 - (sparklineData[0] / sparkMax) * 28} ${sparklineData.map((v, i) => `L${i * 10},${32 - (v / sparkMax) * 28}`).join(' ')}`}
+              fill="none"
+              stroke={variant === 'highlight' ? CHART_COLORS.gold : CHART_COLORS.blue}
+              strokeWidth="1.5"
+            />
+          </svg>
+        </div>
+      )}
+    </Card>
+  );
+}
+
+// Modern Area Chart component
+function ModernAreaChart({
+  data,
+  dataKey,
+  label,
+  valueFormat = 'number',
+  color = CHART_COLORS.gold,
+}: {
+  data: { label: string; value: number }[];
+  dataKey: string;
+  label: string;
+  valueFormat?: 'number' | 'currency';
+  color?: string;
+}) {
+  return (
+    <ChartContainer
+      config={{
+        [dataKey]: {
+          label,
+          color,
+        },
+      }}
+      className="h-[280px] w-full"
+    >
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+          <defs>
+            <linearGradient id={`gradient-${dataKey}`} x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor={color} stopOpacity={0.3} />
+              <stop offset="95%" stopColor={color} stopOpacity={0} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
+          <XAxis 
+            dataKey="label" 
+            tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
+            tickLine={false}
+            axisLine={false}
+          />
+          <YAxis
+            tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
+            tickLine={false}
+            axisLine={false}
+            tickFormatter={(v) => valueFormat === 'currency' ? formatChartCurrency(v) : v}
+            width={48}
+          />
+          <ChartTooltip
+            content={
+              <ChartTooltipContent
+                formatter={(value) => (
+                  <span className="font-semibold">
+                    {valueFormat === 'currency' ? formatChartCurrency(Number(value)) : value}
+                  </span>
+                )}
+              />
+            }
+          />
+          <Area
+            type="monotone"
+            dataKey="value"
+            stroke={color}
+            strokeWidth={2}
+            fill={`url(#gradient-${dataKey})`}
+            dot={false}
+            activeDot={{ r: 4, strokeWidth: 2, stroke: color, fill: 'hsl(var(--background))' }}
+          />
+        </AreaChart>
+      </ResponsiveContainer>
+    </ChartContainer>
+  );
+}
+
+// Modern Bar Chart component
+function ModernBarChart({
+  data,
+  dataKey,
+  label,
+  valueFormat = 'number',
+  color = CHART_COLORS.gold,
+}: {
+  data: { label: string; value: number }[];
+  dataKey: string;
+  label: string;
+  valueFormat?: 'number' | 'currency';
+  color?: string;
+}) {
+  return (
+    <ChartContainer
+      config={{
+        [dataKey]: {
+          label,
+          color,
+        },
+      }}
+      className="h-[280px] w-full"
+    >
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" vertical={false} />
+          <XAxis
+            dataKey="label"
+            tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
+            tickLine={false}
+            axisLine={false}
+          />
+          <YAxis
+            tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
+            tickLine={false}
+            axisLine={false}
+            tickFormatter={(v) => valueFormat === 'currency' ? formatChartCurrency(v) : v}
+            width={48}
+          />
+          <ChartTooltip
+            content={
+              <ChartTooltipContent
+                formatter={(value) => (
+                  <span className="font-semibold">
+                    {valueFormat === 'currency' ? formatChartCurrency(Number(value)) : value}
+                  </span>
+                )}
+              />
+            }
+          />
+          <Bar
+            dataKey="value"
+            fill={color}
+            radius={[4, 4, 0, 0]}
+            maxBarSize={48}
+          />
+        </BarChart>
+      </ResponsiveContainer>
+    </ChartContainer>
+  );
+}
+
+// Multi-line growth chart
 function MultiLineGrowthChart({
-  labels,
-  cumulative,
+  data,
   visible,
   onToggle,
 }: {
-  labels: string[];
-  cumulative: NonNullable<CockpitData['trendCumulativeTotals']>;
+  data: { label: string; [key: string]: string | number }[];
   visible: Record<string, boolean>;
   onToggle: (id: string) => void;
 }) {
-  const chartHeight = 280;
-  const chartWidth = 800;
-  const padL = 52;
-  const padR = 16;
-  const padT = 16;
-  const padB = 52;
-  const innerW = chartWidth - padL - padR;
-  const innerH = chartHeight - padT - padB;
-  const n = labels.length;
-
-  const series = GROWTH_LINE_SPECS.map((spec) => ({
-    ...spec,
-    values: (cumulative[spec.id] ?? []).slice(0, n),
-  })).filter((s) => s.values.length > 0);
-
-  const active = series.filter((s) => visible[s.id] !== false);
-  const allVals = active.flatMap((s) => s.values);
-  const maxVal = Math.max(0, ...allVals, 0);
-  const yMax = niceYMax(maxVal);
-  const yTicks = yMax <= 0 ? [0] : [0, ...(yMax <= 5 ? [yMax] : [Math.floor(yMax / 2), yMax])];
-  const yAxisIsMoney = active.length > 0 && active.every((s) => s.id === 'bookingGross');
-
-  const xPos = (i: number) => {
-    if (n <= 1) return padL + innerW / 2;
-    return padL + (i / (n - 1)) * innerW;
-  };
-  const yPos = (v: number) => {
-    if (yMax <= 0) return padT + innerH;
-    return padT + innerH - (v / yMax) * innerH;
-  };
-
+  const activeLines = GROWTH_LINE_SPECS.filter(s => visible[s.id] !== false);
+  
   return (
-    <div className="space-y-3">
-      <p className="text-sm text-muted-foreground">
-        Total records in the database at each period end (all-time growth — lines rise left → right). Athletes (kids) includes legacy rows with no <code className="text-xs bg-muted px-1 rounded">created_at</code>.{' '}
-        <strong className="text-foreground">Gross booked ($)</strong> uses dollars — toggle it alone for a readable scale (it does not share the count axis).
-      </p>
+    <div className="space-y-4">
       <div className="flex flex-wrap gap-2">
         {GROWTH_LINE_SPECS.map((spec) => (
           <button
             key={spec.id}
             type="button"
             onClick={() => onToggle(spec.id)}
-            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition-colors ${
-              visible[spec.id] !== false ? 'border-primary bg-primary/10' : 'border-border bg-muted/50 opacity-60'
+            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-all ${
+              visible[spec.id] !== false 
+                ? 'border-[#B89D60]/50 bg-[#B89D60]/10 text-foreground' 
+                : 'border-border bg-muted/30 text-muted-foreground opacity-60 hover:opacity-100'
             }`}
           >
             <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: spec.color }} />
@@ -452,72 +455,64 @@ function MultiLineGrowthChart({
           </button>
         ))}
       </div>
-      <div className="w-full overflow-x-auto">
-        <svg
-          viewBox={`0 0 ${chartWidth} ${chartHeight}`}
-          className="w-full min-w-[360px] h-[280px]"
-          role="img"
-          aria-label="Platform growth over time"
-        >
-          {yTicks.map((t) => {
-            const y = yPos(t);
-            return (
-              <line
-                key={t}
-                x1={padL}
-                y1={y}
-                x2={chartWidth - padR}
-                y2={y}
-                className="stroke-muted"
-                strokeOpacity={0.35}
-                strokeWidth={1}
-                strokeDasharray="4 4"
+      
+      <ChartContainer
+        config={Object.fromEntries(GROWTH_LINE_SPECS.map(s => [s.id, { label: s.label, color: s.color }]))}
+        className="h-[320px] w-full"
+      >
+        <ResponsiveContainer width="100%" height="100%">
+          <LineChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" className="stroke-border/50" />
+            <XAxis
+              dataKey="label"
+              tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 10 }}
+              tickLine={false}
+              axisLine={false}
+            />
+            <YAxis
+              tick={{ fill: 'hsl(var(--muted-foreground))', fontSize: 11 }}
+              tickLine={false}
+              axisLine={false}
+              width={48}
+            />
+            <ChartTooltip content={<ChartTooltipContent />} />
+            <Legend
+              verticalAlign="top"
+              height={36}
+              formatter={(value) => <span className="text-xs text-muted-foreground">{value}</span>}
+            />
+            {activeLines.map((spec) => (
+              <Line
+                key={spec.id}
+                type="monotone"
+                dataKey={spec.id}
+                name={spec.label}
+                stroke={spec.color}
+                strokeWidth={2}
+                dot={false}
+                activeDot={{ r: 4, strokeWidth: 2, stroke: spec.color, fill: 'hsl(var(--background))' }}
               />
-            );
-          })}
-          {[...yTicks].reverse().map((t) => (
-            <text
-              key={`gy-${t}`}
-              x={padL - 4}
-              y={yPos(t) + 4}
-              textAnchor="end"
-              className="fill-muted-foreground text-[11px] font-medium tabular-nums"
-            >
-              {yAxisIsMoney ? formatChartCurrency(t) : t}
-            </text>
-          ))}
-          {active.map((s) => {
-            const pts = s.values.map((v, i) => `${xPos(i)},${yPos(v)}`).join(' ');
-            return (
-              <polyline
-                key={s.id}
-                fill="none"
-                stroke={s.color}
-                strokeWidth={2.25}
-                strokeLinejoin="round"
-                strokeLinecap="round"
-                points={pts}
-              />
-            );
-          })}
-          {active.map((s) =>
-            s.values.map((v, i) => (
-              <circle key={`${s.id}-${i}`} cx={xPos(i)} cy={yPos(v)} r={3} fill={s.color} stroke="#fff" strokeWidth={1} />
-            ))
-          )}
-          {labels.map((l, i) => (
-            <text
-              key={i}
-              x={xPos(i)}
-              y={chartHeight - 12}
-              textAnchor="middle"
-              className="fill-muted-foreground text-[10px] font-medium"
-            >
-              {l.length > 14 ? `${l.slice(0, 12)}…` : l}
-            </text>
-          ))}
-        </svg>
+            ))}
+          </LineChart>
+        </ResponsiveContainer>
+      </ChartContainer>
+    </div>
+  );
+}
+
+// Loading skeleton for the dashboard
+function CockpitSkeleton() {
+  return (
+    <div className="space-y-6">
+      <Skeleton className="h-14 w-full rounded-lg" />
+      <Skeleton className="h-24 w-full rounded-lg" />
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <Skeleton key={i} className="h-28 w-full rounded-lg" />
+        ))}
       </div>
+      <Skeleton className="h-[360px] w-full rounded-lg" />
+      <Skeleton className="h-[360px] w-full rounded-lg" />
     </div>
   );
 }
@@ -530,12 +525,9 @@ export function AdminCockpitView() {
   const [trendMetric, setTrendMetric] = useState<
     'parents' | 'coaches' | 'athletes' | 'sessions' | 'bookings' | 'bookingGross' | 'earlyAccess' | 'reviews'
   >('bookings');
-  /** Cockpit reviews table filters (client-side on loaded period) */
   const [reviewCoachFilter, setReviewCoachFilter] = useState<string>('');
   const [reviewStarFilter, setReviewStarFilter] = useState<number | 'all'>('all');
-  /** Period activity: bar (default) or line */
-  const [trendChartStyle, setTrendChartStyle] = useState<'line' | 'bar'>('bar');
-  /** Additive running total in the selected window (default) vs raw per bucket */
+  const [trendChartStyle, setTrendChartStyle] = useState<'area' | 'bar'>('area');
   const [activityMode, setActivityMode] = useState<'runningTotal' | 'perPeriod'>('runningTotal');
   const [growthLineVisible, setGrowthLineVisible] = useState<Record<string, boolean>>(() => {
     const o = Object.fromEntries(GROWTH_LINE_SPECS.map((s) => [s.id, true])) as Record<string, boolean>;
@@ -591,18 +583,20 @@ export function AdminCockpitView() {
   }, [trendMetric]);
 
   if (loading && !data) {
-    return (
-      <div className="flex items-center justify-center py-24">
-        <Loader2 className="h-10 w-10 animate-spin text-muted-foreground" />
-      </div>
-    );
+    return <CockpitSkeleton />;
   }
 
   if (error) {
     return (
-      <Card>
-        <CardContent className="py-8 text-center text-destructive">
-          {error}
+      <Card className="border-destructive/50">
+        <CardContent className="py-12 text-center">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-destructive/10 mb-4">
+            <TrendingDown className="h-6 w-6 text-destructive" />
+          </div>
+          <p className="text-destructive font-medium">{error}</p>
+          <Button variant="outline" className="mt-4" onClick={() => window.location.reload()}>
+            Try again
+          </Button>
         </CardContent>
       </Card>
     );
@@ -616,296 +610,348 @@ export function AdminCockpitView() {
   const trendLabels = d.trendLabels ?? trendDays.map((ds) => formatEST(new Date(ds + 'T12:00:00'), 'M/d'));
 
   const trendMetrics = [
-    { id: 'parents' as const, label: 'Parents', values: trends.parents ?? [] },
-    { id: 'coaches' as const, label: 'Coaches', values: trends.coaches ?? [] },
-    { id: 'athletes' as const, label: 'Athletes', values: trends.athletes ?? [] },
-    { id: 'sessions' as const, label: 'Sessions', values: trends.sessions ?? [] },
-    { id: 'bookings' as const, label: 'Bookings', values: trends.bookings ?? [] },
-    { id: 'bookingGross' as const, label: 'Booking $ (gross)', values: trends.bookingGross ?? [] },
-    { id: 'earlyAccess' as const, label: 'Early access', values: trends.earlyAccess ?? [] },
-    { id: 'reviews' as const, label: 'Reviews', values: trends.reviews ?? [] },
+    { id: 'parents' as const, label: 'Parents', values: trends.parents ?? [], icon: UserPlus },
+    { id: 'coaches' as const, label: 'Coaches', values: trends.coaches ?? [], icon: Users },
+    { id: 'athletes' as const, label: 'Athletes', values: trends.athletes ?? [], icon: Users },
+    { id: 'sessions' as const, label: 'Sessions', values: trends.sessions ?? [], icon: Calendar },
+    { id: 'bookings' as const, label: 'Bookings', values: trends.bookings ?? [], icon: CreditCard },
+    { id: 'bookingGross' as const, label: 'Booking $', values: trends.bookingGross ?? [], icon: DollarSign },
+    { id: 'earlyAccess' as const, label: 'Early access', values: trends.earlyAccess ?? [], icon: ClipboardList },
+    { id: 'reviews' as const, label: 'Reviews', values: trends.reviews ?? [], icon: Star },
   ];
 
   const be = d.bookingEconomics;
   const bookingN = be?.bookingCount ?? d.bookings.length;
 
-  const summaryCards = [
-    { label: 'Gross (parent payments)', value: `$${d.revenueThatDay.toFixed(0)}`, icon: DollarSign },
-    { label: 'Bookings (# signups)', value: bookingN, icon: CreditCard },
-    { label: 'New parents', value: d.newParents.length, icon: UserPlus },
-    { label: 'New coaches', value: d.newCoaches.length, icon: Users },
-    { label: 'New athletes', value: d.newAthletes.length, icon: Users },
-    { label: 'Sessions created', value: d.sessionsScheduled.length, icon: Calendar },
-    { label: 'Early access', value: d.earlyAccess.length, icon: ClipboardList },
-    {
-      label: 'Payouts paid (this period)',
-      value:
-        d.payoutsPaidAllTime != null
-          ? `$${d.payoutsPaid.toFixed(0)} · $${d.payoutsPaidAllTime.toFixed(0)} all-time`
-          : `$${d.payoutsPaid.toFixed(0)}`,
-      icon: Wallet,
-    },
-  ];
+  // Prepare chart data for activity
+  const selectedMetric = trendMetrics.find((m) => m.id === trendMetric);
+  const rawValues = selectedMetric?.values.slice(0, trendLabels.length) ?? [];
+  const chartValues = activityMode === 'runningTotal' ? runningSum(rawValues) : rawValues;
+  const activityChartData = trendLabels.map((label, i) => ({
+    label,
+    value: chartValues[i] ?? 0,
+  }));
+
+  // Prepare growth chart data
+  const growthChartData = trendLabels.map((label, i) => {
+    const row: { label: string; [key: string]: string | number } = { label };
+    for (const spec of GROWTH_LINE_SPECS) {
+      const cumulative = d.trendCumulativeTotals?.[spec.id] ?? [];
+      row[spec.id] = cumulative[i] ?? 0;
+    }
+    return row;
+  });
 
   return (
     <div className="space-y-6">
-      {/* Filter bar: aligned row */}
-      <div className="flex flex-wrap items-center gap-4 rounded-lg border border-border bg-muted/30 px-4 py-3">
-        <div className="flex items-center gap-2">
-          <Gauge className="h-5 w-5 text-accent" />
-          <h2 className="text-lg font-semibold">Command center</h2>
-        </div>
-        <div className="flex items-center gap-3 flex-1 min-w-0">
-          <div className="flex items-center gap-2 shrink-0">
-            <span className="text-sm font-medium text-muted-foreground whitespace-nowrap">Period</span>
-            <div className="flex rounded-md border border-input bg-background overflow-hidden">
-              {(['today', 'yesterday', 'week', 'month'] as const).map((r) => (
-                <button
-                  key={r}
-                  type="button"
-                  onClick={() => {
-                    setRange(r);
-                    if (r === 'today') setDate(todayInTz(COCKPIT_TIMEZONE));
-                    if (r === 'yesterday') setDate(yesterdayInTz(COCKPIT_TIMEZONE));
-                  }}
-                  className={`px-3 py-2 text-sm font-medium transition-colors ${range === r ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
-                >
-                  {r === 'today' ? 'Today' : r === 'yesterday' ? 'Yesterday' : r === 'week' ? 'This week' : 'This month'}
-                </button>
-              ))}
+      {/* Modern filter bar */}
+      <Card className="border-[#B89D60]/20 bg-gradient-to-r from-[#B89D60]/5 via-transparent to-transparent">
+        <CardContent className="py-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-[#B89D60]/10">
+                <Gauge className="h-5 w-5 text-[#B89D60]" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold">Command Center</h2>
+                <p className="text-xs text-muted-foreground">Real-time business insights</p>
+              </div>
+            </div>
+            
+            <div className="flex flex-wrap items-center gap-3 sm:ml-auto">
+              <div className="flex items-center rounded-lg border border-border bg-background p-1">
+                {(['today', 'yesterday', 'week', 'month'] as const).map((r) => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => {
+                      setRange(r);
+                      if (r === 'today') setDate(todayInTz(COCKPIT_TIMEZONE));
+                      if (r === 'yesterday') setDate(yesterdayInTz(COCKPIT_TIMEZONE));
+                    }}
+                    className={`px-3 py-1.5 text-sm font-medium rounded-md transition-all ${
+                      range === r 
+                        ? 'bg-[#B89D60] text-black shadow-sm' 
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                    }`}
+                  >
+                    {r === 'today' ? 'Today' : r === 'yesterday' ? 'Yesterday' : r === 'week' ? 'Week' : 'Month'}
+                  </button>
+                ))}
+              </div>
+              
+              {(range === 'week' || range === 'month') && (
+                <Input
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  className="w-40 bg-background"
+                />
+              )}
+              
+              {data && (
+                <span className="text-sm font-medium text-muted-foreground">
+                  {range === 'today' && date}
+                  {range === 'yesterday' && date}
+                  {range === 'week' && data.rangeStart && data.rangeEnd && formatRange(data.rangeStart, data.rangeEnd, 'week')}
+                  {range === 'month' && data.rangeStart && data.rangeEnd && formatRange(data.rangeStart, data.rangeEnd, 'month')}
+                </span>
+              )}
             </div>
           </div>
-          {(range === 'week' || range === 'month') && (
-            <div className="flex items-center gap-2 shrink-0">
-              <label className="text-sm font-medium text-muted-foreground whitespace-nowrap">End date</label>
-              <Input
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="w-40 bg-background"
-              />
-            </div>
-          )}
-          {data && (
-            <span className="text-sm text-muted-foreground">
-              {range === 'today' && <><strong>{date}</strong></>}
-              {range === 'yesterday' && <><strong>{date}</strong></>}
-              {range === 'week' && data.rangeStart && data.rangeEnd && <><strong>{formatRange(data.rangeStart, data.rangeEnd, 'week')}</strong></>}
-              {range === 'month' && data.rangeStart && data.rangeEnd && <><strong>{formatRange(data.rangeStart, data.rangeEnd, 'month')}</strong></>}
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* At a glance: $ booked, bookings, new users, new sessions */}
-      <Card className="border-primary/30 bg-primary/5">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base font-medium text-muted-foreground">
-            {range === 'today' ? 'Today' : range === 'yesterday' ? 'Yesterday' : range === 'week' ? 'This week' : 'This month'} — at a glance
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-wrap items-baseline gap-x-6 gap-y-2 text-lg">
-          <span className="font-semibold text-foreground tabular-nums">{bookingN} bookings</span>
-          <span className="font-bold text-2xl tabular-nums">${d.revenueThatDay.toFixed(0)} gross</span>
-          {bookingN > 0 && d.revenueThatDay > 0 && (
-            <span className="text-muted-foreground">(~${(d.revenueThatDay / bookingN).toFixed(0)} / signup)</span>
-          )}
-          <span className="text-muted-foreground">
-            <span className="font-semibold text-foreground tabular-nums">{d.newParents.length}</span> parents,{' '}
-            <span className="font-semibold text-foreground tabular-nums">{d.newCoaches.length}</span> coaches,{' '}
-            <span className="font-semibold text-foreground tabular-nums">{d.newAthletes.length}</span> athletes
-          </span>
-          <span className="text-muted-foreground">
-            <span className="font-semibold text-foreground tabular-nums">{d.sessionsScheduled.length}</span> new sessions created
-          </span>
         </CardContent>
       </Card>
 
-      {be && (
-        <Card className="border-border">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base font-medium text-muted-foreground">Gross vs payouts &amp; fees</CardTitle>
-            <p className="text-xs text-muted-foreground mt-1 max-w-3xl leading-relaxed">
-              <strong className="text-foreground">{be.bookingCount}</strong> signup rows ·{' '}
-              <strong className="text-foreground tabular-nums">${be.gross.toFixed(0)}</strong> gross from parents (sum of{' '}
-              <code className="rounded bg-muted px-1 py-0.5 text-[10px]">amount_paid</code>). Coach, Stripe, and Guild use each
-              session&apos;s values <em>once per session</em> (shared when multiple kids book the same session).
-            </p>
-          </CardHeader>
-          <CardContent>
-            <dl className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 text-sm">
-              <div className="rounded-lg border border-border bg-muted/20 px-3 py-2">
-                <dt className="text-xs font-medium text-muted-foreground">Gross (parents)</dt>
-                <dd className="text-lg font-semibold tabular-nums">${be.gross.toFixed(0)}</dd>
+      {/* Hero KPIs */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <Card className="md:col-span-2 border-[#B89D60]/30 bg-gradient-to-br from-[#B89D60]/10 via-[#B89D60]/5 to-transparent">
+          <CardContent className="py-6">
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground mb-1">
+                  {range === 'today' ? 'Today' : range === 'yesterday' ? 'Yesterday' : range === 'week' ? 'This Week' : 'This Month'} Revenue
+                </p>
+                <div className="flex items-baseline gap-3">
+                  <span className="text-4xl font-bold tabular-nums">${d.revenueThatDay.toFixed(0)}</span>
+                  {bookingN > 0 && d.revenueThatDay > 0 && (
+                    <span className="text-lg text-muted-foreground">
+                      ~${(d.revenueThatDay / bookingN).toFixed(0)}/signup
+                    </span>
+                  )}
+                </div>
               </div>
-              <div className="rounded-lg border border-border bg-muted/20 px-3 py-2">
-                <dt className="text-xs font-medium text-muted-foreground">Coach payouts</dt>
-                <dd className="text-lg font-semibold tabular-nums">${be.coachPayouts.toFixed(0)}</dd>
+              <div className="flex items-center gap-6 text-sm">
+                <div className="text-center">
+                  <p className="text-2xl font-bold tabular-nums">{bookingN}</p>
+                  <p className="text-muted-foreground">Bookings</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold tabular-nums">{d.newParents.length}</p>
+                  <p className="text-muted-foreground">New Parents</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-2xl font-bold tabular-nums">{d.sessionsScheduled.length}</p>
+                  <p className="text-muted-foreground">Sessions</p>
+                </div>
               </div>
-              <div className="rounded-lg border border-border bg-muted/20 px-3 py-2">
-                <dt className="text-xs font-medium text-muted-foreground">Stripe</dt>
-                <dd className="text-lg font-semibold tabular-nums">${be.stripeFees.toFixed(0)}</dd>
-              </div>
-              <div className="rounded-lg border border-border bg-muted/20 px-3 py-2">
-                <dt className="text-xs font-medium text-muted-foreground">Guild (org fee)</dt>
-                <dd className="text-lg font-semibold tabular-nums">${be.guildOrgFees.toFixed(0)}</dd>
-              </div>
-              <div className="rounded-lg border border-dashed border-primary/40 bg-primary/5 px-3 py-2 lg:col-span-2">
-                <dt className="text-xs font-medium text-muted-foreground">Check (gross − coach − Stripe − Guild)</dt>
-                <dd className="text-lg font-semibold tabular-nums">${be.remainder.toFixed(2)}</dd>
-              </div>
-            </dl>
+            </div>
           </CardContent>
         </Card>
-      )}
-
-      {/* Summary cards: consistent grid and styling */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-        {summaryCards.map(({ label, value, icon: Icon }) => (
-          <Card key={label} className="overflow-hidden">
-            <CardHeader className="pb-2 pt-4 px-4">
-              <div className="flex items-center justify-between gap-2">
-                <CardDescription className="text-xs font-medium text-muted-foreground">{label}</CardDescription>
-                <span className="rounded-md bg-muted/50 p-1.5">
-                  <Icon className="h-3.5 w-3.5 text-muted-foreground" />
-                </span>
-              </div>
-              <CardTitle className="text-2xl font-bold tabular-nums mt-1">{value}</CardTitle>
+        
+        {be && (
+          <Card className="border-border">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">Revenue Breakdown</CardTitle>
             </CardHeader>
+            <CardContent className="space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Coach payouts</span>
+                <span className="font-medium tabular-nums">${be.coachPayouts.toFixed(0)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Stripe fees</span>
+                <span className="font-medium tabular-nums">${be.stripeFees.toFixed(0)}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Guild fees</span>
+                <span className="font-medium tabular-nums">${be.guildOrgFees.toFixed(0)}</span>
+              </div>
+              <div className="border-t border-border pt-2 mt-2">
+                <div className="flex justify-between text-sm">
+                  <span className="font-medium text-[#B89D60]">Net remaining</span>
+                  <span className="font-bold tabular-nums text-[#B89D60]">${be.remainder.toFixed(2)}</span>
+                </div>
+              </div>
+            </CardContent>
           </Card>
-        ))}
-        <Card className="overflow-hidden border-dashed bg-muted/20">
-          <CardHeader className="pb-2 pt-4 px-4">
-            <div className="flex items-center justify-between gap-2">
-              <CardDescription className="text-xs font-medium text-muted-foreground">Website visitors</CardDescription>
-              <span className="rounded-md bg-muted/50 p-1.5">
-                <Eye className="h-3.5 w-3.5 text-muted-foreground" />
-              </span>
-            </div>
-            <CardTitle className="text-2xl font-bold tabular-nums mt-1">
-              {typeof d.visitors === 'number' ? d.visitors : '—'}
-            </CardTitle>
-            <p className="text-[10px] text-muted-foreground mt-0.5">
-              {typeof d.pageViews === 'number' && d.pageViews > 0 ? `${d.pageViews.toLocaleString()} page views` : 'Add a Web Analytics Drain in Vercel → Project → Drains to stream data here.'}
-            </p>
-          </CardHeader>
-        </Card>
+        )}
       </div>
 
-      {/* Activity by period: bar + line (same per-bucket counts) */}
+      {/* Metric cards grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+        <MetricCard
+          label="Gross Revenue"
+          value={`$${d.revenueThatDay.toFixed(0)}`}
+          icon={DollarSign}
+          sparklineData={trends.bookingGross}
+          variant="highlight"
+        />
+        <MetricCard
+          label="Bookings"
+          value={bookingN}
+          icon={CreditCard}
+          sparklineData={trends.bookings}
+        />
+        <MetricCard
+          label="New Parents"
+          value={d.newParents.length}
+          icon={UserPlus}
+          sparklineData={trends.parents}
+        />
+        <MetricCard
+          label="New Coaches"
+          value={d.newCoaches.length}
+          icon={Users}
+          sparklineData={trends.coaches}
+        />
+        <MetricCard
+          label="New Athletes"
+          value={d.newAthletes.length}
+          icon={Users}
+          sparklineData={trends.athletes}
+        />
+        <MetricCard
+          label="Visitors"
+          value={typeof d.visitors === 'number' ? d.visitors : '—'}
+          icon={Eye}
+          variant="muted"
+        />
+      </div>
+
+      {/* Activity Chart */}
       <Card>
         <CardHeader>
-          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
+          <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
             <div>
               <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="h-4 w-4" />
-                Activity by period
+                <Activity className="h-5 w-5 text-[#B89D60]" />
+                Activity Trends
               </CardTitle>
-              <CardDescription>
-                By default shows a <strong className="text-foreground">running total</strong> in the window (each bucket adds to the previous). Switch to “Per period only” for new-in-bucket counts.
+              <CardDescription className="mt-1">
+                {activityMode === 'runningTotal' 
+                  ? 'Cumulative values over the selected period' 
+                  : 'New records per period'}
               </CardDescription>
             </div>
+            
             <div className="flex flex-wrap items-center gap-3">
-              <span className="text-sm font-medium text-muted-foreground">Metric</span>
-              <div className="flex rounded-md border border-input bg-background overflow-hidden flex-wrap">
+              {/* Metric selector */}
+              <div className="flex items-center rounded-lg border border-border bg-background p-1 overflow-x-auto">
                 {trendMetrics.map((m) => (
                   <button
                     key={m.id}
                     type="button"
                     onClick={() => setTrendMetric(m.id)}
-                    className={`px-2.5 py-1.5 text-xs font-medium transition-colors ${trendMetric === m.id ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium rounded-md whitespace-nowrap transition-all ${
+                      trendMetric === m.id 
+                        ? 'bg-[#B89D60] text-black' 
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                    }`}
                   >
+                    <m.icon className="h-3 w-3" />
                     {m.label}
                   </button>
                 ))}
               </div>
-              <span className="text-sm font-medium text-muted-foreground">Window</span>
-              <div className="flex rounded-md border border-input bg-background overflow-hidden">
+              
+              {/* Period selector */}
+              <div className="flex items-center rounded-lg border border-border bg-background p-1">
                 {(['7d', '3w', '12m'] as const).map((p) => (
                   <button
                     key={p}
                     type="button"
                     onClick={() => setTrendPeriod(p)}
-                    className={`px-3 py-2 text-sm font-medium transition-colors ${trendPeriod === p ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                      trendPeriod === p 
+                        ? 'bg-foreground text-background' 
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                    }`}
                   >
-                    {p === '7d' ? 'Week' : p === '3w' ? '3 weeks' : 'Year'}
+                    {p === '7d' ? '7 Days' : p === '3w' ? '3 Weeks' : '12 Months'}
                   </button>
                 ))}
               </div>
-              <span className="text-sm font-medium text-muted-foreground">Chart</span>
-              <div className="flex rounded-md border border-input bg-background overflow-hidden">
+              
+              {/* Chart style */}
+              <div className="flex items-center rounded-lg border border-border bg-background p-1">
+                <button
+                  type="button"
+                  onClick={() => setTrendChartStyle('area')}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                    trendChartStyle === 'area' 
+                      ? 'bg-foreground text-background' 
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                  }`}
+                >
+                  Area
+                </button>
                 <button
                   type="button"
                   onClick={() => setTrendChartStyle('bar')}
-                  className={`px-3 py-2 text-sm font-medium transition-colors ${trendChartStyle === 'bar' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                    trendChartStyle === 'bar' 
+                      ? 'bg-foreground text-background' 
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                  }`}
                 >
                   Bar
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setTrendChartStyle('line')}
-                  className={`px-3 py-2 text-sm font-medium transition-colors ${trendChartStyle === 'line' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
-                >
-                  Line
-                </button>
               </div>
-              <span className="text-sm font-medium text-muted-foreground">Values</span>
-              <div className="flex rounded-md border border-input bg-background overflow-hidden">
+              
+              {/* Mode toggle */}
+              <div className="flex items-center rounded-lg border border-border bg-background p-1">
                 <button
                   type="button"
                   onClick={() => setActivityMode('runningTotal')}
-                  className={`px-3 py-2 text-sm font-medium transition-colors ${activityMode === 'runningTotal' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                    activityMode === 'runningTotal' 
+                      ? 'bg-foreground text-background' 
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                  }`}
                 >
-                  Running total
+                  Cumulative
                 </button>
                 <button
                   type="button"
                   onClick={() => setActivityMode('perPeriod')}
-                  className={`px-3 py-2 text-sm font-medium transition-colors ${activityMode === 'perPeriod' ? 'bg-primary text-primary-foreground' : 'hover:bg-muted'}`}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                    activityMode === 'perPeriod' 
+                      ? 'bg-foreground text-background' 
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                  }`}
                 >
-                  Per period only
+                  Per Period
                 </button>
               </div>
             </div>
           </div>
         </CardHeader>
         <CardContent>
-          {trendChartStyle === 'line' ? (
-            <TrendLineChart
-              values={trendMetrics.find((m) => m.id === trendMetric)?.values ?? []}
-              labels={trendLabels}
-              metricLabel={trendMetrics.find((m) => m.id === trendMetric)?.label ?? ''}
-              mode={activityMode}
+          {trendChartStyle === 'area' ? (
+            <ModernAreaChart
+              data={activityChartData}
+              dataKey={trendMetric}
+              label={selectedMetric?.label ?? ''}
               valueFormat={trendMetric === 'bookingGross' ? 'currency' : 'number'}
+              color={CHART_COLORS.gold}
             />
           ) : (
-            <StandardBarChart
-              values={trendMetrics.find((m) => m.id === trendMetric)?.values ?? []}
-              labels={trendLabels}
-              metricLabel={trendMetrics.find((m) => m.id === trendMetric)?.label ?? ''}
-              mode={activityMode}
+            <ModernBarChart
+              data={activityChartData}
+              dataKey={trendMetric}
+              label={selectedMetric?.label ?? ''}
               valueFormat={trendMetric === 'bookingGross' ? 'currency' : 'number'}
+              color={CHART_COLORS.gold}
             />
           )}
         </CardContent>
       </Card>
 
-      {/* All-time growth: multiple lines on one chart */}
+      {/* Platform Growth Chart */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="h-4 w-4" />
-            Platform growth (all-time)
+            <TrendingUp className="h-5 w-5 text-emerald-500" />
+            Platform Growth (All-Time)
           </CardTitle>
           <CardDescription>
-            Cumulative totals: how many parents, coaches, kids, sessions, bookings, etc. existed in the database at the end of each period below. Toggle series to compare.
+            Cumulative totals showing how the platform has grown over time. Toggle metrics to compare different growth curves.
           </CardDescription>
         </CardHeader>
         <CardContent>
           {d.trendCumulativeTotals ? (
             <MultiLineGrowthChart
-              labels={trendLabels}
-              cumulative={d.trendCumulativeTotals}
+              data={growthChartData}
               visible={growthLineVisible}
               onToggle={(id) =>
                 setGrowthLineVisible((prev) => ({
@@ -915,12 +961,14 @@ export function AdminCockpitView() {
               }
             />
           ) : (
-            <p className="text-sm text-muted-foreground">Upgrade the app — growth data loads from the latest API.</p>
+            <p className="text-sm text-muted-foreground py-8 text-center">
+              Growth data not available. Update the API to enable this feature.
+            </p>
           )}
         </CardContent>
       </Card>
 
-      {/* Table below chart: rows for the selected trend metric and period */}
+      {/* Detail Table */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -932,91 +980,90 @@ export function AdminCockpitView() {
             {trendMetric === 'bookingGross' && <DollarSign className="h-4 w-4" />}
             {trendMetric === 'earlyAccess' && <ClipboardList className="h-4 w-4" />}
             {trendMetric === 'reviews' && <Star className="h-4 w-4" />}
-            {trendMetrics.find((m) => m.id === trendMetric)?.label ?? ''} · {trendPeriod === '7d' ? 'Last 7 days' : trendPeriod === '3w' ? 'Last 3 weeks' : 'Last 12 months'}
+            {selectedMetric?.label ?? ''} Details
           </CardTitle>
           <CardDescription>
-            {trendMetric === 'parents' && 'Parents who signed up in this period'}
-            {trendMetric === 'coaches' && 'Coaches onboarded in this period'}
-            {trendMetric === 'athletes' && 'Youth wrestlers added in this period'}
-            {trendMetric === 'sessions' && 'Sessions created in this period'}
-            {trendMetric === 'bookings' && 'Bookings (signups) in this period'}
-            {trendMetric === 'bookingGross' &&
-              'Sum of parent payments (amount_paid on new signup rows) in each period — use Running total to see dollars accumulate across the window.'}
-            {trendMetric === 'earlyAccess' && 'Early access signups in this period'}
-            {trendMetric === 'reviews' && 'Reviews left in this period — coach, reviewer, stars, comment'}
+            {trendPeriod === '7d' ? 'Last 7 days' : trendPeriod === '3w' ? 'Last 3 weeks' : 'Last 12 months'}
           </CardDescription>
         </CardHeader>
         <CardContent>
           {trendMetric === 'parents' && (d.trendDetailParents ?? []).length > 0 && (
-            <ul className="space-y-2 text-sm">
+            <div className="space-y-2">
               {(d.trendDetailParents ?? []).map((p) => (
-                <li key={p.id} className="flex items-center justify-between gap-2">
-                  <a href={`mailto:${p.email}`} className="text-accent hover:underline truncate">{p.email}</a>
-                  <span className="text-muted-foreground shrink-0">{formatEST(new Date(p.created_at), 'MMM d h:mm a')}</span>
-                </li>
+                <div key={p.id} className="flex items-center justify-between gap-2 py-2 border-b border-border/50 last:border-0">
+                  <a href={`mailto:${p.email}`} className="text-sm text-[#B89D60] hover:underline truncate">{p.email}</a>
+                  <span className="text-xs text-muted-foreground shrink-0">{formatEST(new Date(p.created_at), 'MMM d h:mm a')}</span>
+                </div>
               ))}
-            </ul>
+            </div>
           )}
+          
           {trendMetric === 'coaches' && (d.trendDetailCoaches ?? []).length > 0 && (
-            <ul className="space-y-2 text-sm">
+            <div className="space-y-2">
               {(d.trendDetailCoaches ?? []).map((c) => (
-                <li key={c.id} className="flex items-center justify-between gap-2">
-                  <Link href={`/athlete/${c.id}`} className="text-accent hover:underline">{c.name}</Link>
-                  <span className="text-muted-foreground shrink-0">{c.school} · {formatEST(new Date(c.created_at), 'MMM d')}</span>
-                </li>
+                <div key={c.id} className="flex items-center justify-between gap-2 py-2 border-b border-border/50 last:border-0">
+                  <Link href={`/athlete/${c.id}`} className="text-sm text-[#B89D60] hover:underline">{c.name}</Link>
+                  <span className="text-xs text-muted-foreground shrink-0">{c.school} · {formatEST(new Date(c.created_at), 'MMM d')}</span>
+                </div>
               ))}
-            </ul>
+            </div>
           )}
+          
           {trendMetric === 'athletes' && (d.trendDetailAthletes ?? []).length > 0 && (
-            <ul className="space-y-2 text-sm">
+            <div className="space-y-2">
               {(d.trendDetailAthletes ?? []).map((y) => (
-                <li key={y.id} className="flex items-center justify-between gap-2">
-                  <Link href={`/wrestlers/${y.id}`} className="text-accent hover:underline">{y.name}</Link>
-                  <span className="text-muted-foreground shrink-0">{formatEST(new Date(y.created_at), 'MMM d h:mm a')}</span>
-                </li>
+                <div key={y.id} className="flex items-center justify-between gap-2 py-2 border-b border-border/50 last:border-0">
+                  <Link href={`/wrestlers/${y.id}`} className="text-sm text-[#B89D60] hover:underline">{y.name}</Link>
+                  <span className="text-xs text-muted-foreground shrink-0">{formatEST(new Date(y.created_at), 'MMM d h:mm a')}</span>
+                </div>
               ))}
-            </ul>
+            </div>
           )}
+          
           {trendMetric === 'sessions' && (d.trendDetailSessions ?? []).length > 0 && (
-            <ul className="space-y-2 text-sm">
+            <div className="space-y-2">
               {(d.trendDetailSessions ?? []).map((s) => (
-                <li key={s.id} className="flex flex-wrap items-center justify-between gap-2">
-                  <Link href={`/admin/sessions/${s.id}/edit`} className="text-accent hover:underline">{s.coach_name} · {s.facility_name}</Link>
-                  <span className="text-muted-foreground">{formatEST(new Date(s.scheduled_datetime), 'MMM d h:mm a')} · {s.participants}</span>
-                </li>
+                <div key={s.id} className="flex flex-wrap items-center justify-between gap-2 py-2 border-b border-border/50 last:border-0">
+                  <Link href={`/admin/sessions/${s.id}/edit`} className="text-sm text-[#B89D60] hover:underline">{s.coach_name} · {s.facility_name}</Link>
+                  <span className="text-xs text-muted-foreground">{formatEST(new Date(s.scheduled_datetime), 'MMM d h:mm a')} · {s.participants}</span>
+                </div>
               ))}
-            </ul>
+            </div>
           )}
+          
           {trendMetric === 'bookingGross' && (
-            <p className="text-sm text-muted-foreground">
-              See the chart above for totals. For each signup line with amount, switch the metric to <strong className="text-foreground">Bookings</strong>.
+            <p className="text-sm text-muted-foreground py-4">
+              See the chart above for totals. For individual signup details, switch to <strong className="text-foreground">Bookings</strong>.
             </p>
           )}
+          
           {trendMetric === 'bookings' && (d.trendDetailBookings ?? []).length > 0 && (
-            <ul className="space-y-2 text-sm">
+            <div className="space-y-2">
               {(d.trendDetailBookings ?? []).map((b) => (
-                <li key={b.id} className="flex flex-wrap items-center justify-between gap-2">
-                  <span>{b.kid_name ?? '—'} · {b.coach_name} · {b.facility_name}</span>
-                  <span className="text-muted-foreground">
+                <div key={b.id} className="flex flex-wrap items-center justify-between gap-2 py-2 border-b border-border/50 last:border-0">
+                  <span className="text-sm">{b.kid_name ?? '—'} · {b.coach_name} · {b.facility_name}</span>
+                  <span className="text-xs text-muted-foreground">
                     {b.amount_paid != null ? `$${b.amount_paid.toFixed(2)}` : '—'}
                     {b.created_at ? ` · ${formatEST(new Date(b.created_at), 'MMM d')}` : ''}
                   </span>
-                </li>
+                </div>
               ))}
-            </ul>
+            </div>
           )}
+          
           {trendMetric === 'earlyAccess' && (d.trendDetailEarlyAccess ?? []).length > 0 && (
-            <ul className="space-y-2 text-sm">
+            <div className="space-y-2">
               {(d.trendDetailEarlyAccess ?? []).map((e) => (
-                <li key={e.id} className="flex items-center justify-between gap-2">
-                  <a href={`mailto:${e.email}`} className="text-accent hover:underline truncate">{e.email}</a>
-                  {e.name !== '—' && <span className="text-muted-foreground truncate">{e.name}</span>}
-                </li>
+                <div key={e.id} className="flex items-center justify-between gap-2 py-2 border-b border-border/50 last:border-0">
+                  <a href={`mailto:${e.email}`} className="text-sm text-[#B89D60] hover:underline truncate">{e.email}</a>
+                  {e.name !== '—' && <span className="text-xs text-muted-foreground truncate">{e.name}</span>}
+                </div>
               ))}
-            </ul>
+            </div>
           )}
+          
           {trendMetric === 'reviews' && (d.trendDetailReviews ?? []).length > 0 && (
-            <div className="space-y-3">
+            <div className="space-y-4">
               <div className="flex flex-wrap items-end gap-3">
                 <div className="space-y-1.5 min-w-[180px]">
                   <label htmlFor="cockpit-review-coach" className="text-xs font-medium text-muted-foreground">
@@ -1063,31 +1110,26 @@ export function AdminCockpitView() {
                   </Select>
                 </div>
               </div>
+              
               {filteredReviews.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No reviews match your filters.</p>
+                <p className="text-sm text-muted-foreground py-4">No reviews match your filters.</p>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full min-w-[640px] text-sm border-collapse table-fixed">
-                    <colgroup>
-                      <col className="w-[18%]" />
-                      <col className="w-[22%]" />
-                      <col className="w-[100px]" />
-                      <col />
-                    </colgroup>
-                    <thead>
-                      <tr className="border-b border-border">
-                        <th className="text-left py-2 pr-3 font-medium text-muted-foreground">Coach</th>
-                        <th className="text-left py-2 pr-3 font-medium text-muted-foreground">Reviewed by</th>
-                        <th className="text-left py-2 pr-3 font-medium text-muted-foreground">Stars</th>
-                        <th className="text-left py-2 font-medium text-muted-foreground">Comment</th>
+                <div className="rounded-lg border border-border overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/50">
+                      <tr>
+                        <th className="text-left py-3 px-4 font-medium text-muted-foreground">Coach</th>
+                        <th className="text-left py-3 px-4 font-medium text-muted-foreground">Reviewed by</th>
+                        <th className="text-left py-3 px-4 font-medium text-muted-foreground">Rating</th>
+                        <th className="text-left py-3 px-4 font-medium text-muted-foreground">Comment</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredReviews.map((r) => (
-                        <tr key={r.id} className="border-b border-border/50 align-top">
-                          <td className="py-2 pr-3 font-medium break-words">{r.coach_name}</td>
-                          <td className="py-2 pr-3 text-muted-foreground break-words">{r.reviewed_by}</td>
-                          <td className="py-2 pr-3 whitespace-nowrap">
+                        <tr key={r.id} className="border-t border-border/50 hover:bg-muted/30 transition-colors">
+                          <td className="py-3 px-4 font-medium">{r.coach_name}</td>
+                          <td className="py-3 px-4 text-muted-foreground">{r.reviewed_by}</td>
+                          <td className="py-3 px-4">
                             <span className="inline-flex gap-0.5" aria-label={`${r.rating} stars`}>
                               {[1, 2, 3, 4, 5].map((i) => (
                                 <Star
@@ -1097,7 +1139,7 @@ export function AdminCockpitView() {
                               ))}
                             </span>
                           </td>
-                          <td className="py-2 text-muted-foreground min-w-0 whitespace-normal break-words">
+                          <td className="py-3 px-4 text-muted-foreground max-w-xs truncate">
                             {r.comment || '—'}
                           </td>
                         </tr>
@@ -1108,6 +1150,7 @@ export function AdminCockpitView() {
               )}
             </div>
           )}
+          
           {(
             (trendMetric === 'parents' && (d.trendDetailParents ?? []).length === 0) ||
             (trendMetric === 'coaches' && (d.trendDetailCoaches ?? []).length === 0) ||
@@ -1117,49 +1160,83 @@ export function AdminCockpitView() {
             (trendMetric === 'earlyAccess' && (d.trendDetailEarlyAccess ?? []).length === 0) ||
             (trendMetric === 'reviews' && (d.trendDetailReviews ?? []).length === 0)
           ) && (
-            <p className="text-sm text-muted-foreground">No records in this period.</p>
+            <p className="text-sm text-muted-foreground py-8 text-center">No records in this period.</p>
           )}
         </CardContent>
       </Card>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        {(d.payoutsPaidList.length > 0 || d.payoutsPaid > 0 || (d.payoutsPaidAllTime ?? 0) > 0) && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Wallet className="h-4 w-4" />
-                Payouts recorded in this period
-              </CardTitle>
-              <CardDescription>
-                Period total: ${d.payoutsPaid.toFixed(2)}
-                {d.payoutsPaidAllTime != null && (
-                  <span className="block mt-1 text-muted-foreground">
-                    All-time paid out (every marked session): ${d.payoutsPaidAllTime.toFixed(2)}
-                  </span>
-                )}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {d.payoutsPaidList.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No individual session breakdown.</p>
-              ) : (
-                <ul className="space-y-2 text-sm">
-                  {d.payoutsPaidList.map((p) => (
-                    <li key={p.session_id} className="flex items-center justify-between gap-2">
-                      <span>{p.coach_name}</span>
-                      <span className="font-medium">${p.amount.toFixed(2)}</span>
-                    </li>
-                  ))}
-                </ul>
+      {/* Payouts section */}
+      {(d.payoutsPaidList.length > 0 || d.payoutsPaid > 0 || (d.payoutsPaidAllTime ?? 0) > 0) && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Wallet className="h-4 w-4 text-emerald-500" />
+              Payouts This Period
+            </CardTitle>
+            <CardDescription>
+              Period total: <span className="font-semibold text-foreground">${d.payoutsPaid.toFixed(2)}</span>
+              {d.payoutsPaidAllTime != null && (
+                <span className="ml-2">
+                  · All-time: <span className="font-semibold text-foreground">${d.payoutsPaidAllTime.toFixed(2)}</span>
+                </span>
               )}
-              <Link href="/admin?tab=payouts" className="inline-block mt-3 text-sm text-accent hover:underline">
-                Manage all payouts →
-              </Link>
-            </CardContent>
-          </Card>
-        )}
-      </div>
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {d.payoutsPaidList.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No individual session breakdown.</p>
+            ) : (
+              <div className="space-y-2">
+                {d.payoutsPaidList.map((p) => (
+                  <div key={p.session_id} className="flex items-center justify-between gap-2 py-2 border-b border-border/50 last:border-0">
+                    <span className="text-sm">{p.coach_name}</span>
+                    <span className="font-medium tabular-nums">${p.amount.toFixed(2)}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <Link href="/admin?tab=payouts" className="inline-flex items-center gap-1 mt-4 text-sm text-[#B89D60] hover:underline">
+              Manage all payouts
+              <ArrowUpRight className="h-3 w-3" />
+            </Link>
+          </CardContent>
+        </Card>
+      )}
 
+      {/* Credits (Liability) */}
+      {(d.outstandingCredits ?? 0) > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CreditCard className="h-4 w-4 text-amber-500" />
+              Outstanding Credits
+            </CardTitle>
+            <CardDescription>
+              Credits owed to parents (from reschedules/cancellations)
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-muted-foreground">Total outstanding</span>
+              <span className="font-medium tabular-nums text-amber-500">${(d.outstandingCredits ?? 0).toFixed(2)}</span>
+            </div>
+            {(d.creditsIssuedInRange ?? 0) > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Issued this period</span>
+                <span className="font-medium tabular-nums">+${(d.creditsIssuedInRange ?? 0).toFixed(2)}</span>
+              </div>
+            )}
+            {(d.creditsUsedInRange ?? 0) > 0 && (
+              <div className="flex justify-between text-sm">
+                <span className="text-muted-foreground">Redeemed this period</span>
+                <span className="font-medium tabular-nums text-emerald-500">-${(d.creditsUsedInRange ?? 0).toFixed(2)}</span>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Empty state */}
       {d.newParents.length === 0 &&
         d.newCoaches.length === 0 &&
         d.newAthletes.length === 0 &&
@@ -1167,9 +1244,15 @@ export function AdminCockpitView() {
         d.bookings.length === 0 &&
         d.earlyAccess.length === 0 &&
         d.payoutsPaidList.length === 0 && (
-          <Card>
-            <CardContent className="py-12 text-center text-muted-foreground">
-              No activity {range === 'today' ? `on ${formatEST(new Date(d.date + 'T12:00:00'), 'MMMM d, yyyy')}` : d.rangeStart && d.rangeEnd ? `for ${range === 'month' ? formatRange(d.rangeStart, d.rangeEnd, 'month') : formatRange(d.rangeStart, d.rangeEnd, 'week')}` : 'for this period'}. Change the period or check back later.
+          <Card className="border-dashed">
+            <CardContent className="py-12 text-center">
+              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-muted mb-4">
+                <Calendar className="h-6 w-6 text-muted-foreground" />
+              </div>
+              <p className="text-muted-foreground">
+                No activity {range === 'today' ? `on ${formatEST(new Date(d.date + 'T12:00:00'), 'MMMM d, yyyy')}` : d.rangeStart && d.rangeEnd ? `for ${range === 'month' ? formatRange(d.rangeStart, d.rangeEnd, 'month') : formatRange(d.rangeStart, d.rangeEnd, 'week')}` : 'for this period'}.
+              </p>
+              <p className="text-sm text-muted-foreground mt-1">Change the period or check back later.</p>
             </CardContent>
           </Card>
         )}

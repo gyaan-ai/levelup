@@ -40,7 +40,9 @@ export async function notifySessionScheduledFollowers(
     const link = base ? `${base}${path}` : path;
 
     const title = `New session: ${coachName}`;
-    const body = `${coachName} scheduled a session (${when}). Open the app to book.`;
+    const body = `${coachName} scheduled a session (${when}). Tap to book!`;
+    // Link directly to the session detail page
+    const sessionLink = `/sessions/${opts.sessionId}`;
 
     await Promise.all(
       follows.map((f) =>
@@ -52,7 +54,7 @@ export async function notifySessionScheduledFollowers(
           data: {
             coach_id: coachId,
             session_id: opts.sessionId,
-            link: path,
+            link: sessionLink,
           },
         })
       )
@@ -67,7 +69,14 @@ export async function notifySessionScheduledFollowers(
       const phone = normalizePhone(p.phone ?? undefined);
       if (!phone || sentPhones.has(phone)) continue;
       sentPhones.add(phone);
-      void sendSms(phone, smsBody);
+      void sendSms(phone, smsBody, {
+        admin,
+        messageType: 'coach_new_session',
+        recipientId: p.id,
+        recipientLabel: 'Parent (follower)',
+        sessionId: opts.sessionId,
+        coachId,
+      });
     }
   } catch (e) {
     console.warn('notifySessionScheduledFollowers failed:', e);

@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { getTenantConfig } from '@/config/tenants';
-import Link from 'next/link';
+import { BackLink } from '@/components/back-link';
 
 export const metadata = {
   title: 'Contact | The Guild',
@@ -26,9 +26,11 @@ export default function ContactPage() {
             <strong>Phone:</strong> {tenant.phone}
           </p>
           <p>
-            <Link href="/" className="text-accent hover:underline">
-              ← Back to home
-            </Link>
+            <BackLink
+              fallbackHref="/"
+              label="Back to home"
+              className="text-accent hover:underline"
+            />
           </p>
         </CardContent>
       </Card>

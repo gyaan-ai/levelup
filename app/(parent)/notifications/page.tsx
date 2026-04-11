@@ -3,7 +3,7 @@ import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import Link from 'next/link';
+import { BackLink } from '@/components/back-link';
 import { Bell } from 'lucide-react';
 import { format } from 'date-fns';
 import { NotificationsClient } from './notifications-client';
@@ -30,12 +30,12 @@ export default async function NotificationsPage() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-2xl">
-      <Link
-        href={isAthlete ? '/athlete-dashboard' : '/dashboard'}
-        className="text-sm text-muted-foreground hover:text-foreground mb-4 inline-block"
-      >
-        ← Back to Dashboard
-      </Link>
+      <div className="mb-4">
+        <BackLink
+          fallbackHref={isAthlete ? '/athlete-dashboard' : '/dashboard'}
+          label="Back to Dashboard"
+        />
+      </div>
       <h1 className="text-2xl font-bold mb-6 flex items-center gap-2">
         <Bell className="h-6 w-6" />
         Notifications

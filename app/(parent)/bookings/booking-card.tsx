@@ -6,7 +6,19 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { Calendar, User, MapPin, X, Share2, Check, ExternalLink, RotateCcw, Star, Smartphone } from 'lucide-react';
+import {
+  Calendar,
+  User,
+  MapPin,
+  Share2,
+  Check,
+  ExternalLink,
+  RotateCcw,
+  Star,
+  Smartphone,
+  Users,
+  Loader2,
+} from 'lucide-react';
 import { SchoolLogo } from '@/components/school-logo';
 import { differenceInHours } from 'date-fns';
 import { formatEST } from '@/lib/format-date';
@@ -19,6 +31,26 @@ import { showSessionSmsCopyAndTextGroup } from '@/lib/session-sms-tools';
 import { CopySessionPhonesButton } from '@/components/copy-session-phones-button';
 import { CoachTextGroupDialog } from '@/components/coach-text-group-dialog';
 import { copyTextToClipboard } from '@/lib/copy-to-clipboard';
+import { AddToCalendarButton } from '@/components/add-to-calendar-button';
+import { SessionContactsPanel } from '@/components/session-contacts-panel';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+
+/** Other sessions the same coach can move a wrestler into (coach home only). */
+export type CoachTransferSessionOption = {
+  id: string;
+  scheduled_datetime: string;
+  facilityLabel: string;
+  current_participants: number;
+  max_participants: number;
+};
 
 const CANCELLATION_WINDOW_HOURS = 24;
 
@@ -57,7 +89,7 @@ export type BookingSession = {
   facility_id?: string | null;
   wrestlers: string[];
   primaryWrestlerId?: string | null;
-  /** True if current user already left a review for this (completed) session */
+  /** True if this parent has reviewed this coach (any session); we do not nag per session. */
   hasReviewed?: boolean;
 };
 
@@ -66,16 +98,113 @@ interface BookingCardProps {
   isPast?: boolean;
   /** Admin Home (all sessions): show Copy Cell #s + Text group — APIs allow admin only */
   showAdminSmsTools?: boolean;
+  /** Coach home: same layout as parent card, with earnings + reg link + contacts */
+  variant?: 'parent' | 'coach';
+  /** Required when variant is coach — projected / max payout for this session */
+  coachEarnings?: { projected: number; max: number };
+  /**
+   * When set on coach cards, shows "Roster & transfer" to list athletes and move them to another session.
+   * Omit on parent cards.
+   */
+  coachTransferSessionOptions?: CoachTransferSessionOption[];
 }
 
-export function BookingCard({ session, isPast = false, showAdminSmsTools = false }: BookingCardProps) {
+export function BookingCard({
+  session,
+  isPast = false,
+  showAdminSmsTools = false,
+  variant = 'parent',
+  coachEarnings,
+  coachTransferSessionOptions,
+}: BookingCardProps) {
   const router = useRouter();
   const [cancelling, setCancelling] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
   const [linkCopied, setLinkCopied] = useState(false);
+  const [regLinkCopied, setRegLinkCopied] = useState(false);
   const [textGroupOpen, setTextGroupOpen] = useState(false);
+
+  const [rosterOpen, setRosterOpen] = useState(false);
+  const [rosterLoading, setRosterLoading] = useState(false);
+  const [rosterData, setRosterData] = useState<
+    Array<{
+      id: string;
+      wrestlerName: string;
+      photoUrl: string | null;
+      paid: boolean;
+      amountPaid: number;
+      isDropIn: boolean;
+    }>
+  >([]);
+  const [transferringParticipant, setTransferringParticipant] = useState<{
+    id: string;
+    wrestlerName: string;
+    amountPaid: number;
+  } | null>(null);
+  const [transferTargetSessionId, setTransferTargetSessionId] = useState('');
+  const [transferLoading, setTransferLoading] = useState(false);
+
+  const openCoachRoster = async () => {
+    setRosterOpen(true);
+    setRosterLoading(true);
+    setTransferringParticipant(null);
+    setTransferTargetSessionId('');
+    try {
+      const res = await fetch(`/api/coach/sessions/${session.id}/roster`);
+      const data = await res.json();
+      if (!res.ok) {
+        setRosterData([]);
+        alert(data.error || 'Could not load roster');
+        return;
+      }
+      setRosterData(data.roster || []);
+    } catch {
+      setRosterData([]);
+    } finally {
+      setRosterLoading(false);
+    }
+  };
+
+  const handleCoachTransferRegistration = async () => {
+    if (!transferringParticipant || !transferTargetSessionId) return;
+    setTransferLoading(true);
+    try {
+      const res = await fetch('/api/coach/sessions/transfer-registration', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          participantId: transferringParticipant.id,
+          fromSessionId: session.id,
+          toSessionId: transferTargetSessionId,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert(data.error || 'Transfer failed');
+        return;
+      }
+      alert(
+        `Successfully transferred ${transferringParticipant.wrestlerName} with $${transferringParticipant.amountPaid} payment preserved`
+      );
+      setTransferringParticipant(null);
+      setTransferTargetSessionId('');
+      setRosterLoading(true);
+      try {
+        const r = await fetch(`/api/coach/sessions/${session.id}/roster`);
+        const d = await r.json();
+        setRosterData(r.ok ? d.roster || [] : []);
+      } finally {
+        setRosterLoading(false);
+      }
+      router.refresh();
+    } catch (err) {
+      alert('Transfer failed: ' + (err instanceof Error ? err.message : String(err)));
+    } finally {
+      setTransferLoading(false);
+    }
+  };
 
   const handleCopyShareLink = async () => {
     if (!session.partner_invite_code) return;
@@ -84,6 +213,15 @@ export function BookingCard({ session, isPast = false, showAdminSmsTools = false
     if (ok) {
       setLinkCopied(true);
       setTimeout(() => setLinkCopied(false), 2000);
+    }
+  };
+
+  const handleCopyRegLink = async () => {
+    const url = `${typeof window !== 'undefined' ? window.location.origin : ''}/sessions/${session.id}/register`;
+    const ok = await copyTextToClipboard(url);
+    if (ok) {
+      setRegLinkCopied(true);
+      setTimeout(() => setRegLinkCopied(false), 2000);
     }
   };
 
@@ -97,6 +235,7 @@ export function BookingCard({ session, isPast = false, showAdminSmsTools = false
   const familyHasSpot = session.isFamilyParticipant !== false;
   const canLeave = canCancel && !session.isOwner && familyHasSpot;
   const showJoinWhenNotEnrolled =
+    variant !== 'coach' &&
     session.isFamilyParticipant === false &&
     !isPast &&
     isSessionOpenForParentBrowse(session) &&
@@ -210,9 +349,13 @@ export function BookingCard({ session, isPast = false, showAdminSmsTools = false
             <p className="text-sm text-muted-foreground flex items-center gap-1.5 flex-wrap">
               <User className="h-3.5 w-3.5 shrink-0" />
               {session.coach.id && String(session.coach.id).trim() ? (
-                <Link href={`/athlete/${String(session.coach.id).trim()}`} className="hover:underline text-foreground font-medium">
-                  {session.coach.name}
-                </Link>
+                variant === 'coach' ? (
+                  <span className="text-foreground font-medium">{session.coach.name}</span>
+                ) : (
+                  <Link href={`/athlete/${String(session.coach.id).trim()}`} className="hover:underline text-foreground font-medium">
+                    {session.coach.name}
+                  </Link>
+                )
               ) : (
                 session.coach.name
               )}
@@ -222,13 +365,15 @@ export function BookingCard({ session, isPast = false, showAdminSmsTools = false
                   <span className="text-muted-foreground/80">({session.coach.school})</span>
                 </span>
               )}
-              {session.coach.id && String(session.coach.id).trim() && (
+              {variant !== 'coach' && session.coach.id && String(session.coach.id).trim() && (
                 <Link href={`/athlete/${String(session.coach.id).trim()}`} className="text-xs text-accent hover:underline">
                   View profile
                 </Link>
               )}
             </p>
-            <StarRating averageRating={session.coach.average_rating} reviewCount={session.coach.review_count} size="sm" />
+            {variant !== 'coach' && (
+              <StarRating averageRating={session.coach.average_rating} reviewCount={session.coach.review_count} size="sm" />
+            )}
             {(session.max_participants ?? 1) > 1 && (
               <p className="text-sm text-muted-foreground flex items-center gap-2">
                 <CapacityBadge
@@ -246,8 +391,32 @@ export function BookingCard({ session, isPast = false, showAdminSmsTools = false
             </div>
           </div>
           <div className="text-left sm:text-right flex flex-col sm:items-end gap-2 shrink-0">
-            <p className={isPast ? 'font-bold' : 'text-xl font-bold'}>
-              {session.amountPaid != null && session.amountPaid > 0
+            <p
+              className={
+                isPast
+                  ? 'font-bold'
+                  : variant === 'coach'
+                    ? 'text-xl font-bold text-[#D4AF37]'
+                    : 'text-xl font-bold'
+              }
+            >
+              {variant === 'coach' && coachEarnings ? (
+                (() => {
+                  const { projected, max } = coachEarnings;
+                  const maxP = Math.max(1, session.max_participants ?? 1);
+                  if (maxP <= 1) {
+                    if (projected > 0) return `Earning: $${projected.toFixed(0)}`;
+                    if (max > 0) return `Up to $${max.toFixed(0)} when booked`;
+                    return '—';
+                  }
+                  if (projected > 0) {
+                    return projected < max
+                      ? `Earning: $${projected.toFixed(0)} (of $${max.toFixed(0)} if full)`
+                      : `Earning: $${projected.toFixed(0)}`;
+                  }
+                  return max > 0 ? `$${max.toFixed(0)} if full` : '—';
+                })()
+              ) : session.amountPaid != null && session.amountPaid > 0
                 ? `You paid $${Number(session.amountPaid).toFixed(2)}`
                 : session.total_price > 0
                   ? `$${Number(session.total_price).toFixed(2)}`
@@ -315,12 +484,12 @@ export function BookingCard({ session, isPast = false, showAdminSmsTools = false
                   )}
                 </div>
               )}
-              {/* Past completed: Leave/View feedback first — must show on mobile and desktop, never hidden */}
-              {isPast && session.status === 'completed' && (
+              {/* Past completed: show until parent has reviewed this coach (any session) */}
+              {isPast && session.status === 'completed' && !session.hasReviewed && (
                 <Link href={`/sessions/${session.id}/review`} className="inline-flex w-full sm:w-auto">
                   <Button size="sm" className="w-full sm:w-auto min-h-[44px] px-4 bg-accent hover:bg-accent/90 text-primary">
                     <Star className="h-4 w-4 mr-1 shrink-0 fill-current" />
-                    {session.hasReviewed ? 'View feedback' : 'Leave feedback'}
+                    Rate coach
                   </Button>
                 </Link>
               )}
@@ -358,10 +527,11 @@ export function BookingCard({ session, isPast = false, showAdminSmsTools = false
               <div className="mt-2 p-3 border border-destructive/50 rounded-lg bg-destructive/5 text-left w-full max-w-xs">
                 <p className="text-sm font-medium mb-2">Cancel this session?</p>
                 <p className="text-xs text-muted-foreground mb-3">
-                  {willGetRefund
-                    ? `A refund of $${Number(session.total_price).toFixed(2)} will be processed (24h+ notice).`
-                    : `Less than ${CANCELLATION_WINDOW_HOURS} hours notice — no refund.`
-                  }
+                  {variant === 'coach'
+                    ? 'This cancels the session for all booked wrestlers. Parents are notified; refunds follow the same timing rules as parent cancellations.'
+                    : willGetRefund
+                      ? `A refund of $${Number(session.total_price).toFixed(2)} will be processed (24h+ notice).`
+                      : `Less than ${CANCELLATION_WINDOW_HOURS} hours notice — no refund.`}
                 </p>
                 <div className="flex gap-2">
                   <Button 
@@ -412,6 +582,204 @@ export function BookingCard({ session, isPast = false, showAdminSmsTools = false
             )}
           </div>
         </div>
+        {variant === 'coach' && !isPast && coachTransferSessionOptions !== undefined && (
+          <Dialog
+            open={rosterOpen}
+            onOpenChange={(open) => {
+              setRosterOpen(open);
+              if (!open) {
+                setTransferringParticipant(null);
+                setTransferTargetSessionId('');
+              }
+            }}
+          >
+            <DialogContent className="sm:max-w-[500px]">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  Session roster
+                </DialogTitle>
+                <DialogDescription>
+                  {formatEST(scheduledTime, 'EEE, MMM d, yyyy h:mm a')} · {session.facility}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="py-2">
+                {rosterLoading ? (
+                  <div className="flex items-center justify-center py-8">
+                    <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : rosterData.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">No participants registered</p>
+                ) : (
+                  <div className="space-y-3">
+                    {rosterData.map((p, idx) => (
+                      <div key={p.id} className="flex items-center gap-3 p-3 rounded-lg bg-muted/50">
+                        <div className="font-medium text-muted-foreground w-6">{idx + 1}.</div>
+                        {p.photoUrl ? (
+                          <img src={p.photoUrl} alt="" className="w-10 h-10 rounded-full object-cover" />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-sm font-medium">
+                            {p.wrestlerName
+                              .split(' ')
+                              .map((n) => n[0])
+                              .join('')
+                              .slice(0, 2)}
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="font-medium flex items-center gap-2 flex-wrap">
+                            {p.wrestlerName}
+                            {p.isDropIn && (
+                              <Badge variant="outline" className="text-xs">
+                                Drop-in
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <div className="text-right">
+                            <div className="font-medium tabular-nums">${Number(p.amountPaid || 0).toFixed(2)}</div>
+                            {p.paid ? (
+                              <Badge variant="outline" className="text-xs border-emerald-600/50 bg-emerald-600/10">
+                                Paid
+                              </Badge>
+                            ) : (
+                              <Badge variant="outline" className="text-xs border-amber-600/50 bg-amber-600/10">
+                                Pending
+                              </Badge>
+                            )}
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-xs text-accent"
+                            onClick={() =>
+                              setTransferringParticipant({
+                                id: p.id,
+                                wrestlerName: p.wrestlerName,
+                                amountPaid: p.amountPaid,
+                              })
+                            }
+                          >
+                            Transfer
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {transferringParticipant && (
+                  <div className="mt-4 p-4 rounded-lg border border-border bg-muted/30">
+                    <div className="font-medium mb-2">
+                      Transfer {transferringParticipant.wrestlerName} (${transferringParticipant.amountPaid} paid)
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="coach-transfer-target">Move to session</Label>
+                      <select
+                        id="coach-transfer-target"
+                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                        value={transferTargetSessionId}
+                        onChange={(e) => setTransferTargetSessionId(e.target.value)}
+                      >
+                        <option value="">Select a session…</option>
+                        {coachTransferSessionOptions
+                          .filter((s) => new Date(s.scheduled_datetime) > new Date())
+                          .sort(
+                            (a, b) =>
+                              new Date(a.scheduled_datetime).getTime() - new Date(b.scheduled_datetime).getTime()
+                          )
+                          .slice(0, 30)
+                          .map((s) => (
+                            <option key={s.id} value={s.id}>
+                              {formatEST(new Date(s.scheduled_datetime), 'MMM d h:mm a')} · {s.facilityLabel} (
+                              {s.current_participants}/{s.max_participants})
+                            </option>
+                          ))}
+                      </select>
+                    </div>
+                    <div className="flex gap-2 mt-3">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setTransferringParticipant(null);
+                          setTransferTargetSessionId('');
+                        }}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        size="sm"
+                        disabled={!transferTargetSessionId || transferLoading}
+                        onClick={handleCoachTransferRegistration}
+                      >
+                        {transferLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Confirm transfer'}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setRosterOpen(false)}>
+                  Close
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        )}
+
+        {variant === 'coach' && !isPast && (
+          <>
+            <div className="mt-4 flex flex-wrap gap-2 border-t border-border pt-4">
+              {coachTransferSessionOptions !== undefined && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="min-h-[40px] touch-manipulation"
+                  onClick={openCoachRoster}
+                >
+                  <Users className="h-4 w-4 mr-1 shrink-0" />
+                  Roster & transfer
+                </Button>
+              )}
+              <AddToCalendarButton
+                sessionId={session.id}
+                title={session.wrestlers.length > 0 ? session.wrestlers.join(', ') : 'Coaching session'}
+                start={session.scheduled_datetime}
+                location={session.facility}
+                size="sm"
+                className="min-h-[40px] touch-manipulation"
+              />
+              <CopySessionPhonesButton sessionId={session.id} className="min-h-[40px] touch-manipulation" />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="min-h-[40px] touch-manipulation"
+                onClick={handleCopyRegLink}
+              >
+                {regLinkCopied ? (
+                  <>
+                    <Check className="h-4 w-4 mr-1 shrink-0" />
+                    Copied
+                  </>
+                ) : (
+                  <>
+                    <Share2 className="h-4 w-4 mr-1 shrink-0" />
+                    Registration link
+                  </>
+                )}
+              </Button>
+            </div>
+            <SessionContactsPanel
+              sessionId={session.id}
+              participantCount={session.current_participants ?? 0}
+              className="mt-2"
+            />
+          </>
+        )}
       </CardContent>
     </Card>
   );

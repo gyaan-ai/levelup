@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getTenantByDomain } from '@/config/tenants';
+import { getTenantByDomain, resolveHostnameFromHeaders } from '@/config/tenants';
 
 /** True for hashed Next assets and typical /public files — keep long-cache behavior from Next/Vercel. */
 function isFingerprintedOrPublicFile(pathname: string): boolean {
@@ -10,9 +10,9 @@ function isFingerprintedOrPublicFile(pathname: string): boolean {
 }
 
 export async function middleware(req: NextRequest) {
-  const hostname = req.headers.get('host') || '';
+  const hostname = resolveHostnameFromHeaders(req.headers);
 
-  // Extract tenant from subdomain
+  // Extract tenant from subdomain / known domains
   const tenant = getTenantByDomain(hostname);
 
   if (!tenant) {

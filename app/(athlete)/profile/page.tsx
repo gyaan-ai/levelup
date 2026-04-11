@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useAuth } from '@/lib/auth/use-auth';
@@ -27,16 +27,13 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { RequestFacilityBlock } from '@/components/request-facility-block';
-import { Plus, X, ArrowLeft, Globe, Lock } from 'lucide-react';
+import { Globe, Lock } from 'lucide-react';
+import { BackLink } from '@/components/back-link';
 import Link from 'next/link';
 
 const profileSchema = z.object({
   weightClass: z.string().optional(),
   bio: z.string().max(500, 'Bio must be 500 characters or less').optional(),
-  credentials: z.array(z.object({
-    title: z.string().min(1, 'Title is required'),
-    description: z.string().optional(),
-  })).optional(),
   facilityId: z.string().optional(),
   secondaryFacilityId: z.string().optional(),
   phone: z.string().optional().refine((v) => !v || v.trim() === '' || v.replace(/\D/g, '').length >= 10, 'Enter a valid 10-digit cell number'),
@@ -69,18 +66,12 @@ export default function ProfilePage() {
     defaultValues: {
       weightClass: '',
       bio: '',
-      credentials: [],
       facilityId: '',
       secondaryFacilityId: '',
       phone: '',
       venmoHandle: '',
       zelleEmail: '',
     },
-  });
-
-  const { fields, append, remove } = useFieldArray({
-    control: form.control,
-    name: 'credentials',
   });
 
   useEffect(() => {
@@ -102,12 +93,6 @@ export default function ProfilePage() {
           form.reset({
             weightClass: data.athlete.weight_class || '',
             bio: data.athlete.bio || '',
-            credentials: (data.athlete.credentials && Object.keys(data.athlete.credentials).length > 0)
-              ? Object.entries(data.athlete.credentials).map(([title, desc]: [string, any]) => ({
-                  title,
-                  description: desc || '',
-                }))
-              : [],
             facilityId: data.athlete.facility_id || '',
             secondaryFacilityId: data.athlete.secondary_facility_id || '',
             phone: data.athlete.phone || '',
@@ -207,20 +192,13 @@ export default function ProfilePage() {
         if (uploadData.photoUrl) photoUrl = uploadData.photoUrl;
       }
 
-      const credentialsObj: Record<string, string> = {};
-      (values.credentials || []).forEach((cred) => {
-        if (cred.title) {
-          credentialsObj[cred.title] = cred.description || '';
-        }
-      });
-
       const response = await fetch('/api/athletes/profile', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           weightClass: values.weightClass,
           bio: values.bio,
-          credentials: credentialsObj,
+          credentials: {},
           photoUrl,
           photoFocusX: photoFocusX,
           photoFocusY: photoFocusY,
@@ -282,10 +260,7 @@ export default function ProfilePage() {
   return (
     <div className="container mx-auto px-4 py-8 max-w-2xl">
       <div className="flex flex-wrap items-center gap-4 mb-6">
-        <Link href="/athlete-dashboard" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Dashboard
-        </Link>
+        <BackLink fallbackHref="/athlete-dashboard" label="Back to Dashboard" />
         <Link href="/inbox" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
           Inbox
         </Link>
@@ -583,59 +558,6 @@ export default function ProfilePage() {
                     </FormItem>
                   )}
                 />
-              </div>
-
-              {/* Credentials */}
-              <div>
-                <FormLabel className="mb-2 block">Credentials & Achievements</FormLabel>
-                <FormDescription className="mb-4">
-                  Add your wrestling achievements, awards, and credentials
-                </FormDescription>
-                {fields.map((field, index) => (
-                  <div key={field.id} className="flex gap-2 mb-2">
-                    <FormField
-                      control={form.control}
-                      name={`credentials.${index}.title`}
-                      render={({ field }) => (
-                        <FormItem className="flex-1">
-                          <FormControl>
-                            <Input placeholder="Title (e.g., NCAA Qualifier)" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name={`credentials.${index}.description`}
-                      render={({ field }) => (
-                        <FormItem className="flex-1">
-                          <FormControl>
-                            <Input placeholder="Description (optional)" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="icon"
-                      onClick={() => remove(index)}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => append({ title: '', description: '' })}
-                  className="w-full"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Credential
-                </Button>
               </div>
 
               <div className="flex gap-4 pt-4">

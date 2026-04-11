@@ -9,9 +9,11 @@ import { createRegisterConfirmationToken } from '@/lib/confirmation-token';
 import { createNotification } from '@/lib/notifications';
 import { sendCoachNewSignupSms } from '@/lib/twilio';
 import { hasMinPhoneDigits } from '@/lib/phone';
-import { rosterSnapshotFromYouthRow } from '@/lib/session-roster-snapshot';
+import { maybeBackfillRosterSnapshot } from '@/lib/session-roster-snapshot';
 import { finalizeRegisterFromCheckoutSession } from '@/lib/finalize-session-register-from-stripe';
 import { getEffectiveFilledCount } from '@/lib/sessions';
+import { ensureAutoFamilyDiscountForParent } from '@/lib/family-auto-discount';
+import { checkoutAllowSavedAccountPercent, resolveCheckoutPercentOff } from '@/lib/checkout-promo';
 
 /**
  * POST - Pay & register a youth wrestler for a session (public or invite_only).
@@ -40,8 +42,8 @@ export async function POST(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const body = (await req.json()) as { youthWrestlerId: string };
-    const { youthWrestlerId } = body;
+    const body = (await req.json()) as { youthWrestlerId: string; promoCode?: string };
+    const { youthWrestlerId, promoCode } = body;
     if (!youthWrestlerId) return NextResponse.json({ error: 'Missing youthWrestlerId' }, { status: 400 });
     if (role === 'youth_wrestler' && youthWrestlerId !== user.id) {
       return NextResponse.json({ error: 'Youth wrestlers can only register themselves' }, { status: 403 });
@@ -70,6 +72,9 @@ export async function POST(
     };
 
     const admin = createAdminClient(tenant.slug);
+    if (role === 'parent' && checkoutAllowSavedAccountPercent()) {
+      await ensureAutoFamilyDiscountForParent(admin, user.id, user.email);
+    }
     const { count: participantRowCount } = await admin
       .from('session_participants')
       .select('*', { count: 'exact', head: true })
@@ -128,9 +133,9 @@ export async function POST(
         parent_id: user.id,
         paid: true,
         amount_paid: 0,
-        ...rosterSnapshotFromYouthRow((yw ?? {}) as { first_name?: string; last_name?: string; photo_url?: string }),
       });
       if (insertErr) return NextResponse.json({ error: insertErr.message }, { status: 500 });
+      await maybeBackfillRosterSnapshot(admin, { session_id: sessionId, youth_wrestler_id: youthWrestlerId }, yw ?? {});
       await supabase.from('sessions').update({ current_participants: current + 1, updated_at: new Date().toISOString() }).eq('id', sessionId);
       const coachId = (session as { athlete_id?: string }).athlete_id;
       const dt = s.scheduled_datetime;
@@ -201,7 +206,11 @@ export async function POST(
       .select('percent_off')
       .eq('parent_id', user.id)
       .maybeSingle();
-    const percentOff = pctDiscount?.percent_off != null ? Number(pctDiscount.percent_off) : 0;
+    const percentOff = await resolveCheckoutPercentOff(admin, {
+      savedPercent: pctDiscount?.percent_off,
+      email: user.email,
+      promoCode,
+    });
     const priceAfterDiscount = percentOff >= 1 && percentOff <= 100
       ? pricePer * (1 - percentOff / 100)
       : pricePer;
@@ -226,6 +235,11 @@ export async function POST(
     /** One checkout per parent+session+kid — retries / double-submit reuse the same Session (no extra charges). */
     const idempotencyKey = `register-checkout-${sessionId}-${youthWrestlerId}-${user.id}`.slice(0, 255);
 
+    const sessionRow = session as {
+      athlete_id: string;
+      session_type?: string | null;
+    };
+
     const stripeSession = await stripe.checkout.sessions.create(
       {
         mode: 'payment',
@@ -244,6 +258,12 @@ export async function POST(
           },
         ],
       metadata: {
+        business: 'guild',
+        channel: 'bookings',
+        category: 'booking',
+        session_type: sessionRow.session_type ?? '',
+        coach_id: sessionRow.athlete_id,
+        platform_fee_pct: '20',
         app: 'the-guild',
         tenant_slug: tenant.slug,
         session_id: sessionId,

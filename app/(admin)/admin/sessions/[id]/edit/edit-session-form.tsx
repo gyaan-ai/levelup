@@ -63,6 +63,7 @@ export function EditSessionForm({
   participantAmountPaidSum = 0,
 }: Props) {
   const router = useRouter();
+  const [sessionTypeState, setSessionTypeState] = useState(sessionType || 'small_group');
   const [focus, setFocus] = useState(focusArea);
   const [focus2, setFocus2] = useState(focusArea2);
   const [join, setJoin] = useState(joinPolicy);
@@ -70,6 +71,19 @@ export function EditSessionForm({
   const [price, setPrice] = useState(String(pricePerParticipant));
   const [date, setDate] = useState(initialDate);
   const [time, setTime] = useState(initialTime);
+  
+  // Session type presets for auto-fill
+  const SESSION_PRESETS = {
+    small_group: { label: 'Small Group', price: 30, maxParticipants: 6 },
+    partner: { label: 'Partner Session', price: 50, maxParticipants: 3 },
+    private: { label: 'Private Session', price: 75, maxParticipants: 1 },
+  } as const;
+
+  // Only change type - don't auto-fill price/max on existing sessions (coach may have customized)
+  const handleSessionTypeChange = (newType: string) => {
+    setSessionTypeState(newType);
+    // Don't overwrite price/max - they're editable and coach may have set custom values
+  };
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [focusAreaList, setFocusAreaList] = useState<string[]>([]);
@@ -77,8 +91,16 @@ export function EditSessionForm({
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [payoutLoading, setPayoutLoading] = useState(false);
   const [completeLoading, setCompleteLoading] = useState(false);
+  const [manualPaymentAmount, setManualPaymentAmount] = useState('');
+  const [manualPaymentMethod, setManualPaymentMethod] = useState<'cash' | 'check' | 'venmo' | 'other'>('cash');
+  const [manualPaymentLoading, setManualPaymentLoading] = useState(false);
 
   function suggestedCoachPayoutAmount(): string {
+    // Coach gets 83.3% of what parents paid (gross revenue)
+    // If no payments recorded, fall back to old calculation
+    if (participantAmountPaidSum > 0) {
+      return (participantAmountPaidSum * 0.833).toFixed(2);
+    }
     return String(
       coachPayoutUsd({
         athlete_payment: athletePayment,
@@ -124,6 +146,7 @@ export function EditSessionForm({
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          session_type: sessionTypeState,
           focus_area: focus.trim() || null,
           focus_area_2: focus2.trim() || null,
           join_policy: join,
@@ -161,6 +184,25 @@ export function EditSessionForm({
           {error && (
             <p className="text-sm text-destructive">{error}</p>
           )}
+          
+          {/* Session Type Selector */}
+          <div>
+            <Label htmlFor="session-type">Session Type</Label>
+            <Select value={sessionTypeState} onValueChange={handleSessionTypeChange}>
+              <SelectTrigger id="session-type">
+                <SelectValue placeholder="Select session type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="small_group">Small Group (suggested $30/person)</SelectItem>
+                <SelectItem value="partner">Partner Session (suggested $50/person)</SelectItem>
+                <SelectItem value="private">Private Session (suggested $75)</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground mt-1">
+              Suggested: ${SESSION_PRESETS[sessionTypeState as keyof typeof SESSION_PRESETS]?.price ?? 30}/person - adjust price below as needed
+            </p>
+          </div>
+          
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="edit-date">Date</Label>
@@ -183,6 +225,50 @@ export function EditSessionForm({
               />
             </div>
           </div>
+
+          {/* Who Can Join */}
+          <div>
+            <Label htmlFor="join">Who Can Join</Label>
+            <Select value={join === 'private' ? 'invite_only' : join} onValueChange={(v) => setJoin(v as Props['joinPolicy'])}>
+              <SelectTrigger id="join">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="public">Anyone — Open registration</SelectItem>
+                <SelectItem value="invite_only">Invite Only — Need invite link to register</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Published Status */}
+          <div>
+            <Label htmlFor="published">Published</Label>
+            <Select value={join === 'private' ? 'no' : 'yes'} onValueChange={(v) => {
+              if (v === 'no') {
+                setJoin('private');
+              } else {
+                // Keep current join policy or default to public
+                if (join === 'private') setJoin('public');
+              }
+            }}>
+              <SelectTrigger id="published">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="yes">Yes — Visible in Browse Training</SelectItem>
+                <SelectItem value="no">No — Hidden, only you can add wrestlers</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground mt-1">
+              {join === 'private' 
+                ? 'Session is hidden from public. Only you can add wrestlers manually.'
+                : join === 'invite_only'
+                  ? 'Session shows in Browse Training but only people with the invite link can register.'
+                  : 'Session shows in Browse Training and anyone can book a spot.'
+              }
+            </p>
+          </div>
+
           {isGroup && (
             <>
               <div>
@@ -224,19 +310,6 @@ export function EditSessionForm({
                 <p className="text-xs text-muted-foreground mt-1">
                   Shown on session cards as &quot;Covering: …&quot;
                 </p>
-              </div>
-              <div>
-                <Label htmlFor="join">Who can join</Label>
-                <Select value={join} onValueChange={(v) => setJoin(v as Props['joinPolicy'])}>
-                  <SelectTrigger id="join">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="public">Public — listed on Training; anyone can join</SelectItem>
-                    <SelectItem value="private">Private — not listed; only you add wrestlers</SelectItem>
-                    <SelectItem value="invite_only">Invite only — not listed; share link to register</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -310,6 +383,135 @@ export function EditSessionForm({
             )}
           </div>
         </form>
+      </CardContent>
+    </Card>
+
+    {/* Financials Section */}
+    <Card>
+      <CardHeader>
+        <CardTitle>Session Financials</CardTitle>
+        <CardDescription>
+          What parents paid (Gross) and what you paid/will pay the coach. The coach payout should be ~83.3% of gross.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <Label className="text-muted-foreground text-xs uppercase tracking-wider">Parents Paid (Gross)</Label>
+            <p className="text-xl font-semibold mt-1">${participantAmountPaidSum.toFixed(2)}</p>
+            <p className="text-xs text-muted-foreground">From Stripe checkout</p>
+          </div>
+          <div>
+            <Label className="text-muted-foreground text-xs uppercase tracking-wider">Suggested Coach Payout</Label>
+            <p className="text-xl font-semibold mt-1 text-blue-400">${(participantAmountPaidSum * 0.833).toFixed(2)}</p>
+            <p className="text-xs text-muted-foreground">83.3% of gross</p>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-4 pt-2 border-t border-border">
+          <div>
+            <Label className="text-muted-foreground text-xs uppercase tracking-wider">Guild Net</Label>
+            <p className={`text-xl font-semibold mt-1 ${(participantAmountPaidSum - (athletePayment ?? 0)) >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
+              ${(participantAmountPaidSum - (athletePayment ?? 0)).toFixed(2)}
+            </p>
+            <p className="text-xs text-muted-foreground">Gross - Coach Payout</p>
+          </div>
+          <div>
+            <Label className="text-muted-foreground text-xs uppercase tracking-wider">Recorded Payout</Label>
+            <p className="text-xl font-semibold mt-1">
+              {athletePayment != null ? `$${Number(athletePayment).toFixed(2)}` : '—'}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {athletePayoutDate ? `Paid ${formatEST(`${athletePayoutDate}T12:00:00`, 'MMM d, yyyy')}` : 'Not yet paid'}
+            </p>
+          </div>
+        </div>
+        {participantAmountPaidSum === 0 && currentParticipants > 0 && (
+          <div className="p-3 rounded-md bg-amber-500/10 border border-amber-500/20 text-sm">
+            <p className="font-medium text-amber-500">Gross revenue is $0</p>
+            <p className="text-muted-foreground text-xs mt-1">
+              This could be a promo session or the payments weren&apos;t recorded via Stripe. 
+              If parents paid cash, use the form below to add a manual payment record.
+            </p>
+          </div>
+        )}
+
+        {/* Manual Payment Entry */}
+        <div className="pt-4 border-t border-border">
+          <Label className="text-sm font-medium">Add Manual Payment (Cash/Check)</Label>
+          <p className="text-xs text-muted-foreground mb-3">
+            Record a payment that didn&apos;t go through Stripe. This adds to the gross revenue for this session.
+          </p>
+          <form
+            className="flex flex-wrap items-end gap-3"
+            onSubmit={async (e) => {
+              e.preventDefault();
+              const val = parseFloat(manualPaymentAmount);
+              if (Number.isNaN(val) || val <= 0) return;
+              setManualPaymentLoading(true);
+              setError(null);
+              try {
+                const res = await fetch(`/api/admin/sessions/${sessionId}/add-payment`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ 
+                    amount: val, 
+                    paymentMethod: manualPaymentMethod,
+                    notes: `Manual ${manualPaymentMethod} payment`
+                  }),
+                });
+                const data = await res.json();
+                if (res.ok && data.success) {
+                  router.refresh();
+                  setManualPaymentAmount('');
+                } else {
+                  setError(data.error || 'Failed to add payment');
+                }
+              } catch {
+                setError('Failed to add payment');
+              } finally {
+                setManualPaymentLoading(false);
+              }
+            }}
+          >
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="manual-amount" className="text-xs">Amount ($)</Label>
+              <Input
+                id="manual-amount"
+                type="number"
+                min={0}
+                step={1}
+                value={manualPaymentAmount}
+                onChange={(e) => setManualPaymentAmount(e.target.value)}
+                className="w-24"
+                placeholder="30"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <Label htmlFor="manual-method" className="text-xs">Method</Label>
+              <Select value={manualPaymentMethod} onValueChange={(v) => setManualPaymentMethod(v as typeof manualPaymentMethod)}>
+                <SelectTrigger id="manual-method" className="w-28">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="cash">Cash</SelectItem>
+                  <SelectItem value="check">Check</SelectItem>
+                  <SelectItem value="venmo">Venmo</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button type="submit" variant="outline" disabled={manualPaymentLoading || manualPaymentAmount.trim() === ''}>
+              {manualPaymentLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  Adding...
+                </>
+              ) : (
+                'Add Payment'
+              )}
+            </Button>
+          </form>
+        </div>
       </CardContent>
     </Card>
 

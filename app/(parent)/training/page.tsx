@@ -36,22 +36,19 @@ type SessionRow = {
   price_per_participant: number | null;
   athlete_id: string;
   facility_id: string;
-  athletes?: { id: string; first_name?: string; last_name?: string; school?: string } | null;
+  athletes?: { id: string; first_name?: string; last_name?: string; school?: string; photo_url?: string; average_rating?: number; review_count?: number } | null;
   facilities?: { id: string; name?: string; address?: string } | null;
   session_participants?: Array<{
-    id?: string;
-    youth_wrestler_id?: string | null;
-    roster_first_name?: string | null;
-    roster_last_name?: string | null;
-    roster_photo_url?: string | null;
-    youth_wrestlers?: { id: string; first_name?: string; last_name?: string; photo_url?: string } | { id: string; first_name?: string; last_name?: string; photo_url?: string }[] | null;
-  } | null>;
+    id: string;
+    youth_wrestler_id: string | null;
+    youth_wrestlers?: { id: string; first_name?: string; last_name?: string } | null;
+  }>;
 };
 
 export default async function TrainingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tab?: string; date?: string; time?: string; location?: string; coach?: string; wrestler?: string }>;
+  searchParams: Promise<{ tab?: string; date?: string; time?: string; location?: string; coach?: string; wrestler?: string; type?: string }>;
 }) {
   const sp = await searchParams;
   const tab = sp.tab ?? 'sessions';
@@ -69,6 +66,13 @@ export default async function TrainingPage({
   const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
   if (userData?.role === 'coach') redirect('/athlete-dashboard');
   if (userData?.role !== 'parent' && userData?.role !== 'admin' && userData?.role !== 'youth_wrestler') redirect('/dashboard');
+
+  // Fetch parent's wrestlers for "Booked" state check
+  const { data: parentWrestlers } = await supabase
+    .from('youth_wrestlers')
+    .select('id')
+    .eq('parent_id', user.id);
+  const parentWrestlerIds = (parentWrestlers || []).map((w) => w.id);
 
   const { data: facilities } = await supabase
     .from('facilities')
@@ -156,7 +160,7 @@ export default async function TrainingPage({
       })()
     : (() => {
         const end = new Date(now);
-        end.setDate(end.getDate() + 7);
+        end.setDate(end.getDate() + 14);
         return end.toISOString();
       })();
   // Past/completed sessions: when no date = last 14 days; when date = that day
@@ -169,29 +173,33 @@ export default async function TrainingPage({
       })();
   const pastDayEnd = dateParam ? dayEnd : now.toISOString();
 
+  // Query sessions - use simple select first, then join coach/facility data
   const baseSelect = `
     id, scheduled_datetime, status, session_type, session_mode, join_policy, focus_area,
-    current_participants, max_participants, total_price, price_per_participant,
-    athlete_id, facility_id, athletes(id, first_name, last_name, school, photo_url, average_rating, review_count), facilities(id, name, address),
-    session_participants(id, youth_wrestler_id, youth_wrestlers(id, first_name, last_name, photo_url))
+    current_participants, max_participants, total_price, price_per_participant, duration_minutes,
+    athlete_id, facility_id,
+    athletes:athlete_id(id, first_name, last_name, school, photo_url, average_rating, review_count),
+    facilities:facility_id(id, name, address),
+    session_participants(id, youth_wrestler_id, youth_wrestlers:youth_wrestler_id(id, first_name, last_name))
   `;
-  const sessions = (start: string, end: string) =>
-    admin.from('sessions').select(baseSelect).gte('scheduled_datetime', start).lte('scheduled_datetime', end);
-  const withOptFilters = (q: ReturnType<typeof sessions>) => {
+  const sessionQuery = (start: string, end: string) =>
+    supabase.from('sessions').select(baseSelect).gte('scheduled_datetime', start).lte('scheduled_datetime', end);
+  const withOptFilters = (q: ReturnType<typeof sessionQuery>) => {
     if (sp.location && sp.location !== 'all') q = q.eq('facility_id', sp.location);
     if (sp.coach && sp.coach !== 'all') q = q.eq('athlete_id', sp.coach);
     return q;
   };
 
-  const [groupUpcoming, partnerUpcoming, groupPast, partnerPast] = await Promise.all([
-    withOptFilters(sessions(dayStart, dayEnd)).in('status', ['scheduled', 'pending_payment']).in('session_type', ['group', 'small_group', '2-athlete']).order('scheduled_datetime', { ascending: true }),
-    withOptFilters(sessions(dayStart, dayEnd)).in('status', ['scheduled', 'pending_payment']).eq('session_mode', 'partner-open').order('scheduled_datetime', { ascending: true }),
-    withOptFilters(sessions(pastDayStart, pastDayEnd)).in('status', ['completed', 'cancelled', 'no-show']).in('session_type', ['group', 'small_group', '2-athlete']).order('scheduled_datetime', { ascending: true }),
-    withOptFilters(sessions(pastDayStart, pastDayEnd)).in('status', ['completed', 'cancelled', 'no-show']).eq('session_mode', 'partner-open').order('scheduled_datetime', { ascending: true }),
-  ]);
+  // Query only UPCOMING sessions (scheduled or pending_payment)
+  const { data: upcomingData, error: upcomingError } = await withOptFilters(sessionQuery(dayStart, dayEnd))
+    .in('status', ['scheduled', 'pending_payment'])
+    .order('scheduled_datetime', { ascending: true });
+  
+  
+  
   const seen = new Set<string>();
   let list: SessionRow[] = [];
-  for (const row of [...(groupUpcoming.data ?? []), ...(partnerUpcoming.data ?? []), ...(groupPast.data ?? []), ...(partnerPast.data ?? [])]) {
+  for (const row of (upcomingData ?? [])) {
     const r = row as unknown as SessionRow;
     if (seen.has(r.id)) continue;
     seen.add(r.id);
@@ -208,19 +216,20 @@ export default async function TrainingPage({
       return h >= startHour && h < endHour;
     });
   }
-  // Only list publicly discoverable sessions. invite_only / private = share link only (not shown here).
-  availabilitySessions = list.filter((s) => (s as { join_policy?: string }).join_policy === 'public');
+  // Show ALL sessions - we'll display badges to indicate public vs invite-only
+  availabilitySessions = list;
 
   availabilitySessions = patchSessionsWithCoachReviewStats(availabilitySessions, reviewStatsMap);
 
   const isAdmin = userData?.role === 'admin';
 
   return (
-    <div className="container mx-auto px-4 py-5 pb-8 md:py-8 max-w-full">
-      <h1 className="text-2xl font-bold text-foreground md:text-3xl mb-1">Training</h1>
-      <p className="text-muted-foreground text-sm md:text-base mb-6">
-        Find sessions to book or pick a coach for private
-      </p>
+    <div className="min-h-screen pb-24">
+      <div className="px-4 pt-6 pb-4">
+        <h1 className="text-2xl font-bold text-foreground">Training</h1>
+        <p className="text-zinc-400 text-sm mt-0.5">Find and book sessions</p>
+      </div>
+      <div className="px-4">
       <TrainingClient
         key={`training-${tab}-${sp.coach ?? 'all'}`}
         initialTab={tab}
@@ -234,7 +243,10 @@ export default async function TrainingPage({
         availabilityCoach={sp.coach ?? 'all'}
         coaches={athletesMerged.map((a) => ({ id: a.id, first_name: a.first_name, last_name: a.last_name, school: a.school }))}
         preselectedWrestlerId={sp.wrestler ?? ''}
+        parentWrestlerIds={parentWrestlerIds}
+        availabilitySessionType={sp.type ?? 'all'}
       />
+      </div>
     </div>
   );
 }

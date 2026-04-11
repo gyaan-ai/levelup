@@ -6,27 +6,15 @@ import { ParentBottomNav } from './parent-bottom-nav';
 import { CoachBottomNav } from './coach-bottom-nav';
 import { YouthWrestlerBottomNav } from './youth-wrestler-bottom-nav';
 import { AdminBottomNav } from './admin-bottom-nav';
-
-const PARENT_ROUTES = [
-  '/dashboard',
-  '/training',
-  '/find-training',
-  '/browse',
-  '/bookings',
-  '/inbox',
-  '/account',
-  '/my-wrestlers',
-  '/my-coaches',
-  '/partner-sessions',
-  '/small-group-sessions',
-  '/wrestlers',
-  '/sessions',
-];
+import { isParentRoute } from '@/lib/parent-routes';
 
 const COACH_ROUTES = [
   '/athlete-dashboard',
   '/availability',
   '/coach-sessions',
+  '/coach-roster',
+  '/coach-earnings',
+  '/coach-reviews',
   '/inbox',
   '/profile',
   '/rate-card',
@@ -45,13 +33,6 @@ const YOUTH_WRESTLER_ROUTES = [
 ];
 
 const ADMIN_ROUTES = ['/dashboard', '/admin', '/account'];
-
-function isParentRoute(pathname: string | null): boolean {
-  if (!pathname) return false;
-  return PARENT_ROUTES.some(
-    (route) => pathname === route || (route !== '/dashboard' && pathname.startsWith(route + '/'))
-  );
-}
 
 function isCoachRoute(pathname: string | null): boolean {
   if (!pathname) return false;
@@ -81,11 +62,20 @@ function isAdminRoute(pathname: string | null): boolean {
 /** One menu system on mobile: bottom nav for everyone (parent, coach, youth_wrestler, admin). */
 export function ParentBottomNavWrapper({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const { effectiveRole } = useAuth();
-  const showParentNav = effectiveRole === 'parent' && isParentRoute(pathname);
-  const showCoachNav = effectiveRole === 'coach' && isCoachRoute(pathname);
-  const showYouthNav = effectiveRole === 'youth_wrestler' && isYouthWrestlerRoute(pathname);
-  const showAdminNav = effectiveRole === 'admin' && isAdminRoute(pathname);
+  const { effectiveRole, userRole, viewAsRole } = useAuth();
+  
+  // When admin switches to parent view, show parent nav regardless of current route
+  const adminViewingAsParent = userRole === 'admin' && viewAsRole === 'parent';
+  const adminViewingAsCoach = userRole === 'admin' && viewAsRole === 'coach';
+  const adminViewingAsYouth = userRole === 'admin' && viewAsRole === 'youth_wrestler';
+  
+  const showParentNav = adminViewingAsParent || (effectiveRole === 'parent' && isParentRoute(pathname));
+  // Include `/` so coaches see bottom nav on the marketing home (desktop header links are md+ only).
+  const showCoachNav =
+    adminViewingAsCoach ||
+    (effectiveRole === 'coach' && (isCoachRoute(pathname) || pathname === '/'));
+  const showYouthNav = adminViewingAsYouth || (effectiveRole === 'youth_wrestler' && isYouthWrestlerRoute(pathname));
+  const showAdminNav = effectiveRole === 'admin' && !viewAsRole && isAdminRoute(pathname);
   const showNav = showParentNav || showCoachNav || showYouthNav || showAdminNav;
 
   return (

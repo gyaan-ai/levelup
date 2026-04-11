@@ -3,6 +3,8 @@ import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
+import { checkoutAllowSavedAccountPercent, displayPercentForPromoOnlyCheckout } from '@/lib/checkout-promo';
+import { effectivePercentOffForCheckout } from '@/lib/family-auto-discount';
 
 /** GET: current user's percentage discount (e.g. 10 for 10% off). Parents only. */
 export async function GET() {
@@ -22,14 +24,19 @@ export async function GET() {
     }
 
     const admin = createAdminClient(tenant.slug);
+    if (!checkoutAllowSavedAccountPercent()) {
+      const implicit = await displayPercentForPromoOnlyCheckout(admin, user.email);
+      return NextResponse.json({ percent_off: implicit >= 1 ? implicit : null });
+    }
+
     const { data: row } = await admin
       .from('parent_percentage_discounts')
       .select('percent_off')
       .eq('parent_id', user.id)
       .maybeSingle();
 
-    const percentOff = row?.percent_off != null ? Number(row.percent_off) : null;
-    return NextResponse.json({ percent_off: percentOff });
+    const eff = effectivePercentOffForCheckout(row?.percent_off, user.email);
+    return NextResponse.json({ percent_off: eff >= 1 ? eff : null });
   } catch (e) {
     console.error('Percentage discount error:', e);
     return NextResponse.json({ percent_off: null });

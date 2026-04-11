@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import Link from 'next/link';
+import { BackLink } from '@/components/back-link';
 
 export const metadata = {
   title: 'Pricing | The Guild',
@@ -21,9 +22,11 @@ export default function PricingPage() {
             </Link>
           </p>
           <p>
-            <Link href="/" className="text-muted-foreground hover:text-accent hover:underline text-sm">
-              ← Back to home
-            </Link>
+            <BackLink
+              fallbackHref="/"
+              label="Back to home"
+              className="text-muted-foreground hover:text-accent hover:underline text-sm"
+            />
           </p>
         </CardContent>
       </Card>

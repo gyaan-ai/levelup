@@ -4,9 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import { SessionReviewForm } from './session-review-form';
-import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { BackLink } from '@/components/back-link';
 
 function ReviewError({ title, message }: { title: string; message: string }) {
   return (
@@ -14,12 +12,11 @@ function ReviewError({ title, message }: { title: string; message: string }) {
       <div className="rounded-lg border border-border bg-card p-6 space-y-4">
         <h1 className="text-xl font-semibold">{title}</h1>
         <p className="text-muted-foreground text-sm">{message}</p>
-        <Button asChild variant="outline" className="w-full sm:w-auto">
-          <Link href="/bookings" className="inline-flex items-center gap-2">
-            <ArrowLeft className="h-4 w-4" />
-            Back to My bookings
-          </Link>
-        </Button>
+        <BackLink
+          fallbackHref="/bookings"
+          label="Back to My bookings"
+          className="inline-flex h-10 w-full sm:w-auto items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium ring-offset-background hover:bg-accent hover:text-accent-foreground"
+        />
       </div>
     </div>
   );
@@ -118,6 +115,27 @@ export default async function SessionReviewPage({
   const f = session.facilities;
   const facility = Array.isArray(f) ? f[0] : (f as { name: string } | null);
 
+  const coachName = coach ? `${coach.first_name} ${coach.last_name}` : 'Coach';
+  const coachId = coach?.id ?? '';
+
+  if (coachId) {
+    const { data: existingCoachRows } = await supabase
+      .from('reviews')
+      .select('session_id')
+      .eq('parent_id', user.id)
+      .eq('athlete_id', coachId)
+      .limit(1);
+    const existingForCoach = existingCoachRows?.[0];
+    if (existingForCoach && existingForCoach.session_id !== sessionId) {
+      return (
+        <ReviewError
+          title="Feedback already shared"
+          message={`You already left feedback for ${coachName}. One review per coach is enough — thank you!`}
+        />
+      );
+    }
+  }
+
   const { data: existing } = await supabase
     .from('reviews')
     .select('id, rating, comment, tags')
@@ -125,18 +143,13 @@ export default async function SessionReviewPage({
     .eq('parent_id', user.id)
     .maybeSingle();
 
-  const coachName = coach ? `${coach.first_name} ${coach.last_name}` : 'Coach';
   const facilityName = facility?.name ?? '';
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-lg">
-      <Link
-        href="/bookings"
-        className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-6"
-      >
-        <ArrowLeft className="h-4 w-4 mr-2" />
-        Back to My bookings
-      </Link>
+      <div className="mb-6">
+        <BackLink fallbackHref="/bookings" label="Back to My bookings" />
+      </div>
       <div className="mb-6">
         <h1 className="text-2xl font-bold">Leave feedback</h1>
         <p className="text-muted-foreground mt-1">

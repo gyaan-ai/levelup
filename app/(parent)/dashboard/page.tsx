@@ -1,24 +1,24 @@
 import { redirect } from 'next/navigation';
 import { headers, cookies } from 'next/headers';
+import Link from 'next/link';
 import { VIEW_AS_COOKIE_NAME } from '@/lib/auth/view-as-cookie';
 import { getParentYouthWrestlerIds } from '@/lib/parent-wrestlers';
-
-export const dynamic = 'force-dynamic';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
-import { Card, CardContent, CardDescription, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import Link from 'next/link';
-import { Edit, User, Calendar } from 'lucide-react';
+import { Calendar, ChevronRight, Star, User, Plus } from 'lucide-react';
 import { YouthWrestler } from '@/types';
-import { BookingCard, type BookingSession } from '@/app/(parent)/bookings/booking-card';
-import { CoachSessionBadge } from '@/components/coach-session-badge';
 import { ProfileImage } from '@/components/profile-image';
 import { formatEST } from '@/lib/format-date';
-import { fetchCoachReviewStatsMap, getCoachReviewStatsForId } from '@/lib/coach-review-stats';
+import { SessionTypeBadge } from '@/components/session-type-badge';
+import { SchoolLogo } from '@/components/school-logo';
+import { ensureAutoFamilyDiscountForParent } from '@/lib/family-auto-discount';
+import { checkoutAllowSavedAccountPercent } from '@/lib/checkout-promo';
 
-/** Parent sees only their own wrestlers (primary or linked). RLS on youth_wrestlers enforces this. */
+export const dynamic = 'force-dynamic';
+
 export default async function HomePage() {
   const headersList = await headers();
   const host = headersList.get('host') || '';
@@ -36,72 +36,33 @@ export default async function HomePage() {
   const isAdmin = userData?.role === 'admin';
   const cookieStore = await cookies();
   const viewAsCookie = cookieStore.get(VIEW_AS_COOKIE_NAME)?.value;
-  /** Admin + "Preview as Parent" in header should match a real parent’s Home (family sessions only). */
   const adminPreviewAsParent = isAdmin && viewAsCookie === 'parent';
-  const nowISO = new Date().toISOString();
 
-  // Admin (not previewing as parent): fetch ALL scheduled/pending sessions
-  type AdminUpcomingRow = {
-    id: string;
-    athlete_id?: string | null;
-    scheduled_datetime: string;
-    status: string;
-    total_price?: number;
-    price_per_participant?: number | null;
-    parent_id?: string;
-    session_type?: string;
-    session_mode?: string;
-    focus_area?: string | null;
-    focus_area_2?: string | null;
-    current_participants?: number;
-    max_participants?: number;
-    partner_invite_code?: string | null;
-    athletes?: { id: string; first_name?: string; last_name?: string; school?: string; photo_url?: string } | { id: string; first_name?: string; last_name?: string; school?: string; photo_url?: string }[] | null;
-    facilities?: { id?: string; name?: string; address?: string } | { id?: string; name?: string; address?: string }[] | null;
-    join_policy?: string | null;
-    session_participants?: Array<{
-      youth_wrestler_id?: string;
-      parent_id?: string;
-      youth_wrestlers?: { first_name?: string; last_name?: string } | null;
-    }>;
-  };
-  let allUpcomingForAdmin: AdminUpcomingRow[] = [];
+  // If admin not previewing as parent, redirect to admin dashboard
   if (isAdmin && !adminPreviewAsParent) {
-    const admin = createAdminClient(tenant.slug);
-    const { data: adminSessions } = await admin
-      .from('sessions')
-      .select(`
-        id,
-        athlete_id,
-        scheduled_datetime,
-        status,
-        total_price,
-        price_per_participant,
-        parent_id,
-        session_type,
-        session_mode,
-        join_policy,
-        focus_area,
-        current_participants,
-        max_participants,
-        partner_invite_code,
-        athletes(id, first_name, last_name, school, photo_url, average_rating, review_count),
-        facilities(id, name, address),
-        session_participants(youth_wrestler_id, parent_id, youth_wrestlers(first_name, last_name))
-      `)
-      .in('status', ['scheduled', 'pending_payment'])
-      .order('scheduled_datetime', { ascending: true })
-      .limit(100);
-    allUpcomingForAdmin = (adminSessions ?? []) as unknown as AdminUpcomingRow[];
+    redirect('/admin');
   }
 
-  // Parent sees only their wrestlers (primary or linked). Explicit filter so parents never see other users' kids.
+  const nowISO = new Date().toISOString();
+  const admin = createAdminClient(tenant.slug);
+
+  const { count: pendingSessionRequestCount } = await supabase
+    .from('parent_session_requests')
+    .select('id', { count: 'exact', head: true })
+    .eq('requesting_parent_id', user.id)
+    .eq('status', 'pending');
+  if (userData?.role === 'parent' && checkoutAllowSavedAccountPercent()) {
+    await ensureAutoFamilyDiscountForParent(admin, user.id, user.email);
+  }
+
+  // Get parent's wrestlers
   const youthWrestlerIds = await getParentYouthWrestlerIds(supabase, user.id);
   const { data: youthWrestlersRaw } = youthWrestlerIds.length > 0
     ? await supabase.from('youth_wrestlers').select('*').in('id', youthWrestlerIds).order('created_at', { ascending: false })
     : { data: [] };
   const youthWrestlers = [...new Map((youthWrestlersRaw ?? []).map((yw: YouthWrestler) => [yw.id, yw])).values()];
 
+  // Get family session IDs
   let familySessionIds: string[] = [];
   if (youthWrestlerIds.length > 0) {
     const { data: partRows } = await supabase
@@ -111,41 +72,7 @@ export default async function HomePage() {
     familySessionIds = [...new Set((partRows ?? []).map((r: { session_id: string }) => r.session_id))];
   }
 
-  const { data: completedSessions } = familySessionIds.length > 0
-    ? await supabase.from('sessions').select('id').in('id', familySessionIds).eq('status', 'completed')
-    : { data: [] };
-  const completedIds = (completedSessions ?? []).map((s: { id: string }) => s.id);
-
-  const sessionCounts: Record<string, number> = {};
-  let lastSessionByWrestler: Record<string, string> = {};
-  if (youthWrestlerIds.length > 0 && completedIds.length > 0) {
-    const { data: participantRows } = await supabase
-      .from('session_participants')
-      .select('session_id, youth_wrestler_id')
-      .in('session_id', completedIds)
-      .in('youth_wrestler_id', youthWrestlerIds);
-    for (const p of participantRows ?? []) {
-      const yid = (p as { youth_wrestler_id: string }).youth_wrestler_id;
-      sessionCounts[yid] = (sessionCounts[yid] || 0) + 1;
-    }
-    const { data: pastSessions } = await supabase
-      .from('sessions')
-      .select('id, scheduled_datetime, session_participants(youth_wrestler_id)')
-      .in('id', completedIds)
-      .order('scheduled_datetime', { ascending: false });
-    for (const sess of pastSessions ?? []) {
-      const parts = (sess as { session_participants?: Array<{ youth_wrestler_id?: string }> }).session_participants ?? [];
-      const dt = (sess as { scheduled_datetime?: string }).scheduled_datetime;
-      if (!dt) continue;
-      for (const part of parts) {
-        const yid = part.youth_wrestler_id;
-        if (yid && youthWrestlerIds.includes(yid) && !lastSessionByWrestler[yid]) {
-          lastSessionByWrestler[yid] = dt;
-        }
-      }
-    }
-  }
-
+  // Fetch upcoming sessions
   const { data: upcomingSessions } = familySessionIds.length > 0
     ? await supabase
         .from('sessions')
@@ -154,328 +81,303 @@ export default async function HomePage() {
           athlete_id,
           scheduled_datetime,
           status,
-          total_price,
           price_per_participant,
-          parent_id,
           session_type,
           session_mode,
           focus_area,
-          join_policy,
           current_participants,
           max_participants,
-          partner_invite_code,
-          athletes(id, first_name, last_name, school, photo_url, average_rating, review_count),
-          facilities(id, name, address),
-          session_participants(youth_wrestler_id, amount_paid, youth_wrestlers(id, first_name, last_name))
+          athletes(id, first_name, last_name, school, photo_url),
+          facilities(id, name),
+          session_participants(youth_wrestler_id, youth_wrestlers(first_name, last_name))
         `)
         .in('id', familySessionIds)
         .in('status', ['scheduled', 'pending_payment'])
         .gte('scheduled_datetime', nowISO)
         .order('scheduled_datetime', { ascending: true })
-        .limit(10)
+        .limit(5)
     : { data: [] };
 
-  const upcoming = (upcomingSessions ?? []) as Array<{
+  // Fetch sessions awaiting review (completed, no review yet)
+  const { data: completedSessions } = familySessionIds.length > 0
+    ? await supabase
+        .from('sessions')
+        .select(`
+          id,
+          athlete_id,
+          scheduled_datetime,
+          session_type,
+          session_mode,
+          athletes(id, first_name, last_name, school, photo_url),
+          session_participants(youth_wrestler_id, youth_wrestlers(first_name, last_name))
+        `)
+        .in('id', familySessionIds)
+        .eq('status', 'completed')
+        .order('scheduled_datetime', { ascending: false })
+        .limit(200)
+    : { data: [] };
+
+  // Coaches this parent has already reviewed (one review per coach is enough — no per-session nag)
+  const { data: myReviewsForCoaches } = await supabase
+    .from('reviews')
+    .select('athlete_id')
+    .eq('parent_id', user.id);
+  const reviewedCoachIds = new Set(
+    (myReviewsForCoaches ?? [])
+      .map((r: { athlete_id?: string | null }) => r.athlete_id)
+      .filter((id): id is string => Boolean(id))
+  );
+
+  type CompletedRow = {
     id: string;
     athlete_id?: string | null;
     scheduled_datetime: string;
-    status: string;
-    total_price?: number;
-    price_per_participant?: number | null;
-    parent_id?: string;
     session_type?: string;
     session_mode?: string;
-    focus_area?: string | null;
-    focus_area_2?: string | null;
-    current_participants?: number;
-    max_participants?: number;
-    join_policy?: string | null;
-    partner_invite_code?: string | null;
-    athletes?: { id: string; first_name?: string; last_name?: string; school?: string } | { id: string; first_name?: string; last_name?: string; school?: string }[];
-    facilities?: { id: string; name?: string; address?: string } | { id: string; name?: string; address?: string }[];
-    session_participants?: Array<{ youth_wrestler_id?: string; amount_paid?: number | null; youth_wrestlers?: { first_name?: string; last_name?: string } | { first_name?: string; last_name?: string }[] }>;
-  }>;
+    athletes?: unknown;
+    session_participants?: unknown;
+  };
 
-  // Fetch all participants for upcoming sessions (RLS only returns current user's kids; admin gives full list for the tile)
-  let allParticipantsBySession: Record<string, string[]> = {};
-  if (upcoming.length > 0) {
-    const admin = createAdminClient(tenant.slug);
-    const ids = upcoming.map((s) => s.id);
-    const { data: allParts } = await admin
-      .from('session_participants')
-      .select('session_id, youth_wrestlers(first_name, last_name)')
-      .in('session_id', ids);
-    for (const p of allParts ?? []) {
-      const row = p as { session_id: string; youth_wrestlers?: { first_name?: string; last_name?: string } | null };
-      const yw = row.youth_wrestlers;
-      const name = yw ? `${yw.first_name ?? ''} ${yw.last_name ?? ''}`.trim() : null;
-      if (name && row.session_id) {
-        if (!allParticipantsBySession[row.session_id]) allParticipantsBySession[row.session_id] = [];
-        allParticipantsBySession[row.session_id].push(name);
+  const completedList = (completedSessions ?? []) as unknown as CompletedRow[];
+  const pendingCoachReview: CompletedRow[] = [];
+  const seenCoach = new Set<string>();
+  for (const s of completedList) {
+    const coachId = s.athlete_id && String(s.athlete_id).trim();
+    if (!coachId || reviewedCoachIds.has(coachId)) continue;
+    if (seenCoach.has(coachId)) continue;
+    seenCoach.add(coachId);
+    pendingCoachReview.push(s);
+  }
+  const sessionsAwaitingReview = pendingCoachReview.slice(0, 20);
+
+  // Get next session info per wrestler
+  const nextSessionByWrestler: Record<string, string> = {};
+  for (const s of upcomingSessions ?? []) {
+    const parts = ((s as { session_participants?: Array<{ youth_wrestler_id?: string }> }).session_participants ?? []);
+    for (const p of parts) {
+      const yid = p.youth_wrestler_id;
+      if (yid && !nextSessionByWrestler[yid]) {
+        nextSessionByWrestler[yid] = (s as { scheduled_datetime: string }).scheduled_datetime;
       }
     }
   }
 
-  const nextSession = upcoming[0];
-
-  const nextSessionByWrestler: Record<string, string> = {};
-  for (const s of upcoming) {
-    const parts = (s.session_participants ?? []) as Array<{ youth_wrestler_id?: string }>;
-    for (const p of parts) {
-      const yid = p.youth_wrestler_id;
-      if (yid && !nextSessionByWrestler[yid]) nextSessionByWrestler[yid] = s.scheduled_datetime;
-    }
-  }
-
-  const coachIdsForReviewStats = new Set<string>();
-  for (const s of upcoming) {
-    const a = s.athletes;
-    const c = Array.isArray(a) ? a[0] : a;
-    const cid = (c as { id?: string } | undefined)?.id ?? s.athlete_id;
-    if (cid) coachIdsForReviewStats.add(String(cid));
-  }
-  if (isAdmin && !adminPreviewAsParent) {
-    for (const s of allUpcomingForAdmin) {
-      const a = s.athletes;
-      const c = Array.isArray(a) ? a[0] : a;
-      const cid = (c as { id?: string } | undefined)?.id ?? s.athlete_id;
-      if (cid) coachIdsForReviewStats.add(String(cid));
-    }
-  }
-  const homeReviewStatsMap = await fetchCoachReviewStatsMap(supabase, [...coachIdsForReviewStats]);
-
-  const amountPaidForSession = (s: (typeof upcoming)[0]) => {
-    const parts = s.session_participants ?? [];
-    let sum = 0;
-    for (const p of parts) {
-      const amt = (p as { amount_paid?: number | null }).amount_paid;
-      if (amt != null && Number(amt) > 0) sum += Number(amt);
-    }
-    return sum || undefined;
+  type SessionRow = {
+    id: string;
+    scheduled_datetime: string;
+    session_type?: string;
+    session_mode?: string;
+    focus_area?: string | null;
+    current_participants?: number;
+    max_participants?: number;
+    price_per_participant?: number | null;
+    athletes?: { id: string; first_name?: string; last_name?: string; school?: string; photo_url?: string } | { id: string; first_name?: string; last_name?: string; school?: string; photo_url?: string }[] | null;
+    facilities?: { id: string; name?: string } | { id: string; name?: string }[] | null;
+    session_participants?: Array<{ youth_wrestler_id?: string; youth_wrestlers?: { first_name?: string; last_name?: string } | null }>;
   };
 
-  const toBookingSession = (s: (typeof upcoming)[0]): BookingSession => {
-    const a = s.athletes;
-    const coach = Array.isArray(a) ? a[0] : a;
-    const f = s.facilities;
-    const fac = Array.isArray(f) ? f[0] : f;
-    const wrestlers =
-      allParticipantsBySession[s.id] ??
-      (s.session_participants ?? []).map((p) => {
-        const yw = p.youth_wrestlers;
-        const o = Array.isArray(yw) ? yw[0] : yw;
-        return o ? `${o.first_name ?? ''} ${o.last_name ?? ''}`.trim() : null;
-      }).filter(Boolean) as string[];
-    const totalPrice = s.total_price ?? 0;
-    const pricePerParticipant = s.price_per_participant != null ? Number(s.price_per_participant) : null;
-    const coachId = (coach?.id && String(coach.id).trim()) || (s.athlete_id && String(s.athlete_id).trim()) || '';
-    const rs = getCoachReviewStatsForId(homeReviewStatsMap, coachId);
-    return {
-      id: s.id,
-      scheduled_datetime: s.scheduled_datetime,
-      status: s.status,
-      total_price: totalPrice,
-      price_per_participant: pricePerParticipant ?? undefined,
-      amountPaid: amountPaidForSession(s),
-      session_type: s.session_type,
-      session_mode: s.session_mode,
-      focus_area: s.focus_area ?? null,
-      focus_area_2: s.focus_area_2 ?? null,
-      current_participants: s.current_participants ?? 0,
-      max_participants: s.max_participants ?? 1,
-      partner_invite_code: s.partner_invite_code ?? null,
-      isTentative: false,
-      isOwner: s.parent_id === user.id,
-      isFamilyParticipant: true,
-      joinPolicy: (s as { join_policy?: string | null }).join_policy ?? null,
-      coach: {
-        name: coach ? `${coach.first_name ?? ''} ${coach.last_name ?? ''}`.trim() || 'Coach' : 'Coach',
-        school: coach?.school ?? '',
-        id: coachId,
-        photo_url: (coach as { photo_url?: string })?.photo_url,
-        average_rating: rs.average_rating,
-        review_count: rs.review_count,
-      },
-      facility: fac?.name ?? '—',
-      facility_id: (fac as { id?: string })?.id ?? null,
-      wrestlers,
-      primaryWrestlerId: (s.session_participants ?? [])[0] ? ((s.session_participants ?? [])[0] as { youth_wrestler_id?: string }).youth_wrestler_id : null,
-    };
+  const SessionCard = ({ session, showReviewButton = false }: { session: SessionRow; showReviewButton?: boolean }) => {
+    const coach = Array.isArray(session.athletes) ? session.athletes[0] : session.athletes;
+    const facility = Array.isArray(session.facilities) ? session.facilities[0] : session.facilities;
+    const dt = new Date(session.scheduled_datetime);
+    const price = session.price_per_participant;
+
+    return (
+      <Link href={showReviewButton ? `/sessions/${session.id}/review` : `/sessions/${session.id}`}>
+        <div className="flex items-center gap-4 p-4 rounded-xl bg-zinc-900/50 border border-zinc-800/50 hover:border-zinc-700 transition-all active:scale-[0.98]">
+          <ProfileImage
+            src={coach?.photo_url}
+            alt={coach ? `${coach.first_name} ${coach.last_name}` : 'Coach'}
+            className="w-14 h-14 rounded-full shrink-0"
+            fallbackIconClassName="h-6 w-6 text-muted-foreground"
+          />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <SessionTypeBadge sessionType={session.session_type ?? null} sessionMode={session.session_mode ?? null} />
+              {session.focus_area && (
+                <span className="text-xs text-zinc-500 truncate">{session.focus_area}</span>
+              )}
+            </div>
+            <p className="font-semibold text-foreground truncate">
+              {formatEST(dt, 'EEE, MMM d')} · {formatEST(dt, 'h:mm a')}
+            </p>
+            <p className="text-sm text-zinc-400 truncate">
+              {coach ? `${coach.first_name} ${coach.last_name}` : 'Coach'}
+              {coach?.school && <SchoolLogo school={coach.school} size="sm" className="ml-1 inline-block" />}
+            </p>
+          </div>
+          <div className="flex flex-col items-end shrink-0">
+            {showReviewButton ? (
+              <div className="flex items-center gap-1 text-[#D4AF37]">
+                <Star className="h-4 w-4" />
+                <span className="text-sm font-medium">Rate coach</span>
+              </div>
+            ) : (
+              <>
+                {price != null && price > 0 && (
+                  <span className="text-sm font-semibold text-foreground">${price}</span>
+                )}
+                <ChevronRight className="h-5 w-5 text-zinc-500" />
+              </>
+            )}
+          </div>
+        </div>
+      </Link>
+    );
   };
 
-  // Admin: convert admin-fetched session row to BookingSession for card display
-  const adminRowToBookingSession = (s: AdminUpcomingRow): BookingSession => {
-    const a = s.athletes;
-    const coach = Array.isArray(a) ? a[0] : a;
-    const f = s.facilities;
-    const fac = Array.isArray(f) ? f[0] : f;
-    const parts = s.session_participants ?? [];
-    const isFamilyParticipant = parts.some((p) => {
-      const pid = (p as { parent_id?: string }).parent_id;
-      const ywid = (p as { youth_wrestler_id?: string }).youth_wrestler_id;
-      return pid === user.id || (ywid != null && youthWrestlerIds.includes(ywid));
-    });
-    const wrestlers = parts
-      .map((p) => {
-        const yw = p.youth_wrestlers;
-        const o = Array.isArray(yw) ? yw[0] : yw;
-        return o ? `${o.first_name ?? ''} ${o.last_name ?? ''}`.trim() : null;
-      })
-      .filter(Boolean) as string[];
-    const totalPrice = s.total_price ?? 0;
-    const pricePerParticipant = s.price_per_participant != null ? Number(s.price_per_participant) : null;
-    const coachId = (coach?.id && String(coach.id).trim()) || (s.athlete_id && String(s.athlete_id).trim()) || '';
-    const rs = getCoachReviewStatsForId(homeReviewStatsMap, coachId);
-    return {
-      id: s.id,
-      scheduled_datetime: s.scheduled_datetime,
-      status: s.status,
-      total_price: totalPrice,
-      price_per_participant: pricePerParticipant ?? undefined,
-      session_type: s.session_type,
-      session_mode: s.session_mode,
-      focus_area: s.focus_area ?? null,
-      focus_area_2: s.focus_area_2 ?? null,
-      current_participants: (s as { current_participants?: number }).current_participants ?? 0,
-      max_participants: (s as { max_participants?: number }).max_participants ?? 1,
-      partner_invite_code: s.partner_invite_code ?? null,
-      isTentative: false,
-      isOwner: s.parent_id === user.id,
-      isFamilyParticipant,
-      joinPolicy: s.join_policy ?? null,
-      coach: {
-        name: coach ? `${coach.first_name ?? ''} ${coach.last_name ?? ''}`.trim() || 'Coach' : 'Coach',
-        school: coach?.school ?? '',
-        id: coachId,
-        photo_url: coach?.photo_url ?? null,
-        average_rating: rs.average_rating,
-        review_count: rs.review_count,
-      },
-      facility: fac?.name ?? '—',
-      facility_id: fac?.id ?? null,
-      wrestlers,
-      primaryWrestlerId: (s.session_participants ?? [])[0]?.youth_wrestler_id ?? null,
-    };
+  const WrestlerCard = ({ wrestler }: { wrestler: YouthWrestler }) => {
+    const nextSession = nextSessionByWrestler[wrestler.id];
+    
+    return (
+      <div className="flex items-center gap-4 p-4 rounded-xl bg-zinc-900/50 border border-zinc-800/50">
+        <ProfileImage
+          src={wrestler.photo_url}
+          alt={`${wrestler.first_name} ${wrestler.last_name}`}
+          focusX={wrestler.photo_focus_x ?? 50}
+          focusY={wrestler.photo_focus_y ?? 15}
+          className="w-16 h-16 rounded-full shrink-0"
+          fallbackIconClassName="h-8 w-8 text-muted-foreground"
+        />
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-foreground text-lg truncate">
+            {wrestler.first_name} {wrestler.last_name}
+          </p>
+          <p className="text-sm text-zinc-400">
+            {wrestler.age != null && <span>{wrestler.age} yrs</span>}
+            {wrestler.weight_class && <span> · {wrestler.weight_class} lbs</span>}
+          </p>
+          <p className="text-xs text-zinc-500 mt-1">
+            Next: {nextSession ? formatEST(new Date(nextSession), 'MMM d, h:mm a') : 'No upcoming'}
+          </p>
+        </div>
+        <Link href={`/training?wrestler=${wrestler.id}`}>
+          <Button size="sm" className="bg-[#D4AF37] hover:bg-[#B8963C] text-black font-medium">
+            Book
+          </Button>
+        </Link>
+      </div>
+    );
   };
 
   return (
-    <div className="container mx-auto px-4 py-5 pb-8 md:py-8 max-w-full">
-      <h1 className="text-2xl font-serif font-bold text-foreground md:text-3xl">Home</h1>
-      <p className="text-muted-foreground mt-1 text-sm md:text-base">
-        Next session, quick actions, and your wrestlers
-      </p>
+    <div className="min-h-screen pb-24">
+      {/* Header */}
+      <div className="px-4 pt-6 pb-4">
+        <h1 className="text-2xl font-bold text-foreground">Home</h1>
+        <p className="text-zinc-400 text-sm mt-0.5">Your training at a glance</p>
+      </div>
 
-      {/* Upcoming session(s): when admin, show all as cards; otherwise show family next session */}
-      <section className="mt-6 mb-6">
-        <h2 className="text-lg font-semibold text-foreground mb-3">
-          {isAdmin && !adminPreviewAsParent ? 'All sessions (scheduled & pending)' : 'Next Session'}
-        </h2>
-        {isAdmin && !adminPreviewAsParent && allUpcomingForAdmin.length > 0 ? (
-          <div className="space-y-4">
-            {allUpcomingForAdmin.map((s) => (
-              <BookingCard key={s.id} session={adminRowToBookingSession(s)} showAdminSmsTools />
+      {/* Upcoming Sessions */}
+      <section className="px-4 mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-semibold text-foreground">Upcoming Sessions</h2>
+          {(upcomingSessions ?? []).length > 0 && (
+            <Link href="/bookings" className="text-sm text-[#D4AF37] font-medium">
+              View all
+            </Link>
+          )}
+        </div>
+        {(upcomingSessions ?? []).length > 0 ? (
+          <div className="space-y-3">
+            {(upcomingSessions ?? []).slice(0, 3).map((session) => (
+              <SessionCard key={(session as SessionRow).id} session={session as SessionRow} />
             ))}
           </div>
-        ) : isAdmin && !adminPreviewAsParent && allUpcomingForAdmin.length === 0 ? (
-          <Card>
-            <CardContent className="py-8 text-center">
-              <p className="text-muted-foreground mb-4">No upcoming sessions.</p>
-              <Link href="/admin/sessions/create">
-                <Button className="min-h-[44px] touch-manipulation">Create session</Button>
-              </Link>
-            </CardContent>
-          </Card>
-        ) : nextSession ? (
-          <BookingCard session={toBookingSession(nextSession)} />
         ) : (
-          <Card>
+          <Card className="border-dashed border-zinc-800 bg-transparent">
             <CardContent className="py-8 text-center">
-              <p className="text-muted-foreground mb-4">No upcoming sessions.</p>
+              <Calendar className="h-10 w-10 mx-auto mb-3 text-zinc-600" />
+              <p className="text-zinc-400 mb-4">No upcoming sessions</p>
               <Link href="/training">
-                <Button className="min-h-[44px] touch-manipulation">Find training</Button>
+                <Button className="bg-[#D4AF37] hover:bg-[#B8963C] text-black font-medium">
+                  Find Training
+                </Button>
               </Link>
             </CardContent>
           </Card>
         )}
       </section>
 
-      {/* B. Find sessions — one primary path */}
-      <section className="mb-6">
-        <Link href="/training">
-          <Button className="w-full min-h-[52px] touch-manipulation text-base font-medium">
-            <Calendar className="h-5 w-5 shrink-0 mr-2" />
-            Find sessions
-          </Button>
-        </Link>
-      </section>
+      {pendingSessionRequestCount != null && pendingSessionRequestCount > 0 && (
+        <section className="px-4 mb-6">
+          <Link href="/session-requests">
+            <Card className="border-amber-500/30 bg-amber-500/5 hover:bg-amber-500/10 transition-colors">
+              <CardContent className="py-4 flex items-center justify-between gap-3">
+                <div>
+                  <p className="font-medium text-foreground">Session requests</p>
+                  <p className="text-sm text-zinc-400">
+                    {pendingSessionRequestCount} pending with{' '}
+                    {pendingSessionRequestCount === 1 ? 'a coach' : 'coaches'}
+                  </p>
+                </div>
+                <ChevronRight className="h-5 w-5 text-[#D4AF37] shrink-0" />
+              </CardContent>
+            </Card>
+          </Link>
+        </section>
+      )}
 
-      {/* C. Your Wrestlers (only RLS-scoped; Add Wrestler lives in Account) */}
-      <section>
-        <h2 className="text-lg font-semibold text-foreground mb-3">Your Wrestlers</h2>
+      {/* One reminder per coach: rate the coach (session link is for the form only) */}
+      {sessionsAwaitingReview.length > 0 && (
+        <section className="px-4 mb-6">
+          <div className="flex items-center justify-between mb-3">
+            <h2 className="text-lg font-semibold text-foreground">Rate your coaches</h2>
+            <span className="text-xs bg-[#D4AF37]/20 text-[#D4AF37] px-2 py-1 rounded-full font-medium">
+              {sessionsAwaitingReview.length} pending
+            </span>
+          </div>
+          <p className="text-sm text-zinc-500 mb-3">
+            You may see several reminders — one for each coach you&apos;ve completed a session with but haven&apos;t rated yet.
+            Each reminder goes away after you leave feedback for that coach.
+          </p>
+          <div className="space-y-3">
+            {sessionsAwaitingReview.map((session) => (
+              <SessionCard key={(session as SessionRow).id} session={session as SessionRow} showReviewButton />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Your Wrestlers */}
+      <section className="px-4 mb-6">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-lg font-semibold text-foreground">Your Wrestlers</h2>
+          <Link href="/wrestlers/add" className="text-sm text-[#D4AF37] font-medium flex items-center gap-1">
+            <Plus className="h-4 w-4" />
+            Add
+          </Link>
+        </div>
         {youthWrestlers.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {youthWrestlers.map((wrestler: YouthWrestler) => {
-              const sessionsCompleted = sessionCounts[wrestler.id] || 0;
-              return (
-                <Card key={wrestler.id}>
-                  <CardContent className="p-4 flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-4">
-                    <div className="flex items-center gap-4 min-w-0 flex-1">
-                      <ProfileImage
-                        src={wrestler.photo_url}
-                        alt={`${wrestler.first_name} ${wrestler.last_name}`}
-                        focusX={wrestler.photo_focus_x ?? 50}
-                        focusY={wrestler.photo_focus_y ?? 15}
-                        className="w-16 h-16 sm:w-20 sm:h-20 shrink-0"
-                        fallbackIconClassName="h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground"
-                      />
-                      <div className="flex-1 min-w-0">
-                        <CardTitle className="text-lg sm:text-xl">
-                          {wrestler.first_name} {wrestler.last_name}
-                        </CardTitle>
-                        <CardDescription className="mt-0.5 text-sm">
-                          {wrestler.age != null && <span>{wrestler.age}</span>}
-                          {wrestler.weight_class && <span> · {wrestler.weight_class} lbs</span>}
-                        </CardDescription>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          Next session: {nextSessionByWrestler[wrestler.id] ? formatEST(new Date(nextSessionByWrestler[wrestler.id]), 'MMM d, h:mm a') : '—'}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Last session: {lastSessionByWrestler[wrestler.id] ? formatEST(new Date(lastSessionByWrestler[wrestler.id]), 'MMM d, h:mm a') : '—'}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex gap-2 w-full sm:w-auto sm:ml-auto">
-                      <Link href="/training" className="flex-1 min-w-0">
-                        <Button className="w-full min-h-[44px] touch-manipulation">
-                          <Calendar className="h-4 w-4 mr-2 shrink-0" />
-                          Book training
-                        </Button>
-                      </Link>
-                      <Link href={`/wrestlers/${wrestler.id}/edit`} className="shrink-0">
-                        <Button variant="outline" size="icon" className="min-h-[44px] min-w-[44px] touch-manipulation">
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                      </Link>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+          <div className="space-y-3">
+            {youthWrestlers.map((wrestler) => (
+              <WrestlerCard key={wrestler.id} wrestler={wrestler} />
+            ))}
           </div>
         ) : (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-16">
-              <User className="h-16 w-16 text-muted-foreground mb-4" />
-              <h3 className="text-xl font-semibold mb-2">Add your first wrestler</h3>
-              <p className="text-muted-foreground mb-6 text-center max-w-md text-sm">
-                Create a profile to start booking training with coaches.
-              </p>
+          <Card className="border-dashed border-zinc-800 bg-transparent">
+            <CardContent className="py-8 text-center">
+              <User className="h-10 w-10 mx-auto mb-3 text-zinc-600" />
+              <p className="text-zinc-400 mb-1">No wrestlers yet</p>
+              <p className="text-zinc-500 text-sm mb-4">Add a wrestler to start booking training</p>
               <Link href="/wrestlers/add">
-                <Button className="min-h-[48px] touch-manipulation">Add wrestler</Button>
+                <Button className="bg-[#D4AF37] hover:bg-[#B8963C] text-black font-medium">
+                  Add Wrestler
+                </Button>
               </Link>
             </CardContent>
           </Card>
         )}
+      </section>
+
+      {/* Quick Action */}
+      <section className="px-4">
+        <Link href="/training">
+          <Button className="w-full h-14 bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-foreground font-medium text-base">
+            <Calendar className="h-5 w-5 mr-2" />
+            Browse All Sessions
+          </Button>
+        </Link>
       </section>
     </div>
   );

@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import Link from 'next/link';
+import { BackLink } from '@/components/back-link';
 
 export const metadata = {
   title: 'FAQs | The Guild',
@@ -16,9 +16,11 @@ export default function FAQsPage() {
         <CardContent className="space-y-4 text-muted-foreground">
           <p>FAQs coming soon.</p>
           <p>
-            <Link href="/" className="text-accent hover:underline">
-              ← Back to home
-            </Link>
+            <BackLink
+              fallbackHref="/"
+              label="Back to home"
+              className="text-accent hover:underline"
+            />
           </p>
         </CardContent>
       </Card>

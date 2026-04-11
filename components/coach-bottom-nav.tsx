@@ -2,41 +2,66 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Calendar, CalendarDays, MessageCircle, User } from 'lucide-react';
+import { Home, Calendar, CalendarPlus, Users, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-const ITEMS = [
-  { href: '/athlete-dashboard', label: 'Home', icon: Home },
+/**
+ * Coach mobile bottom nav — aligns with desktop header: Home, Schedule, Sessions, Roster, Profile.
+ * Earnings, session types, reviews, inbox live in the header overflow menu (see CoachHeaderMobile).
+ */
+const ITEMS: readonly { href: string; label: string; icon: typeof Home; homeTab?: boolean }[] = [
+  { href: '/athlete-dashboard', label: 'Home', icon: Home, homeTab: true },
   { href: '/availability', label: 'Schedule', icon: Calendar },
-  { href: '/coach-sessions', label: 'My sessions', icon: CalendarDays },
-  { href: '/inbox', label: 'Messages', icon: MessageCircle },
+  { href: '/coach-sessions', label: 'Sessions', icon: CalendarPlus },
+  { href: '/coach-roster', label: 'Roster', icon: Users },
   { href: '/profile', label: 'Profile', icon: User },
-] as const;
+];
 
 export function CoachBottomNav() {
   const pathname = usePathname();
 
   return (
     <nav
-      className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around border-t border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 pb-[env(safe-area-inset-bottom)] md:hidden"
+      className="fixed bottom-0 left-0 right-0 z-40 flex items-center justify-around border-t border-border/50 bg-black/95 backdrop-blur-xl supports-[backdrop-filter]:bg-black/90 pb-[env(safe-area-inset-bottom)] md:hidden"
       aria-label="Coach navigation"
     >
-      {ITEMS.map(({ href, label, icon: Icon }) => {
-        const isActive =
-          pathname === href ||
-          (href !== '/athlete-dashboard' && pathname.startsWith(href));
+      {ITEMS.map(({ href, label, icon: Icon, homeTab }) => {
+        const isActive = homeTab
+          ? pathname === '/' || pathname === '/athlete-dashboard' || pathname.startsWith('/athlete-dashboard/')
+          : pathname === href || (href !== '/' && pathname.startsWith(href + '/'));
         return (
           <Link
             key={href}
             href={href}
             className={cn(
-              'flex flex-col items-center justify-center min-h-[44px] min-w-0 flex-1 py-2 px-2 touch-manipulation text-[11px] font-medium transition-colors whitespace-nowrap overflow-visible',
-              isActive ? 'text-accent' : 'text-muted-foreground'
+              'relative flex flex-col items-center justify-center min-h-[56px] min-w-0 flex-1 py-2 px-3 touch-manipulation text-[11px] font-medium transition-all duration-200 whitespace-nowrap',
+              isActive 
+                ? 'text-[#D4AF37]' 
+                : 'text-zinc-500 active:text-zinc-400'
             )}
             aria-current={isActive ? 'page' : undefined}
           >
-            <Icon className="h-5 w-5 shrink-0 mb-0.5" aria-hidden />
-            <span className="overflow-visible whitespace-nowrap">{label}</span>
+            <div className="relative">
+              <Icon 
+                className={cn(
+                  "h-6 w-6 shrink-0 transition-transform duration-200",
+                  isActive && "scale-110"
+                )} 
+                strokeWidth={isActive ? 2.5 : 2}
+                aria-hidden 
+              />
+            </div>
+            <span
+              className={cn(
+                'mt-1 transition-all duration-200 max-w-[4.5rem] truncate leading-tight',
+                isActive ? 'opacity-100' : 'opacity-70'
+              )}
+            >
+              {label}
+            </span>
+            {isActive && (
+              <span className="absolute top-0 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-[#D4AF37] rounded-full" />
+            )}
           </Link>
         );
       })}

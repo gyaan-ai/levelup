@@ -1,6 +1,7 @@
 import { redirect, notFound } from 'next/navigation';
 import { headers } from 'next/headers';
 import Link from 'next/link';
+import { BackLink } from '@/components/back-link';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
@@ -25,10 +26,13 @@ import { Calendar, User, MapPin, Users } from 'lucide-react';
 
 export default async function SessionDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ invite?: string }>;
 }) {
   const { id: sessionId } = await params;
+  const { invite: inviteToken } = await searchParams;
   const headersList = await headers();
   const host = headersList.get('host') || '';
   const tenant = getTenantByDomain(host);
@@ -39,7 +43,11 @@ export default async function SessionDetailPage({
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect('/login?redirect=' + encodeURIComponent(`/sessions/${sessionId}`));
+    // Preserve invite token through auth flow
+    const returnUrl = inviteToken 
+      ? `/sessions/${sessionId}?invite=${inviteToken}`
+      : `/sessions/${sessionId}`;
+    redirect('/login?redirect=' + encodeURIComponent(returnUrl));
   }
 
   const { data: userData } = await supabase
@@ -68,6 +76,8 @@ export default async function SessionDetailPage({
     max_participants,
     partner_invite_code,
     join_policy,
+    invite_token,
+    duration_minutes,
     athletes(id, first_name, last_name, school, photo_url, average_rating, review_count),
     facilities(id, name, address),
     session_participants(youth_wrestler_id, amount_paid, youth_wrestlers(id, first_name, last_name))
@@ -122,6 +132,8 @@ export default async function SessionDetailPage({
     current_participants?: number;
     max_participants?: number;
     join_policy?: string | null;
+    invite_token?: string | null;
+    duration_minutes?: number | null;
     athletes?: { id: string; first_name?: string; last_name?: string; school?: string; photo_url?: string | null; average_rating?: number | null; review_count?: number | null; phone?: string | null } | { id: string; first_name?: string; last_name?: string; school?: string; photo_url?: string | null; average_rating?: number | null; review_count?: number | null; phone?: string | null }[];
     facilities?: { id: string; name?: string; address?: string | null } | { id: string; name?: string; address?: string | null }[];
     session_participants?: Array<{
@@ -177,11 +189,48 @@ export default async function SessionDetailPage({
   );
   const openings = Math.max(0, max - current);
   const joinPolicy = s.join_policy ?? 'private';
+  
+  // For invite-only sessions, check if user has access via:
+  // 1. Valid invite token in URL
+  // 2. Existing session_invite_access record
+  let hasInviteAccess = false;
+  if (joinPolicy === 'invite_only' && !isOwner && !isParticipant) {
+    // Check if URL invite token matches session's invite_token
+    if (inviteToken && s.invite_token && inviteToken === s.invite_token) {
+      hasInviteAccess = true;
+      // Store access record for future visits (fire and forget)
+      try {
+        const admin = createAdminClient(tenant.slug);
+        await admin.from('session_invite_access').upsert({
+          user_id: user.id,
+          session_id: sessionId,
+          accessed_at: new Date().toISOString(),
+        }, { onConflict: 'user_id,session_id' });
+      } catch {
+        // Ignore errors - table may not exist yet
+      }
+    } else {
+      // Check for existing access record
+      try {
+        const admin = createAdminClient(tenant.slug);
+        const { data: accessRecord } = await admin
+          .from('session_invite_access')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('session_id', sessionId)
+          .maybeSingle();
+        hasInviteAccess = !!accessRecord;
+      } catch {
+        // Table may not exist - no access
+      }
+    }
+  }
+  
   const canRegister =
     !isPast &&
     (s.status === 'scheduled' || s.status === 'pending_payment') &&
     openings > 0 &&
-    (isOwner || (!isParticipant && (joinPolicy === 'public' || joinPolicy === 'invite_only')));
+    (isOwner || (!isParticipant && (joinPolicy === 'public' || (joinPolicy === 'invite_only' && hasInviteAccess))));
 
   const coach = Array.isArray(s.athletes) ? s.athletes[0] : s.athletes;
   const coachIdForStats =
@@ -229,15 +278,17 @@ export default async function SessionDetailPage({
     if (amt != null && Number(amt) > 0) amountPaid += Number(amt);
   }
 
-  const pastSessionIds = isPast && s.status === 'completed' ? [sessionId] : [];
-  const { data: myReviews } = pastSessionIds.length > 0
-    ? await supabase
-        .from('reviews')
-        .select('session_id')
-        .eq('parent_id', user.id)
-        .in('session_id', pastSessionIds)
-    : { data: [] };
-  const hasReviewed = (myReviews ?? []).length > 0;
+  const coachIdForReview = s.athlete_id && String(s.athlete_id).trim();
+  const { data: coachReviewRows } =
+    isPast && s.status === 'completed' && coachIdForReview
+      ? await supabase
+          .from('reviews')
+          .select('id')
+          .eq('parent_id', user.id)
+          .eq('athlete_id', coachIdForReview)
+          .limit(1)
+      : { data: [] };
+  const hasReviewed = (coachReviewRows ?? []).length > 0;
 
   const statusBadge = (status: string) => {
     if (status === 'scheduled') return <Badge>Scheduled</Badge>;
@@ -250,12 +301,9 @@ export default async function SessionDetailPage({
 
   return (
     <div className="container mx-auto px-4 py-6 max-w-lg">
-      <Link
-        href="/bookings"
-        className="text-sm text-muted-foreground hover:text-foreground mb-4 inline-block"
-      >
-        ← Back to My bookings
-      </Link>
+      <div className="mb-4">
+        <BackLink fallbackHref="/bookings" label="Back to My bookings" />
+      </div>
 
       <Card>
         <CardHeader className="pb-2">

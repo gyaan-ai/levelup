@@ -17,8 +17,8 @@ export function HomeHeroLogo({
 
   if (failed) {
     return (
-      <div className="flex items-center justify-center w-full max-w-[280px] lg:max-w-[360px] aspect-square rounded-full border-2 border-accent/40 bg-accent/5">
-        <span className="font-serif font-bold text-accent text-6xl lg:text-7xl">G</span>
+      <div className="flex items-center justify-center w-full max-w-[320px] sm:max-w-[400px] lg:max-w-[480px] aspect-square rounded-full border-2 border-accent/40 bg-accent/5">
+        <span className="font-serif font-bold text-accent text-7xl lg:text-8xl">G</span>
       </div>
     );
   }
@@ -27,9 +27,9 @@ export function HomeHeroLogo({
     <Image
       src={src}
       alt={alt}
-      width={360}
-      height={360}
-      className="object-contain w-full max-w-[280px] lg:max-w-[360px] h-auto"
+      width={480}
+      height={480}
+      className="object-contain w-full max-w-[320px] sm:max-w-[400px] lg:max-w-[480px] h-auto"
       priority
       onError={() => setFailed(true)}
     />

@@ -1,13 +1,11 @@
 import { redirect, notFound } from 'next/navigation';
 import { headers } from 'next/headers';
-import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import { formatEST } from '@/lib/format-date';
 import { EditSessionForm } from './edit-session-form';
-import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
+import { BackLink } from '@/components/back-link';
 
 export default async function AdminEditSessionPage({
   params,
@@ -64,14 +62,22 @@ export default async function AdminEditSessionPage({
     ? partRows.reduce((sum, p) => sum + Number(p.amount_paid ?? 0), 0)
     : 0;
 
+  // Map DB session_type to UI values
+  const dbSessionType = (session as { session_type?: string }).session_type;
+  const uiSessionType = dbSessionType === 'group' ? 'small_group' 
+    : dbSessionType === '2-athlete' ? 'partner'
+    : dbSessionType === '1-on-1' ? 'private'
+    : dbSessionType || 'small_group';
+
   return (
     <div className="container mx-auto px-4 py-8 max-w-lg">
-      <Link href="/admin">
-        <Button variant="ghost" size="sm" className="mb-4 -ml-2">
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to Admin
-        </Button>
-      </Link>
+      <div className="mb-4 -ml-2">
+        <BackLink
+          fallbackHref="/admin"
+          label="Back to Admin"
+          className="inline-flex h-9 items-center justify-center rounded-md px-3 text-sm font-medium hover:bg-accent hover:text-accent-foreground"
+        />
+      </div>
       <h1 className="text-2xl font-bold mb-1">Edit session</h1>
       <p className="text-muted-foreground text-sm mb-6">
         {coach ? `${(coach as { first_name?: string }).first_name ?? ''} ${(coach as { last_name?: string }).last_name ?? ''}`.trim() : '—'}
@@ -80,7 +86,7 @@ export default async function AdminEditSessionPage({
       <EditSessionForm
         sessionId={sessionId}
         sessionStatus={(session as { status?: string }).status}
-        sessionType={(session as { session_type?: string }).session_type}
+        sessionType={uiSessionType}
         focusArea={(session as { focus_area?: string | null }).focus_area ?? ''}
         focusArea2={(session as { focus_area_2?: string | null }).focus_area_2 ?? ''}
         joinPolicy={((session as { join_policy?: string }).join_policy as 'public' | 'private' | 'invite_only') ?? 'private'}

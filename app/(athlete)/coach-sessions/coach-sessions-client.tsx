@@ -2,10 +2,11 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { MessageCircle, FolderOpen, Check, X, DollarSign, Users, Smartphone } from 'lucide-react';
+import { Check, X, DollarSign, Smartphone, Trash2, Loader2, Share2, ExternalLink, CalendarPlus } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
 import { CoachTextGroupDialog } from '@/components/coach-text-group-dialog';
 import { CopySessionPhonesButton } from '@/components/copy-session-phones-button';
 import { formatEST } from '@/lib/format-date';
@@ -14,6 +15,7 @@ import { showSessionSmsCopyAndTextGroup } from '@/lib/session-sms-tools';
 import { AddToCalendarButton } from '@/components/add-to-calendar-button';
 import { SessionTypeBadge } from '@/components/session-type-badge';
 import { CapacityBadge } from '@/components/capacity-badge';
+import { SessionContactsPanel } from '@/components/session-contacts-panel';
 import type { CoachSession } from '@/app/(athlete)/athlete-dashboard/coach-schedule-card';
 
 function facilityName(s: CoachSession): string {
@@ -35,7 +37,7 @@ function wrestlerNames(s: CoachSession): string[] {
     .filter((n): n is string => Boolean(n));
 }
 
-type Tab = 'upcoming' | 'requests' | 'completed';
+type Tab = 'mine' | 'requests' | 'completed' | 'all';
 
 type RequestItem = {
   id: string;
@@ -48,11 +50,70 @@ type RequestItem = {
   session?: { id: string; scheduled_datetime: string; session_type?: string; session_mode?: string; facilities?: { name?: string } | null };
 };
 
+export type SlotRequestItem = {
+  id: string;
+  requesting_parent_id: string;
+  youth_wrestler_id: string;
+  coach_id: string;
+  facility_id: string | null;
+  preferred_datetime: string | null;
+  session_type: string | null;
+  message: string | null;
+  flexibility_note: string | null;
+  status: string;
+  created_at: string;
+  youth_wrestlers?: { id: string; first_name?: string; last_name?: string; age?: number; weight_class?: string; skill_level?: string } | null;
+  facilities?: { id?: string; name?: string } | { id?: string; name?: string }[] | null;
+};
+
+export type CommunitySession = {
+  id: string;
+  scheduled_datetime: string;
+  session_type?: string | null;
+  session_mode?: string | null;
+  current_participants?: number | null;
+  max_participants?: number | null;
+  price_per_participant?: number | null;
+  athletes?:
+    | { id: string; first_name?: string; last_name?: string; school?: string; photo_url?: string | null }
+    | Array<{ id: string; first_name?: string; last_name?: string; school?: string; photo_url?: string | null }>
+    | null;
+  facilities?:
+    | { id?: string; name?: string }
+    | Array<{ id?: string; name?: string }>
+    | null;
+};
+
+function communityFacilityName(s: CommunitySession): string {
+  const f = s.facilities;
+  if (!f || typeof f !== 'object') return '—';
+  const arr = Array.isArray(f) ? f : [f];
+  return (arr[0] as { name?: string })?.name ?? '—';
+}
+
+function communityCoachName(s: CommunitySession): string {
+  const a = s.athletes;
+  const o = a ? (Array.isArray(a) ? a[0] : a) : null;
+  return o ? [o.first_name, o.last_name].filter(Boolean).join(' ').trim() || 'Coach' : 'Coach';
+}
+
+function communityCoachSchool(s: CommunitySession): string | null {
+  const a = s.athletes;
+  const o = a ? (Array.isArray(a) ? a[0] : a) : null;
+  const sch = o?.school;
+  return sch && String(sch).trim() ? String(sch).trim() : null;
+}
+
 type Props = {
   initialTab: Tab;
   upcomingSessions: CoachSession[];
   completedSessions: CoachSession[];
   pendingRequests: RequestItem[];
+  /** Other coaches’ public / invite-only upcoming sessions */
+  communitySessions: CommunitySession[];
+  /** Parents asking for a time / format before a session exists */
+  pendingSlotRequests: SlotRequestItem[];
+  payoutRate?: number;
 };
 
 export function CoachSessionsClient({
@@ -60,12 +121,88 @@ export function CoachSessionsClient({
   upcomingSessions,
   completedSessions,
   pendingRequests,
+  pendingSlotRequests,
+  communitySessions,
+  payoutRate = 0.8333,
 }: Props) {
   const router = useRouter();
+  const pathname = usePathname();
   const [tab, setTab] = useState<Tab>(initialTab);
+
+  const goTab = (id: Tab) => {
+    setTab(id);
+    if (id === 'mine') {
+      router.replace(pathname, { scroll: false });
+      return;
+    }
+    const params = new URLSearchParams();
+    if (id === 'requests') params.set('tab', 'requests');
+    else if (id === 'completed') params.set('tab', 'past');
+    else if (id === 'all') params.set('tab', 'all');
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  };
   const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [requests, setRequests] = useState<RequestItem[]>(pendingRequests);
+  const [slotRequests, setSlotRequests] = useState<SlotRequestItem[]>(pendingSlotRequests);
+  const [slotNoteById, setSlotNoteById] = useState<Record<string, string>>({});
   const [textGroupSession, setTextGroupSession] = useState<CoachSession | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const handleCopyLink = async (sessionId: string) => {
+    const url = `${window.location.origin}/sessions/${sessionId}`;
+    await navigator.clipboard.writeText(url);
+    setCopiedId(sessionId);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handleCancelSession = async (sessionId: string) => {
+    const confirmed = window.confirm(
+      'Are you sure you want to cancel this session? All registered participants will receive a credit for their payment.'
+    );
+    if (!confirmed) return;
+
+    setCancellingId(sessionId);
+    try {
+      const res = await fetch(`/api/sessions/${sessionId}/cancel`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason: 'Cancelled by coach' }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to cancel session');
+      alert(data.message || 'Session cancelled');
+      router.refresh();
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : 'Failed to cancel session');
+    } finally {
+      setCancellingId(null);
+    }
+  };
+
+  const requestCount = requests.length + slotRequests.length;
+
+  const handleSlotRespond = async (requestId: string, action: 'approve' | 'decline') => {
+    setLoadingId(requestId);
+    try {
+      const res = await fetch(`/api/parent-session-requests/${requestId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: action === 'approve' ? 'approve' : 'decline',
+          coachResponse: slotNoteById[requestId]?.trim() || null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed');
+      setSlotRequests((prev) => prev.filter((r) => r.id !== requestId));
+      router.refresh();
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : 'Failed');
+    } finally {
+      setLoadingId(null);
+    }
+  };
 
   const handleApproveDecline = async (requestId: string, sessionId: string, action: 'approve' | 'decline') => {
     setLoadingId(requestId);
@@ -87,9 +224,10 @@ export function CoachSessionsClient({
   };
 
   const tabs: { id: Tab; label: string }[] = [
-    { id: 'upcoming', label: 'Open' },
+    { id: 'mine', label: 'Mine' },
     { id: 'requests', label: `Requests${requests.length > 0 ? ` (${requests.length})` : ''}` },
     { id: 'completed', label: 'Past' },
+    { id: 'all', label: 'All' },
   ];
 
   return (
@@ -110,7 +248,7 @@ export function CoachSessionsClient({
           <button
             key={t.id}
             type="button"
-            onClick={() => setTab(t.id)}
+            onClick={() => goTab(t.id)}
             className={`min-h-[44px] px-4 py-2 text-sm font-medium border-b-2 shrink-0 touch-manipulation ${
               tab === t.id
                 ? 'border-accent text-accent'
@@ -122,7 +260,7 @@ export function CoachSessionsClient({
         ))}
       </div>
 
-      {tab === 'upcoming' && (
+      {tab === 'mine' && (
         <div className="space-y-3">
           {upcomingSessions.length === 0 ? (
             <Card>
@@ -159,10 +297,28 @@ export function CoachSessionsClient({
                       </p>
                       <p className="text-sm font-medium text-accent mt-1 inline-flex items-center gap-1">
                         <DollarSign className="h-4 w-4" />
-                        You make ${coachPayoutUsd(session).toFixed(2)}
+                        You make ${coachPayoutUsd(session, payoutRate).toFixed(2)}
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="min-h-[44px] touch-manipulation"
+                        onClick={() => handleCopyLink(session.id)}
+                      >
+                        {copiedId === session.id ? (
+                          <>
+                            <Check className="h-4 w-4 mr-1 text-emerald-500" />
+                            Copied
+                          </>
+                        ) : (
+                          <>
+                            <Share2 className="h-4 w-4 mr-1" />
+                            Share
+                          </>
+                        )}
+                      </Button>
                       <AddToCalendarButton
                         sessionId={session.id}
                         title={`Session ${wrestlerNames(session).join(', ') || 'with athlete'}`}
@@ -171,12 +327,6 @@ export function CoachSessionsClient({
                         size="sm"
                         className="min-h-[44px] touch-manipulation"
                       />
-                      <Link href={`/messages/${session.id}`}>
-                        <Button variant="outline" size="sm" className="min-h-[44px] touch-manipulation">
-                          <MessageCircle className="h-4 w-4 mr-1" />
-                          Message
-                        </Button>
-                      </Link>
                       {showSessionSmsCopyAndTextGroup(session) && (
                         <>
                           <Button
@@ -195,14 +345,30 @@ export function CoachSessionsClient({
                           />
                         </>
                       )}
-                      <Link href={`/workspaces/from-session/${session.id}`}>
-                        <Button variant="ghost" size="sm" className="min-h-[44px] touch-manipulation">
-                          <FolderOpen className="h-4 w-4 mr-1" />
-                          Workspace
-                        </Button>
-                      </Link>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="min-h-[44px] touch-manipulation text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => handleCancelSession(session.id)}
+                        disabled={cancellingId === session.id}
+                      >
+                        {cancellingId === session.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <>
+                            <Trash2 className="h-4 w-4 mr-1" />
+                            Cancel
+                          </>
+                        )}
+                      </Button>
                     </div>
                   </div>
+                  
+                  {/* Expandable contact info */}
+                  <SessionContactsPanel
+                    sessionId={session.id}
+                    participantCount={session.current_participants ?? 0}
+                  />
                 </CardContent>
               </Card>
             ))
@@ -211,15 +377,21 @@ export function CoachSessionsClient({
       )}
 
       {tab === 'requests' && (
-        <div className="space-y-3">
-          {requests.length === 0 ? (
-            <Card>
-              <CardContent className="py-8 text-center text-muted-foreground text-sm">
-                No pending join requests.
-              </CardContent>
-            </Card>
-          ) : (
-            requests.map((r) => {
+        <div className="space-y-8">
+          <div className="space-y-2">
+            <h2 className="text-sm font-semibold text-foreground">Join requests</h2>
+            <p className="text-xs text-muted-foreground">
+              Parents asking to join an existing session you already scheduled (partner / small group).
+            </p>
+            {requests.length === 0 ? (
+              <Card>
+                <CardContent className="py-6 text-center text-muted-foreground text-sm">
+                  No pending join requests.
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-3">
+            {requests.map((r) => {
               const yw = r.youth_wrestlers;
               const name = yw ? [yw.first_name, yw.last_name].filter(Boolean).join(' ') : 'A wrestler';
               const sess = r.session;
@@ -262,8 +434,99 @@ export function CoachSessionsClient({
                   </CardContent>
                 </Card>
               );
-            })
-          )}
+            })}
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <h2 className="text-sm font-semibold text-foreground">Session requests</h2>
+            <p className="text-xs text-muted-foreground">
+              Parents asking you to offer a time or format. Approve to let them know you can work with it, or decline with a short note.
+            </p>
+            {slotRequests.length === 0 ? (
+              <Card>
+                <CardContent className="py-6 text-center text-muted-foreground text-sm">
+                  No pending session requests.
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-3">
+                {slotRequests.map((r) => {
+                  const ywRaw = r.youth_wrestlers;
+                  const yw = Array.isArray(ywRaw) ? ywRaw[0] : ywRaw;
+                  const name = yw ? [yw.first_name, yw.last_name].filter(Boolean).join(' ') : 'A wrestler';
+                  const fac = r.facilities;
+                  const facName = fac
+                    ? (Array.isArray(fac) ? (fac[0] as { name?: string })?.name : (fac as { name?: string })?.name) ?? '—'
+                    : '—';
+                  const when = r.preferred_datetime
+                    ? formatEST(new Date(r.preferred_datetime), 'EEE, MMM d · h:mm a')
+                    : '— (see message)';
+                  const typeLabel = r.session_type ? r.session_type.replace('_', ' ') : '—';
+                  return (
+                    <Card key={r.id}>
+                      <CardContent className="p-4 space-y-3">
+                        <div>
+                          <p className="font-medium">{name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {when} · {facName !== '—' ? facName : 'Facility not specified'}
+                          </p>
+                          <p className="text-sm text-muted-foreground">Type: {typeLabel}</p>
+                          {r.message && <p className="text-sm text-muted-foreground mt-1">&ldquo;{r.message}&rdquo;</p>}
+                          {r.flexibility_note && (
+                            <p className="text-sm text-muted-foreground mt-1">Flexible: {r.flexibility_note}</p>
+                          )}
+                        </div>
+                        <div className="space-y-2">
+                          <label htmlFor={`slot-note-${r.id}`} className="text-xs text-muted-foreground">
+                            Optional note to parent (included in their notification)
+                          </label>
+                          <Textarea
+                            id={`slot-note-${r.id}`}
+                            rows={2}
+                            className="resize-y min-h-[72px] text-sm"
+                            placeholder="e.g. I can do Tuesday 4pm — book from my profile, or I will add a slot."
+                            value={slotNoteById[r.id] ?? ''}
+                            onChange={(e) =>
+                              setSlotNoteById((prev) => ({ ...prev, [r.id]: e.target.value }))
+                            }
+                          />
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            size="sm"
+                            className="min-h-[44px] touch-manipulation"
+                            onClick={() => handleSlotRespond(r.id, 'approve')}
+                            disabled={loadingId === r.id}
+                          >
+                            <Check className="h-4 w-4 mr-1" />
+                            Approve
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="min-h-[44px] touch-manipulation text-destructive border-destructive hover:bg-destructive hover:text-destructive-foreground"
+                            onClick={() => handleSlotRespond(r.id, 'decline')}
+                            disabled={loadingId === r.id}
+                          >
+                            <X className="h-4 w-4 mr-1" />
+                            Decline
+                          </Button>
+                          <Button variant="ghost" size="sm" className="min-h-[44px] touch-manipulation" asChild>
+                            <Link href="/coach-sessions/create">
+                              <CalendarPlus className="h-4 w-4 mr-1" />
+                              New session
+                            </Link>
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -289,20 +552,61 @@ export function CoachSessionsClient({
                         {wrestlerNames(session).length > 0 && ` · ${wrestlerNames(session).join(', ')}`}
                       </p>
                     </div>
-                    <div className="flex flex-wrap gap-2">
-                      <Link href={`/messages/${session.id}`}>
-                        <Button variant="outline" size="sm" className="min-h-[44px] touch-manipulation">
-                          <MessageCircle className="h-4 w-4 mr-1" />
-                          Message
-                        </Button>
-                      </Link>
-                      <Link href={`/workspaces/from-session/${session.id}`}>
-                        <Button variant="ghost" size="sm" className="min-h-[44px] touch-manipulation">
-                          <FolderOpen className="h-4 w-4 mr-1" />
-                          Workspace
-                        </Button>
-                      </Link>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
+        </div>
+      )}
+
+      {tab === 'all' && (
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground">
+            Open sessions other coaches are hosting (public or invite link). Yours are under <span className="font-medium text-foreground">Mine</span>.
+          </p>
+          {communitySessions.length === 0 ? (
+            <Card>
+              <CardContent className="py-8 text-center text-muted-foreground text-sm">
+                No other open sessions listed right now.
+              </CardContent>
+            </Card>
+          ) : (
+            communitySessions.map((session) => (
+              <Card key={session.id} className="border-border/80">
+                <CardContent className="p-4">
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                    <div className="min-w-0 space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <SessionTypeBadge sessionType={session.session_type} sessionMode={session.session_mode} />
+                      </div>
+                      <p className="font-medium text-foreground">
+                        {communityCoachName(session)}
+                        {communityCoachSchool(session) ? (
+                          <span className="text-muted-foreground font-normal"> · {communityCoachSchool(session)}</span>
+                        ) : null}
+                      </p>
+                      <p className="text-sm">
+                        {formatEST(new Date(session.scheduled_datetime), 'EEE, MMM d')} · {formatEST(new Date(session.scheduled_datetime), 'h:mm a')}
+                      </p>
+                      <p className="text-sm text-muted-foreground">{communityFacilityName(session)}</p>
+                      <p className="text-sm text-muted-foreground">
+                        <CapacityBadge
+                          current={session.current_participants ?? 0}
+                          max={session.max_participants ?? 1}
+                          label="spots"
+                        />
+                        {session.price_per_participant != null && Number(session.price_per_participant) > 0 && (
+                          <span className="ml-2">${Number(session.price_per_participant).toFixed(0)}/person</span>
+                        )}
+                      </p>
                     </div>
+                    <Button variant="outline" size="sm" className="min-h-[44px] shrink-0 touch-manipulation" asChild>
+                      <Link href={`/sessions/${session.id}`} prefetch={false}>
+                        <ExternalLink className="h-4 w-4 mr-1" />
+                        View
+                      </Link>
+                    </Button>
                   </div>
                 </CardContent>
               </Card>

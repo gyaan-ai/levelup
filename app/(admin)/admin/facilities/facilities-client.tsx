@@ -14,7 +14,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import Link from 'next/link';
-import { MapPin, Plus, ArrowLeft, Pencil, Trash2 } from 'lucide-react';
+import { MapPin, Plus, Pencil, Trash2 } from 'lucide-react';
+import { BackLink } from '@/components/back-link';
 
 export type Facility = {
   id: string;
@@ -146,10 +147,7 @@ export function FacilitiesClient({ initialFacilities }: Props) {
   return (
     <div className="space-y-8">
       <div className="flex items-center gap-4">
-        <Link href="/admin" className="text-muted-foreground hover:text-foreground">
-          <ArrowLeft className="h-5 w-5" />
-        </Link>
-        <span className="text-muted-foreground">Back to dashboard</span>
+        <BackLink fallbackHref="/admin" label="Back to dashboard" />
       </div>
 
       <Card>

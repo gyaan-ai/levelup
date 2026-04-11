@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Star, Loader2, CheckCircle } from 'lucide-react';
+import { BackLink } from '@/components/back-link';
 
 const TAG_OPTIONS = ['Technique', 'Great with kids', 'Punctual', 'Communication', 'My kid loved it'];
 
@@ -93,9 +94,11 @@ export function SessionReviewForm({
                   </Link>
                 </Button>
               ) : null}
-              <Button asChild variant="outline" size="lg">
-                <Link href="/bookings">Back to My bookings</Link>
-              </Button>
+              <BackLink
+                fallbackHref="/bookings"
+                label="Back to My bookings"
+                className="inline-flex h-11 items-center justify-center rounded-md border border-input bg-background px-8 text-sm font-medium ring-offset-background hover:bg-accent hover:text-accent-foreground"
+              />
             </div>
           </div>
         </CardContent>

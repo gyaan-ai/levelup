@@ -8,7 +8,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft, Target, Video, FileText, Plus, Loader2, Upload, MessageCircle, Trash2, X, Check } from 'lucide-react';
+import { Target, Video, FileText, Plus, Loader2, Upload, MessageCircle, Trash2, X, Check } from 'lucide-react';
+import { BackLink } from '@/components/back-link';
 import { SchoolLogo } from '@/components/school-logo';
 import { SessionsSection } from '@/components/workspace/sessions-section';
 import { ActionItemsSection } from '@/components/workspace/action-items-section';
@@ -239,10 +240,9 @@ export function WorkspaceClient({ workspaceId, isCoach = false }: { workspaceId:
 
   return (
     <div className="container mx-auto px-4 py-8">
-      <Link href="/inbox" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-6">
-        <ArrowLeft className="h-4 w-4 mr-2" />
-        Back to Community
-      </Link>
+      <div className="mb-6">
+        <BackLink fallbackHref="/inbox" label="Back to Community" />
+      </div>
 
       <div className="mb-8">
         <h1 className="text-3xl font-serif font-bold text-foreground">{wrestlerName}</h1>

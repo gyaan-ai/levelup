@@ -8,7 +8,9 @@ export interface User {
   created_at: string;
 }
 
-// Athlete types
+// Athlete (Coach) types
+export type CoachStatus = 'pending' | 'active' | 'rejected' | 'suspended';
+
 export interface Athlete {
   id: string;
   first_name: string;
@@ -36,6 +38,24 @@ export interface Athlete {
   certifications_verified: boolean;
   active: boolean;
   created_at: string;
+  // New onboarding fields
+  status?: CoachStatus;
+  date_of_birth?: string;
+  coach_type?: 'ncaa_athlete' | 'club_hs_coach';
+  payout_method?: 'venmo' | 'zelle';
+  venmo_handle?: string;
+  zelle_email?: string;
+  safesport_certified?: boolean;
+  safesport_expiry?: string;
+  background_check?: boolean;
+  background_check_date?: string;
+  emergency_contact_name?: string;
+  emergency_contact_phone?: string;
+  emergency_contact_relationship?: string;
+  tshirt_size?: string;
+  agreement_signed_at?: string;
+  admin_notes?: string;
+  rejected_reason?: string;
 }
 
 // Session types

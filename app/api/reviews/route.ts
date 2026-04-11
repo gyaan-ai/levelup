@@ -71,7 +71,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-/** POST /api/reviews — create or update a review. One review per session per parent; only the parent (or a parent whose kid participated) can leave it. */
+/** POST /api/reviews — create or update a review for this session. One review per coach per parent (session is the anchor row). */
 export async function POST(req: NextRequest) {
   try {
     const headersList = await headers();
@@ -155,6 +155,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Session has no coach' }, { status: 400 });
     }
 
+    const { data: existingForCoachRows } = await admin
+      .from('reviews')
+      .select('id, session_id')
+      .eq('parent_id', user.id)
+      .eq('athlete_id', coachId)
+      .limit(1);
+    const existingForCoach = existingForCoachRows?.[0];
+    if (existingForCoach && existingForCoach.session_id !== sessionId) {
+      return NextResponse.json(
+        { error: 'You already left feedback for this coach' },
+        { status: 400 }
+      );
+    }
+
     const { data: priorReview } = await admin
       .from('reviews')
       .select('id')
@@ -172,8 +186,9 @@ export async function POST(req: NextRequest) {
       tags: tags.length > 0 ? tags : null,
     };
 
-    // One review per session per family (upsert on session_id + parent_id)
-    const { data: review, error: upsertError } = await supabase
+    // Use service role for write: RLS INSERT only allows organizer or session_participants.parent_id,
+    // but participation includes linked parents (youth_wrestler_parents) validated above — same pattern as eligibility checks.
+    const { data: review, error: upsertError } = await admin
       .from('reviews')
       .upsert(row, {
         onConflict: 'session_id,parent_id',

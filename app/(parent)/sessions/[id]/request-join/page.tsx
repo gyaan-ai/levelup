@@ -3,6 +3,7 @@ import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
 import Link from 'next/link';
+import { BackLink } from '@/components/back-link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { RequestJoinClient } from './request-join-client';
 import { User, Calendar, MapPin, Users } from 'lucide-react';
@@ -84,9 +85,9 @@ export default async function SessionRequestJoinPage({
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-lg">
-      <Link href="/small-group-sessions" className="text-sm text-muted-foreground hover:text-foreground mb-4 inline-block">
-        ← Back to Small group sessions
-      </Link>
+      <div className="mb-4">
+        <BackLink fallbackHref="/small-group-sessions" label="Back to Small group sessions" />
+      </div>
       <Card className="mb-6">
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">

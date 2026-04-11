@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useMemo, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -32,6 +32,8 @@ interface JoinSessionClientProps {
   priceAfterDiscount?: number;
   percentOff?: number;
   youthWrestlers: YouthWrestlerOption[];
+  /** When false (default in prod), discount only after Apply + valid promo; Stripe uses promo on this checkout only. */
+  checkoutUsesSavedAccountDiscount?: boolean;
 }
 
 export function JoinSessionClient({
@@ -42,18 +44,35 @@ export function JoinSessionClient({
   priceAfterDiscount,
   percentOff,
   youthWrestlers,
+  checkoutUsesSavedAccountDiscount = false,
 }: JoinSessionClientProps) {
   const router = useRouter();
   const [selectedWrestlerId, setSelectedWrestlerId] = useState<string>('');
   const [promoCode, setPromoCode] = useState('');
   const [codeApplied, setCodeApplied] = useState(false);
+  const [localPromoPercent, setLocalPromoPercent] = useState<number | null>(null);
   const [applyingCode, setApplyingCode] = useState(false);
   const [joining, setJoining] = useState(false);
   const [registered, setRegistered] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const payLock = useRef(false);
 
-  const displayPrice = priceAfterDiscount ?? pricePerParticipant;
+  const displayPrice = useMemo(() => {
+    if (checkoutUsesSavedAccountDiscount) {
+      return priceAfterDiscount ?? pricePerParticipant;
+    }
+    if (codeApplied && localPromoPercent != null && localPromoPercent >= 1) {
+      return pricePerParticipant * (1 - localPromoPercent / 100);
+    }
+    return pricePerParticipant;
+  }, [
+    checkoutUsesSavedAccountDiscount,
+    priceAfterDiscount,
+    pricePerParticipant,
+    codeApplied,
+    localPromoPercent,
+  ]);
+
   const selectedWrestler = youthWrestlers.find((w) => w.id === selectedWrestlerId);
   const selectedHasCell = selectedWrestler?.hasValidCell !== false;
 
@@ -63,17 +82,32 @@ export function JoinSessionClient({
     setError(null);
     setApplyingCode(true);
     try {
-      const redeemRes = await fetch('/api/redeem-discount-code', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: codeTrimmed }),
-      });
-      const data = await redeemRes.json();
-      if (redeemRes.ok && (data.success || data.alreadyUsed)) {
-        setCodeApplied(true);
-        router.refresh();
+      if (checkoutUsesSavedAccountDiscount) {
+        const redeemRes = await fetch('/api/redeem-discount-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: codeTrimmed }),
+        });
+        const data = await redeemRes.json();
+        if (redeemRes.ok && (data.success || data.alreadyUsed)) {
+          setCodeApplied(true);
+          router.refresh();
+        } else {
+          setError(data.error || 'Invalid or expired promo code');
+        }
       } else {
-        setError(data.error || 'Invalid or expired promo code');
+        const res = await fetch('/api/checkout/validate-promo-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: codeTrimmed.toUpperCase() }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setError(data.error || 'Invalid or expired promo code');
+          return;
+        }
+        setLocalPromoPercent(data.percent_off);
+        setCodeApplied(true);
       }
     } catch {
       setError('Could not apply code. Try again.');
@@ -98,25 +132,19 @@ export function JoinSessionClient({
     try {
       const codeTrimmed = promoCode.trim();
       if (codeTrimmed && !codeApplied) {
-        const redeemRes = await fetch('/api/redeem-discount-code', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code: codeTrimmed }),
-        });
-        const redeemData = await redeemRes.json();
-        if (!redeemRes.ok && !redeemData.alreadyUsed) {
-          setError(redeemData.error || 'Invalid or expired promo code');
-          setJoining(false);
-          payLock.current = false;
-          return;
-        }
-        if (redeemRes.ok && (redeemData.success || redeemData.alreadyUsed)) setCodeApplied(true);
+        setError('Click Apply to confirm your promo code before paying.');
+        setJoining(false);
+        payLock.current = false;
+        return;
       }
 
       const res = await fetch(`/api/sessions/${sessionId}/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ youthWrestlerId: selectedWrestlerId }),
+        body: JSON.stringify({
+          youthWrestlerId: selectedWrestlerId,
+          promoCode: codeApplied ? codeTrimmed.toUpperCase() : undefined,
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -164,6 +192,13 @@ export function JoinSessionClient({
     );
   }
 
+  const showSavedDiscountLine =
+    checkoutUsesSavedAccountDiscount && percentOff != null && isSmallGroup;
+  const showImplicitAllowlistLine =
+    !checkoutUsesSavedAccountDiscount && percentOff != null && isSmallGroup && !codeApplied;
+  const showPromoAppliedLine =
+    !checkoutUsesSavedAccountDiscount && codeApplied && localPromoPercent != null && isSmallGroup;
+
   return (
     <div className="space-y-4 pt-4 border-t">
       {error && (
@@ -201,16 +236,25 @@ export function JoinSessionClient({
         )}
       </div>
       <div className="space-y-2">
-        <Label htmlFor="promo">Promo code (optional)</Label>
+        <Label htmlFor="promo">
+          {checkoutUsesSavedAccountDiscount ? 'Promo code (optional)' : 'Promo code (discount only if valid code applied)'}
+        </Label>
         <div className="flex gap-2">
           <Input
             id="promo"
             type="text"
             placeholder=""
             value={promoCode}
-            onChange={(e) => { setPromoCode(e.target.value.toUpperCase()); setError(null); setCodeApplied(false); }}
+            onChange={(e) => {
+              setPromoCode(e.target.value.toUpperCase());
+              setError(null);
+              setCodeApplied(false);
+              setLocalPromoPercent(null);
+            }}
             className="uppercase flex-1"
             autoComplete="off"
+            name="guild-join-promo"
+            data-lpignore="true"
           />
           <Button
             type="button"
@@ -221,9 +265,21 @@ export function JoinSessionClient({
             {applyingCode ? 'Applying…' : 'Apply'}
           </Button>
         </div>
-        {percentOff != null && isSmallGroup && (
+        {showSavedDiscountLine && (
           <p className="text-sm text-green-600 dark:text-green-400 font-medium">
-            {codeApplied ? `Code applied. You get ${percentOff}% off — pay & register below.` : `Your ${percentOff}% discount applies — pay & register below.`}
+            {codeApplied
+              ? `Code applied. You get ${percentOff}% off — pay & register below.`
+              : `Your account has a ${percentOff}% family discount — the price below reflects it.`}
+          </p>
+        )}
+        {showImplicitAllowlistLine && (
+          <p className="text-sm text-green-600 dark:text-green-400 font-medium">
+            {`Your approved family rate is included — ${percentOff}% off below. You do not need to enter a promo code.`}
+          </p>
+        )}
+        {showPromoAppliedLine && (
+          <p className="text-sm text-green-600 dark:text-green-400 font-medium">
+            {`Code applied. You get ${localPromoPercent}% off — pay & register below.`}
           </p>
         )}
       </div>

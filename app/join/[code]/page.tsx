@@ -12,6 +12,14 @@ import { formatEST } from '@/lib/format-date';
 import { JoinSessionClient } from './join-session-client';
 import { hasMinPhoneDigits } from '@/lib/phone';
 import { getEffectiveFilledCount } from '@/lib/sessions';
+import {
+  ensureAutoFamilyDiscountForParent,
+  effectivePercentOffForCheckout,
+} from '@/lib/family-auto-discount';
+import {
+  checkoutAllowSavedAccountPercent,
+  displayPercentForPromoOnlyCheckout,
+} from '@/lib/checkout-promo';
 
 /** Always fresh roster from DB (avoid stale cached HTML after admin adds a participant). */
 export const dynamic = 'force-dynamic';
@@ -33,6 +41,12 @@ export default async function JoinByCodePage({
 
   // Fetch session by invite code with admin client so unauthenticated users can open the join link (RLS would otherwise block)
   const admin = createAdminClient(tenant.slug);
+  if (user) {
+    const { data: urow } = await supabase.from('users').select('role').eq('id', user.id).maybeSingle();
+    if (urow?.role === 'parent' && checkoutAllowSavedAccountPercent()) {
+      await ensureAutoFamilyDiscountForParent(admin, user.id, user.email);
+    }
+  }
   const { data: session, error } = await admin
     .from('sessions')
     .select('*, athletes(id, first_name, last_name, school, photo_url), facilities(id, name, address)')
@@ -88,13 +102,19 @@ export default async function JoinByCodePage({
   let percentOff: number | null = null;
   let priceAfterDiscount: number | null = null;
   if (user && !isFull && pricePerParticipant > 0) {
-    const { data: pctRow } = await admin
-      .from('parent_percentage_discounts')
-      .select('percent_off')
-      .eq('parent_id', user.id)
-      .maybeSingle();
-    percentOff = pctRow?.percent_off != null ? Number(pctRow.percent_off) : null;
-    if (percentOff != null && percentOff >= 1 && percentOff <= 100) {
+    if (checkoutAllowSavedAccountPercent()) {
+      const { data: pctRow } = await admin
+        .from('parent_percentage_discounts')
+        .select('percent_off')
+        .eq('parent_id', user.id)
+        .maybeSingle();
+      const eff = effectivePercentOffForCheckout(pctRow?.percent_off, user.email);
+      percentOff = eff >= 1 ? eff : null;
+    } else {
+      const implicit = await displayPercentForPromoOnlyCheckout(admin, user.email);
+      percentOff = implicit >= 1 ? implicit : null;
+    }
+    if (percentOff != null) {
       priceAfterDiscount = pricePerParticipant * (1 - percentOff / 100);
     }
   }
@@ -221,6 +241,7 @@ export default async function JoinByCodePage({
                   priceAfterDiscount={priceAfterDiscount ?? undefined}
                   percentOff={percentOff ?? undefined}
                   youthWrestlers={youthWrestlers}
+                  checkoutUsesSavedAccountDiscount={checkoutAllowSavedAccountPercent()}
                 />
               ) : (
                 <div className="space-y-2 pt-2">

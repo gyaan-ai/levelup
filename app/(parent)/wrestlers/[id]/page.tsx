@@ -5,7 +5,8 @@ import { getTenantByDomain } from '@/config/tenants';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { ArrowLeft, Edit, Calendar, User, School, Target, Heart, Award, Smartphone } from 'lucide-react';
+import { Edit, Calendar, User, School, Target, Heart, Award, Smartphone } from 'lucide-react';
+import { BackLink } from '@/components/back-link';
 import { CoachSessionBadge } from '@/components/coach-session-badge';
 import { ProfileImage } from '@/components/profile-image';
 import { formatEST } from '@/lib/format-date';
@@ -117,10 +118,9 @@ export default async function YouthWrestlerProfilePage({
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
-      <Link href="/dashboard" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-6">
-        <ArrowLeft className="h-4 w-4 mr-2" />
-        Back to Dashboard
-      </Link>
+      <div className="mb-6">
+        <BackLink fallbackHref="/dashboard" label="Back to Dashboard" />
+      </div>
 
       {/* Profile Header */}
       <Card className="mb-6">

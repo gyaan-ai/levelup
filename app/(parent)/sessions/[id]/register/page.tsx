@@ -4,12 +4,21 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import Link from 'next/link';
+import { BackLink } from '@/components/back-link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SessionRegisterClient } from './register-client';
 import { User, Calendar, MapPin, Users } from 'lucide-react';
 import { formatEST } from '@/lib/format-date';
 import { SchoolLogo } from '@/components/school-logo';
 import { hasMinPhoneDigits } from '@/lib/phone';
+import {
+  ensureAutoFamilyDiscountForParent,
+  effectivePercentOffForCheckout,
+} from '@/lib/family-auto-discount';
+import {
+  checkoutAllowSavedAccountPercent,
+  displayPercentForPromoOnlyCheckout,
+} from '@/lib/checkout-promo';
 
 export default async function SessionRegisterPage({
   params,
@@ -118,19 +127,27 @@ export default async function SessionRegisterPage({
   const dt = s.scheduled_datetime ? new Date(s.scheduled_datetime) : null;
 
   const admin = createAdminClient(tenant.slug);
-  // Parent percentage discount (e.g. FAMILY10) — used to show discounted price and message
-  const { data: pctDiscount } = !isOwner
-    ? await admin
+  if (role === 'parent' && checkoutAllowSavedAccountPercent()) {
+    await ensureAutoFamilyDiscountForParent(admin, user.id, user.email);
+  }
+  let percentOff: number | null = null;
+  let priceAfterDiscount: number | null = null;
+  if (!isOwner) {
+    if (checkoutAllowSavedAccountPercent()) {
+      const { data: pctDiscount } = await admin
         .from('parent_percentage_discounts')
         .select('percent_off')
         .eq('parent_id', user.id)
-        .maybeSingle()
-    : { data: null };
-  const percentOff = pctDiscount?.percent_off != null ? Number(pctDiscount.percent_off) : null;
-  const priceAfterDiscount =
-    percentOff != null && percentOff >= 1 && percentOff <= 100 && pricePer > 0
-      ? pricePer * (1 - percentOff / 100)
-      : null;
+        .maybeSingle();
+      const effPct = effectivePercentOffForCheckout(pctDiscount?.percent_off, user.email);
+      percentOff = effPct >= 1 ? effPct : null;
+    } else {
+      const implicit = await displayPercentForPromoOnlyCheckout(admin, user.email);
+      percentOff = implicit >= 1 ? implicit : null;
+    }
+    priceAfterDiscount =
+      percentOff != null && pricePer > 0 ? pricePer * (1 - percentOff / 100) : null;
+  }
 
   const { data: participants } = await admin
     .from('session_participants')
@@ -150,9 +167,9 @@ export default async function SessionRegisterPage({
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-lg">
-      <Link href="/find-training" className="text-sm text-muted-foreground hover:text-foreground mb-4 inline-block">
-        ← Back to Dashboard
-      </Link>
+      <div className="mb-4">
+        <BackLink fallbackHref="/find-training" label="Back to Training" />
+      </div>
       <Card className="mb-6">
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
@@ -226,6 +243,7 @@ export default async function SessionRegisterPage({
             priceAfterDiscount={priceAfterDiscount ?? undefined}
             percentOff={percentOff ?? undefined}
             youthWrestlers={youthWrestlers as Array<{ id: string; first_name?: string; last_name?: string; age?: number; weight_class?: string; skill_level?: string; hasValidCell: boolean }>}
+            checkoutUsesSavedAccountDiscount={checkoutAllowSavedAccountPercent()}
             initialWrestlerId={preselectedWrestlerId && youthWrestlers.some((yw) => yw.id === preselectedWrestlerId) ? preselectedWrestlerId : ''}
           />
         </CardContent>

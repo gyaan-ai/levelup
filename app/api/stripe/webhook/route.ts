@@ -7,7 +7,27 @@ import { createNotification } from '@/lib/notifications';
 import { sendCoachNewSignupSms } from '@/lib/twilio';
 import { formatEST } from '@/lib/format-date';
 import { headers } from 'next/headers';
-import { rosterSnapshotFromYouthRow } from '@/lib/session-roster-snapshot';
+import { maybeBackfillRosterSnapshot } from '@/lib/session-roster-snapshot';
+
+/**
+ * Fetch the actual Stripe fee from a PaymentIntent's balance transaction.
+ * Returns fee in dollars (not cents).
+ */
+async function getStripeFee(stripe: Stripe, paymentIntentId: string): Promise<number> {
+  try {
+    const pi = await stripe.paymentIntents.retrieve(paymentIntentId, {
+      expand: ['latest_charge.balance_transaction'],
+    });
+    const charge = pi.latest_charge as Stripe.Charge | null;
+    const bt = charge?.balance_transaction as Stripe.BalanceTransaction | null;
+    if (bt?.fee) {
+      return bt.fee / 100; // Convert cents to dollars
+    }
+  } catch (e) {
+    console.warn('Failed to fetch Stripe fee:', e);
+  }
+  return 0;
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -34,9 +54,167 @@ export async function POST(req: NextRequest) {
 
     if (event.type === 'checkout.session.completed') {
       const session = event.data.object as Stripe.Checkout.Session;
-      const sessionId = session.metadata?.session_id;
       const app = session.metadata?.app;
-      if (app !== 'the-guild' || !sessionId) {
+      const isCartCheckout = session.metadata?.cart_checkout === 'true';
+      const sessionId = session.metadata?.session_id;
+      const sessionIds = session.metadata?.session_ids?.split(',').filter(Boolean) || [];
+      
+      if (app !== 'the-guild') {
+        return NextResponse.json({ received: true });
+      }
+      
+      // Handle cart checkout (multiple lines: session + wrestler per line; same session may repeat for two kids)
+      if (isCartCheckout) {
+        const parentId = session.metadata?.parent_id;
+        const sessionPrices = session.metadata?.session_prices?.split(',') || [];
+        const creditsUsed = parseFloat(session.metadata?.credits_to_use || '0');
+        const cartLinesRaw = session.metadata?.cart_lines as string | undefined;
+        const youthWrestlerIdLegacy = session.metadata?.youth_wrestler_id;
+
+        if (!parentId) {
+          console.error('Cart checkout webhook: missing parent_id', session.metadata);
+          return NextResponse.json({ error: 'Missing parent metadata' }, { status: 500 });
+        }
+
+        const rawMetaTenant = (session.metadata?.tenant_slug as string | undefined)?.trim().toLowerCase();
+        const tenantSlug = rawMetaTenant && rawMetaTenant in tenants ? rawMetaTenant : 'guild';
+        const supabase = createAdminClient(tenantSlug);
+
+        const paymentIntentId =
+          typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id;
+        const totalStripeFee = paymentIntentId ? await getStripeFee(stripe, paymentIntentId) : 0;
+
+        type CartLineRow = { sid: string; ywid: string; amountPaid: number };
+        let rows: CartLineRow[] = [];
+
+        if (cartLinesRaw && cartLinesRaw.length > 0) {
+          rows = cartLinesRaw
+            .split(';')
+            .filter(Boolean)
+            .map((seg) => {
+              const [sid, ywid, priceStr] = seg.split('|');
+              return {
+                sid: sid?.trim() ?? '',
+                ywid: ywid?.trim() ?? '',
+                amountPaid: parseFloat(priceStr || '0'),
+              };
+            })
+            .filter((r) => r.sid && r.ywid);
+        } else if (sessionIds.length > 0 && youthWrestlerIdLegacy) {
+          for (const sid of sessionIds) {
+            const priceEntry = sessionPrices.find((p) => p.startsWith(`${sid}:`));
+            const amountPaid = priceEntry ? parseFloat(priceEntry.split(':')[1]) : 0;
+            rows.push({ sid, ywid: youthWrestlerIdLegacy, amountPaid });
+          }
+        }
+
+        if (rows.length === 0) {
+          console.error('Cart checkout webhook: no cart lines', session.metadata);
+          return NextResponse.json({ error: 'Missing cart lines' }, { status: 500 });
+        }
+
+        const totalPrice = rows.reduce((sum, r) => sum + r.amountPaid, 0);
+
+        const currentBySession = new Map<string, number>();
+
+        for (const { sid, ywid, amountPaid } of rows) {
+          const sessionStripeFee = totalPrice > 0 ? (amountPaid / totalPrice) * totalStripeFee : 0;
+
+          const { data: existing } = await supabase
+            .from('session_participants')
+            .select('id')
+            .eq('session_id', sid)
+            .eq('youth_wrestler_id', ywid)
+            .maybeSingle();
+
+          const { data: sess } = await supabase
+            .from('sessions')
+            .select('current_participants, athlete_id, scheduled_datetime')
+            .eq('id', sid)
+            .single();
+
+          if (!existing) {
+            const currentFromDb = (sess as { current_participants?: number } | null)?.current_participants ?? 0;
+            const baseline = currentBySession.has(sid) ? currentBySession.get(sid)! : currentFromDb;
+
+            const { error: insertErr } = await supabase.from('session_participants').insert({
+              session_id: sid,
+              youth_wrestler_id: ywid,
+              parent_id: parentId,
+              paid: true,
+              amount_paid: amountPaid,
+              stripe_payment_intent_id: paymentIntentId,
+              stripe_fee: sessionStripeFee,
+            });
+
+            if (insertErr) {
+              if (insertErr.code === '23505') {
+                await supabase
+                  .from('session_participants')
+                  .update({
+                    paid: true,
+                    amount_paid: amountPaid,
+                    stripe_payment_intent_id: paymentIntentId,
+                    stripe_fee: sessionStripeFee,
+                  })
+                  .eq('session_id', sid)
+                  .eq('youth_wrestler_id', ywid);
+              } else {
+                console.error('Cart webhook: failed to insert participant', insertErr, { sid, ywid });
+              }
+            } else {
+              const next = baseline + 1;
+              currentBySession.set(sid, next);
+              await supabase
+                .from('sessions')
+                .update({ current_participants: next, updated_at: new Date().toISOString() })
+                .eq('id', sid);
+
+              const coachId = (sess as { athlete_id?: string } | null)?.athlete_id;
+              const dt = (sess as { scheduled_datetime?: string } | null)?.scheduled_datetime;
+              if (coachId) {
+                const dateStr = dt ? formatEST(new Date(dt), 'EEE MMM d, h:mm a') : 'your session';
+                await createNotification(supabase, {
+                  user_id: coachId,
+                  type: 'session_booked',
+                  title: 'Someone just booked your session',
+                  body: `New booking for ${dateStr}. Check My sessions.`,
+                  data: { session_id: sid },
+                }).catch((e) => console.warn('Cart webhook: coach notification failed', e));
+                await sendCoachNewSignupSms(supabase, coachId, dateStr).catch(() => {});
+              }
+            }
+          } else {
+            await supabase
+              .from('session_participants')
+              .update({
+                paid: true,
+                amount_paid: amountPaid,
+                stripe_payment_intent_id: paymentIntentId,
+                stripe_fee: sessionStripeFee,
+              })
+              .eq('session_id', sid)
+              .eq('youth_wrestler_id', ywid);
+          }
+        }
+
+        if (creditsUsed > 0) {
+          const { applyCredits } = await import('@/lib/credits');
+          await applyCredits({
+            userId: parentId,
+            amount: creditsUsed,
+            sessionId: rows[0].sid,
+            description: `Cart checkout for ${rows.length} spot(s)`,
+            tenantSlug,
+          });
+        }
+
+        console.log('Cart checkout webhook completed:', { rows: rows.length, parentId, creditsUsed });
+        return NextResponse.json({ received: true });
+      }
+      
+      // Single session checkout (original flow)
+      if (!sessionId) {
         return NextResponse.json({ received: true });
       }
 
@@ -69,6 +247,9 @@ export async function POST(req: NextRequest) {
           );
         }
         const amountPaid = amountTotal / 100;
+        // Fetch actual Stripe fee
+        const stripeFee = paymentIntentId ? await getStripeFee(stripe, paymentIntentId) : 0;
+        
         const { data: existing } = await supabase
           .from('session_participants')
           .select('id')
@@ -93,16 +274,18 @@ export async function POST(req: NextRequest) {
             parent_id: parentId,
             paid: true,
             amount_paid: amountPaid,
-            ...rosterSnapshotFromYouthRow((ywSnap ?? {}) as { first_name?: string; last_name?: string; photo_url?: string }),
+            stripe_payment_intent_id: paymentIntentId,
+            stripe_fee: stripeFee,
           });
           if (insertErr) {
             // Concurrent webhook deliveries or Stripe retries: two workers both saw "no row" — second insert loses UNIQUE race.
             if (insertErr.code === '23505') {
               await supabase
                 .from('session_participants')
-                .update({ paid: true, amount_paid: amountPaid })
+                .update({ paid: true, amount_paid: amountPaid, stripe_payment_intent_id: paymentIntentId, stripe_fee: stripeFee })
                 .eq('session_id', sessionId)
                 .eq('youth_wrestler_id', youthWrestlerId);
+              await maybeBackfillRosterSnapshot(supabase, { session_id: sessionId, youth_wrestler_id: youthWrestlerId }, ywSnap ?? {});
             } else {
               console.error('Webhook: failed to insert session_participant (register)', {
                 code: insertErr.code,
@@ -126,13 +309,20 @@ export async function POST(req: NextRequest) {
             if (upErr) {
               console.error('Webhook: failed to increment current_participants', upErr);
             }
+            await maybeBackfillRosterSnapshot(supabase, { session_id: sessionId, youth_wrestler_id: youthWrestlerId }, ywSnap ?? {});
           }
         } else {
           await supabase
             .from('session_participants')
-            .update({ paid: true, amount_paid: amountPaid })
+            .update({ paid: true, amount_paid: amountPaid, stripe_payment_intent_id: paymentIntentId, stripe_fee: stripeFee })
             .eq('session_id', sessionId)
             .eq('youth_wrestler_id', youthWrestlerId);
+          const { data: ywExisting } = await supabase
+            .from('youth_wrestlers')
+            .select('first_name, last_name, photo_url')
+            .eq('id', youthWrestlerId)
+            .maybeSingle();
+          await maybeBackfillRosterSnapshot(supabase, { session_id: sessionId, youth_wrestler_id: youthWrestlerId }, ywExisting ?? {});
         }
         // Notify coach so they see it (college kids need reminders)
         const { data: sessRow } = await supabase

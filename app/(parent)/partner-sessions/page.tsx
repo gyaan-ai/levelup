@@ -5,6 +5,7 @@ import { getTenantByDomain } from '@/config/tenants';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
+import { BackLink } from '@/components/back-link';
 import { User, Calendar, MapPin } from 'lucide-react';
 import { PartnerSessionsClient } from './partner-sessions-client';
 
@@ -53,9 +54,9 @@ export default async function PartnerSessionsPage() {
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
-        <Link href="/dashboard" className="text-sm text-muted-foreground hover:text-foreground mb-4 inline-block">
-          ← Back to Dashboard
-        </Link>
+        <div className="mb-4">
+          <BackLink fallbackHref="/dashboard" label="Back to Dashboard" />
+        </div>
         <h1 className="text-3xl font-bold">Open Partner Sessions</h1>
         <p className="text-muted-foreground">
           Sessions where someone else is looking for a workout partner. Request to join and train together.
