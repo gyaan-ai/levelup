@@ -41,6 +41,8 @@ export const metadata = {
   manifest: '/manifest.json',
 };
 
+const deploymentSha = process.env.VERCEL_GIT_COMMIT_SHA ?? '';
+
 export default async function RootLayout({
   children,
 }: {
@@ -49,10 +51,16 @@ export default async function RootLayout({
   const headersList = await headers();
   const host = headersList.get('host') || '';
   const tenant = getTenantByDomain(host);
-  
+
+  const htmlProps = {
+    lang: 'en' as const,
+    className: `dark ${playfair.variable}`,
+    ...(deploymentSha ? { 'data-deployment-sha': deploymentSha } : {}),
+  };
+
   if (!tenant) {
     return (
-      <html lang="en" className={`dark ${playfair.variable}`}>
+      <html {...htmlProps}>
         <body className="font-sans bg-background text-foreground">
           <div className="flex items-center justify-center min-h-screen">
             <div className="text-center">
@@ -65,9 +73,9 @@ export default async function RootLayout({
       </html>
     );
   }
-  
+
   return (
-    <html lang="en" className={`dark ${playfair.variable}`}>
+    <html {...htmlProps}>
       <body className="flex flex-col min-h-screen font-sans bg-background text-foreground">
         <ThemeProvider tenant={tenant}>
           <AuthProvider tenantSlug={tenant.slug}>
