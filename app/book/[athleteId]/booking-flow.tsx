@@ -9,7 +9,6 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Calendar } from '@/components/ui/calendar';
-import { Input } from '@/components/ui/input';
 import Link from 'next/link';
 import { User, Clock, CheckCircle, Link2, Users, UserCircle } from 'lucide-react';
 import { BackLink } from '@/components/back-link';
@@ -344,6 +343,40 @@ export function BookingFlow({
       setBookingPromoError('Could not validate code');
     } finally {
       setBookingPromoLoading(false);
+    }
+  };
+
+  const refreshPercentDiscount = async () => {
+    const pctRes = await fetch('/api/account/percentage-discount');
+    if (!pctRes.ok) return;
+    const p = await pctRes.json();
+    const n = p.percent_off != null ? Number(p.percent_off) : null;
+    setPercentOff(n != null && n >= 1 && n <= 100 ? n : null);
+  };
+
+  const handleApplyPromo = async () => {
+    const trimmed = promoCode.trim();
+    if (!trimmed) return;
+    setApplyingPromo(true);
+    setPromoMessage(null);
+    try {
+      const res = await fetch('/api/redeem-discount-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: trimmed }),
+      });
+      const data = await res.json();
+      if (!res.ok && !data.alreadyUsed) {
+        setPromoMessage({ type: 'error', text: data.error || 'Could not apply code' });
+        return;
+      }
+      await refreshPercentDiscount();
+      setPromoMessage({ type: 'success', text: data.message || 'Code applied.' });
+      setPromoCode('');
+    } catch {
+      setPromoMessage({ type: 'error', text: 'Could not apply code. Try again.' });
+    } finally {
+      setApplyingPromo(false);
     }
   };
 
