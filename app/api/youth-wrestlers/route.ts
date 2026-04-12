@@ -30,7 +30,13 @@ export async function GET(req: NextRequest) {
       .single();
 
     if (userData?.role !== 'parent') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return NextResponse.json(
+        {
+          error:
+            'Wrestler profiles are managed from a parent account. Sign in with a parent login, or contact us if you need help switching your account type.',
+        },
+        { status: 403 }
+      );
     }
 
     // Get all youth wrestlers this parent can see (primary or linked via youth_wrestler_parents)
@@ -79,7 +85,13 @@ export async function POST(req: NextRequest) {
       .single();
 
     if (userData?.role !== 'parent') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return NextResponse.json(
+        {
+          error:
+            'Only parent accounts can add a wrestler profile. If you signed up as a wrestler or coach by mistake, contact us and we can help.',
+        },
+        { status: 403 }
+      );
     }
 
     const body = await req.json();

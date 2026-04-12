@@ -29,7 +29,13 @@ export async function POST(req: NextRequest) {
     }
     const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
     if (userData?.role !== 'parent' && userData?.role !== 'admin') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return NextResponse.json(
+        {
+          error:
+            'Booking is only available for parent accounts. Sign in with a parent login, or contact us if you signed up under the wrong account type.',
+        },
+        { status: 403 }
+      );
     }
 
     const body = (await req.json()) as {
