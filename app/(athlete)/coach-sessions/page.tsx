@@ -5,6 +5,7 @@ import { getTenantByDomain } from '@/config/tenants';
 import { CoachSessionsClient, type CommunitySession, type SlotRequestItem } from './coach-sessions-client';
 import type { CoachSession } from '@/app/(athlete)/athlete-dashboard/coach-schedule-card';
 import { CopyCoachAllAthletePhonesButton } from '@/components/copy-coach-all-athlete-phones-button';
+import { COACH_REVENUE_FRACTION } from '@/lib/pricing';
 
 export const dynamic = 'force-dynamic';
 
@@ -168,7 +169,7 @@ export default async function CoachSessionsPage({
           session?: { id: string; scheduled_datetime: string; session_type?: string; session_mode?: string; facilities?: { name?: string } | null };
         }>}
         pendingSlotRequests={(slotRequestsRaw ?? []) as unknown as SlotRequestItem[]}
-        payoutRate={athlete?.payout_rate ?? 0.8333}
+        payoutRate={athlete?.payout_rate ?? COACH_REVENUE_FRACTION}
         communitySessions={(communitySessions ?? []) as unknown as CommunitySession[]}
       />
     </div>

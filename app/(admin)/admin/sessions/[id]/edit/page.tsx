@@ -41,7 +41,8 @@ export default async function AdminEditSessionPage({
       price_per_participant,
       athlete_payment,
       athlete_payout_date,
-      athletes(id, first_name, last_name, school),
+      session_payout_rate,
+      athletes(id, first_name, last_name, school, payout_rate),
       facilities(id, name),
       session_participants(amount_paid)
     `)
@@ -52,7 +53,7 @@ export default async function AdminEditSessionPage({
 
   const coach = Array.isArray((session as { athletes?: unknown }).athletes)
     ? (session as { athletes: unknown[] }).athletes[0]
-    : (session as { athletes?: { first_name?: string; last_name?: string; school?: string } }).athletes;
+    : (session as { athletes?: { first_name?: string; last_name?: string; school?: string; payout_rate?: number | null } }).athletes;
   const fac = Array.isArray((session as { facilities?: unknown }).facilities)
     ? (session as { facilities: unknown[] }).facilities[0]
     : (session as { facilities?: { name?: string } }).facilities;
@@ -100,6 +101,12 @@ export default async function AdminEditSessionPage({
         }
         athletePayoutDate={(session as { athlete_payout_date?: string | null }).athlete_payout_date ?? null}
         participantAmountPaidSum={participantAmountPaidSum}
+        sessionPayoutRate={(session as { session_payout_rate?: number | null }).session_payout_rate ?? null}
+        coachPayoutRate={
+          coach && (coach as { payout_rate?: number | null }).payout_rate != null
+            ? Number((coach as { payout_rate?: number | null }).payout_rate)
+            : null
+        }
         scheduledDate={formatEST((session as { scheduled_datetime?: string }).scheduled_datetime ?? '', 'yyyy-MM-dd')}
         scheduledTime={formatEST((session as { scheduled_datetime?: string }).scheduled_datetime ?? '', 'HH:mm')}
       />

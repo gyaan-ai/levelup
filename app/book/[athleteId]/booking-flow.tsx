@@ -20,6 +20,7 @@ import { formatEST } from '@/lib/format-date';
 import { YouthWrestler } from '@/types';
 import type { SessionMode } from '@/types';
 import { getSessionPrice } from '@/lib/sessions';
+import { COACH_REVENUE_FRACTION } from '@/lib/pricing';
 import { formatSlotDisplay, getDayOfWeek } from '@/lib/availability';
 
 /** 8am–9pm fallback when coach has no availability */
@@ -149,7 +150,7 @@ export function BookingFlow({
     return priceInfo ? { 
       total: priceInfo.total, 
       pricePerParticipant: priceInfo.pricePerParticipant,
-      athletePayout: priceInfo.total * 0.83, // ~83% to athlete as estimate
+      athletePayout: priceInfo.total * COACH_REVENUE_FRACTION,
     } : null;
   };
 

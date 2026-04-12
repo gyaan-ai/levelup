@@ -1,4 +1,5 @@
 import { coachPayoutUsd } from '@/lib/coach-session-payout';
+import { COACH_REVENUE_FRACTION } from '@/lib/pricing';
 
 export type ProgramReportPeriod = '7d' | '30d' | '90d' | 'ytd' | 'all';
 
@@ -128,7 +129,8 @@ export function aggregateProgramReport(
     const participantAmountPaidSum = Array.isArray(s.session_participants)
       ? s.session_participants.reduce((sum, p) => sum + Number(p.amount_paid || 0), 0)
       : 0;
-    const rate = s.session_payout_rate != null ? Number(s.session_payout_rate) : ath.payout_rate ?? 0.8333;
+    const rate =
+      s.session_payout_rate != null ? Number(s.session_payout_rate) : ath.payout_rate ?? COACH_REVENUE_FRACTION;
     const payout = coachPayoutUsd(
       {
         athlete_payment: s.athlete_payment,

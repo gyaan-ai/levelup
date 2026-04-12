@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Calendar, DollarSign, CalendarPlus, Users, Star, BookUser } from 'lucide-react';
 import { easternCalendarDaysBetween, formatEST } from '@/lib/format-date';
 import { differenceInHours } from 'date-fns';
+import { COACH_REVENUE_FRACTION } from '@/lib/pricing';
 import { CoachPlaybook } from '@/components/coach-playbook';
 import { CoachRankCard } from '@/components/coach-rank-card';
 import {
@@ -168,7 +169,7 @@ export function CoachHomeClient({
   averageRating,
   reviewCount = 0,
   recentReviews = [],
-  payoutRate = 0.8333,
+  payoutRate = COACH_REVENUE_FRACTION,
   needsOnboarding = false,
 }: Props) {
   const coachBlock = {

@@ -146,6 +146,10 @@ export type AdminSession = {
   stripe_fee_sum?: number;
   /** When the coach was marked paid for this session (YYYY-MM-DD from DB) */
   athlete_payout_date?: string | null;
+  /** Snapshot at session creation */
+  session_payout_rate?: number | null;
+  /** From athletes.payout_rate when needed */
+  coach_payout_rate?: number | null;
 };
 
 function sessionPayoutAmountUsd(s: AdminSession): number {
@@ -156,6 +160,8 @@ function sessionPayoutAmountUsd(s: AdminSession): number {
     price_per_participant: s.price_per_participant,
     current_participants: s.current_participants,
     participant_amount_paid_sum: s.participant_amount_paid_sum,
+    session_payout_rate: s.session_payout_rate ?? null,
+    coach_payout_rate: s.coach_payout_rate ?? null,
   });
 }
 

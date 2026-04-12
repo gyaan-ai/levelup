@@ -11,6 +11,7 @@ import { CoachTextGroupDialog } from '@/components/coach-text-group-dialog';
 import { CopySessionPhonesButton } from '@/components/copy-session-phones-button';
 import { formatEST } from '@/lib/format-date';
 import { coachPayoutUsd } from '@/lib/coach-session-payout';
+import { COACH_REVENUE_FRACTION } from '@/lib/pricing';
 import { showSessionSmsCopyAndTextGroup } from '@/lib/session-sms-tools';
 import { AddToCalendarButton } from '@/components/add-to-calendar-button';
 import { SessionTypeBadge } from '@/components/session-type-badge';
@@ -24,6 +25,15 @@ function facilityName(s: CoachSession): string {
   const arr = Array.isArray(f) ? f : [f];
   const first = arr[0] as { name?: string } | null;
   return first?.name ?? '—';
+}
+
+function participantPaidSum(s: CoachSession): number {
+  const parts = s.session_participants;
+  if (!Array.isArray(parts)) return 0;
+  return parts.reduce(
+    (sum, p) => sum + Number((p as { amount_paid?: number | null }).amount_paid ?? 0),
+    0
+  );
 }
 
 function wrestlerNames(s: CoachSession): string[] {
@@ -123,7 +133,7 @@ export function CoachSessionsClient({
   pendingRequests,
   pendingSlotRequests,
   communitySessions,
-  payoutRate = 0.8333,
+  payoutRate = COACH_REVENUE_FRACTION,
 }: Props) {
   const router = useRouter();
   const pathname = usePathname();
@@ -297,7 +307,15 @@ export function CoachSessionsClient({
                       </p>
                       <p className="text-sm font-medium text-accent mt-1 inline-flex items-center gap-1">
                         <DollarSign className="h-4 w-4" />
-                        You make ${coachPayoutUsd(session, payoutRate).toFixed(2)}
+                        You make $
+                        {coachPayoutUsd({
+                          athlete_payment: session.athlete_payment,
+                          price_per_participant: session.price_per_participant,
+                          current_participants: session.current_participants,
+                          participant_amount_paid_sum: participantPaidSum(session) > 0 ? participantPaidSum(session) : null,
+                          session_payout_rate: session.session_payout_rate ?? null,
+                          coach_payout_rate: payoutRate,
+                        }).toFixed(2)}
                       </p>
                     </div>
                     <div className="flex flex-wrap gap-2">

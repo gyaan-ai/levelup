@@ -7,6 +7,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { DollarSign, TrendingUp, Clock } from 'lucide-react';
 import { formatEST } from '@/lib/format-date';
 import { coachPayoutUsd } from '@/lib/coach-session-payout';
+import { COACH_REVENUE_FRACTION } from '@/lib/pricing';
 
 export const dynamic = 'force-dynamic';
 
@@ -47,7 +48,7 @@ export default async function CoachEarningsPage() {
 
   const { data: athlete } = await supabase.from('athletes').select('first_name, payout_rate').eq('id', coachId).maybeSingle();
 
-  const payoutRate = athlete?.payout_rate ?? 0.8333;
+  const payoutRate = athlete?.payout_rate ?? COACH_REVENUE_FRACTION;
 
   const nowIso = new Date().toISOString();
 

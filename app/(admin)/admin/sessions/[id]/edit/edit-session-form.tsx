@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/dialog';
 import { SESSION_FOCUS_AREAS } from '@/lib/focus-areas';
 import { formatEST } from '@/lib/format-date';
-import { coachPayoutUsd } from '@/lib/coach-session-payout';
+import { coachPayoutUsd, resolveCoachPayoutRate } from '@/lib/coach-session-payout';
 import { Loader2, Trash2 } from 'lucide-react';
 
 type Props = {
@@ -44,6 +44,9 @@ type Props = {
   athletePayoutDate?: string | null;
   /** Sum of session_participants.amount_paid (parent $ after discounts) */
   participantAmountPaidSum?: number;
+  /** Session snapshot; used with coach rate for suggested payout % */
+  sessionPayoutRate?: number | null;
+  coachPayoutRate?: number | null;
 };
 
 export function EditSessionForm({
@@ -61,6 +64,8 @@ export function EditSessionForm({
   athletePayment = null,
   athletePayoutDate = null,
   participantAmountPaidSum = 0,
+  sessionPayoutRate = null,
+  coachPayoutRate = null,
 }: Props) {
   const router = useRouter();
   const [sessionTypeState, setSessionTypeState] = useState(sessionType || 'small_group');
@@ -95,11 +100,15 @@ export function EditSessionForm({
   const [manualPaymentMethod, setManualPaymentMethod] = useState<'cash' | 'check' | 'venmo' | 'other'>('cash');
   const [manualPaymentLoading, setManualPaymentLoading] = useState(false);
 
+  const coachShareRate = resolveCoachPayoutRate({
+    session_payout_rate: sessionPayoutRate,
+    coach_payout_rate: coachPayoutRate,
+  });
+  const coachSharePctLabel = `${(coachShareRate * 100).toFixed(1)}%`;
+
   function suggestedCoachPayoutAmount(): string {
-    // Coach gets 83.3% of what parents paid (gross revenue)
-    // If no payments recorded, fall back to old calculation
     if (participantAmountPaidSum > 0) {
-      return (participantAmountPaidSum * 0.833).toFixed(2);
+      return (participantAmountPaidSum * coachShareRate).toFixed(2);
     }
     return String(
       coachPayoutUsd({
@@ -107,6 +116,8 @@ export function EditSessionForm({
         price_per_participant: pricePerParticipant,
         current_participants: currentParticipants,
         participant_amount_paid_sum: participantAmountPaidSum,
+        session_payout_rate: sessionPayoutRate,
+        coach_payout_rate: coachPayoutRate,
       })
     );
   }
@@ -123,7 +134,16 @@ export function EditSessionForm({
       setPayoutAmount(suggestedCoachPayoutAmount());
     }
     wasCompletedOnMount.current = nowCompleted;
-  }, [sessionStatus, athletePayoutDate, athletePayment, pricePerParticipant, currentParticipants, participantAmountPaidSum]);
+  }, [
+    sessionStatus,
+    athletePayoutDate,
+    athletePayment,
+    pricePerParticipant,
+    currentParticipants,
+    participantAmountPaidSum,
+    sessionPayoutRate,
+    coachPayoutRate,
+  ]);
 
   useEffect(() => {
     fetch('/api/focus-areas')
@@ -391,7 +411,8 @@ export function EditSessionForm({
       <CardHeader>
         <CardTitle>Session Financials</CardTitle>
         <CardDescription>
-          What parents paid (Gross) and what you paid/will pay the coach. The coach payout should be ~83.3% of gross.
+          What parents paid (gross) and what you paid/will pay the coach. Suggested payout is{' '}
+          <span className="font-medium">80%</span> of gross unless you override below.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -403,8 +424,10 @@ export function EditSessionForm({
           </div>
           <div>
             <Label className="text-muted-foreground text-xs uppercase tracking-wider">Suggested Coach Payout</Label>
-            <p className="text-xl font-semibold mt-1 text-blue-400">${(participantAmountPaidSum * 0.833).toFixed(2)}</p>
-            <p className="text-xs text-muted-foreground">83.3% of gross</p>
+            <p className="text-xl font-semibold mt-1 text-blue-400">
+              ${(participantAmountPaidSum * coachShareRate).toFixed(2)}
+            </p>
+            <p className="text-xs text-muted-foreground">{coachSharePctLabel} of gross</p>
           </div>
         </div>
         <div className="grid grid-cols-2 gap-4 pt-2 border-t border-border">

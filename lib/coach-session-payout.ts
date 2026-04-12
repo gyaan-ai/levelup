@@ -4,8 +4,8 @@
  *
  * - If `athlete_payment` is set (> 0), use it (bookings, Stripe, or manual record).
  * - Else if we know what parents actually paid (sum of `session_participants.amount_paid`),
- *   coach share = that total × 5/6 (captures family % discounts, comps, etc.).
- * - Otherwise estimate from roster: list price per slot × participants × coach share (5/6).
+ *   coach share = that total × rate (default 80% via `COACH_REVENUE_FRACTION`; overrides on `session_payout_rate` / `athletes.payout_rate`).
+ * - Otherwise estimate from roster: list price per slot × participants × coach share.
  */
 import { COACH_REVENUE_FRACTION } from '@/lib/pricing';
 
@@ -15,10 +15,31 @@ export type SessionCoachPayoutFields = {
   current_participants?: number | null;
   /** Sum of session_participants.amount_paid when loaded — reflects discounts vs list price */
   participant_amount_paid_sum?: number | null;
+  /** Snapshot on the session row (preferred for estimates when set). */
+  session_payout_rate?: number | null;
+  /** From `athletes.payout_rate` when session snapshot is missing. */
+  coach_payout_rate?: number | null;
 };
 
+/** Resolve revenue share for coach estimates: explicit arg → session → athlete → app default (80%). */
+export function resolveCoachPayoutRate(
+  session: SessionCoachPayoutFields,
+  explicitRate?: number
+): number {
+  if (explicitRate != null && !Number.isNaN(Number(explicitRate))) {
+    return Number(explicitRate);
+  }
+  if (session.session_payout_rate != null && !Number.isNaN(Number(session.session_payout_rate))) {
+    return Number(session.session_payout_rate);
+  }
+  if (session.coach_payout_rate != null && !Number.isNaN(Number(session.coach_payout_rate))) {
+    return Number(session.coach_payout_rate);
+  }
+  return COACH_REVENUE_FRACTION;
+}
+
 export function coachPayoutUsd(session: SessionCoachPayoutFields, payoutRate?: number): number {
-  const rate = payoutRate ?? COACH_REVENUE_FRACTION;
+  const rate = resolveCoachPayoutRate(session, payoutRate);
   if (session.athlete_payment != null && Number(session.athlete_payment) > 0) {
     return Math.round(Number(session.athlete_payment) * 100) / 100;
   }

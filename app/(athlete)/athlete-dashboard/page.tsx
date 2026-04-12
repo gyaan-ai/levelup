@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
 import { isProfileComplete } from '@/lib/athletes';
 import { coachPayoutUsd } from '@/lib/coach-session-payout';
+import { COACH_REVENUE_FRACTION } from '@/lib/pricing';
 import { CoachHomeClient } from './coach-home-client';
 import type { CoachSession } from './coach-schedule-card';
 
@@ -74,12 +75,12 @@ export default async function CoachHomePage() {
   const thisMonthStart = new Date();
   thisMonthStart.setDate(1);
   thisMonthStart.setHours(0, 0, 0, 0);
-  const payoutRateHome = Number(athlete?.payout_rate) || 0.8333;
+  const payoutRateHome = Number(athlete?.payout_rate) || COACH_REVENUE_FRACTION;
 
   const { data: completedForMonth } = await supabase
     .from('sessions')
     .select(
-      'athlete_payment, price_per_participant, current_participants, completed_at, scheduled_datetime, session_participants(amount_paid)'
+      'athlete_payment, price_per_participant, current_participants, completed_at, scheduled_datetime, session_payout_rate, session_participants(amount_paid)'
     )
     .eq('athlete_id', coachId)
     .eq('status', 'completed');
@@ -102,15 +103,14 @@ export default async function CoachHomePage() {
         : 0;
       return (
         sum +
-        coachPayoutUsd(
-          {
-            athlete_payment: s.athlete_payment as number | null | undefined,
-            price_per_participant: s.price_per_participant as number | null | undefined,
-            current_participants: s.current_participants as number | null | undefined,
-            participant_amount_paid_sum: participantAmountPaidSum > 0 ? participantAmountPaidSum : null,
-          },
-          payoutRateHome
-        )
+        coachPayoutUsd({
+          athlete_payment: s.athlete_payment as number | null | undefined,
+          price_per_participant: s.price_per_participant as number | null | undefined,
+          current_participants: s.current_participants as number | null | undefined,
+          participant_amount_paid_sum: participantAmountPaidSum > 0 ? participantAmountPaidSum : null,
+          session_payout_rate: (s as { session_payout_rate?: number | null }).session_payout_rate ?? null,
+          coach_payout_rate: payoutRateHome,
+        })
       );
     }, 0) || 0;
 
@@ -182,7 +182,7 @@ export default async function CoachHomePage() {
         averageRating={averageRating}
         reviewCount={reviewCount ?? 0}
         recentReviews={recentReviews}
-        payoutRate={Number(athlete?.payout_rate) || 0.8333}
+        payoutRate={Number(athlete?.payout_rate) || COACH_REVENUE_FRACTION}
         needsOnboarding={needsOnboarding}
       />
     </div>

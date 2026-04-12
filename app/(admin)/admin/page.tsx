@@ -94,7 +94,8 @@ export default async function AdminPage() {
         current_participants,
         max_participants,
         price_per_participant,
-        athletes(id, first_name, last_name, school, venmo_handle, zelle_email),
+        session_payout_rate,
+        athletes(id, first_name, last_name, school, venmo_handle, zelle_email, payout_rate),
         facilities(id, name),
         session_participants(id, amount_paid, youth_wrestler_id, stripe_fee)
       `)
@@ -294,6 +295,12 @@ export default async function AdminPage() {
       drop_in_count: dropInCount(s),
       stripe_fee_sum: stripeFeeSum(s),
       athlete_payout_date: s.athlete_payout_date ?? null,
+      session_payout_rate:
+        (s as { session_payout_rate?: number | null }).session_payout_rate ?? null,
+      coach_payout_rate:
+        o && (o as { payout_rate?: number | null }).payout_rate != null
+          ? Number((o as { payout_rate?: number | null }).payout_rate)
+          : null,
     };
   });
 
@@ -372,6 +379,11 @@ export default async function AdminPage() {
         price_per_participant: s.price_per_participant,
         current_participants: s.current_participants,
         participant_amount_paid_sum: participantAmountPaidSum(s),
+        session_payout_rate: (s as { session_payout_rate?: number | null }).session_payout_rate ?? null,
+        coach_payout_rate:
+          o && (o as { payout_rate?: number | null }).payout_rate != null
+            ? Number((o as { payout_rate?: number | null }).payout_rate)
+            : null,
       });
       if (s.status === 'completed') r.completed_count += 1;
     }
@@ -393,6 +405,11 @@ export default async function AdminPage() {
       price_per_participant: s.price_per_participant,
       current_participants: s.current_participants,
       participant_amount_paid_sum: participantAmountPaidSum(s),
+      session_payout_rate: (s as { session_payout_rate?: number | null }).session_payout_rate ?? null,
+      coach_payout_rate:
+        o && (o as { payout_rate?: number | null }).payout_rate != null
+          ? Number((o as { payout_rate?: number | null }).payout_rate)
+          : null,
     });
     if (existing) {
       existing.amount += payment;

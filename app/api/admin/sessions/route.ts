@@ -12,6 +12,7 @@ import {
   type CoachCreateSessionType,
 } from '@/lib/coach-session-pricing';
 import { normalizeUuidParam } from '@/lib/normalize-uuid-param';
+import { COACH_REVENUE_FRACTION } from '@/lib/pricing';
 
 /**
  * POST - Admin creates a small-group session: assign coach, set time/facility, get shareable link.
@@ -127,8 +128,7 @@ export async function POST(req: NextRequest) {
         : `Coach not found for that id (no matching users row). Refresh and pick the coach again.${mismatchHint}`;
       return NextResponse.json({ error: errorMsg }, { status: 404 });
     }
-    // Default to 80% (0.8000), founding coaches get 83.33% (0.8333)
-    const coachPayoutRate = (athlete as { payout_rate?: number }).payout_rate ?? 0.8000;
+    const coachPayoutRate = (athlete as { payout_rate?: number }).payout_rate ?? COACH_REVENUE_FRACTION;
 
     const sessionTypeKey = (sessionType || 'small_group') as CoachCreateSessionType;
     const defaultPrice = await getRecommendedPricePerParticipant(admin, athleteId, sessionTypeKey);
@@ -160,7 +160,7 @@ export async function POST(req: NextRequest) {
     const orgFee = 0;
     const stripeFee = 0;
     const totalPrice = 0;
-    const athletePayment = 0; // pay-per-person; coach payout = price × COACH_REVENUE_FRACTION × participants (5/6)
+    const athletePayment = 0; // pay-per-person; coach payout = price × coach share × participants
 
     // Assign session to the selected coach (parent_id = athlete_id) so they own it and see it on their schedule
     // published is not stored on sessions in all DBs — use body flag only for follower notifications
