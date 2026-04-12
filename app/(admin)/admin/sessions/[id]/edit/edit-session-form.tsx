@@ -625,7 +625,7 @@ export function EditSessionForm({
                 id="payout-amount"
                 type="number"
                 min={0}
-                step={5}
+                step={0.01}
                 value={payoutAmount}
                 onChange={(e) => setPayoutAmount(e.target.value)}
                 className="w-28"
