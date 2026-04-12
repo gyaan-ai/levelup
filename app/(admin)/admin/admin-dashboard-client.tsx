@@ -171,6 +171,8 @@ export type AdminUser = {
   role: string;
   created_at: string;
   last_login_at: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
 };
 
 export type BillingSummary = {
@@ -644,6 +646,10 @@ export function AdminDashboardClient({
   const [textGroupAdminSession, setTextGroupAdminSession] = useState<AdminSession | null>(null);
   const [userRoleFilter, setUserRoleFilter] = useState<string>('all');
   const [userSearch, setUserSearch] = useState('');
+  const [cockpitEditUser, setCockpitEditUser] = useState<AdminUser | null>(null);
+  const [cockpitEditRole, setCockpitEditRole] = useState('');
+  const [cockpitEditLoading, setCockpitEditLoading] = useState(false);
+  const [cockpitEditError, setCockpitEditError] = useState<string | null>(null);
   const [athleteSearch, setAthleteSearch] = useState('');
   const [leaderboardTimeFilter, setLeaderboardTimeFilter] = useState<'all' | '7d' | '30d' | '90d'>('all');
   const [leaderboardTypeFilter, setLeaderboardTypeFilter] = useState<string>('all');
@@ -1069,14 +1075,22 @@ export function AdminDashboardClient({
           ? 'Completed'
           : 'Cancelled / other';
 
-  const filteredUsers = users.filter((u) => {
-    if (userRoleFilter !== 'all' && u.role !== userRoleFilter) return false;
-    if (userSearch) {
-      const q = userSearch.toLowerCase();
-      if (!u.email.toLowerCase().includes(q)) return false;
-    }
-    return true;
-  });
+  const filteredUsers = useMemo(() => {
+    const q = userSearch.trim().toLowerCase();
+    const list = users.filter((u) => {
+      if (userRoleFilter !== 'all' && u.role !== userRoleFilter) return false;
+      if (q) {
+        const email = u.email.toLowerCase();
+        const ln = (u.last_name ?? '').toLowerCase();
+        const fn = (u.first_name ?? '').toLowerCase();
+        if (!email.includes(q) && !ln.includes(q) && !fn.includes(q)) return false;
+      }
+      return true;
+    });
+    // Newest signups first (same as server default; keeps order after filter)
+    list.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    return list;
+  }, [users, userRoleFilter, userSearch]);
 
   // Compute leaderboard data from sessions
   const leaderboardData = useMemo(() => {
@@ -4428,26 +4442,31 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
       if (subSection === 'parents') {
         return (
           <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-3">
               <div>
                 <h2 className="text-lg font-semibold">Users</h2>
                 <p className="text-sm text-muted-foreground">{filteredUsers.length} users</p>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 flex-wrap">
+                <Button variant="outline" size="sm" className="h-9" asChild>
+                  <Link href="/admin/users">Open full user management</Link>
+                </Button>
                 <Select value={userRoleFilter} onValueChange={setUserRoleFilter}>
-                  <SelectTrigger className="w-32 h-9">
+                  <SelectTrigger className="w-36 h-9">
                     <SelectValue placeholder="Role" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All roles</SelectItem>
                     <SelectItem value="parent">Parent</SelectItem>
+                    <SelectItem value="coach">Coach</SelectItem>
+                    <SelectItem value="youth_wrestler">Athlete</SelectItem>
                     <SelectItem value="admin">Admin</SelectItem>
                   </SelectContent>
                 </Select>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
-                    placeholder="Search users..."
+                    placeholder="Search email or name..."
                     className="pl-9 w-64"
                     value={userSearch}
                     onChange={(e) => setUserSearch(e.target.value)}
@@ -4462,19 +4481,21 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
                   <thead className="bg-muted/50">
                     <tr>
                       <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Email</th>
+                      <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Last name</th>
                       <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Role</th>
                       <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Created</th>
-                      <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Last Login</th>
+                      <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Last login</th>
+                      <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
                     {usersError ? (
                       <tr>
-                        <td colSpan={4} className="py-12 text-center text-red-500">{usersError}</td>
+                        <td colSpan={6} className="py-12 text-center text-red-500">{usersError}</td>
                       </tr>
                     ) : filteredUsers.length === 0 ? (
                       <tr>
-                        <td colSpan={4} className="py-12 text-center text-muted-foreground">
+                        <td colSpan={6} className="py-12 text-center text-muted-foreground">
                           <Users className="h-8 w-8 mx-auto mb-2 text-muted-foreground/50" />
                           <p>No users found</p>
                         </td>
@@ -4483,12 +4504,33 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
                       filteredUsers.map((u) => (
                         <tr key={u.id} className="hover:bg-muted/30 transition-colors">
                           <td className="py-3 px-4 font-medium">{u.email}</td>
+                          <td className="py-3 px-4 text-muted-foreground">
+                            {u.last_name?.trim() ? u.last_name.trim() : '—'}
+                          </td>
                           <td className="py-3 px-4">
                             <Badge variant={u.role === 'admin' ? 'default' : 'outline'}>{u.role}</Badge>
                           </td>
                           <td className="py-3 px-4 text-muted-foreground">{formatEST(new Date(u.created_at), 'MMM d, yyyy')}</td>
                           <td className="py-3 px-4 text-muted-foreground">
-                            {u.last_login_at ? formatEST(new Date(u.last_login_at), 'MMM d, yyyy') : '-'}
+                            {u.last_login_at
+                              ? formatEST(new Date(u.last_login_at), 'MMM d, yyyy h:mm a')
+                              : '—'}
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-8"
+                              onClick={() => {
+                                setCockpitEditError(null);
+                                setCockpitEditUser(u);
+                                setCockpitEditRole(u.role);
+                              }}
+                            >
+                              <Pencil className="h-3.5 w-3.5 mr-1" />
+                              Edit role
+                            </Button>
                           </td>
                         </tr>
                       ))
@@ -4497,6 +4539,101 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
                 </table>
               </div>
             </Card>
+
+            <Dialog
+              open={!!cockpitEditUser}
+              onOpenChange={(open) => {
+                if (!open) {
+                  setCockpitEditUser(null);
+                  setCockpitEditError(null);
+                }
+              }}
+            >
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Edit user role</DialogTitle>
+                  <DialogDescription>
+                    {cockpitEditUser?.email}
+                    {cockpitEditUser?.last_name?.trim() && (
+                      <span className="block mt-1 text-foreground">{cockpitEditUser.last_name.trim()}</span>
+                    )}
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-2">
+                  <div>
+                    <Label htmlFor="cockpit-user-role" className="text-sm font-medium">
+                      Role
+                    </Label>
+                    <Select value={cockpitEditRole} onValueChange={setCockpitEditRole}>
+                      <SelectTrigger id="cockpit-user-role" className="mt-2">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="parent">Parent</SelectItem>
+                        <SelectItem value="coach">Coach</SelectItem>
+                        <SelectItem value="admin">Admin</SelectItem>
+                        <SelectItem value="youth_wrestler">Athlete</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Coaches need a profile in Athletes (onboarding or admin). Use{' '}
+                    <Link href="/admin/users" className="text-accent underline">
+                      full user management
+                    </Link>{' '}
+                    for archive and more actions.
+                  </p>
+                  {cockpitEditError && (
+                    <p className="text-sm text-red-600 dark:text-red-400">{cockpitEditError}</p>
+                  )}
+                </div>
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setCockpitEditUser(null)}
+                    disabled={cockpitEditLoading}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    disabled={
+                      cockpitEditLoading ||
+                      !cockpitEditUser ||
+                      cockpitEditRole === cockpitEditUser.role
+                    }
+                    onClick={async () => {
+                      if (!cockpitEditUser) return;
+                      setCockpitEditLoading(true);
+                      setCockpitEditError(null);
+                      try {
+                        const res = await fetch(`/api/admin/users/${cockpitEditUser.id}`, {
+                          method: 'PATCH',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ role: cockpitEditRole }),
+                        });
+                        const data = await res.json().catch(() => ({}));
+                        if (!res.ok) {
+                          setCockpitEditError(
+                            typeof data.error === 'string' ? data.error : 'Could not update role'
+                          );
+                          return;
+                        }
+                        setCockpitEditUser(null);
+                        router.refresh();
+                      } catch {
+                        setCockpitEditError('Request failed');
+                      } finally {
+                        setCockpitEditLoading(false);
+                      }
+                    }}
+                  >
+                    {cockpitEditLoading ? 'Saving…' : 'Save'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
         );
       }

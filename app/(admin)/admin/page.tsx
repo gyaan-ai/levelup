@@ -103,7 +103,7 @@ export default async function AdminPage() {
       .limit(10000),
     admin
       .from('users')
-      .select('id, email, role, created_at')
+      .select('id, email, role, created_at, last_login_at, first_name, last_name')
       .order('created_at', { ascending: false }),
     admin
       .from('credits')
@@ -119,11 +119,26 @@ export default async function AdminPage() {
   if (usersRes.error) {
     console.error('Admin users fetch error:', usersRes.error);
   }
-  // Map users with last_login_at as null (column may not exist)
-  const usersRows = (usersRes.data ?? []).map((u) => ({
-    ...u,
-    last_login_at: null as string | null,
-  }));
+  const usersRows = (usersRes.data ?? []).map((u) => {
+    const row = u as {
+      id: string;
+      email: string;
+      role: string;
+      created_at: string;
+      last_login_at?: string | null;
+      first_name?: string | null;
+      last_name?: string | null;
+    };
+    return {
+      id: row.id,
+      email: row.email,
+      role: row.role,
+      created_at: row.created_at,
+      last_login_at: row.last_login_at ?? null,
+      first_name: row.first_name ?? null,
+      last_name: row.last_name ?? null,
+    };
+  });
   if (sessionsRes.error) {
     console.error('Admin sessions fetch error:', sessionsRes.error);
     console.error('Admin sessions error details:', JSON.stringify(sessionsRes.error, null, 2));
@@ -310,6 +325,8 @@ export default async function AdminPage() {
     role: u.role,
     created_at: u.created_at,
     last_login_at: u.last_login_at ?? null,
+    first_name: u.first_name ?? null,
+    last_name: u.last_name ?? null,
   }));
 
   const billing: BillingSummary = {

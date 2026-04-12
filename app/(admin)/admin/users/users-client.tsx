@@ -32,6 +32,8 @@ export type AdminUserRow = {
   created_at: string;
   last_login_at: string | null;
   archived_at: string | null;
+  first_name?: string | null;
+  last_name?: string | null;
   display_name?: string | null;
   school?: string | null;
   /** For coaches: true = visible on Browse Coaches, false = hidden. null = not a coach. */
@@ -72,7 +74,9 @@ export function AdminUsersClient({ initialUsers }: { initialUsers: AdminUserRow[
         const q = search.toLowerCase().trim();
         const matchEmail = u.email.toLowerCase().includes(q);
         const matchName = u.display_name?.toLowerCase().includes(q);
-        if (!matchEmail && !matchName) return false;
+        const matchLast = (u.last_name ?? '').toLowerCase().includes(q);
+        const matchFirst = (u.first_name ?? '').toLowerCase().includes(q);
+        if (!matchEmail && !matchName && !matchLast && !matchFirst) return false;
       }
       return true;
     });
@@ -303,6 +307,7 @@ export function AdminUsersClient({ initialUsers }: { initialUsers: AdminUserRow[
               <thead>
                 <tr className="border-b">
                   <th className="text-left py-2 font-medium">Profile / Name</th>
+                  <th className="text-left py-2 font-medium">Last name</th>
                   <th className="text-left py-2 font-medium">Email</th>
                   <th className="text-left py-2 font-medium">Role</th>
                   <th className="text-left py-2 font-medium">Kids / Athletes</th>
@@ -315,7 +320,7 @@ export function AdminUsersClient({ initialUsers }: { initialUsers: AdminUserRow[
               <tbody>
                 {filteredAndSorted.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-8 text-center text-muted-foreground">
+                    <td colSpan={9} className="py-8 text-center text-muted-foreground">
                       No users match filters.
                     </td>
                   </tr>
@@ -332,6 +337,7 @@ export function AdminUsersClient({ initialUsers }: { initialUsers: AdminUserRow[
                           <span className="block text-xs text-muted-foreground">{u.school}</span>
                         )}
                       </td>
+                      <td className="py-2 text-muted-foreground">{u.last_name?.trim() || '—'}</td>
                       <td className="py-2">
                         <a href={`mailto:${u.email}`} className="text-accent hover:underline">
                           {u.email}

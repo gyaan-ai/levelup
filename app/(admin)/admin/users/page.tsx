@@ -22,19 +22,33 @@ export default async function AdminUsersPage() {
   const admin = createAdminClient(tenant.slug);
   const { data: rows, error } = await admin
     .from('users')
-    .select('id, email, role, created_at, archived_at')
+    .select('id, email, role, created_at, archived_at, last_login_at, first_name, last_name')
     .order('created_at', { ascending: false });
 
   if (error) console.error('Admin users fetch error:', error);
-  
-  const userRows = (rows ?? []).map((u) => ({
-    id: u.id,
-    email: u.email,
-    role: u.role,
-    created_at: u.created_at,
-    last_login_at: null as string | null,
-    archived_at: (u as { archived_at?: string | null }).archived_at ?? null,
-  }));
+
+  const userRows = (rows ?? []).map((u) => {
+    const row = u as {
+      id: string;
+      email: string;
+      role: string;
+      created_at: string;
+      archived_at?: string | null;
+      last_login_at?: string | null;
+      first_name?: string | null;
+      last_name?: string | null;
+    };
+    return {
+      id: row.id,
+      email: row.email,
+      role: row.role,
+      created_at: row.created_at,
+      last_login_at: row.last_login_at ?? null,
+      first_name: row.first_name ?? null,
+      last_name: row.last_name ?? null,
+      archived_at: row.archived_at ?? null,
+    };
+  });
 
   const athleteIds = userRows.filter((u) => u.role === 'coach').map((u) => u.id);
   const athleteMap = new Map<string, { first_name: string; last_name: string; school: string; active: boolean }>();
@@ -98,8 +112,11 @@ export default async function AdminUsersPage() {
 
   const users: AdminUserRow[] = userRows.map((u) => {
     const profile = u.role === 'coach' ? athleteMap.get(u.id) : null;
+    const fromUsersName = [u.first_name, u.last_name].filter(Boolean).join(' ').trim() || null;
     const display_name =
-      profile ? [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim() || null : null;
+      profile != null
+        ? [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim() || null
+        : fromUsersName;
     const kids = u.role === 'parent' ? (kidsByParentId.get(u.id) ?? []) : null;
     return {
       ...u,
