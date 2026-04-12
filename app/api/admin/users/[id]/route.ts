@@ -36,11 +36,12 @@ export async function PATCH(
     if (!hasChange) return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
 
     const admin = createAdminClient(tenant.slug);
+    // Do not select archived_at here — some DBs predate that migration and the column may not exist.
     const { data, error } = await admin
       .from('users')
       .update(updates)
       .eq('id', id)
-      .select('id, email, role, archived_at')
+      .select('id, email, role')
       .single();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
