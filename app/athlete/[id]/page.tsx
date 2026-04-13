@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import { Star, User, MapPin, Award, Shield, CheckCircle, MessageCircle, DollarSign, Pencil, Calendar, Users, ChevronRight } from 'lucide-react';
+import { Star, User, MapPin, Award, Shield, CheckCircle, MessageCircle, DollarSign, Pencil, Calendar, Users, ChevronRight, Share2 } from 'lucide-react';
 import { BackLink } from '@/components/back-link';
 import { formatEST } from '@/lib/format-date';
 import { SessionTypeBadge } from '@/components/session-type-badge';
@@ -310,6 +310,12 @@ export default async function AthleteProfilePage({
 
               {/* Book + Message + Follow + Edit */}
               <div className="flex flex-wrap items-center gap-3">
+                <Link href={`/coach/${athlete.id}`}>
+                  <Button size="lg" variant="outline" className="w-full md:w-auto border-accent/40">
+                    <Share2 className="h-4 w-4 mr-2" />
+                    All sessions (share link)
+                  </Button>
+                </Link>
                 <Link href={youthWrestlerId ? `/book/${athlete.id}?youthWrestlerId=${encodeURIComponent(youthWrestlerId)}` : `/book/${athlete.id}`}>
                   <Button
                     size="lg"
@@ -399,7 +405,7 @@ export default async function AthleteProfilePage({
                 const openSlots = Math.max(0, max - current);
                 const price = s.price_per_participant;
                 return (
-                  <Link key={s.id} href={`/training?coach=${athlete.id}&tab=sessions`}>
+                  <Link key={s.id} href={`/coach/${athlete.id}`}>
                     <div className="flex items-center gap-4 p-4 rounded-xl bg-zinc-900/50 border border-zinc-800/50 hover:border-zinc-700 transition-all">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
@@ -437,9 +443,9 @@ export default async function AthleteProfilePage({
                 );
               })}
             </div>
-            <Link href={`/training?coach=${athlete.id}&tab=sessions`}>
+            <Link href={`/coach/${athlete.id}`}>
               <Button variant="outline" className="w-full mt-4">
-                View all sessions
+                View all sessions (public link)
               </Button>
             </Link>
           </CardContent>
