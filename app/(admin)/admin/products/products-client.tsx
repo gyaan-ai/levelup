@@ -267,10 +267,10 @@ export function ProductsClient({ products }: ProductsClientProps) {
           <CardHeader className="pb-2">
             <CardDescription className="flex items-center gap-2">
               <Users className="h-4 w-4" />
-              Revenue per partner (3 spots)
+              Revenue per partner (2 spots)
             </CardDescription>
             <CardTitle className="text-2xl">
-              ${((products.find(p => p.slug === 'partner')?.parent_price || 0) * 3).toFixed(2)}
+              ${((products.find(p => p.slug === 'partner')?.parent_price || 0) * 2).toFixed(2)}
             </CardTitle>
           </CardHeader>
         </Card>

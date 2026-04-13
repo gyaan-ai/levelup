@@ -121,7 +121,7 @@ export async function POST(req: NextRequest) {
 
     const numParticipants = youthWrestlerIdsNorm.length;
     const isPartner = sessionMode === 'partner-invite' || sessionMode === 'partner-open';
-    const maxParticipants = isPartner ? 3 : Math.max(1, numParticipants);
+    const maxParticipants = isPartner ? 2 : Math.max(1, numParticipants);
     const sessionType = sessionMode === 'private' ? '1-on-1' : '2-athlete';
 
     // Family / percentage discount (e.g. 10% off). Early-adopter $0 sessions are disabled.

@@ -24,7 +24,7 @@ type Facility = { id: string; name: string; school: string; address?: string | n
 /** Format only — price comes from recommendedPrices (rate card) with coach override in the price field */
 const SESSION_FORMAT = {
   small_group: { label: 'Small group', maxParticipants: 6, duration: 60 },
-  partner: { label: 'Partner (up to 3 athletes)', maxParticipants: 3, duration: 60 },
+  partner: { label: 'Partner (2 athletes)', maxParticipants: 2, duration: 60 },
   private: { label: 'Private (1-on-1)', maxParticipants: 1, duration: 60 },
 } as const;
 
@@ -372,8 +372,8 @@ export function CoachCreateSessionForm({
                 <Label>Max athletes</Label>
                 <Input
                   type="number"
-                  min={1}
-                  max={12}
+                  min={sessionType === 'private' ? 1 : 2}
+                  max={sessionType === 'partner' ? 2 : sessionType === 'private' ? 1 : 12}
                   value={maxParticipants}
                   onChange={(e) => setMaxParticipants(Number(e.target.value) || 1)}
                 />

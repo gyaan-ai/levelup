@@ -104,7 +104,7 @@ export default async function BookPage({
 
   if (coachServices && coachServices.length > 0) {
     const durationLabel = (m: number) => m === 30 ? '30 min' : m === 60 ? '1 hr' : m === 90 ? '1 hr 30 min' : m === 120 ? '2 hr' : `${m} min`;
-    const typeLabel = (t: string) => t === 'private' ? 'Private (1:1)' : t === 'partner' ? 'Partner (1:3)' : 'Small group';
+    const typeLabel = (t: string) => t === 'private' ? 'Private (1:1)' : t === 'partner' ? 'Partner (1:2)' : 'Small group';
     products = coachServices.map((s) => ({
       id: s.id,
       slug: `service-${s.id}`,

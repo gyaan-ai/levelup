@@ -80,14 +80,16 @@ export function EditSessionForm({
   // Session type presets for auto-fill
   const SESSION_PRESETS = {
     small_group: { label: 'Small Group', price: 30, maxParticipants: 6 },
-    partner: { label: 'Partner Session', price: 50, maxParticipants: 3 },
+    partner: { label: 'Partner Session', price: 50, maxParticipants: 2 },
     private: { label: 'Private Session', price: 75, maxParticipants: 1 },
   } as const;
 
   // Only change type - don't auto-fill price/max on existing sessions (coach may have customized)
   const handleSessionTypeChange = (newType: string) => {
     setSessionTypeState(newType);
-    // Don't overwrite price/max - they're editable and coach may have set custom values
+    if (newType === 'partner') setMax('2');
+    else if (newType === 'private') setMax('1');
+    else if (newType === 'small_group') setMax(String(SESSION_PRESETS.small_group.maxParticipants));
   };
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -155,7 +157,8 @@ export function EditSessionForm({
   const focusOptions = focusAreaList.length > 0 ? focusAreaList : [...SESSION_FOCUS_AREAS];
   const optionsWithCurrent = focus && !focusOptions.includes(focus) ? [focus, ...focusOptions] : focusOptions;
 
-  const isGroup = sessionType === 'group' || sessionType === 'small_group';
+  const isGroup =
+    sessionTypeState === 'group' || sessionTypeState === 'small_group';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -337,7 +340,7 @@ export function EditSessionForm({
                   <Input
                     id="max"
                     type="number"
-                    min={1}
+                    min={2}
                     max={20}
                     value={max}
                     onChange={(e) => setMax(e.target.value)}
@@ -367,8 +370,14 @@ export function EditSessionForm({
                 <Input
                   id="max-other"
                   type="number"
-                  min={1}
-                  max={20}
+                  min={sessionTypeState === 'private' ? 1 : 2}
+                  max={
+                    sessionTypeState === 'partner'
+                      ? 2
+                      : sessionTypeState === 'private'
+                        ? 1
+                        : 20
+                  }
                   value={max}
                   onChange={(e) => setMax(e.target.value)}
                 />

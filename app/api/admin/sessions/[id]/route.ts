@@ -88,8 +88,22 @@ export async function PATCH(
       }
     }
     if (body.max_participants !== undefined) {
-      const max = Math.min(20, Math.max(1, Number(body.max_participants) || 2));
+      let max = Math.min(20, Math.max(1, Number(body.max_participants) || 2));
+      const effectiveType =
+        body.session_type !== undefined
+          ? body.session_type === 'small_group'
+            ? 'group'
+            : body.session_type === 'partner'
+              ? '2-athlete'
+              : '1-on-1'
+          : session.session_type;
+      if (effectiveType === '2-athlete') {
+        max = 2;
+      }
       updates.max_participants = max;
+    }
+    if (body.session_type === 'partner') {
+      updates.max_participants = 2;
     }
     if (body.price_per_participant !== undefined) {
       const price = Math.max(0, Number(body.price_per_participant) ?? 0);

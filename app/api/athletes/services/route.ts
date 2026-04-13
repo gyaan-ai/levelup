@@ -70,7 +70,7 @@ export async function POST(req: Request) {
       ? body.sessionType
       : 'private';
     let maxParticipants = 1;
-    if (sessionType === 'partner') maxParticipants = 3;
+    if (sessionType === 'partner') maxParticipants = 2;
     else if (sessionType === 'small_group') {
       const n = Math.min(20, Math.max(3, Number(body.maxParticipants) || 6));
       maxParticipants = n;

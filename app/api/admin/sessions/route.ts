@@ -96,7 +96,9 @@ export async function POST(req: NextRequest) {
     const max =
       sessionType === 'private'
         ? Math.min(20, Math.max(1, Number.isFinite(rawMax) && rawMax > 0 ? rawMax : 1))
-        : Math.min(20, Math.max(2, Number.isFinite(rawMax) && rawMax > 0 ? rawMax : sessionType === 'partner' ? 3 : 6));
+        : sessionType === 'partner'
+          ? 2
+          : Math.min(20, Math.max(2, Number.isFinite(rawMax) && rawMax > 0 ? rawMax : 6));
     const duration = Math.min(120, Math.max(30, Number(durationMinutes) || 60));
 
     // Coach must exist in athletes (same id as auth user for coaches) — also get payout rate
