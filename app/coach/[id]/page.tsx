@@ -13,7 +13,7 @@ import { SessionTypeBadge } from '@/components/session-type-badge';
 import { SchoolLogo } from '@/components/school-logo';
 import { formatEST } from '@/lib/format-date';
 import { getEffectiveFilledCount } from '@/lib/sessions';
-import { Calendar, MapPin, Users, ChevronRight, Lock, Share2 } from 'lucide-react';
+import { Calendar, MapPin, Users, ChevronRight, Lock, Share2, UserCheck } from 'lucide-react';
 import type { Metadata } from 'next';
 
 export const dynamic = 'force-dynamic';
@@ -32,6 +32,25 @@ type SessionRow = {
   partner_invite_code?: string | null;
   facilities?: { name?: string } | { name?: string }[] | null;
 };
+
+type ParticipantRow = {
+  session_id: string;
+  roster_first_name?: string | null;
+  roster_last_name?: string | null;
+  youth_wrestlers?: { first_name?: string | null; last_name?: string | null } | null;
+};
+
+function displayNameFromParticipant(p: ParticipantRow): string | null {
+  const raw = p.youth_wrestlers;
+  const yw = (Array.isArray(raw) ? raw[0] : raw) as
+    | { first_name?: string | null; last_name?: string | null }
+    | null
+    | undefined;
+  const fromYw = yw ? `${yw.first_name ?? ''} ${yw.last_name ?? ''}`.trim() : '';
+  const fromRoster = [p.roster_first_name, p.roster_last_name].filter(Boolean).join(' ').trim();
+  const name = (fromYw || fromRoster).trim();
+  return name || null;
+}
 
 export async function generateMetadata({
   params,
@@ -124,17 +143,28 @@ export default async function CoachPublicSchedulePage({ params }: { params: Prom
 
   const sessions = (sessionRows ?? []) as SessionRow[];
 
-  /** Optional: load participant counts for fuller sessions (same as browse). */
   const sessionIds = sessions.map((s) => s.id);
-  const filledBySession = new Map<string, number>();
+  /** Roster rows per session: names for coaches/parents viewing this schedule; counts drive filled vs max. */
+  const participantsBySession = new Map<string, ParticipantRow[]>();
   if (sessionIds.length > 0) {
     const { data: parts } = await admin
       .from('session_participants')
-      .select('session_id')
+      .select(
+        `
+        session_id,
+        roster_first_name,
+        roster_last_name,
+        youth_wrestlers ( first_name, last_name )
+      `
+      )
       .in('session_id', sessionIds);
-    for (const p of parts ?? []) {
-      const sid = (p as { session_id: string }).session_id;
-      filledBySession.set(sid, (filledBySession.get(sid) ?? 0) + 1);
+    for (const raw of parts ?? []) {
+      const p = raw as ParticipantRow;
+      const sid = p.session_id;
+      if (!sid) continue;
+      const list = participantsBySession.get(sid) ?? [];
+      list.push(p);
+      participantsBySession.set(sid, list);
     }
   }
 
@@ -217,14 +247,17 @@ export default async function CoachPublicSchedulePage({ params }: { params: Prom
             const dt = new Date(s.scheduled_datetime);
             const fac = Array.isArray(s.facilities) ? s.facilities[0] : s.facilities;
             const max = s.max_participants ?? 1;
-            const listedOverride = filledBySession.get(s.id);
-            const filled = getEffectiveFilledCount(
-              {
-                current_participants: s.current_participants,
-                max_participants: max,
-              },
-              listedOverride
-            );
+            const rosterRows = participantsBySession.get(s.id) ?? [];
+            const filled = getEffectiveFilledCount({
+              current_participants: s.current_participants,
+              max_participants: max,
+              session_participants: rosterRows,
+            });
+            const nameList = rosterRows
+              .map((row) => displayNameFromParticipant(row))
+              .filter((n): n is string => Boolean(n));
+            nameList.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+            const unnamedCount = Math.max(0, filled - nameList.length);
             const openSlots = Math.max(0, max - filled);
             const isFull = max > 0 && openSlots <= 0;
             const price = s.price_per_participant;
@@ -285,14 +318,48 @@ export default async function CoachPublicSchedulePage({ params }: { params: Prom
                               {fac.name}
                             </span>
                           )}
-                          <span className="inline-flex items-center gap-1">
-                            <Users className="h-3.5 w-3.5" />
-                            {isFull ? 'Full' : `${openSlots} spot${openSlots !== 1 ? 's' : ''} left`}
+                          <span className="inline-flex items-center gap-1 flex-wrap">
+                            <Users className="h-3.5 w-3.5 shrink-0" />
+                            {filled > 0 && (
+                              <span className="inline-flex items-center gap-1 text-foreground">
+                                <UserCheck className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                                {filled} registered
+                                {' · '}
+                              </span>
+                            )}
+                            <span>
+                              {isFull
+                                ? 'Full'
+                                : filled === 0
+                                  ? `${openSlots} spot${openSlots !== 1 ? 's' : ''} open`
+                                  : `${openSlots} spot${openSlots !== 1 ? 's' : ''} left`}
+                            </span>
                           </span>
                           {price != null && Number(price) > 0 && (
                             <span className="text-foreground font-medium">${Number(price)}</span>
                           )}
                         </div>
+                        {filled > 0 && (
+                          <div className="mt-2 rounded-md border border-border/70 bg-muted/30 px-3 py-2">
+                            <p className="text-xs font-medium text-foreground mb-1">Wrestlers registered</p>
+                            {nameList.length > 0 ? (
+                              <ul className="text-sm text-muted-foreground list-disc list-inside space-y-0.5">
+                                {nameList.map((n, idx) => (
+                                  <li key={`${s.id}-${idx}`}>{n}</li>
+                                ))}
+                                {unnamedCount > 0 && (
+                                  <li className="list-none -ml-1 text-xs italic">
+                                    +{unnamedCount} more registration{unnamedCount !== 1 ? 's' : ''} (name not shown)
+                                  </li>
+                                )}
+                              </ul>
+                            ) : (
+                              <p className="text-sm text-muted-foreground">
+                                {filled} registration{filled !== 1 ? 's' : ''} — names will appear here when available.
+                              </p>
+                            )}
+                          </div>
+                        )}
                       </div>
                       <div className="flex flex-wrap gap-2 pt-1">
                         {isFull ? (
