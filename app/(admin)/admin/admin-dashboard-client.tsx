@@ -925,6 +925,7 @@ export function AdminDashboardClient({
   const [athleteEditSaving, setAthleteEditSaving] = useState(false);
   const [athletePhotoUploading, setAthletePhotoUploading] = useState(false);
   const [athletePhotoError, setAthletePhotoError] = useState<string | null>(null);
+  const [copiedCoachPublicLink, setCopiedCoachPublicLink] = useState(false);
   const [deactivatingId, setDeactivatingId] = useState<string | null>(null);
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [deletingAthleteId, setDeletingAthleteId] = useState<string | null>(null);
@@ -4924,6 +4925,7 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
           if (!open) {
             setEditingAthleteId(null);
             setAthletePhotoError(null);
+            setCopiedCoachPublicLink(false);
           }
         }}
       >
@@ -4932,6 +4934,52 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
             <DialogTitle>Edit Coach</DialogTitle>
             <DialogDescription>Update coach profile information</DialogDescription>
           </DialogHeader>
+          {editingAthleteId ? (
+            <div className="rounded-lg border border-border bg-muted/30 px-3 py-3 space-y-2">
+              <Label className="text-foreground">Public sessions link</Label>
+              <p className="text-xs text-muted-foreground">
+                Lists all upcoming sessions for this coach (no login). Same as on their public profile.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                <Input
+                  readOnly
+                  className="font-mono text-xs sm:text-sm"
+                  value={
+                    (process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, '') ||
+                      (typeof window !== 'undefined' ? window.location.origin : '')) +
+                    `/coach/${editingAthleteId}`
+                  }
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0"
+                  onClick={async () => {
+                    const url =
+                      (process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, '') ||
+                        (typeof window !== 'undefined' ? window.location.origin : '')) +
+                      `/coach/${editingAthleteId}`;
+                    await navigator.clipboard.writeText(url);
+                    setCopiedCoachPublicLink(true);
+                    setTimeout(() => setCopiedCoachPublicLink(false), 2000);
+                  }}
+                >
+                  {copiedCoachPublicLink ? (
+                    <>
+                      <Check className="h-4 w-4 mr-1" />
+                      Copied
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-4 w-4 mr-1" />
+                      Copy
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          ) : null}
           {!athleteEditForm ? (
             <div className="py-8 flex items-center justify-center">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />

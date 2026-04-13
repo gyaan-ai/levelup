@@ -27,7 +27,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { RequestFacilityBlock } from '@/components/request-facility-block';
-import { Globe, Lock } from 'lucide-react';
+import { Check, Copy, Globe, Lock, Share2 } from 'lucide-react';
 import { BackLink } from '@/components/back-link';
 import Link from 'next/link';
 
@@ -46,7 +46,7 @@ type ProfileFormValues = z.infer<typeof profileSchema>;
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, userRole, effectiveRole } = useAuth();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -57,6 +57,7 @@ export default function ProfilePage() {
   const [photoFocusX, setPhotoFocusX] = useState(50);
   const [photoFocusY, setPhotoFocusY] = useState(50);
   const [isPublic, setIsPublic] = useState(true);
+  const [copiedPublicSessionsLink, setCopiedPublicSessionsLink] = useState(false);
   const visibilityModalRef = useRef<HTMLDialogElement>(null);
   const photoContainerRef = useRef<HTMLDivElement>(null);
   const photoImgRef = useRef<HTMLImageElement>(null);
@@ -257,6 +258,13 @@ export default function ProfilePage() {
     );
   }
 
+  const isCoachProfile = effectiveRole === 'coach' || userRole === 'coach';
+  const publicSessionsLink =
+    user?.id &&
+    (process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, '') ||
+      (typeof window !== 'undefined' ? window.location.origin : '')) +
+      `/coach/${user.id}`;
+
   return (
     <div className="container mx-auto px-4 py-8 max-w-2xl">
       <div className="flex flex-wrap items-center gap-4 mb-6">
@@ -283,6 +291,53 @@ export default function ProfilePage() {
           {saveSuccess && (
             <div className="mb-4 p-3 bg-accent/10 border border-accent rounded-md">
               <p className="text-sm text-foreground">{saveSuccess}</p>
+            </div>
+          )}
+
+          {isCoachProfile && user?.id && publicSessionsLink && (
+            <div className="mb-6 rounded-lg border border-border bg-muted/30 p-4 space-y-3">
+              <div className="flex items-start gap-2">
+                <Share2 className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
+                <div className="space-y-1 min-w-0 flex-1">
+                  <p className="text-sm font-medium">Public sessions link</p>
+                  <p className="text-xs text-muted-foreground">
+                    Share this URL to show everyone your upcoming sessions (no login). It does not change when you edit
+                    your profile.
+                  </p>
+                </div>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                <Input readOnly className="font-mono text-xs sm:text-sm" value={publicSessionsLink} />
+                <div className="flex gap-2 shrink-0">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      await navigator.clipboard.writeText(publicSessionsLink);
+                      setCopiedPublicSessionsLink(true);
+                      setTimeout(() => setCopiedPublicSessionsLink(false), 2000);
+                    }}
+                  >
+                    {copiedPublicSessionsLink ? (
+                      <>
+                        <Check className="h-4 w-4 mr-1" />
+                        Copied
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-4 w-4 mr-1" />
+                        Copy
+                      </>
+                    )}
+                  </Button>
+                  <Button type="button" variant="secondary" size="sm" asChild>
+                    <Link href={`/coach/${user.id}`} target="_blank" rel="noopener noreferrer">
+                      Open
+                    </Link>
+                  </Button>
+                </div>
+              </div>
             </div>
           )}
 
