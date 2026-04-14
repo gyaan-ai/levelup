@@ -16,6 +16,7 @@ import {
   type CoachPayout,
   type CreditRecord,
   type YouthSessionSpendLine,
+  type RecentSignupRow,
 } from './admin-dashboard-client';
 import { coachPayoutUsd } from '@/lib/coach-session-payout';
 
@@ -70,7 +71,7 @@ export default async function AdminPage() {
 
   const admin = createAdminClient(tenant.slug);
 
-  const [sessionsRes, usersRes, creditsRes, athletesRes, reviewsRes] = await Promise.all([
+  const [sessionsRes, usersRes, creditsRes, athletesRes, reviewsRes, youthWrestlersRes] = await Promise.all([
     admin
       .from('sessions')
       .select(`
@@ -114,6 +115,11 @@ export default async function AdminPage() {
       .select('id, first_name, last_name, school, average_rating, review_count, active')
       .order('last_name'),
     admin.from('reviews').select('athlete_id, rating'),
+    admin
+      .from('youth_wrestlers')
+      .select('id, first_name, last_name, parent_id, created_at')
+      .order('created_at', { ascending: false })
+      .limit(80),
   ]);
 
   if (usersRes.error) {
@@ -151,6 +157,9 @@ export default async function AdminPage() {
   }
   if (reviewsRes.error) {
     console.error('Admin reviews fetch error:', reviewsRes.error);
+  }
+  if (youthWrestlersRes.error) {
+    console.error('Admin youth_wrestlers fetch error:', youthWrestlersRes.error);
   }
 
   const reviewAggByAthlete = new Map<string, { sum: number; count: number }>();
@@ -457,6 +466,56 @@ export default async function AdminPage() {
     expires_at: c.expires_at,
   }));
 
+  function displayNameFromUser(u: {
+    email: string;
+    first_name?: string | null;
+    last_name?: string | null;
+  }): string {
+    const n = [u.first_name, u.last_name].filter(Boolean).join(' ').trim();
+    return n || u.email;
+  }
+
+  const fromAccounts: RecentSignupRow[] = usersRows
+    .filter((u) => u.role === 'parent' || u.role === 'coach')
+    .slice(0, 45)
+    .map((u) => {
+      const base = {
+        id: u.id,
+        name: displayNameFromUser(u),
+        email: u.email,
+        created_at: u.created_at,
+      };
+      return u.role === 'coach'
+        ? ({ kind: 'coach' as const, ...base })
+        : ({ kind: 'parent' as const, ...base });
+    });
+
+  const ywRows = (youthWrestlersRes.data ?? []) as Array<{
+    id: string;
+    first_name: string;
+    last_name: string;
+    parent_id: string;
+    created_at: string;
+  }>;
+
+  const fromWrestlers: RecentSignupRow[] = ywRows.slice(0, 45).map((y) => {
+    const parentUser = usersRows.find((x) => x.id === y.parent_id);
+    const parent_email = parentUser?.email ?? emailByUserId.get(y.parent_id) ?? '—';
+    const parent_name = parentUser ? displayNameFromUser(parentUser) : parent_email;
+    return {
+      kind: 'youth_wrestler' as const,
+      id: y.id,
+      name: `${y.first_name} ${y.last_name}`.trim(),
+      parent_name,
+      parent_email,
+      created_at: y.created_at,
+    };
+  });
+
+  const recentSignups: RecentSignupRow[] = [...fromAccounts, ...fromWrestlers]
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))
+    .slice(0, 36);
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
@@ -474,6 +533,7 @@ export default async function AdminPage() {
         credits={credits}
         usersError={usersRes.error?.message ?? null}
         youthSessionSpendLines={youthSessionSpendLines}
+        recentSignups={recentSignups}
       />
     </div>
   );
