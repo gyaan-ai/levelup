@@ -84,6 +84,15 @@ export default async function HomePage() {
         >
           <Link href="/login">Log in</Link>
         </Button>
+
+        <Button
+          size="lg"
+          variant="outline"
+          asChild
+          className="mt-3 w-full max-w-[280px] border-2 border-accent/60 bg-transparent text-accent hover:bg-accent/10"
+        >
+          <Link href="/signup/coach">Apply as a coach</Link>
+        </Button>
         
         {/* Scroll indicator */}
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce">
@@ -167,16 +176,18 @@ export default async function HomePage() {
 
       {/* For Coaches - minimal footer-style */}
       <section className="py-10 px-6 border-t border-accent/20 bg-black">
-        <div className="max-w-sm mx-auto text-center">
-          <p className="text-white/60 text-sm mb-3">
+        <div className="max-w-sm mx-auto text-center space-y-3">
+          <p className="text-white/60 text-sm">
             NCAA wrestler or elite coach?
           </p>
-          <Link 
-            href="/signup?role=coach" 
-            className="text-accent text-sm font-medium hover:underline"
+          <Button
+            size="lg"
+            variant="outline"
+            asChild
+            className="w-full max-w-[280px] border-accent/60 text-accent hover:bg-accent/10"
           >
-            Apply to join The Guild
-          </Link>
+            <Link href="/signup/coach">Apply to join The Guild</Link>
+          </Button>
         </div>
       </section>
     </main>

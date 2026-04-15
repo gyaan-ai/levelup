@@ -278,6 +278,22 @@ export function CoachCreateSessionForm({
               </Select>
             </div>
 
+            <div>
+              <Label>Who can sign up</Label>
+              <Select value={joinPolicy} onValueChange={(v) => setJoinPolicy(v as 'public' | 'invite_only')}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="public">Public — anyone with the link can join</SelectItem>
+                  <SelectItem value="invite_only">Invite only — private invite code</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Public is the default: share your link and families can register. Choose invite only when you want a private code.
+              </p>
+            </div>
+
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <Label>When</Label>
@@ -400,18 +416,6 @@ export function CoachCreateSessionForm({
                         onChange={(e) => setMaxParticipants(Number(e.target.value) || 1)}
                       />
                     </div>
-                  </div>
-                  <div>
-                    <Label>Who can join</Label>
-                    <Select value={joinPolicy} onValueChange={(v) => setJoinPolicy(v as 'public' | 'invite_only')}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="public">Anyone with link</SelectItem>
-                        <SelectItem value="invite_only">Invite only</SelectItem>
-                      </SelectContent>
-                    </Select>
                   </div>
                 </div>
               )}

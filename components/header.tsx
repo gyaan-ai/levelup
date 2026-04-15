@@ -117,6 +117,12 @@ export function Header() {
               <Link href="/signup">Book Training</Link>
             </Button>
           </div>
+          <Link
+            href="/signup/coach"
+            className="mt-2 block text-center text-xs font-semibold text-black/90 underline-offset-2 hover:underline"
+          >
+            Apply as a coach
+          </Link>
         </div>
       )}
       <div className="container mx-auto px-4">
