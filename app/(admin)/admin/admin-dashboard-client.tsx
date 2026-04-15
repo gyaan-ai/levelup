@@ -240,7 +240,15 @@ export type YouthSessionSpendLine = {
 /** Merged timeline for overview: newest parent/coach accounts + youth wrestler profiles. */
 export type RecentSignupRow =
   | { kind: 'coach'; id: string; name: string; email: string; created_at: string }
-  | { kind: 'parent'; id: string; name: string; email: string; created_at: string }
+  | {
+      kind: 'parent';
+      id: string;
+      name: string;
+      email: string;
+      created_at: string;
+      /** Wrestler first/last names when parent has a name on file too (second line in UI). */
+      kids_summary?: string | null;
+    }
   | {
       kind: 'youth_wrestler';
       id: string;

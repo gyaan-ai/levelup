@@ -8,6 +8,7 @@ import { sendCoachNewSignupSms } from '@/lib/twilio';
 import { formatEST } from '@/lib/format-date';
 import { headers } from 'next/headers';
 import { maybeBackfillRosterSnapshot } from '@/lib/session-roster-snapshot';
+import { maybeBackfillUserNameFromCheckoutSession } from '@/lib/stripe-backfill-user-name';
 
 /**
  * Fetch the actual Stripe fee from a PaymentIntent's balance transaction.
@@ -209,6 +210,8 @@ export async function POST(req: NextRequest) {
           });
         }
 
+        await maybeBackfillUserNameFromCheckoutSession(supabase, parentId, session);
+
         console.log('Cart checkout webhook completed:', { rows: rows.length, parentId, creditsUsed });
         return NextResponse.json({ received: true });
       }
@@ -402,6 +405,16 @@ export async function POST(req: NextRequest) {
             .update({ remaining: (ent.remaining ?? 1) - 1 })
             .eq('id', earlyAdopterEntitlementId);
         }
+      }
+
+      const { data: sessParentRow } = await supabase
+        .from('sessions')
+        .select('parent_id')
+        .eq('id', sessionId)
+        .maybeSingle();
+      const bookingParentId = (sessParentRow as { parent_id?: string } | null)?.parent_id;
+      if (bookingParentId) {
+        await maybeBackfillUserNameFromCheckoutSession(supabase, bookingParentId, session);
       }
     }
 

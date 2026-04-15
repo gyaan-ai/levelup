@@ -71,7 +71,8 @@ export default async function AdminPage() {
 
   const admin = createAdminClient(tenant.slug);
 
-  const [sessionsRes, usersRes, creditsRes, athletesRes, reviewsRes, youthWrestlersRes] = await Promise.all([
+  const [sessionsRes, usersRes, creditsRes, athletesRes, reviewsRes, youthWrestlersRes, allYouthNamesRes] =
+    await Promise.all([
     admin
       .from('sessions')
       .select(`
@@ -120,6 +121,7 @@ export default async function AdminPage() {
       .select('id, first_name, last_name, parent_id, created_at')
       .order('created_at', { ascending: false })
       .limit(80),
+    admin.from('youth_wrestlers').select('parent_id, first_name, last_name'),
   ]);
 
   if (usersRes.error) {
@@ -160,6 +162,9 @@ export default async function AdminPage() {
   }
   if (youthWrestlersRes.error) {
     console.error('Admin youth_wrestlers fetch error:', youthWrestlersRes.error);
+  }
+  if (allYouthNamesRes.error) {
+    console.error('Admin youth_wrestlers (all names) fetch error:', allYouthNamesRes.error);
   }
 
   const reviewAggByAthlete = new Map<string, { sum: number; count: number }>();
@@ -466,6 +471,29 @@ export default async function AdminPage() {
     expires_at: c.expires_at,
   }));
 
+  const coachNameByUserId = new Map(
+    athletesRows.map((a) => [a.id, `${a.first_name} ${a.last_name}`.trim()])
+  );
+
+  const kidsLinesByParentId = new Map<string, string>();
+  {
+    const byParent = new Map<string, string[]>();
+    for (const row of (allYouthNamesRes.data ?? []) as Array<{
+      parent_id: string;
+      first_name: string;
+      last_name: string;
+    }>) {
+      const label = `${row.first_name} ${row.last_name}`.trim();
+      if (!label) continue;
+      const arr = byParent.get(row.parent_id) ?? [];
+      arr.push(label);
+      byParent.set(row.parent_id, arr);
+    }
+    for (const [pid, names] of byParent) {
+      kidsLinesByParentId.set(pid, names.join(', '));
+    }
+  }
+
   function displayNameFromUser(u: {
     email: string;
     first_name?: string | null;
@@ -475,19 +503,55 @@ export default async function AdminPage() {
     return n || u.email;
   }
 
+  function parentRowName(u: (typeof usersRows)[0]): { name: string; kids_summary: string | null } {
+    const fromUser = [u.first_name, u.last_name].filter(Boolean).join(' ').trim();
+    const kids = kidsLinesByParentId.get(u.id) ?? '';
+    let name: string;
+    if (fromUser) {
+      name = fromUser;
+    } else if (kids) {
+      name = `Parent · ${kids}`;
+    } else {
+      name = u.email;
+    }
+    const kids_summary = fromUser && kids ? kids : null;
+    return { name, kids_summary };
+  }
+
+  function parentDisplayForWrestlerRow(
+    parentUser: (typeof usersRows)[0] | undefined,
+    parentId: string
+  ): string {
+    if (!parentUser) return emailByUserId.get(parentId) ?? '—';
+    if (parentUser.role === 'parent') {
+      return parentRowName(parentUser).name;
+    }
+    return displayNameFromUser(parentUser);
+  }
+
   const fromAccounts: RecentSignupRow[] = usersRows
     .filter((u) => u.role === 'parent' || u.role === 'coach')
     .slice(0, 45)
     .map((u) => {
-      const base = {
+      if (u.role === 'coach') {
+        const name = coachNameByUserId.get(u.id) || displayNameFromUser(u);
+        return {
+          kind: 'coach' as const,
+          id: u.id,
+          name,
+          email: u.email,
+          created_at: u.created_at,
+        };
+      }
+      const { name, kids_summary } = parentRowName(u);
+      return {
+        kind: 'parent' as const,
         id: u.id,
-        name: displayNameFromUser(u),
+        name,
         email: u.email,
         created_at: u.created_at,
+        kids_summary,
       };
-      return u.role === 'coach'
-        ? ({ kind: 'coach' as const, ...base })
-        : ({ kind: 'parent' as const, ...base });
     });
 
   const ywRows = (youthWrestlersRes.data ?? []) as Array<{
@@ -501,7 +565,7 @@ export default async function AdminPage() {
   const fromWrestlers: RecentSignupRow[] = ywRows.slice(0, 45).map((y) => {
     const parentUser = usersRows.find((x) => x.id === y.parent_id);
     const parent_email = parentUser?.email ?? emailByUserId.get(y.parent_id) ?? '—';
-    const parent_name = parentUser ? displayNameFromUser(parentUser) : parent_email;
+    const parent_name = parentDisplayForWrestlerRow(parentUser, y.parent_id);
     return {
       kind: 'youth_wrestler' as const,
       id: y.id,
