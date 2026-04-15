@@ -13,7 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Copy, Check, Plus, X, Share2 } from 'lucide-react';
+import { Check, Plus, X, Share2, ChevronDown, ChevronUp } from 'lucide-react';
 import { formatEST } from '@/lib/format-date';
 import { SESSION_FOCUS_AREAS } from '@/lib/focus-areas';
 import type { CoachCreateSessionType } from '@/lib/coach-session-pricing';
@@ -62,6 +62,7 @@ export function CoachCreateSessionForm({
   }>>([]);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [focusAreaList, setFocusAreaList] = useState<string[]>([]);
+  const [moreOpen, setMoreOpen] = useState(false);
 
   useEffect(() => {
     fetch('/api/focus-areas')
@@ -164,9 +165,10 @@ export function CoachCreateSessionForm({
   return (
     <Card>
       <CardHeader className="pb-4">
-        <CardTitle className="text-lg">Session Details</CardTitle>
+        <CardTitle className="text-lg">New session</CardTitle>
         <CardDescription>
-          Creating as <span className="font-medium text-foreground">{coachName}</span>
+          <span className="font-medium text-foreground">{coachName}</span>
+          {' — '}type, place, time, then share the link.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-5">
@@ -245,7 +247,6 @@ export function CoachCreateSessionForm({
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Session Type */}
             <div>
               <Label>Session type</Label>
               <Select value={sessionType} onValueChange={(v) => handleSessionTypeChange(v as SessionTypeKey)}>
@@ -258,12 +259,8 @@ export function CoachCreateSessionForm({
                   <SelectItem value="private">{SESSION_FORMAT.private.label}</SelectItem>
                 </SelectContent>
               </Select>
-              <p className="text-xs text-muted-foreground mt-1.5">
-                Suggested price for this format is filled in below (from your rate card). You can change it to any amount parents will pay.
-              </p>
             </div>
 
-            {/* Facility */}
             <div>
               <Label>Facility</Label>
               <Select value={facilityId} onValueChange={setFacilityId} required>
@@ -281,61 +278,28 @@ export function CoachCreateSessionForm({
               </Select>
             </div>
 
-            {/* Focus Areas */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <Label>Focus (1)</Label>
-                <Select value={focusArea || '__none__'} onValueChange={(v) => setFocusArea(v === '__none__' ? '' : v)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="e.g. Takedowns" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">None</SelectItem>
-                    {focusOptions.map((area) => (
-                      <SelectItem key={area} value={area}>{area}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Focus (2)</Label>
-                <Select value={focusArea2 || '__none__'} onValueChange={(v) => setFocusArea2(v === '__none__' ? '' : v)}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Optional" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="__none__">None</SelectItem>
-                    {focusOptions.filter((a) => a !== focusArea).map((area) => (
-                      <SelectItem key={area} value={area}>{area}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {/* Date/Time */}
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <Label>Date & Time</Label>
+                <Label>When</Label>
                 <Button type="button" variant="ghost" size="sm" onClick={addDateTime} className="h-7 gap-1 text-xs">
-                  <Plus className="h-3 w-3" /> Add date
+                  <Plus className="h-3 w-3" /> Add another time
                 </Button>
               </div>
               {dateTimes.map((dt, idx) => (
-                <div key={idx} className="flex items-center gap-2">
+                <div key={idx} className="flex items-center gap-2 flex-wrap">
                   <Input
                     type="date"
                     value={dt.date}
                     onChange={(e) => updateDateTime(idx, 'date', e.target.value)}
                     min={today}
-                    className="flex-1"
+                    className="min-w-0 flex-1 sm:max-w-[11rem]"
                     required={idx === 0}
                   />
                   <Input
                     type="time"
                     value={dt.time}
                     onChange={(e) => updateDateTime(idx, 'time', e.target.value)}
-                    className="w-28"
+                    className="w-[7.5rem]"
                     required={idx === 0}
                   />
                   {dateTimes.length > 1 && (
@@ -353,61 +317,104 @@ export function CoachCreateSessionForm({
               ))}
             </div>
 
-            {/* Capacity & Price */}
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <Label>Duration</Label>
-                <Select value={String(durationMinutes)} onValueChange={(v) => setDurationMinutes(Number(v))}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="45">45 min</SelectItem>
-                    <SelectItem value="60">60 min</SelectItem>
-                    <SelectItem value="90">90 min</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <Label>Max athletes</Label>
-                <Input
-                  type="number"
-                  min={sessionType === 'private' ? 1 : 2}
-                  max={sessionType === 'partner' ? 2 : sessionType === 'private' ? 1 : 12}
-                  value={maxParticipants}
-                  onChange={(e) => setMaxParticipants(Number(e.target.value) || 1)}
-                />
-              </div>
-              <div>
-                <Label htmlFor="coach-session-price">
-                  {sessionType === 'private' ? 'Session price ($)' : 'Price per spot ($)'}
-                </Label>
-                <Input
-                  id="coach-session-price"
-                  type="number"
-                  min={0}
-                  step={1}
-                  value={pricePerParticipant}
-                  onChange={(e) => setPricePerParticipant(Number(e.target.value) || 0)}
-                />
-                <p className="text-xs text-muted-foreground mt-1">
-                  Suggested: ${recommendedPrices[sessionType]?.toFixed(0) ?? '—'} · What parents pay — edit freely.
-                </p>
-              </div>
+            <div>
+              <Label htmlFor="coach-session-price">
+                {sessionType === 'private' ? 'Price ($)' : 'Price per spot ($)'}
+              </Label>
+              <Input
+                id="coach-session-price"
+                type="number"
+                min={0}
+                step={1}
+                value={pricePerParticipant}
+                onChange={(e) => setPricePerParticipant(Number(e.target.value) || 0)}
+                className="text-base"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Suggested from your rate card: ${recommendedPrices[sessionType]?.toFixed(0) ?? '—'} — change if you need to.
+              </p>
             </div>
 
-            {/* Who Can Join */}
-            <div>
-              <Label>Who Can Join</Label>
-              <Select value={joinPolicy} onValueChange={(v) => setJoinPolicy(v as 'public' | 'invite_only')}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="public">Anyone with link</SelectItem>
-                  <SelectItem value="invite_only">Invite only</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="rounded-lg border border-border bg-muted/30">
+              <button
+                type="button"
+                onClick={() => setMoreOpen((o) => !o)}
+                className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left text-sm font-medium text-foreground hover:bg-muted/50 rounded-lg"
+              >
+                <span>More options</span>
+                {moreOpen ? <ChevronUp className="h-4 w-4 shrink-0 text-muted-foreground" /> : <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />}
+              </button>
+              {moreOpen && (
+                <div className="space-y-4 px-3 pb-3 pt-0 border-t border-border/80">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3">
+                    <div>
+                      <Label>Focus</Label>
+                      <Select value={focusArea || '__none__'} onValueChange={(v) => setFocusArea(v === '__none__' ? '' : v)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Optional" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">None</SelectItem>
+                          {focusOptions.map((area) => (
+                            <SelectItem key={area} value={area}>{area}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Second focus</Label>
+                      <Select value={focusArea2 || '__none__'} onValueChange={(v) => setFocusArea2(v === '__none__' ? '' : v)}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Optional" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__none__">None</SelectItem>
+                          {focusOptions.filter((a) => a !== focusArea).map((area) => (
+                            <SelectItem key={area} value={area}>{area}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label>Duration</Label>
+                      <Select value={String(durationMinutes)} onValueChange={(v) => setDurationMinutes(Number(v))}>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="45">45 min</SelectItem>
+                          <SelectItem value="60">60 min</SelectItem>
+                          <SelectItem value="90">90 min</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label>Max athletes</Label>
+                      <Input
+                        type="number"
+                        min={sessionType === 'private' ? 1 : 2}
+                        max={sessionType === 'partner' ? 2 : sessionType === 'private' ? 1 : 12}
+                        value={maxParticipants}
+                        onChange={(e) => setMaxParticipants(Number(e.target.value) || 1)}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <Label>Who can join</Label>
+                    <Select value={joinPolicy} onValueChange={(v) => setJoinPolicy(v as 'public' | 'invite_only')}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="public">Anyone with link</SelectItem>
+                        <SelectItem value="invite_only">Invite only</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              )}
             </div>
 
             <Button type="submit" disabled={loading} className="w-full min-h-[48px] bg-[#D4AF37] hover:bg-[#B8963C] text-black font-medium">

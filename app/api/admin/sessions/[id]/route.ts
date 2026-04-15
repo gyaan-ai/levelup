@@ -27,7 +27,9 @@ export async function PATCH(
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
-    if (userData?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const isAdmin = userData?.role === 'admin';
+    const isCoach = userData?.role === 'coach';
+    if (!isAdmin && !isCoach) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
     let body: {
       session_type?: 'small_group' | 'partner' | 'private';
@@ -57,7 +59,13 @@ export async function PATCH(
     if (fetchErr || !session) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
-    // Allow admin to edit any session that isn't cancelled
+
+    const coachOwnsSession = isCoach && session.athlete_id === user.id;
+    if (!isAdmin && !coachOwnsSession) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    // Allow admin or owning coach to edit any session that isn't cancelled
     if (session.status === 'cancelled') {
       return NextResponse.json(
         { error: 'Cancelled sessions cannot be edited' },
@@ -171,23 +179,59 @@ export async function DELETE(
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
-    if (userData?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const isAdmin = userData?.role === 'admin';
+    const isCoach = userData?.role === 'coach';
+    if (!isAdmin && !isCoach) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
     const admin = createAdminClient(tenant.slug);
     const { data: session, error: fetchErr } = await admin
       .from('sessions')
-      .select('id, status')
+      .select('id, status, athlete_id, current_participants')
       .eq('id', sessionId)
       .single();
 
     if (fetchErr || !session) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
+
+    const coachOwnsSession = isCoach && session.athlete_id === user.id;
+    if (!isAdmin && !coachOwnsSession) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     if (session.status !== 'scheduled' && session.status !== 'pending_payment') {
       return NextResponse.json(
         { error: 'Only scheduled or pending-payment sessions can be deleted' },
         { status: 400 }
       );
+    }
+
+    if (!isAdmin) {
+      if ((session.current_participants ?? 0) > 0) {
+        return NextResponse.json(
+          {
+            error:
+              'This session has registrations. Cancel it from your session list instead of deleting.',
+          },
+          { status: 400 }
+        );
+      }
+      const { count, error: cntErr } = await admin
+        .from('session_participants')
+        .select('id', { count: 'exact', head: true })
+        .eq('session_id', sessionId);
+      if (cntErr) {
+        return NextResponse.json({ error: 'Could not verify participants' }, { status: 500 });
+      }
+      if ((count ?? 0) > 0) {
+        return NextResponse.json(
+          {
+            error:
+              'This session has registrations. Cancel it from your session list instead of deleting.',
+          },
+          { status: 400 }
+        );
+      }
     }
 
     const { error: deleteErr } = await admin.from('sessions').delete().eq('id', sessionId);

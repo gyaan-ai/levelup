@@ -38,6 +38,8 @@ type Props = {
   currentParticipants: number;
   scheduledDate: string;
   scheduledTime: string;
+  /** Coach UI hides org financial tools */
+  formMode?: 'admin' | 'coach';
   /** Gross coach payout for this session (from bookings), if any */
   athletePayment?: number | null;
   /** YYYY-MM-DD when payout was marked paid */
@@ -61,6 +63,7 @@ export function EditSessionForm({
   currentParticipants,
   scheduledDate: initialDate,
   scheduledTime: initialTime,
+  formMode = 'admin',
   athletePayment = null,
   athletePayoutDate = null,
   participantAmountPaidSum = 0,
@@ -184,7 +187,7 @@ export function EditSessionForm({
         setError(data.error || 'Failed to update session');
         return;
       }
-      router.push('/admin');
+      router.push(formMode === 'coach' ? '/coach-sessions' : '/admin');
       router.refresh();
     } catch {
       setError('Something went wrong');
@@ -405,6 +408,12 @@ export function EditSessionForm({
                 variant="outline"
                 className="text-destructive border-destructive hover:bg-destructive/10"
                 onClick={() => setShowDeleteConfirm(true)}
+                disabled={formMode === 'coach' && currentParticipants > 0}
+                title={
+                  formMode === 'coach' && currentParticipants > 0
+                    ? 'Cancel from My sessions to refund families when someone is registered'
+                    : undefined
+                }
               >
                 <Trash2 className="h-4 w-4 mr-2" />
                 Delete session
@@ -416,6 +425,7 @@ export function EditSessionForm({
     </Card>
 
     {/* Financials Section */}
+    {formMode === 'admin' && (
     <Card>
       <CardHeader>
         <CardTitle>Session Financials</CardTitle>
@@ -546,13 +556,18 @@ export function EditSessionForm({
         </div>
       </CardContent>
     </Card>
+    )}
 
     {(sessionStatus === 'scheduled' || sessionStatus === 'pending_payment') && (
       <Card>
         <CardHeader>
-          <CardTitle>1 · Mark session complete</CardTitle>
+          <CardTitle>{formMode === 'coach' ? 'Mark session complete' : '1 · Mark session complete'}</CardTitle>
           <CardDescription>
-            Do this first: record that this session happened. Status becomes completed so it counts in coach stats and unlocks payout below.
+            {formMode === 'coach' ? (
+              <>When the session is over, mark it complete so it counts in your stats and reviews.</>
+            ) : (
+              <>Do this first: record that this session happened. Status becomes completed so it counts in coach stats and unlocks payout below.</>
+            )}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -590,6 +605,7 @@ export function EditSessionForm({
       </Card>
     )}
 
+    {formMode === 'admin' && (
     <Card className={sessionStatus !== 'completed' ? 'opacity-90' : undefined}>
       <CardHeader>
         <CardTitle>2 · Record coach payout</CardTitle>
@@ -681,13 +697,16 @@ export function EditSessionForm({
         )}
       </CardContent>
     </Card>
+    )}
 
     <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Delete session?</DialogTitle>
           <DialogDescription>
-            This will permanently delete this session and all participants. This cannot be undone.
+            {formMode === 'coach' && currentParticipants > 0
+              ? 'Sessions with registrations cannot be deleted here — cancel from your session list to credit families.'
+              : 'This will permanently delete this session and all participants. This cannot be undone.'}
           </DialogDescription>
         </DialogHeader>
         <DialogFooter>
@@ -706,7 +725,7 @@ export function EditSessionForm({
                   setShowDeleteConfirm(false);
                   return;
                 }
-                router.push('/admin');
+                router.push(formMode === 'coach' ? '/coach-sessions' : '/admin');
                 router.refresh();
               } catch {
                 setError('Failed to delete session');

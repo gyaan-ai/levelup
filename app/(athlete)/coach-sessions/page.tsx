@@ -1,7 +1,9 @@
 import { redirect } from 'next/navigation';
 import { headers, cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
+import { purgeEmptyPastSessions } from '@/lib/purge-empty-past-sessions';
 import { CoachSessionsClient, type CommunitySession, type SlotRequestItem } from './coach-sessions-client';
 import type { CoachSession } from '@/app/(athlete)/athlete-dashboard/coach-schedule-card';
 import { CopyCoachAllAthletePhonesButton } from '@/components/copy-coach-all-athlete-phones-button';
@@ -29,6 +31,9 @@ export default async function CoachSessionsPage({
   const host = headersList.get('host') || '';
   const tenant = getTenantByDomain(host);
   if (!tenant) redirect('/404');
+
+  const admin = createAdminClient(tenant.slug);
+  await purgeEmptyPastSessions(admin);
 
   const supabase = await createClient(tenant.slug);
   const { data: { user } } = await supabase.auth.getUser();

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Check, X, DollarSign, Smartphone, Trash2, Loader2, Share2, ExternalLink, CalendarPlus } from 'lucide-react';
+import { Check, X, DollarSign, Smartphone, Trash2, Loader2, Share2, ExternalLink, CalendarPlus, Pencil } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { CoachTextGroupDialog } from '@/components/coach-text-group-dialog';
 import { CopySessionPhonesButton } from '@/components/copy-session-phones-button';
@@ -277,8 +277,12 @@ export function CoachSessionsClient({
               <CardContent className="py-8 text-center text-muted-foreground text-sm space-y-3">
                 <p>No upcoming sessions.</p>
                 <p>
-                  <Link href="/availability" className="text-accent font-medium underline">Set your schedule</Link>
-                  {' '}so parents can book. New group session? Ask your admin to create one.
+                  <Link href="/availability" className="text-accent font-medium underline">Set your availability</Link>
+                  {' '}so parents can book, or{' '}
+                  <Link href="/coach-sessions/create" className="text-accent font-medium underline">
+                    create a session
+                  </Link>
+                  {' '}with a share link.
                 </p>
               </CardContent>
             </Card>
@@ -345,6 +349,12 @@ export function CoachSessionsClient({
                         size="sm"
                         className="min-h-[44px] touch-manipulation"
                       />
+                      <Button variant="outline" size="sm" className="min-h-[44px] touch-manipulation" asChild>
+                        <Link href={`/coach-sessions/${session.id}/edit`}>
+                          <Pencil className="h-4 w-4 mr-1" />
+                          Edit
+                        </Link>
+                      </Button>
                       {showSessionSmsCopyAndTextGroup(session) && (
                         <>
                           <Button

@@ -373,8 +373,8 @@ export function CoachHomeClient({
           <Link href="/availability">
             <Button variant="outline" className="w-full min-h-[56px] touch-manipulation flex flex-col gap-0.5">
               <Calendar className="h-4 w-4 shrink-0" />
-              <span className="text-xs">Schedule</span>
-              <span className="text-[10px] font-normal text-muted-foreground">Set availability</span>
+              <span className="text-xs">Availability</span>
+              <span className="text-[10px] font-normal text-muted-foreground">When you&apos;re free</span>
             </Button>
           </Link>
           <Link href="/coach-sessions">

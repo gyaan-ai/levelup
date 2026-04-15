@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { headers } from 'next/headers';
+import { headers, cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
@@ -22,11 +22,27 @@ export default async function CoachCreateSessionPage() {
   const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
   if (userData?.role !== 'coach' && userData?.role !== 'admin') redirect('/athlete-dashboard');
 
-  const { data: athlete } = await supabase.from('athletes').select('*').eq('id', user.id).maybeSingle();
-  if (!athlete) redirect('/onboarding');
+  const cookieStore = await cookies();
+  const viewAsCoachId =
+    userData?.role === 'admin' ? cookieStore.get('levelup_view_as_coach_id')?.value : null;
+  const coachId = viewAsCoachId || user.id;
+
+  let { data: athlete } = await supabase.from('athletes').select('*').eq('id', coachId).maybeSingle();
+
+  const admin = createAdminClient(tenant.slug);
+  if (!athlete && userData?.role === 'admin' && viewAsCoachId) {
+    const { data: coachAthlete } = await admin.from('athletes').select('*').eq('id', coachId).maybeSingle();
+    athlete = coachAthlete;
+  }
+
+  if (!athlete) {
+    if (userData?.role === 'admin') {
+      redirect(viewAsCoachId ? '/athlete-dashboard' : '/admin');
+    }
+    redirect('/onboarding');
+  }
 
   // Get coach's facilities (primary + secondary)
-  const admin = createAdminClient(tenant.slug);
   const facilityIds = [athlete.facility_id, athlete.secondary_facility_id].filter(Boolean) as string[];
   
   let facilities: Array<{ id: string; name: string; school: string; address?: string | null }> = [];
@@ -47,7 +63,6 @@ export default async function CoachCreateSessionPage() {
     facilities = allFacilities ?? [];
   }
 
-  const coachId = user.id;
   const coachName = [athlete.first_name, athlete.last_name].filter(Boolean).join(' ') || 'Coach';
 
   const recommendedPrices = await getRecommendedPricesForCoach(admin, coachId);
@@ -58,9 +73,9 @@ export default async function CoachCreateSessionPage() {
         <BackLink fallbackHref="/coach-sessions" label="Back to Sessions" />
       </div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-foreground">Create Session</h1>
+        <h1 className="text-2xl font-bold text-foreground">Create session</h1>
         <p className="text-muted-foreground text-sm mt-1">
-          Set up a session, get a share link, send it to families.
+          Fill the basics, then copy your link for families.
         </p>
       </div>
       <CoachCreateSessionForm
