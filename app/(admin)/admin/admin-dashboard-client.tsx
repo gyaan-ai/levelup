@@ -2189,110 +2189,6 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
       
       return (
         <div className="space-y-6">
-          <Card className="border-[#B89D60]/30 shadow-sm">
-            <CardHeader className="pb-2 flex flex-row flex-wrap items-start justify-between gap-3">
-              <div className="space-y-1">
-                <CardTitle className="text-base flex items-center gap-2">
-                  <UserPlus className="h-5 w-5 text-[#B89D60] shrink-0" />
-                  Recent sign-ups
-                </CardTitle>
-                <CardDescription>
-                  Newest parent & coach accounts and youth wrestler profiles. Names show in the Name column; account email
-                  or parent is on the right.
-                </CardDescription>
-              </div>
-              <div className="flex flex-wrap gap-2 shrink-0">
-                <Button variant="outline" size="sm" asChild>
-                  <Link href="/admin/users">All users</Link>
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="text-[#B89D60]"
-                  onClick={() => handleNavChange('people', 'coaches')}
-                >
-                  Coaches list
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="p-0">
-              {recentSignups.length === 0 ? (
-                <p className="text-sm text-muted-foreground px-6 pb-6">No sign-ups to show.</p>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="bg-muted/30 border-y border-border">
-                      <tr>
-                        <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wide">
-                          When
-                        </th>
-                        <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wide">
-                          Type
-                        </th>
-                        <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wide">
-                          Name
-                        </th>
-                        <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wide">
-                          Email / parent
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border">
-                      {recentSignups.map((row) => (
-                        <tr key={`${row.kind}-${row.id}`} className="hover:bg-muted/15 align-top">
-                          <td className="py-2.5 px-4 whitespace-nowrap text-muted-foreground">
-                            <span className="text-foreground">{formatEST(new Date(row.created_at), 'MMM d, yyyy')}</span>
-                            <span className="block text-xs">{formatEST(new Date(row.created_at), 'h:mm a')}</span>
-                          </td>
-                          <td className="py-2.5 px-4">
-                            <Badge variant="secondary" className="text-xs font-normal">
-                              {row.kind === 'coach' ? 'Coach' : row.kind === 'parent' ? 'Parent' : 'Wrestler'}
-                            </Badge>
-                          </td>
-                          <td className="py-2.5 px-4">
-                            <div className="font-medium text-foreground">{row.name}</div>
-                            {row.kind === 'coach' && (
-                              <Link
-                                href={`/admin?section=people&sub=coaches&edit=${row.id}`}
-                                className="text-xs text-[#B89D60] hover:underline"
-                              >
-                                Edit coach
-                              </Link>
-                            )}
-                            {row.kind === 'parent' && (
-                              <Link href="/admin/users" className="text-xs text-[#B89D60] hover:underline">
-                                Users
-                              </Link>
-                            )}
-                            {row.kind === 'youth_wrestler' && (
-                              <Link href={`/wrestlers/${row.id}`} className="text-xs text-[#B89D60] hover:underline">
-                                Wrestler profile
-                              </Link>
-                            )}
-                          </td>
-                          <td className="py-2.5 px-4 text-muted-foreground break-words max-w-md">
-                            {row.kind === 'youth_wrestler' ? (
-                              <div className="space-y-0.5">
-                                <p>
-                                  <span className="text-xs text-muted-foreground">Parent: </span>
-                                  <span className="text-foreground/90">{row.parent_name}</span>
-                                </p>
-                                <p className="text-xs">{row.parent_email}</p>
-                              </div>
-                            ) : (
-                              <span>{row.email}</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
           {/* Hero KPIs - Proper Accounting */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <KpiCard
@@ -2498,6 +2394,110 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
                   </tbody>
                 </table>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card className="border-[#B89D60]/30 shadow-sm">
+            <CardHeader className="pb-2 flex flex-row flex-wrap items-start justify-between gap-3">
+              <div className="space-y-1">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <UserPlus className="h-5 w-5 text-[#B89D60] shrink-0" />
+                  Recent sign-ups
+                </CardTitle>
+                <CardDescription>
+                  Newest parent & coach accounts and youth wrestler profiles. Names show in the Name column; account email
+                  or parent is on the right.
+                </CardDescription>
+              </div>
+              <div className="flex flex-wrap gap-2 shrink-0">
+                <Button variant="outline" size="sm" asChild>
+                  <Link href="/admin/users">All users</Link>
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="text-[#B89D60]"
+                  onClick={() => handleNavChange('people', 'coaches')}
+                >
+                  Coaches list
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="p-0">
+              {recentSignups.length === 0 ? (
+                <p className="text-sm text-muted-foreground px-6 pb-6">No sign-ups to show.</p>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-muted/30 border-y border-border">
+                      <tr>
+                        <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wide">
+                          When
+                        </th>
+                        <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wide">
+                          Type
+                        </th>
+                        <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wide">
+                          Name
+                        </th>
+                        <th className="text-left py-2.5 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wide">
+                          Email / parent
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {recentSignups.map((row) => (
+                        <tr key={`${row.kind}-${row.id}`} className="hover:bg-muted/15 align-top">
+                          <td className="py-2.5 px-4 whitespace-nowrap text-muted-foreground">
+                            <span className="text-foreground">{formatEST(new Date(row.created_at), 'MMM d, yyyy')}</span>
+                            <span className="block text-xs">{formatEST(new Date(row.created_at), 'h:mm a')}</span>
+                          </td>
+                          <td className="py-2.5 px-4">
+                            <Badge variant="secondary" className="text-xs font-normal">
+                              {row.kind === 'coach' ? 'Coach' : row.kind === 'parent' ? 'Parent' : 'Wrestler'}
+                            </Badge>
+                          </td>
+                          <td className="py-2.5 px-4">
+                            <div className="font-medium text-foreground">{row.name}</div>
+                            {row.kind === 'coach' && (
+                              <Link
+                                href={`/admin?section=people&sub=coaches&edit=${row.id}`}
+                                className="text-xs text-[#B89D60] hover:underline"
+                              >
+                                Edit coach
+                              </Link>
+                            )}
+                            {row.kind === 'parent' && (
+                              <Link href="/admin/users" className="text-xs text-[#B89D60] hover:underline">
+                                Users
+                              </Link>
+                            )}
+                            {row.kind === 'youth_wrestler' && (
+                              <Link href={`/wrestlers/${row.id}`} className="text-xs text-[#B89D60] hover:underline">
+                                Wrestler profile
+                              </Link>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-4 text-muted-foreground break-words max-w-md">
+                            {row.kind === 'youth_wrestler' ? (
+                              <div className="space-y-0.5">
+                                <p>
+                                  <span className="text-xs text-muted-foreground">Parent: </span>
+                                  <span className="text-foreground/90">{row.parent_name}</span>
+                                </p>
+                                <p className="text-xs">{row.parent_email}</p>
+                              </div>
+                            ) : (
+                              <span>{row.email}</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
