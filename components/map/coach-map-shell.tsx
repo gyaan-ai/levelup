@@ -2,17 +2,19 @@
 
 import Link from 'next/link';
 import { CoachLocatorMap } from '@/components/map/coach-locator-map';
-import type { CoachMapPin } from '@/lib/map/fetch-coach-map-pins';
+import type { CoachMapPin, CoachMapStats } from '@/lib/map/fetch-coach-map-pins';
 
 export function CoachMapShell({
   accessToken,
   initialPins,
   initialCities,
+  initialStats,
   showFiltersBelowMap = false,
 }: {
   accessToken: string;
   initialPins: CoachMapPin[];
   initialCities: string[];
+  initialStats: CoachMapStats | null;
   showFiltersBelowMap?: boolean;
 }) {
   if (!accessToken) {
@@ -24,6 +26,7 @@ export function CoachMapShell({
       accessToken={accessToken}
       initialPins={initialPins}
       initialCities={initialCities}
+      initialStats={initialStats}
       showFiltersBelowMap={showFiltersBelowMap}
     />
   );

@@ -23,6 +23,7 @@ export default async function CoachesMapPage() {
   const result = await fetchCoachMapPins(tenant.slug);
   const pins = result.ok ? result.pins : [];
   const cities = result.ok ? result.cities : [];
+  const initialStats = result.ok ? result.stats : null;
   const accessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN ?? '';
 
   const jsonLd = {
@@ -75,6 +76,7 @@ export default async function CoachesMapPage() {
             accessToken={accessToken}
             initialPins={pins}
             initialCities={cities}
+            initialStats={initialStats}
             showFiltersBelowMap={false}
           />
         </div>

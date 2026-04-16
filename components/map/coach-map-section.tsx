@@ -5,6 +5,7 @@ export async function CoachMapSection({ tenantSlug }: { tenantSlug: string }) {
   const result = await fetchCoachMapPins(tenantSlug);
   const pins = result.ok ? result.pins : [];
   const cities = result.ok ? result.cities : [];
+  const initialStats = result.ok ? result.stats : null;
   const accessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN ?? '';
 
   return (
@@ -22,6 +23,7 @@ export async function CoachMapSection({ tenantSlug }: { tenantSlug: string }) {
             accessToken={accessToken}
             initialPins={pins}
             initialCities={cities}
+            initialStats={initialStats}
             showFiltersBelowMap
           />
         </div>

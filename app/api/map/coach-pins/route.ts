@@ -20,5 +20,9 @@ export async function GET() {
     return NextResponse.json({ error: result.error }, { status: 500 });
   }
 
-  return NextResponse.json({ pins: result.pins, cities: result.cities });
+  return NextResponse.json({
+    pins: result.pins,
+    cities: result.cities,
+    stats: result.stats,
+  });
 }

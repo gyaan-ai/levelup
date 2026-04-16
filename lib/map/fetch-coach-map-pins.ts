@@ -3,6 +3,13 @@ import { isSessionOpenForParentBrowse } from '@/lib/sessions';
 
 export type SessionKind = 'private' | 'partner' | 'small_group';
 
+/** Why the map might show zero pins (for empty-state copy). */
+export type CoachMapStats = {
+  facilitiesWithCoordinates: number;
+  /** Active coaches whose primary or secondary facility has lat/lng. */
+  coachesLinkedToGeocodedFacilities: number;
+};
+
 export type CoachMapPin = {
   pinKey: string;
   coachId: string;
@@ -57,7 +64,10 @@ function coachHasOpenUpcomingSession(
 
 export async function fetchCoachMapPins(
   tenantSlug: string
-): Promise<{ ok: true; pins: CoachMapPin[]; cities: string[] } | { ok: false; error: string }> {
+): Promise<
+  | { ok: true; pins: CoachMapPin[]; cities: string[]; stats: CoachMapStats }
+  | { ok: false; error: string }
+> {
   const admin = createAdminClient(tenantSlug);
 
   const { data: facilities, error: facErr } = await admin
@@ -72,8 +82,14 @@ export async function fetchCoachMapPins(
   }
 
   const facilityIds = new Set((facilities ?? []).map((f) => f.id));
+  const facilitiesWithCoordinates = facilities?.length ?? 0;
   if (facilityIds.size === 0) {
-    return { ok: true, pins: [], cities: [] };
+    return {
+      ok: true,
+      pins: [],
+      cities: [],
+      stats: { facilitiesWithCoordinates: 0, coachesLinkedToGeocodedFacilities: 0 },
+    };
   }
 
   const { data: coaches, error: coachErr } = await admin
@@ -82,18 +98,22 @@ export async function fetchCoachMapPins(
       'id, first_name, last_name, photo_url, school, year, weight_class, average_rating, review_count, facility_id, secondary_facility_id'
     )
     .eq('active', true)
-    .eq('status', 'active');
+    .or('status.eq.active,status.is.null');
 
   if (coachErr) {
     console.error('[fetchCoachMapPins] athletes', coachErr);
     return { ok: false, error: 'Failed to load coaches' };
   }
 
+  let coachesLinkedToGeocodedFacilities = 0;
   const coachIds: string[] = [];
   for (const c of coaches ?? []) {
     const primary = c.facility_id && facilityIds.has(c.facility_id);
     const secondary = c.secondary_facility_id && facilityIds.has(c.secondary_facility_id);
-    if (primary || secondary) coachIds.push(c.id as string);
+    if (primary || secondary) {
+      coachesLinkedToGeocodedFacilities += 1;
+      coachIds.push(c.id as string);
+    }
   }
 
   const sessionByCoach = new Map<
@@ -205,5 +225,13 @@ export async function fetchCoachMapPins(
 
   const cities = Array.from(citySet).sort((a, b) => a.localeCompare(b));
 
-  return { ok: true, pins, cities };
+  return {
+    ok: true,
+    pins,
+    cities,
+    stats: {
+      facilitiesWithCoordinates,
+      coachesLinkedToGeocodedFacilities,
+    },
+  };
 }

@@ -13,9 +13,28 @@ import { formatEST } from '@/lib/format-date';
 import { NC_BOUNDS_LNG_LAT, NC_MAX_BOUNDS_LNG_LAT, GUILD_GOLD } from '@/lib/map/nc-bounds';
 import { cn } from '@/lib/utils';
 import { MapPin, Navigation, X } from 'lucide-react';
-import type { CoachMapPin, SessionKind } from '@/lib/map/fetch-coach-map-pins';
+import type { CoachMapPin, CoachMapStats, SessionKind } from '@/lib/map/fetch-coach-map-pins';
 
 export type { CoachMapPin };
+
+function CoachMapEmptyHint({ stats }: { stats: CoachMapStats }) {
+  let body: string;
+  if (stats.facilitiesWithCoordinates === 0) {
+    body =
+      'No facilities have map coordinates yet. In Supabase, set latitude and longitude on each row in facilities (WGS84). Pins only appear after both values are filled.';
+  } else if (stats.coachesLinkedToGeocodedFacilities === 0) {
+    body =
+      'No active coaches are linked to a geocoded facility. In Supabase, set athletes.facility_id or secondary_facility_id to a facility that has latitude and longitude.';
+  } else {
+    body = 'Coach pins could not be built. Check server logs or contact support.';
+  }
+  return (
+    <div className="mt-3 rounded-lg border border-accent/25 bg-black/50 px-3 py-2.5 text-left text-xs leading-relaxed text-white/75">
+      <p className="font-semibold text-accent/90">Why there are no pins yet</p>
+      <p className="mt-1 text-white/65">{body}</p>
+    </div>
+  );
+}
 
 const WEIGHT_OPTIONS = [
   'all',
@@ -76,6 +95,7 @@ export function CoachLocatorMap({
   showFiltersBelowMap = false,
   initialPins,
   initialCities,
+  initialStats,
 }: {
   accessToken: string;
   className?: string;
@@ -83,6 +103,7 @@ export function CoachLocatorMap({
   showFiltersBelowMap?: boolean;
   initialPins?: CoachMapPin[];
   initialCities?: string[];
+  initialStats?: CoachMapStats | null;
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
@@ -91,6 +112,7 @@ export function CoachLocatorMap({
 
   const [pins, setPins] = useState<CoachMapPin[]>(initialPins ?? []);
   const [cities, setCities] = useState<string[]>(initialCities ?? []);
+  const [stats, setStats] = useState<CoachMapStats | null>(initialStats ?? null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [sessionType, setSessionType] = useState('all');
   const [weightClass, setWeightClass] = useState('all');
@@ -129,6 +151,7 @@ export function CoachLocatorMap({
         }
         setPins(data.pins ?? []);
         setCities(data.cities ?? []);
+        if (data.stats) setStats(data.stats);
       })
       .catch(() => {
         if (!cancelled) setLoadError('Could not load coaches');
@@ -447,8 +470,11 @@ export function CoachLocatorMap({
 
       {showFiltersBelowMap && filterBar}
 
+      {pins.length === 0 && stats && !loadError && <CoachMapEmptyHint stats={stats} />}
+
       <p className="mt-3 text-center text-xs text-white/50">
-        {coachCount} coach{coachCount === 1 ? '' : 'es'} across {cityCount || 'several'} cities in North Carolina
+        {coachCount} coach{coachCount === 1 ? '' : 'es'} across{' '}
+        {cityCount > 0 ? cityCount : pins.length === 0 ? '0' : 'several'} cities in North Carolina
         {geoDenied && !userPos && ' · Location off — distances hidden'}
       </p>
 
