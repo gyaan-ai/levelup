@@ -2,10 +2,15 @@
 -- Run this after the initial migration
 
 -- Insert facilities (matches seed-athletes - use Facility, not Room, to avoid dupes)
-INSERT INTO public.facilities (id, name, school, address) VALUES
-  ('00000000-0000-0000-0000-000000000001', 'UNC Wrestling Facility', 'UNC', 'Chapel Hill, NC'),
-  ('00000000-0000-0000-0000-000000000002', 'NC State Wrestling Facility', 'NC State', 'Raleigh, NC')
-ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, school = EXCLUDED.school, address = EXCLUDED.address;
+INSERT INTO public.facilities (id, name, school, address, latitude, longitude) VALUES
+  ('00000000-0000-0000-0000-000000000001', 'UNC Wrestling Facility', 'UNC', 'Chapel Hill, NC', 35.9049, -79.0469),
+  ('00000000-0000-0000-0000-000000000002', 'NC State Wrestling Facility', 'NC State', 'Raleigh, NC', 35.7872, -78.6701)
+ON CONFLICT (id) DO UPDATE SET
+  name = EXCLUDED.name,
+  school = EXCLUDED.school,
+  address = EXCLUDED.address,
+  latitude = COALESCE(public.facilities.latitude, EXCLUDED.latitude),
+  longitude = COALESCE(public.facilities.longitude, EXCLUDED.longitude);
 
 -- Note: To add more test data, you can:
 -- 1. Create test users via Supabase Auth dashboard

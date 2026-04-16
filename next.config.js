@@ -10,7 +10,12 @@ const nextConfig = {
             key: 'Content-Security-Policy',
             value: [
               "script-src 'self' 'unsafe-inline' https://js.stripe.com",
-              "style-src 'self' 'unsafe-inline' https://js.stripe.com",
+              "style-src 'self' 'unsafe-inline' https://js.stripe.com https://api.mapbox.com",
+              "worker-src 'self' blob:",
+              "child-src blob:",
+              "img-src 'self' data: blob: https://*.tiles.mapbox.com https://api.mapbox.com https://*.stripe.com",
+              "connect-src 'self' https://api.mapbox.com https://events.mapbox.com https://*.supabase.co https://js.stripe.com https://api.stripe.com",
+              "font-src 'self' data: https://fonts.mapbox.com",
             ].join('; '),
           },
         ],

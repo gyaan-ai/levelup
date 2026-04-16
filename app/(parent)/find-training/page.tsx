@@ -30,7 +30,15 @@ export default async function FindTrainingPage({
   const supabase = await createClient(tenant.slug);
   const admin = createAdminClient(tenant.slug);
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect('/login?redirect=/find-training');
+  if (!user) {
+    const qs = new URLSearchParams();
+    if (sp.date) qs.set('date', sp.date);
+    if (sp.time) qs.set('time', sp.time);
+    if (sp.location) qs.set('location', sp.location);
+    if (sp.coach) qs.set('coach', sp.coach);
+    const path = qs.toString() ? `/find-training?${qs.toString()}` : '/find-training';
+    redirect(`/login?redirect=${encodeURIComponent(path)}`);
+  }
 
   const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
   if (userData?.role === 'coach') redirect('/athlete-dashboard');

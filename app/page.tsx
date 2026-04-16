@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server';
 import { Button } from '@/components/ui/button';
 import { Star, ChevronDown } from 'lucide-react';
 import { HomeHeroLogo } from '@/app/home-hero-logo';
+import { CoachMapSection } from '@/components/map/coach-map-section';
 
 export const metadata = {
   title: 'The Wrestling Guild | Access Elite Master Technique',
@@ -126,6 +127,8 @@ export default async function HomePage() {
           </div>
         </section>
       )}
+
+      {tenant && <CoachMapSection tenantSlug={tenant.slug} />}
 
       {/* How It Works - 3 simple steps, training-focused */}
       <section id="how-it-works" className="py-12 px-6 border-t border-accent/20 bg-black">
