@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { headers } from 'next/headers';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getTenantConfig, getTenantFromRequestHeaders } from '@/config/tenants';
+import { tenants } from '@/config/tenants';
 import { purgeEmptyPastSessions } from '@/lib/purge-empty-past-sessions';
 
 /**
- * Daily cron: remove past scheduled sessions with zero participants (never booked).
- * Production: set CRON_SECRET and send Authorization: Bearer <CRON_SECRET> (configure in Vercel cron or proxy).
+ * Daily cron: remove past sessions with zero roster rows (no kids registered).
+ * Runs once per configured tenant DB. Production: set CRON_SECRET; Vercel cron sends Authorization: Bearer <CRON_SECRET>.
  */
 export async function GET(req: NextRequest) {
   const secret = process.env.CRON_SECRET?.trim();
@@ -21,17 +20,19 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  const headersList = await headers();
-  let tenant = getTenantFromRequestHeaders(headersList);
-  if (!tenant) {
+  const byTenant: Record<string, number> = {};
+  let deleted = 0;
+  for (const slug of Object.keys(tenants)) {
     try {
-      tenant = getTenantConfig('guild');
-    } catch {
-      return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
+      const admin = createAdminClient(slug);
+      const n = await purgeEmptyPastSessions(admin);
+      byTenant[slug] = n;
+      deleted += n;
+    } catch (e) {
+      console.error(`purge-empty-past-sessions tenant ${slug}:`, e);
+      byTenant[slug] = 0;
     }
   }
 
-  const admin = createAdminClient(tenant.slug);
-  const deleted = await purgeEmptyPastSessions(admin);
-  return NextResponse.json({ ok: true, deleted });
+  return NextResponse.json({ ok: true, deleted, byTenant });
 }
