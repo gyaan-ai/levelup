@@ -120,7 +120,8 @@ export function CoachLocatorMap({
   const [search, setSearch] = useState('');
   const [userPos, setUserPos] = useState<{ lat: number; lng: number } | null>(null);
   const [geoDenied, setGeoDenied] = useState(false);
-  const [selected, setSelected] = useState<CoachMapPin | null>(null);
+  /** One or more pins (cluster at same spot opens many). */
+  const [selectedPins, setSelectedPins] = useState<CoachMapPin[] | null>(null);
   const [visible, setVisible] = useState(false);
   const [mapReady, setMapReady] = useState(false);
   const sectionRef = useRef<HTMLDivElement | null>(null);
@@ -323,10 +324,23 @@ export function CoachLocatorMap({
         const clusterId = features[0]?.properties?.cluster_id as number | undefined;
         if (clusterId == null) return;
         const src = map.getSource('coaches') as mapboxgl.GeoJSONSource;
-        src.getClusterExpansionZoom(clusterId, (err, zoom) => {
-          if (err || zoom == null) return;
-          const coords = (features[0].geometry as GeoJSON.Point).coordinates as [number, number];
-          map.easeTo({ center: coords, zoom });
+        src.getClusterLeaves(clusterId, 64, 0, (err, leaves) => {
+          if (err || !leaves?.length) {
+            src.getClusterExpansionZoom(clusterId, (zErr, zoom) => {
+              if (zErr || zoom == null) return;
+              const coords = (features[0].geometry as GeoJSON.Point).coordinates as [number, number];
+              map.easeTo({ center: coords, zoom });
+            });
+            return;
+          }
+          const keys = leaves
+            .map((leaf) => (leaf.properties as { pinKey?: string })?.pinKey)
+            .filter((k): k is string => typeof k === 'string' && k.length > 0);
+          const list = keys
+            .map((k) => pinsRef.current.find((p) => p.pinKey === k))
+            .filter((p): p is CoachMapPin => p != null);
+          if (list.length === 0) return;
+          setSelectedPins(list);
         });
       };
 
@@ -335,11 +349,17 @@ export function CoachLocatorMap({
         const key = f?.properties?.pinKey as string | undefined;
         if (!key) return;
         const pin = pinsRef.current.find((p) => p.pinKey === key);
-        if (pin) setSelected(pin);
+        if (pin) setSelectedPins([pin]);
       };
 
       map.on('click', 'clusters', onClusterClick);
       map.on('click', 'unclustered', onPinClick);
+      map.on('mouseenter', 'clusters', () => {
+        map.getCanvas().style.cursor = 'pointer';
+      });
+      map.on('mouseleave', 'clusters', () => {
+        map.getCanvas().style.cursor = '';
+      });
       map.on('mouseenter', 'unclustered', () => {
         map.getCanvas().style.cursor = 'pointer';
       });
@@ -478,31 +498,110 @@ export function CoachLocatorMap({
         {geoDenied && !userPos && ' · Location off — distances hidden'}
       </p>
 
-      {selected && (
+      {selectedPins && selectedPins.length > 0 && (
         <>
           <div className="fixed inset-0 z-50 md:hidden">
             <button
               type="button"
               className="absolute inset-0 bg-black/70"
               aria-label="Close"
-              onClick={() => setSelected(null)}
+              onClick={() => setSelectedPins(null)}
             />
-            <div className="animate-in slide-in-from-bottom duration-200 absolute bottom-0 left-0 right-0 max-h-[85vh] overflow-y-auto rounded-t-2xl border border-accent/30 bg-zinc-950 p-4 shadow-2xl">
-              <CoachCardContent
-                pin={selected}
-                distanceMiles={distanceMiles(selected)}
-                onClose={() => setSelected(null)}
-              />
+            <div className="animate-in slide-in-from-bottom duration-200 absolute bottom-0 left-0 right-0 flex max-h-[85vh] flex-col rounded-t-2xl border border-accent/30 bg-zinc-950 shadow-2xl">
+              {selectedPins.length > 1 ? (
+                <>
+                  <div className="flex shrink-0 items-start justify-between gap-2 border-b border-white/10 px-4 pb-3 pt-4">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-white">
+                        {selectedPins.length} coaches here
+                      </p>
+                      <p className="text-xs text-white/55">{selectedPins[0].facilityName}</p>
+                      {selectedPins[0].facilityAddress && (
+                        <p className="mt-0.5 text-xs text-white/40">{selectedPins[0].facilityAddress}</p>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedPins(null)}
+                      className="rounded-full p-1 text-white/50 hover:bg-white/10 hover:text-white"
+                      aria-label="Close"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+                  <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+                    <div className="space-y-0">
+                      {selectedPins.map((pin, i) => (
+                        <div
+                          key={pin.pinKey}
+                          className={cn(i > 0 && 'mt-6 border-t border-white/10 pt-6')}
+                        >
+                          <CoachCardContent
+                            pin={pin}
+                            distanceMiles={distanceMiles(pin)}
+                            onClose={() => setSelectedPins(null)}
+                            showFacilityLine={false}
+                            showCloseButton={false}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="overflow-y-auto p-4">
+                  <CoachCardContent
+                    pin={selectedPins[0]}
+                    distanceMiles={distanceMiles(selectedPins[0])}
+                    onClose={() => setSelectedPins(null)}
+                  />
+                </div>
+              )}
             </div>
           </div>
 
-          <div className="pointer-events-none fixed bottom-6 left-1/2 z-40 hidden w-full max-w-sm -translate-x-1/2 md:block">
-            <div className="pointer-events-auto mx-4 rounded-xl border border-accent/30 bg-zinc-950 p-4 shadow-2xl">
-              <CoachCardContent
-                pin={selected}
-                distanceMiles={distanceMiles(selected)}
-                onClose={() => setSelected(null)}
-              />
+          <div className="pointer-events-none fixed bottom-6 left-1/2 z-40 hidden w-full max-w-md -translate-x-1/2 md:block">
+            <div className="pointer-events-auto mx-4 max-h-[min(80vh,640px)] overflow-y-auto rounded-xl border border-accent/30 bg-zinc-950 p-4 shadow-2xl">
+              {selectedPins.length > 1 ? (
+                <>
+                  <div className="mb-4 flex items-start justify-between gap-2 border-b border-white/10 pb-3">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-white">{selectedPins.length} coaches here</p>
+                      <p className="text-xs text-white/55">{selectedPins[0].facilityName}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedPins(null)}
+                      className="rounded-full p-1 text-white/50 hover:bg-white/10 hover:text-white"
+                      aria-label="Close"
+                    >
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
+                  <div className="space-y-0">
+                    {selectedPins.map((pin, i) => (
+                      <div
+                        key={pin.pinKey}
+                        className={cn(i > 0 && 'mt-6 border-t border-white/10 pt-6')}
+                      >
+                        <CoachCardContent
+                          pin={pin}
+                          distanceMiles={distanceMiles(pin)}
+                          onClose={() => setSelectedPins(null)}
+                          showFacilityLine={false}
+                          showCloseButton={false}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <CoachCardContent
+                  pin={selectedPins[0]}
+                  distanceMiles={distanceMiles(selectedPins[0])}
+                  onClose={() => setSelectedPins(null)}
+                />
+              )}
             </div>
           </div>
         </>
@@ -515,10 +614,15 @@ function CoachCardContent({
   pin,
   distanceMiles,
   onClose,
+  showFacilityLine = true,
+  showCloseButton = true,
 }: {
   pin: CoachMapPin;
   distanceMiles: number | null;
   onClose: () => void;
+  /** When listing several coaches at one facility, hide repeated address rows. */
+  showFacilityLine?: boolean;
+  showCloseButton?: boolean;
 }) {
   const findTrainingHref = `/find-training?coach=${encodeURIComponent(pin.coachId)}`;
 
@@ -546,14 +650,16 @@ function CoachCardContent({
             )}
           </div>
         </div>
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded-full p-1 text-white/50 hover:bg-white/10 hover:text-white"
-          aria-label="Close"
-        >
-          <X className="h-5 w-5" />
-        </button>
+        {showCloseButton && (
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full p-1 text-white/50 hover:bg-white/10 hover:text-white"
+            aria-label="Close"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        )}
       </div>
 
       <StarRating averageRating={pin.averageRating} reviewCount={pin.reviewCount} size="sm" />
@@ -577,13 +683,15 @@ function CoachCardContent({
         </p>
       )}
 
-      <p className="flex items-start gap-2 text-xs text-white/60">
-        <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent/80" />
-        <span>
-          {pin.facilityName}
-          {pin.facilityAddress ? ` · ${pin.facilityAddress}` : ''}
-        </span>
-      </p>
+      {showFacilityLine && (
+        <p className="flex items-start gap-2 text-xs text-white/60">
+          <MapPin className="mt-0.5 h-3.5 w-3.5 shrink-0 text-accent/80" />
+          <span>
+            {pin.facilityName}
+            {pin.facilityAddress ? ` · ${pin.facilityAddress}` : ''}
+          </span>
+        </p>
+      )}
 
       {distanceMiles != null && (
         <p className="text-xs text-accent">{Math.round(distanceMiles * 10) / 10} miles away</p>
