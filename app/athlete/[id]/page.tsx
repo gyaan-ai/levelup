@@ -19,13 +19,7 @@ import { FollowCoachButton } from '@/components/follow-coach-button';
 import { DeleteAthleteProfileButton } from '@/components/delete-athlete-profile-button';
 import { ProfileImage } from '@/components/profile-image';
 import { isBackgroundCheckValidForDisplay, isSafeSportValidForDisplay } from '@/lib/athletes';
-
-const SCHOOL_COLORS: Record<string, { bg: string; text: string }> = {
-  'UNC': { bg: 'bg-blue-600', text: 'text-white' },
-  'NC State': { bg: 'bg-red-600', text: 'text-white' },
-  'NCSU': { bg: 'bg-red-600', text: 'text-white' },
-  'North Carolina State': { bg: 'bg-red-600', text: 'text-white' },
-};
+import { getSchoolBadgeColors, schoolBadgeClassName } from '@/lib/school-logos';
 
 function CoachProfileUnavailable() {
   return (
@@ -126,7 +120,7 @@ export default async function AthleteProfilePage({
     ? new Date(athlete.cpr_expiration) > today
     : false;
 
-  const schoolColor = SCHOOL_COLORS[athlete.school] || { bg: 'bg-gray-500', text: 'text-white' };
+  const schoolColor = getSchoolBadgeColors(athlete.school);
 
   const { data: reviewsRows } = await supabase
     .from('reviews_anonymous')
@@ -251,7 +245,7 @@ export default async function AthleteProfilePage({
               <div className="flex items-center gap-3 mb-3 flex-wrap">
                 <CoachSessionBadge totalSessions={completedSessions} size="lg" />
                 <SchoolLogo school={athlete.school} size="md" />
-                <Badge className={`${schoolColor.bg} ${schoolColor.text}`}>
+                <Badge className={schoolBadgeClassName(schoolColor)}>
                   {athlete.school}
                 </Badge>
                 {athlete.year && (

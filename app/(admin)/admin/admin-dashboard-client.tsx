@@ -73,6 +73,7 @@ import { CoachTextGroupDialog } from '@/components/coach-text-group-dialog';
 import { showSessionSmsCopyAndTextGroup } from '@/lib/session-sms-tools';
 import { AdminCockpitView } from './admin-cockpit-view';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Checkbox } from '@/components/ui/checkbox';
 import { coachPayoutUsd } from '@/lib/coach-session-payout';
 import {
   Area,
@@ -649,8 +650,9 @@ export function AdminDashboardClient({
   const [sessionCoachFilter, setSessionCoachFilter] = useState<string>('all');
   const [copiedSessionId, setCopiedSessionId] = useState<string | null>(null);
   const [duplicatingSessionId, setDuplicatingSessionId] = useState<string | null>(null);
-  const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
-  const [sessionDeleteLoading, setSessionDeleteLoading] = useState(false);
+  const [bulkDeleteSelection, setBulkDeleteSelection] = useState<string[]>([]);
+  const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
+  const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
   // Roster modal state
   const [rosterSessionId, setRosterSessionId] = useState<string | null>(null);
   const [rosterData, setRosterData] = useState<Array<{
@@ -1091,6 +1093,20 @@ export function AdminDashboardClient({
     const openings = Math.max(0, capacity - booked);
     return { booked, capacity, openings, collected };
   }, [filteredSessions]);
+
+  /** Only these statuses can be removed via DELETE /api/admin/sessions/[id] (admin may include registrations). */
+  const bulkDeletableFilteredIds = useMemo(
+    () =>
+      filteredSessions
+        .filter((s) => s.status === 'scheduled' || s.status === 'pending_payment')
+        .map((s) => s.id),
+    [filteredSessions]
+  );
+
+  useEffect(() => {
+    const allowed = new Set(bulkDeletableFilteredIds);
+    setBulkDeleteSelection((prev) => prev.filter((id) => allowed.has(id)));
+  }, [bulkDeletableFilteredIds]);
 
   const sessionsTotalsScopeLabel =
     sessionStatusFilter === 'all'
@@ -2506,7 +2522,37 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
 
     // BOOKINGS SECTION
     if (section === 'bookings') {
+      const allBulkSelected =
+        bulkDeletableFilteredIds.length > 0 &&
+        bulkDeletableFilteredIds.every((id) => bulkDeleteSelection.includes(id));
+      const someBulkPartial =
+        !allBulkSelected &&
+        bulkDeletableFilteredIds.length > 0 &&
+        bulkDeletableFilteredIds.some((id) => bulkDeleteSelection.includes(id));
+
+      const handleBulkDeleteConfirm = async () => {
+        const ids = [...bulkDeleteSelection];
+        if (ids.length === 0) return;
+        setBulkDeleteLoading(true);
+        const failures: string[] = [];
+        for (const id of ids) {
+          const res = await fetch(`/api/admin/sessions/${id}`, { method: 'DELETE' });
+          const data = (await res.json().catch(() => ({}))) as { error?: string };
+          if (!res.ok) failures.push(`${id.slice(0, 8)}…: ${data.error ?? res.statusText}`);
+        }
+        setBulkDeleteLoading(false);
+        setBulkDeleteDialogOpen(false);
+        setBulkDeleteSelection([]);
+        router.refresh();
+        if (failures.length > 0) {
+          window.alert(
+            `Deleted ${ids.length - failures.length} of ${ids.length} session(s).\n\nFailed:\n${failures.join('\n')}`
+          );
+        }
+      };
+
       return (
+        <>
         <div className="space-y-6">
           {/* Header with Create Button */}
           <div className="flex items-center justify-between">
@@ -2581,6 +2627,19 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
             </div>
           </Card>
 
+          {bulkDeleteSelection.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm">
+              <span className="font-medium text-foreground">{bulkDeleteSelection.length} selected</span>
+              <Button variant="destructive" size="sm" onClick={() => setBulkDeleteDialogOpen(true)}>
+                <Trash2 className="h-4 w-4 mr-1.5" />
+                Delete selected
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setBulkDeleteSelection([])}>
+                Clear selection
+              </Button>
+            </div>
+          )}
+
           {sessions.length > 0 && (
             <div className="rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm">
               <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-2">
@@ -2630,6 +2689,29 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
               <table className="w-full text-sm">
                 <thead className="bg-muted/50">
                   <tr>
+                    <th className="w-10 py-3 pl-3 pr-0 align-middle">
+                      <Checkbox
+                        checked={
+                          bulkDeletableFilteredIds.length === 0
+                            ? false
+                            : allBulkSelected
+                              ? true
+                              : someBulkPartial
+                                ? 'indeterminate'
+                                : false
+                        }
+                        onCheckedChange={(checked) => {
+                          if (checked === true) {
+                            setBulkDeleteSelection([...bulkDeletableFilteredIds]);
+                          } else {
+                            setBulkDeleteSelection([]);
+                          }
+                        }}
+                        disabled={bulkDeletableFilteredIds.length === 0}
+                        aria-label="Select all sessions that can be deleted"
+                        className="translate-y-0.5"
+                      />
+                    </th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Date / Time</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Type</th>
                     <th className="text-left py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Coach</th>
@@ -2643,7 +2725,7 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
                 <tbody className="divide-y divide-border">
                   {filteredSessions.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="py-12 text-center text-muted-foreground">
+                      <td colSpan={9} className="py-12 text-center text-muted-foreground">
                         <div className="flex flex-col items-center gap-2">
                           <Calendar className="h-8 w-8 text-muted-foreground/50" />
                           <p>No sessions found</p>
@@ -2677,8 +2759,26 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
                           // Ignore errors
                         }
                       };
+                      const canBulkDelete =
+                        s.status === 'scheduled' || s.status === 'pending_payment';
                       return (
                         <tr key={s.id} className="hover:bg-muted/30 transition-colors">
+                          <td className="w-10 py-3 pl-3 pr-0 align-middle">
+                            {canBulkDelete ? (
+                              <Checkbox
+                                checked={bulkDeleteSelection.includes(s.id)}
+                                onCheckedChange={(checked) => {
+                                  setBulkDeleteSelection((prev) =>
+                                    checked === true
+                                      ? [...new Set([...prev, s.id])]
+                                      : prev.filter((x) => x !== s.id)
+                                  );
+                                }}
+                                aria-label={`Select session ${formatEST(new Date(s.scheduled_datetime), 'MMM d, yyyy')}`}
+                                className="translate-y-0.5"
+                              />
+                            ) : null}
+                          </td>
                           <td className="py-3 px-4">
                             <div className="font-medium">{formatEST(new Date(s.scheduled_datetime), 'MMM d, yyyy')}</div>
                             <div className="text-xs text-muted-foreground">{formatEST(new Date(s.scheduled_datetime), 'h:mm a')}</div>
@@ -2765,7 +2865,39 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
               </table>
             </div>
           </Card>
+          <p className="text-xs text-muted-foreground px-1">
+            Use the checkboxes on scheduled or pending-payment sessions to delete many at once (any coach). Completed or
+            cancelled rows have no checkbox.
+          </p>
         </div>
+
+        <Dialog open={bulkDeleteDialogOpen} onOpenChange={setBulkDeleteDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete {bulkDeleteSelection.length} session(s)?</DialogTitle>
+              <DialogDescription>
+                This permanently removes the selected sessions and their participant rows. Only scheduled and
+                pending-payment sessions can be deleted. This cannot be undone.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setBulkDeleteDialogOpen(false)} disabled={bulkDeleteLoading}>
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={() => void handleBulkDeleteConfirm()} disabled={bulkDeleteLoading}>
+                {bulkDeleteLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Deleting…
+                  </>
+                ) : (
+                  'Delete'
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+        </>
       );
     }
 

@@ -24,6 +24,7 @@ import { StarRating } from '@/components/star-rating';
 import { formatEST } from '@/lib/format-date';
 import { Athlete } from '@/types';
 import { FollowCoachButton } from '@/components/follow-coach-button';
+import { getSchoolBadgeColors, schoolBadgeClassName } from '@/lib/school-logos';
 
 interface AthleteWithNext extends Athlete {
   nextAvailable?: { slot_date: string; start_time: string } | null;
@@ -75,13 +76,6 @@ function weightMatchesRanges(weightClass: string | undefined, selectedIds: strin
     return range ? range.classes.includes(w) : false;
   });
 }
-
-const SCHOOL_COLORS: Record<string, { bg: string; text: string }> = {
-  'UNC': { bg: 'bg-blue-600', text: 'text-white' },
-  'NC State': { bg: 'bg-red-600', text: 'text-white' },
-  'NCSU': { bg: 'bg-red-600', text: 'text-white' },
-  'North Carolina State': { bg: 'bg-red-600', text: 'text-white' },
-};
 
 export function BrowseAthletesClient({ initialAthletes, isAdmin, initialYouthWrestlerId, embedded }: BrowseAthletesClientProps) {
   const router = useRouter();
@@ -166,11 +160,6 @@ export function BrowseAthletesClient({ initialAthletes, isAdmin, initialYouthWre
       return (b.total_sessions ?? 0) - (a.total_sessions ?? 0);
     });
   }, [initialAthletes, searchQuery, selectedSchool, selectedWeightRanges, followedCoachIds]);
-
-  const getSchoolBadgeColor = (school: string) => {
-    const normalizedSchool = school.trim();
-    return SCHOOL_COLORS[normalizedSchool] || { bg: 'bg-gray-600', text: 'text-white' };
-  };
 
   return (
     <div className={embedded ? '' : 'container mx-auto px-4 py-8'}>
@@ -305,7 +294,7 @@ export function BrowseAthletesClient({ initialAthletes, isAdmin, initialYouthWre
       {!loading && filteredAthletes.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredAthletes.map((athlete) => {
-            const schoolColors = getSchoolBadgeColor(athlete.school);
+            const schoolColors = getSchoolBadgeColors(athlete.school);
             const isFollowed = followedCoachIds.has(athlete.id);
             return (
               <div key={athlete.id} className="relative">
@@ -348,9 +337,7 @@ export function BrowseAthletesClient({ initialAthletes, isAdmin, initialYouthWre
                           )}
                           <CoachSessionBadge totalSessions={athlete.total_sessions ?? 0} size="sm" />
                           <SchoolLogo school={athlete.school} size="sm" />
-                          <Badge
-                            className={`${schoolColors.bg} ${schoolColors.text} text-xs`}
-                          >
+                          <Badge className={schoolBadgeClassName(schoolColors, 'text-xs')}>
                             {athlete.school}
                           </Badge>
                         </div>
