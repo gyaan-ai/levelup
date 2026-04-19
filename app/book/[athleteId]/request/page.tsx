@@ -9,11 +9,13 @@ export default async function RequestSessionPage({
   searchParams,
 }: {
   params: Promise<{ athleteId: string }>;
-  searchParams: Promise<{ youthWrestlerId?: string }>;
+  searchParams: Promise<{ youthWrestlerId?: string; sessionType?: string }>;
 }) {
   const { athleteId } = await params;
   const sp = await searchParams;
   const preselectedYouthWrestlerId = sp.youthWrestlerId ?? null;
+  const initialSessionType =
+    sp.sessionType === 'partner' ? 'partner' : sp.sessionType === 'private' ? 'private' : undefined;
 
   const headersList = await headers();
   const host = headersList.get('host') || '';
@@ -56,6 +58,7 @@ export default async function RequestSessionPage({
       facilities={(facilities ?? []) as { id: string; name: string; school?: string }[]}
       youthWrestlers={youthWrestlers ?? []}
       preselectedYouthWrestlerId={preselectedYouthWrestlerId}
+      initialSessionType={initialSessionType}
     />
   );
 }

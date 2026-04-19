@@ -1,12 +1,20 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CalendarPlus, Check, Loader2, X } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { formatEST } from '@/lib/format-date';
+import { formatSlotDisplay } from '@/lib/availability';
 import { COACH_REVENUE_FRACTION } from '@/lib/pricing';
 import type { CoachSession } from './coach-schedule-card';
 import { splitCoachSessionsByToday } from '@/lib/coach-schedule-split';
@@ -74,8 +82,48 @@ export function CoachScheduleClient({
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [slotNoteById, setSlotNoteById] = useState<Record<string, string>>({});
   const [counterForId, setCounterForId] = useState<string | null>(null);
-  const [counterDtById, setCounterDtById] = useState<Record<string, string>>({});
+  const [counterDateById, setCounterDateById] = useState<Record<string, string>>({});
+  const [counterTimeById, setCounterTimeById] = useState<Record<string, string>>({});
+  const [counterSlotsById, setCounterSlotsById] = useState<Record<string, string[]>>({});
+  const [counterSlotsLoadingId, setCounterSlotsLoadingId] = useState<string | null>(null);
   const [counterNoteById, setCounterNoteById] = useState<Record<string, string>>({});
+
+  const counterDateActive = counterForId ? counterDateById[counterForId] : undefined;
+  const counterCoachIdActive = counterForId
+    ? pendingSlotRequests.find((x) => x.id === counterForId)?.coach_id
+    : undefined;
+
+  useEffect(() => {
+    if (!counterForId || !counterDateActive || !counterCoachIdActive) return;
+    let cancelled = false;
+    setCounterSlotsLoadingId(counterForId);
+    fetch(
+      `/api/availability/slots?athleteId=${encodeURIComponent(counterCoachIdActive)}&date=${encodeURIComponent(counterDateActive)}`
+    )
+      .then((res) => res.json())
+      .then((data) => {
+        if (cancelled) return;
+        const list = Array.isArray(data.slots) ? (data.slots as string[]) : [];
+        setCounterSlotsById((prev) => ({ ...prev, [counterForId]: list }));
+        setCounterTimeById((prev) => {
+          const cur = prev[counterForId];
+          if (cur && list.includes(cur)) return prev;
+          return { ...prev, [counterForId]: '' };
+        });
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setCounterSlotsById((prev) => ({ ...prev, [counterForId]: [] }));
+          setCounterTimeById((prev) => ({ ...prev, [counterForId]: '' }));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setCounterSlotsLoadingId(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [counterForId, counterDateActive, counterCoachIdActive]);
 
   const now = new Date();
   const { today, upcoming } = splitCoachSessionsByToday(upcomingSessions, now);
@@ -126,12 +174,18 @@ export function CoachScheduleClient({
   };
 
   const submitCounter = async (requestId: string) => {
-    const raw = counterDtById[requestId]?.trim();
-    if (!raw) {
-      window.alert('Pick a date and time for the counter-proposal.');
+    const dateStr = counterDateById[requestId]?.trim();
+    const time = counterTimeById[requestId]?.trim();
+    if (!dateStr || !time) {
+      window.alert('Pick a date and an open time slot for the counter-proposal.');
       return;
     }
-    const iso = new Date(raw).toISOString();
+    const slots = counterSlotsById[requestId] ?? [];
+    if (slots.length > 0 && !slots.includes(time)) {
+      window.alert('That time is not available. Choose a slot from the list.');
+      return;
+    }
+    const iso = new Date(`${dateStr}T${time}:00`).toISOString();
     setLoadingId(requestId);
     try {
       const res = await fetch(`/api/parent-session-requests/${requestId}`, {
@@ -267,6 +321,10 @@ export function CoachScheduleClient({
               const when = r.preferred_datetime
                 ? `${formatEST(new Date(r.preferred_datetime), 'EEE MMM d')} · ${formatEST(new Date(r.preferred_datetime), 'h:mm a')}`
                 : 'Time TBD';
+              const counterSlots = counterSlotsById[r.id] ?? [];
+              const counterTimePick = counterTimeById[r.id];
+              const counterSelectValue =
+                counterTimePick && counterSlots.includes(counterTimePick) ? counterTimePick : undefined;
               return (
                 <Card key={r.id} className="border-amber-500/40 bg-amber-500/5">
                   <CardContent className="p-4 space-y-3">
@@ -288,12 +346,46 @@ export function CoachScheduleClient({
                     {counterForId === r.id && (
                       <div className="rounded-lg border border-border bg-background/80 p-3 space-y-2">
                         <p className="text-xs font-medium text-foreground">Propose a different time</p>
+                        <p className="text-xs text-muted-foreground">
+                          Only times that are still open on your calendar (same rules as parent booking).
+                        </p>
                         <input
-                          type="datetime-local"
+                          type="date"
                           className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[44px]"
-                          value={counterDtById[r.id] ?? ''}
-                          onChange={(e) => setCounterDtById((prev) => ({ ...prev, [r.id]: e.target.value }))}
+                          min={formatEST(new Date(), 'yyyy-MM-dd')}
+                          value={counterDateById[r.id] ?? ''}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setCounterDateById((prev) => ({ ...prev, [r.id]: v }));
+                            setCounterTimeById((prev) => ({ ...prev, [r.id]: '' }));
+                          }}
                         />
+                        {counterSlotsLoadingId === r.id ? (
+                          <p className="text-xs text-muted-foreground flex items-center gap-2">
+                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            Loading open slots…
+                          </p>
+                        ) : counterSlots.length === 0 ? (
+                          <p className="text-xs text-muted-foreground">
+                            No open slots this day. Choose another date.
+                          </p>
+                        ) : (
+                          <Select
+                            value={counterSelectValue}
+                            onValueChange={(v) => setCounterTimeById((prev) => ({ ...prev, [r.id]: v }))}
+                          >
+                            <SelectTrigger className="w-full min-h-[44px]">
+                              <SelectValue placeholder="Select a start time" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {counterSlots.map((t) => (
+                                <SelectItem key={t} value={t}>
+                                  {formatSlotDisplay(t)}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
                         <textarea
                           rows={2}
                           placeholder="Optional note (e.g. original slot is taken)"
@@ -307,7 +399,12 @@ export function CoachScheduleClient({
                             size="sm"
                             className="min-h-[44px]"
                             onClick={() => void submitCounter(r.id)}
-                            disabled={loadingId === r.id}
+                            disabled={
+                              loadingId === r.id ||
+                              counterSlotsLoadingId === r.id ||
+                              !counterSlots.length ||
+                              !counterTimeById[r.id]
+                            }
                           >
                             Send counter
                           </Button>
@@ -337,7 +434,17 @@ export function CoachScheduleClient({
                         variant="secondary"
                         size="sm"
                         className="min-h-[44px] touch-manipulation"
-                        onClick={() => setCounterForId((cur) => (cur === r.id ? null : r.id))}
+                        onClick={() => {
+                          setCounterForId((cur) => {
+                            if (cur === r.id) return null;
+                            const initialDate = r.preferred_datetime
+                              ? formatEST(new Date(r.preferred_datetime), 'yyyy-MM-dd')
+                              : formatEST(new Date(), 'yyyy-MM-dd');
+                            setCounterDateById((prev) => ({ ...prev, [r.id]: initialDate }));
+                            setCounterTimeById((prev) => ({ ...prev, [r.id]: '' }));
+                            return r.id;
+                          });
+                        }}
                         disabled={loadingId === r.id}
                       >
                         Counter

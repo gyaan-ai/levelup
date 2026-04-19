@@ -3,6 +3,10 @@
     {
       "path": "/api/cron/purge-empty-past-sessions",
       "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/session-request-reminders",
+      "schedule": "0 * * * *"
     }
   ]
 }

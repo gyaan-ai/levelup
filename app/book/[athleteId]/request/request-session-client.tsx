@@ -41,6 +41,7 @@ type Props = {
   facilities: Facility[];
   youthWrestlers: YouthWrestler[];
   preselectedYouthWrestlerId?: string | null;
+  initialSessionType?: 'private' | 'partner';
 };
 
 type AvailabilityByDay = { day_of_week: number; start_time: string; end_time: string }[];
@@ -52,13 +53,14 @@ export function RequestSessionClient({
   facilities,
   youthWrestlers,
   preselectedYouthWrestlerId = null,
+  initialSessionType,
 }: Props) {
   const router = useRouter();
   const [youthWrestlerId, setYouthWrestlerId] = useState(
     () => preselectedYouthWrestlerId || youthWrestlers[0]?.id || ''
   );
   const [facilityId, setFacilityId] = useState<string>('any');
-  const [sessionType, setSessionType] = useState<string>('private');
+  const [sessionType, setSessionType] = useState<string>(initialSessionType ?? 'private');
   const [durationMinutes, setDurationMinutes] = useState(60);
   const [message, setMessage] = useState('');
   const [flexibilityNote, setFlexibilityNote] = useState('');

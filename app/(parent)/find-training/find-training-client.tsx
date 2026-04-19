@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,8 @@ import {
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { MapPin, Calendar, Users, Clock, ShoppingCart, Check, ChevronRight, Filter, X, Copy, Lock, Minus } from 'lucide-react';
 import { useCart } from '@/lib/cart-context';
-import { formatEST } from '@/lib/format-date';
+import { formatEST, APP_TIMEZONE } from '@/lib/format-date';
+import { toZonedTime } from 'date-fns-tz';
 import { startOfDay } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { SchoolLogo } from '@/components/school-logo';
@@ -53,6 +54,14 @@ type SessionRow = {
 
 type CoachOption = { id: string; first_name?: string; last_name?: string; school?: string };
 
+type RequestCoachRow = {
+  id: string;
+  first_name?: string;
+  last_name?: string;
+  school?: string;
+  photo_url?: string | null;
+};
+
 export function FindTrainingClient({
   facilities,
   initialSessions,
@@ -66,6 +75,8 @@ export function FindTrainingClient({
   preselectedWrestlerId = '',
   parentWrestlerIds = [],
   initialSessionType = 'all',
+  requestSessionCoaches = [],
+  serviceTypesByCoach = {},
 }: {
   facilities: Facility[];
   initialSessions: SessionRow[];
@@ -79,6 +90,8 @@ export function FindTrainingClient({
   preselectedWrestlerId?: string;
   parentWrestlerIds?: string[];
   initialSessionType?: string;
+  requestSessionCoaches?: RequestCoachRow[];
+  serviceTypesByCoach?: Record<string, string[]>;
 }) {
   const router = useRouter();
   const { addItem, removeItem, isInCart, items } = useCart();
@@ -87,6 +100,8 @@ export function FindTrainingClient({
   const [location, setLocation] = useState(initialLocation || 'all');
   const [coach, setCoach] = useState(initialCoach || 'all');
   const [sessionType, setSessionType] = useState<string>(initialSessionType || 'all');
+  const [dowFilter, setDowFilter] = useState<number | 'all'>('all');
+  const [durationFilter, setDurationFilter] = useState<'any' | '60' | '90' | '120'>('any');
   const [dateOpen, setDateOpen] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [coachOpen, setCoachOpen] = useState(false);
@@ -132,9 +147,36 @@ export function FindTrainingClient({
     if (isInviteOnly && isFull) return false;
     
     // Session type filter
-    if (sessionType !== 'all' && s.session_type !== sessionType) return false;
+    if (sessionType === 'partner_private') {
+      const st = s.session_type;
+      if (st !== 'private' && st !== '2-athlete' && st !== 'partner') return false;
+    } else if (sessionType !== 'all' && s.session_type !== sessionType) return false;
+
+    if (dowFilter !== 'all') {
+      const localDow = toZonedTime(new Date(s.scheduled_datetime), APP_TIMEZONE).getDay();
+      if (localDow !== dowFilter) return false;
+    }
+
+    if (durationFilter !== 'any') {
+      const dm = (s as { duration_minutes?: number | null }).duration_minutes;
+      if (Number(dm) !== Number(durationFilter)) return false;
+    }
+
     return true;
   });
+
+  const filteredRequestCoaches = useMemo(() => {
+    if (searchBasePath !== '/training' || requestSessionCoaches.length === 0) return [];
+    return requestSessionCoaches.filter((c) => {
+      const types = serviceTypesByCoach[c.id] ?? [];
+      if (sessionType === 'all') return true;
+      if (sessionType === 'group') return types.includes('small_group');
+      if (sessionType === 'partner_private') {
+        return types.includes('private') || types.includes('partner');
+      }
+      return types.includes(sessionType);
+    });
+  }, [searchBasePath, requestSessionCoaches, serviceTypesByCoach, sessionType]);
 
   const applyFilters = (overrides?: { type?: string; coachId?: string }) => {
     const params = new URLSearchParams();
@@ -154,8 +196,25 @@ export function FindTrainingClient({
   const sessionTypeOptions = [
     { value: 'all', label: 'All Types' },
     { value: 'group', label: 'Small Group' },
-    { value: '2-athlete', label: 'Partner' },
-    { value: 'private', label: 'Private' },
+    { value: 'partner_private', label: 'Partner / Private' },
+  ];
+
+  const dowOptions: { v: number | 'all'; label: string }[] = [
+    { v: 'all', label: 'Any day' },
+    { v: 0, label: 'Sun' },
+    { v: 1, label: 'Mon' },
+    { v: 2, label: 'Tue' },
+    { v: 3, label: 'Wed' },
+    { v: 4, label: 'Thu' },
+    { v: 5, label: 'Fri' },
+    { v: 6, label: 'Sat' },
+  ];
+
+  const durationOptions: { v: 'any' | '60' | '90' | '120'; label: string }[] = [
+    { v: 'any', label: 'Any duration' },
+    { v: '60', label: '60 min' },
+    { v: '90', label: '90 min' },
+    { v: '120', label: '120 min' },
   ];
 
   const clearFilters = () => {
@@ -164,11 +223,28 @@ export function FindTrainingClient({
     setLocation('all');
     setCoach('all');
     setSessionType('all');
+    setDowFilter('all');
+    setDurationFilter('any');
     router.push(searchBasePath);
   };
 
-  const hasActiveFilters = date || time !== 'any' || location !== 'all' || coach !== 'all' || sessionType !== 'all';
-  const activeFilterCount = [date, time !== 'any', location !== 'all', coach !== 'all', sessionType !== 'all'].filter(Boolean).length;
+  const hasActiveFilters =
+    date ||
+    time !== 'any' ||
+    location !== 'all' ||
+    coach !== 'all' ||
+    sessionType !== 'all' ||
+    dowFilter !== 'all' ||
+    durationFilter !== 'any';
+  const activeFilterCount = [
+    date,
+    time !== 'any',
+    location !== 'all',
+    coach !== 'all',
+    sessionType !== 'all',
+    dowFilter !== 'all',
+    durationFilter !== 'any',
+  ].filter(Boolean).length;
 
   // Filter pills data
   const timeOptions = [
@@ -707,6 +783,38 @@ export function FindTrainingClient({
           </button>
         ))}
 
+        {dowOptions.map((opt) => (
+          <button
+            key={String(opt.v)}
+            type="button"
+            onClick={() => setDowFilter(opt.v)}
+            className={cn(
+              'min-h-[44px] px-3 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all border',
+              dowFilter === opt.v
+                ? 'bg-[#D4AF37]/20 text-[#D4AF37] border-[#D4AF37]/30'
+                : 'bg-zinc-900 text-zinc-300 border-zinc-800 hover:border-zinc-700'
+            )}
+          >
+            {opt.label}
+          </button>
+        ))}
+
+        {durationOptions.map((opt) => (
+          <button
+            key={opt.v}
+            type="button"
+            onClick={() => setDurationFilter(opt.v)}
+            className={cn(
+              'min-h-[44px] px-3 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all border',
+              durationFilter === opt.v
+                ? 'bg-[#D4AF37]/20 text-[#D4AF37] border-[#D4AF37]/30'
+                : 'bg-zinc-900 text-zinc-300 border-zinc-800 hover:border-zinc-700'
+            )}
+          >
+            {opt.label}
+          </button>
+        ))}
+
         {/* Coach Dropdown */}
         {coaches.length > 0 && (
           <Popover open={coachOpen} onOpenChange={setCoachOpen}>
@@ -884,13 +992,64 @@ export function FindTrainingClient({
           ))}
         </div>
       ) : (
-<div className="py-16 text-center">
+        <div className="py-16 text-center">
           <Calendar className="h-12 w-12 mx-auto mb-4 text-zinc-700" />
           <p className="text-zinc-400 mb-2">No sessions available</p>
           <p className="text-sm text-zinc-500">
             {hasActiveFilters ? 'Try adjusting your filters' : 'Check back later for new sessions'}
           </p>
         </div>
+      )}
+
+      {filteredRequestCoaches.length > 0 && (
+        <section className="mt-8 pt-6 border-t border-zinc-800" aria-label="Request a session">
+          <h3 className="text-sm font-semibold uppercase tracking-wider text-zinc-500 mb-3">
+            Need a different time?
+          </h3>
+          <p className="text-sm text-zinc-400 mb-4">
+            These coaches take private or partner requests when they don&apos;t have an open group spot listed.
+          </p>
+          <div className="space-y-3">
+            {filteredRequestCoaches.map((c) => {
+              const name = [c.first_name, c.last_name].filter(Boolean).join(' ').trim() || 'Coach';
+              const reqHref = preselectedWrestlerId
+                ? `/book/${c.id}/request?youthWrestlerId=${encodeURIComponent(preselectedWrestlerId)}`
+                : `/book/${c.id}/request`;
+              return (
+                <div
+                  key={c.id}
+                  className="flex items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-900/40 p-3"
+                >
+                  <Link href={`/athlete/${c.id}`} className="shrink-0">
+                    <ProfileImage
+                      src={c.photo_url}
+                      alt={name}
+                      className="w-14 h-14"
+                      fallbackIconClassName="h-6 w-6 text-muted-foreground"
+                    />
+                  </Link>
+                  <div className="flex-1 min-w-0">
+                    <Link href={`/athlete/${c.id}`} className="font-medium text-foreground hover:underline truncate block">
+                      {name}
+                    </Link>
+                    {c.school ? (
+                      <span className="text-xs text-zinc-500 flex items-center gap-1 mt-0.5">
+                        <SchoolLogo school={c.school} size="sm" />
+                        {c.school}
+                      </span>
+                    ) : null}
+                  </div>
+                  <Button
+                    className="shrink-0 min-h-[44px] bg-[#D4AF37] hover:bg-[#c9a432] text-black font-semibold text-sm"
+                    asChild
+                  >
+                    <Link href={reqHref}>Request session</Link>
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+        </section>
       )}
     </div>
   );

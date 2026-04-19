@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Dumbbell, ShoppingCart, User } from 'lucide-react';
+import { Home, Users, ShoppingCart, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCart } from '@/lib/cart-context';
 
@@ -11,7 +11,7 @@ import { useCart } from '@/lib/cart-context';
  */
 const ITEMS: readonly { href: string; label: string; icon: typeof Home; showBadge?: boolean }[] = [
   { href: '/dashboard', label: 'Home', icon: Home },
-  { href: '/training', label: 'Training', icon: Dumbbell },
+  { href: '/training', label: 'Training', icon: Users },
   { href: '/cart', label: 'Cart', icon: ShoppingCart, showBadge: true },
   { href: '/account', label: 'Account', icon: User },
 ];

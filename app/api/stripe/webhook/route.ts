@@ -117,13 +117,14 @@ export async function POST(req: NextRequest) {
         const totalPrice = rows.reduce((sum, r) => sum + r.amountPaid, 0);
 
         const currentBySession = new Map<string, number>();
+        const cartNotifyBaseUrl = (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/$/, '');
 
         for (const { sid, ywid, amountPaid } of rows) {
           const sessionStripeFee = totalPrice > 0 ? (amountPaid / totalPrice) * totalStripeFee : 0;
 
           const { data: existing } = await supabase
             .from('session_participants')
-            .select('id')
+            .select('id, paid')
             .eq('session_id', sid)
             .eq('youth_wrestler_id', ywid)
             .maybeSingle();
@@ -186,6 +187,7 @@ export async function POST(req: NextRequest) {
               }
             }
           } else {
+            const wasAlreadyPaid = (existing as { paid?: boolean } | null)?.paid === true;
             await supabase
               .from('session_participants')
               .update({
@@ -196,7 +198,59 @@ export async function POST(req: NextRequest) {
               })
               .eq('session_id', sid)
               .eq('youth_wrestler_id', ywid);
+
+            // Pre-created rows (e.g. coach-approved session requests) skip the insert path — still notify the coach once.
+            if (!wasAlreadyPaid) {
+              const coachId = (sess as { athlete_id?: string } | null)?.athlete_id;
+              const dt = (sess as { scheduled_datetime?: string } | null)?.scheduled_datetime;
+              if (coachId) {
+                const dateStr = dt ? formatEST(new Date(dt), 'EEE MMM d, h:mm a') : 'your session';
+                await createNotification(supabase, {
+                  user_id: coachId,
+                  type: 'session_booked',
+                  title: 'Payment received',
+                  body: `A family completed checkout for ${dateStr}. Check My sessions.`,
+                  data: { session_id: sid, link: cartNotifyBaseUrl ? `${cartNotifyBaseUrl}/athlete-dashboard` : '/athlete-dashboard' },
+                  coachId,
+                }).catch((e) => console.warn('Cart webhook: coach notification failed', e));
+                await sendCoachNewSignupSms(supabase, coachId, dateStr).catch(() => {});
+              }
+            }
           }
+        }
+
+        const uniqueCartSessionIds = [...new Set(rows.map((row) => row.sid))];
+        const seenPaidRequestIds = new Set<string>();
+        for (const sid of uniqueCartSessionIds) {
+          const { data: reqRow } = await supabase
+            .from('parent_session_requests')
+            .select('id')
+            .eq('created_session_id', sid)
+            .eq('requesting_parent_id', parentId)
+            .eq('status', 'approved')
+            .maybeSingle();
+          const reqId = (reqRow as { id?: string } | null)?.id;
+          if (!reqId || seenPaidRequestIds.has(reqId)) continue;
+          seenPaidRequestIds.add(reqId);
+
+          const { data: paidSess } = await supabase
+            .from('sessions')
+            .select('scheduled_datetime')
+            .eq('id', sid)
+            .maybeSingle();
+          const sched = (paidSess as { scheduled_datetime?: string } | null)?.scheduled_datetime;
+          const whenStr = sched ? formatEST(new Date(sched), 'EEE MMM d, h:mm a') : 'your session';
+          await createNotification(supabase, {
+            user_id: parentId,
+            type: 'parent_session_request_paid',
+            title: 'Booking confirmed',
+            body: `Payment received — you're booked for ${whenStr}. View details in My bookings.`,
+            data: {
+              session_id: sid,
+              requestId: reqId,
+              link: cartNotifyBaseUrl ? `${cartNotifyBaseUrl}/bookings` : '/bookings',
+            },
+          }).catch((e) => console.warn('Cart webhook: parent request paid notify failed', e));
         }
 
         if (creditsUsed > 0) {

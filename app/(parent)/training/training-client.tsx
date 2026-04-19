@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { BrowseAthletesClient } from '@/app/(parent)/browse/browse-client';
 import { FindTrainingClient } from '@/app/(parent)/find-training/find-training-client';
+import { TrainingCoachesGrid } from '@/app/(parent)/training/training-coaches-grid';
 import type { Athlete } from '@/types';
 
 type TabId = 'sessions' | 'coaches';
@@ -12,14 +12,13 @@ interface AthleteWithNext extends Athlete {
 }
 
 const TABS: { id: TabId; label: string }[] = [
-  { id: 'sessions', label: 'Find sessions' },
-  { id: 'coaches', label: 'All coaches' },
+  { id: 'coaches', label: 'Coaches' },
+  { id: 'sessions', label: 'Sessions' },
 ];
 
 type Props = {
   initialTab: string;
   athletesWithNext: AthleteWithNext[];
-  isAdmin: boolean;
   facilities: { id: string; name?: string; school?: string; address?: string | null }[];
   availabilitySessions: Array<{
     id: string;
@@ -54,12 +53,20 @@ type Props = {
   preselectedWrestlerId?: string;
   parentWrestlerIds?: string[];
   availabilitySessionType?: string;
+  coachIdsWithPublicOpen?: string[];
+  serviceTypesByCoach?: Record<string, string[]>;
+  requestSessionCoaches?: Array<{
+    id: string;
+    first_name?: string;
+    last_name?: string;
+    school?: string;
+    photo_url?: string | null;
+  }>;
 };
 
 export function TrainingClient({
   initialTab,
   athletesWithNext,
-  isAdmin,
   facilities,
   availabilitySessions,
   availabilityDate,
@@ -70,8 +77,11 @@ export function TrainingClient({
   preselectedWrestlerId = '',
   parentWrestlerIds = [],
   availabilitySessionType = 'all',
+  coachIdsWithPublicOpen = [],
+  serviceTypesByCoach = {},
+  requestSessionCoaches = [],
 }: Props) {
-  const tab = (initialTab === 'coaches' ? 'coaches' : 'sessions') as TabId;
+  const tab = (initialTab === 'sessions' ? 'sessions' : 'coaches') as TabId;
   const [activeTab, setActiveTab] = useState<TabId>(tab);
 
   // Sync tab state when URL changes (e.g. "View their group sessions" → ?tab=sessions&coach=xxx)
@@ -112,14 +122,17 @@ export function TrainingClient({
           preselectedWrestlerId={preselectedWrestlerId}
           parentWrestlerIds={parentWrestlerIds}
           initialSessionType={availabilitySessionType}
+          requestSessionCoaches={requestSessionCoaches}
+          serviceTypesByCoach={serviceTypesByCoach}
         />
       )}
 
       {activeTab === 'coaches' && (
-        <BrowseAthletesClient
-          initialAthletes={athletesWithNext}
-          isAdmin={isAdmin}
-          embedded
+        <TrainingCoachesGrid
+          athletes={athletesWithNext}
+          serviceTypesByCoach={serviceTypesByCoach}
+          coachIdsWithOpen={coachIdsWithPublicOpen}
+          preselectedWrestlerId={preselectedWrestlerId}
         />
       )}
     </>

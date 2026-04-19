@@ -28,6 +28,8 @@ import { getSchoolBadgeColors, schoolBadgeClassName } from '@/lib/school-logos';
 
 interface AthleteWithNext extends Athlete {
   nextAvailable?: { slot_date: string; start_time: string } | null;
+  /** Strong CTA: availability exists but no upcoming public bookable session. */
+  showRequestSessionPrimary?: boolean;
 }
 
 interface BrowseAthletesClientProps {
@@ -296,6 +298,11 @@ export function BrowseAthletesClient({ initialAthletes, isAdmin, initialYouthWre
           {filteredAthletes.map((athlete) => {
             const schoolColors = getSchoolBadgeColors(athlete.school);
             const isFollowed = followedCoachIds.has(athlete.id);
+            const bookHref = `/book/${athlete.id}${initialYouthWrestlerId ? `?youthWrestlerId=${encodeURIComponent(initialYouthWrestlerId)}` : ''}`;
+            const requestHref = `/book/${athlete.id}/request${initialYouthWrestlerId ? `?youthWrestlerId=${encodeURIComponent(initialYouthWrestlerId)}` : ''}`;
+            const profileHref = initialYouthWrestlerId
+              ? `/athlete/${athlete.id}?youthWrestlerId=${encodeURIComponent(initialYouthWrestlerId)}`
+              : `/athlete/${athlete.id}`;
             return (
               <div key={athlete.id} className="relative">
                 {isAdmin && (
@@ -320,10 +327,7 @@ export function BrowseAthletesClient({ initialAthletes, isAdmin, initialYouthWre
                           fallbackIconClassName="h-12 w-12 text-muted-foreground"
                         />
                       <div className="flex-1 min-w-0">
-                        <Link
-                          href={initialYouthWrestlerId ? `/athlete/${athlete.id}?youthWrestlerId=${encodeURIComponent(initialYouthWrestlerId)}` : `/athlete/${athlete.id}`}
-                          className="hover:underline"
-                        >
+                        <Link href={profileHref} className="hover:underline">
                           <h3 className="text-lg font-semibold truncate">
                             {athleteDisplayName(athlete.first_name, athlete.last_name) || 'Coach'}
                           </h3>
@@ -363,24 +367,45 @@ export function BrowseAthletesClient({ initialAthletes, isAdmin, initialYouthWre
                     <div className="flex flex-col gap-2">
                       <div className="flex gap-2">
                         <Button className="flex-1" variant="outline" asChild>
-                          <Link href={initialYouthWrestlerId ? `/athlete/${athlete.id}?youthWrestlerId=${encodeURIComponent(initialYouthWrestlerId)}` : `/athlete/${athlete.id}`}>
-                            View Profile
-                          </Link>
+                          <Link href={profileHref}>View Profile</Link>
                         </Button>
                         <FollowCoachButton coachId={athlete.id} />
                       </div>
-                      <Button className="w-full" variant="secondary" size="sm" asChild>
-                        <Link href={`/book/${athlete.id}${initialYouthWrestlerId ? `?youthWrestlerId=${encodeURIComponent(initialYouthWrestlerId)}` : ''}`}>
-                          <Calendar className="h-4 w-4 mr-2 shrink-0" />
-                          See availability
-                        </Link>
-                      </Button>
-                      <Link
-                        href={`/book/${athlete.id}/request${initialYouthWrestlerId ? `?youthWrestlerId=${encodeURIComponent(initialYouthWrestlerId)}` : ''}`}
-                        className="text-sm text-center text-accent font-medium underline underline-offset-2 hover:no-underline min-h-[44px] flex items-center justify-center"
-                      >
-                        Need a different time? Request a session
-                      </Link>
+                      {athlete.showRequestSessionPrimary ? (
+                        <>
+                          <Button
+                            className="w-full min-h-[44px] bg-[#D4AF37] hover:bg-[#c9a432] text-black font-semibold"
+                            size="sm"
+                            asChild
+                          >
+                            <Link href={requestHref}>
+                              <Calendar className="h-4 w-4 mr-2 shrink-0" />
+                              Request a session
+                            </Link>
+                          </Button>
+                          <Button className="w-full" variant="secondary" size="sm" asChild>
+                            <Link href={bookHref}>
+                              <Calendar className="h-4 w-4 mr-2 shrink-0" />
+                              See availability
+                            </Link>
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Button className="w-full" variant="secondary" size="sm" asChild>
+                            <Link href={bookHref}>
+                              <Calendar className="h-4 w-4 mr-2 shrink-0" />
+                              See availability
+                            </Link>
+                          </Button>
+                          <Link
+                            href={requestHref}
+                            className="text-sm text-center text-accent font-medium underline underline-offset-2 hover:no-underline min-h-[44px] flex items-center justify-center"
+                          >
+                            Need a different time? Request a session
+                          </Link>
+                        </>
+                      )}
                       <a
                         href={`/training?tab=sessions&coach=${encodeURIComponent(athlete.id)}${initialYouthWrestlerId ? `&wrestler=${encodeURIComponent(initialYouthWrestlerId)}` : ''}`}
                         className="text-xs text-muted-foreground hover:text-foreground underline text-center block"

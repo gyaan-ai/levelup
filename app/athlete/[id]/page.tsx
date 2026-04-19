@@ -195,6 +195,14 @@ export default async function AthleteProfilePage({
     .select('day_of_week, start_time, end_time')
     .eq('athlete_id', id);
   const availabilitySummaryLines = summarizeWeeklyAvailability((weeklyAvailRows ?? []) as WeeklyAvailabilityRow[]);
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const { count: datedSlotCount } = await supabase
+    .from('athlete_availability_slots')
+    .select('id', { count: 'exact', head: true })
+    .eq('athlete_id', id)
+    .gte('slot_date', todayStr);
+  const hasSchedulingAvailability =
+    availabilitySummaryLines.length > 0 || (datedSlotCount ?? 0) > 0;
 
   // Fetch upcoming public sessions for this coach
   const nowISO = new Date().toISOString();
@@ -352,20 +360,42 @@ export default async function AthleteProfilePage({
                   )
                 )}
               </div>
-              {(isParent || isAdmin) && !isOwnProfile && (
-                <p className="text-sm text-muted-foreground mt-4 max-w-xl">
-                  Don&apos;t see a time that works?{' '}
+              {(isParent || isAdmin) && !isOwnProfile && hasSchedulingAvailability && (
+                <div className="flex flex-col sm:flex-row flex-wrap gap-3 mt-4 max-w-xl">
                   <Link
                     href={
                       youthWrestlerId
-                        ? `/book/${athlete.id}/request?youthWrestlerId=${encodeURIComponent(youthWrestlerId)}`
-                        : `/book/${athlete.id}/request`
+                        ? `/book/${athlete.id}/request?youthWrestlerId=${encodeURIComponent(youthWrestlerId)}&sessionType=private`
+                        : `/book/${athlete.id}/request?sessionType=private`
                     }
-                    className="text-accent font-medium underline underline-offset-2 hover:no-underline"
                   >
-                    Request a session
-                  </Link>{' '}
-                  — the coach can reply from their requests inbox.
+                    <Button size="lg" variant="premium" className="w-full sm:w-auto">
+                      Request a Private
+                    </Button>
+                  </Link>
+                  <Link
+                    href={
+                      youthWrestlerId
+                        ? `/book/${athlete.id}/request?youthWrestlerId=${encodeURIComponent(youthWrestlerId)}&sessionType=partner`
+                        : `/book/${athlete.id}/request?sessionType=partner`
+                    }
+                  >
+                    <Button size="lg" variant="outline" className="w-full sm:w-auto border-[#D4AF37]/50">
+                      Request a Partner Session
+                    </Button>
+                  </Link>
+                </div>
+              )}
+              {(isParent || isAdmin) && !isOwnProfile && !hasSchedulingAvailability && user && (
+                <p className="text-sm text-muted-foreground mt-4 max-w-xl">
+                  <span className="font-medium text-foreground">Contact to schedule</span>
+                  {' — '}
+                  <Link href={`/inbox/thread/${user.id}/${athlete.id}`}>
+                    <Button size="sm" variant="outline" className="mt-2 sm:mt-0 sm:ml-1">
+                      <MessageCircle className="h-4 w-4 mr-2" />
+                      Message
+                    </Button>
+                  </Link>
                 </p>
               )}
             </div>

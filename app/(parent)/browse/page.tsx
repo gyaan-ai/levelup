@@ -92,10 +92,42 @@ export default async function BrowsePage({
     }
   }
 
-  const athletesWithNext = athletesMerged.map((a) => ({
-    ...a,
-    nextAvailable: nextByAthlete.get(a.id) ?? null,
-  }));
+  const weeklyCoachIds = new Set<string>();
+  if (athleteIds.length) {
+    const { data: weeklyRows } = await supabase
+      .from('athlete_availability')
+      .select('athlete_id')
+      .in('athlete_id', athleteIds);
+    for (const row of weeklyRows || []) {
+      weeklyCoachIds.add((row as { athlete_id: string }).athlete_id);
+    }
+  }
+
+  const nowIso = new Date().toISOString();
+  const publicSessionCoachIds = new Set<string>();
+  if (athleteIds.length) {
+    const { data: pubSessions } = await supabase
+      .from('sessions')
+      .select('athlete_id')
+      .in('athlete_id', athleteIds)
+      .eq('join_policy', 'public')
+      .in('status', ['scheduled', 'pending_payment'])
+      .gte('scheduled_datetime', nowIso);
+    for (const row of pubSessions || []) {
+      publicSessionCoachIds.add((row as { athlete_id: string }).athlete_id);
+    }
+  }
+
+  const athletesWithNext = athletesMerged.map((a) => {
+    const hasAvailability = weeklyCoachIds.has(a.id) || !!nextByAthlete.get(a.id);
+    const hasPublicOpenSession = publicSessionCoachIds.has(a.id);
+    return {
+      ...a,
+      nextAvailable: nextByAthlete.get(a.id) ?? null,
+      hasAvailabilityForRequest: hasAvailability,
+      showRequestSessionPrimary: hasAvailability && !hasPublicOpenSession,
+    };
+  });
 
   const isAdmin = userData?.role === 'admin';
   return (

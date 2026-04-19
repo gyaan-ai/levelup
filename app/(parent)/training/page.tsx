@@ -13,6 +13,8 @@ import {
   patchSessionsWithCoachReviewStats,
   sortAthletesForBrowse,
 } from '@/lib/coach-review-stats';
+import { isSessionOpenForParentBrowse } from '@/lib/sessions';
+import { buildServiceTypesByCoach } from '@/lib/coach-offered-session-types';
 
 export const metadata = {
   title: 'Training | The Guild',
@@ -51,7 +53,7 @@ export default async function TrainingPage({
   searchParams: Promise<{ tab?: string; date?: string; time?: string; location?: string; coach?: string; wrestler?: string; type?: string }>;
 }) {
   const sp = await searchParams;
-  const tab = sp.tab ?? 'sessions';
+  const tab = sp.tab === 'sessions' ? 'sessions' : 'coaches';
 
   const headersList = await headers();
   const host = headersList.get('host') || '';
@@ -221,20 +223,111 @@ export default async function TrainingPage({
 
   availabilitySessions = patchSessionsWithCoachReviewStats(availabilitySessions, reviewStatsMap);
 
-  const isAdmin = userData?.role === 'admin';
+  /** Coaches with at least one future public session that still has spots (grid "Available" + request CTA contrast). */
+  const { data: publicSessionsForOpenCheck } = athleteIds.length
+    ? await supabase
+        .from('sessions')
+        .select(
+          `
+          athlete_id,
+          status,
+          join_policy,
+          scheduled_datetime,
+          current_participants,
+          max_participants,
+          session_participants(id)
+        `
+        )
+        .in('athlete_id', athleteIds)
+        .eq('join_policy', 'public')
+        .in('status', ['scheduled', 'pending_payment'])
+        .gte('scheduled_datetime', nowIso)
+    : { data: [] };
+  const coachHasBookablePublicSession = new Set<string>();
+  for (const row of publicSessionsForOpenCheck ?? []) {
+    if (isSessionOpenForParentBrowse(row as Parameters<typeof isSessionOpenForParentBrowse>[0])) {
+      coachHasBookablePublicSession.add((row as { athlete_id: string }).athlete_id);
+    }
+  }
+  const coachIdsWithPublicOpen = [...coachHasBookablePublicSession].sort();
+
+  const { data: weeklyAvailIds } = athleteIds.length
+    ? await supabase.from('athlete_availability').select('athlete_id').in('athlete_id', athleteIds)
+    : { data: [] };
+  const weeklyAvailSet = new Set(
+    (weeklyAvailIds ?? []).map((r: { athlete_id: string }) => r.athlete_id)
+  );
+  const { data: datedSlotIds } = athleteIds.length
+    ? await supabase
+        .from('athlete_availability_slots')
+        .select('athlete_id')
+        .in('athlete_id', athleteIds)
+        .gte('slot_date', today)
+    : { data: [] };
+  const datedAvailSet = new Set(
+    (datedSlotIds ?? []).map((r: { athlete_id: string }) => r.athlete_id)
+  );
+  const hasRealSchedulingAvailability = (coachId: string) =>
+    weeklyAvailSet.has(coachId) || datedAvailSet.has(coachId);
+
+  const { data: svcRows } = athleteIds.length
+    ? await admin
+        .from('athlete_services')
+        .select('athlete_id, session_type')
+        .in('athlete_id', athleteIds)
+        .eq('active', true)
+    : { data: [] };
+
+  const { data: apRows } = athleteIds.length
+    ? await admin
+        .from('athlete_products')
+        .select('athlete_id, product_id, enabled')
+        .in('athlete_id', athleteIds)
+        .eq('enabled', true)
+    : { data: [] };
+  const productIds = [...new Set((apRows ?? []).map((r: { product_id: string }) => r.product_id))];
+  const { data: prodSlugRows } = productIds.length
+    ? await admin.from('products').select('id, slug').in('id', productIds).eq('active', true)
+    : { data: [] };
+  const slugByProductId = new Map((prodSlugRows ?? []).map((p: { id: string; slug: string }) => [p.id, p.slug]));
+  const productSlugRows = (apRows ?? [])
+    .map((r: { athlete_id: string; product_id: string }) => ({
+      athlete_id: r.athlete_id,
+      slug: String(slugByProductId.get(r.product_id) ?? ''),
+    }))
+    .filter((r) => r.slug.length > 0);
+
+  const serviceTypesByCoach = buildServiceTypesByCoach({
+    athleteIds,
+    serviceRows: (svcRows ?? []) as { athlete_id: string; session_type: string }[],
+    productRows: productSlugRows,
+  });
+
+  let requestSessionCoaches = athletesMerged
+    .filter(
+      (a) => hasRealSchedulingAvailability(a.id) && !coachHasBookablePublicSession.has(a.id)
+    )
+    .map((a) => ({
+      id: a.id,
+      first_name: a.first_name,
+      last_name: a.last_name,
+      school: a.school,
+      photo_url: a.photo_url,
+    }));
+  if (sp.coach && sp.coach !== 'all') {
+    requestSessionCoaches = requestSessionCoaches.filter((c) => c.id === sp.coach);
+  }
 
   return (
     <div className="min-h-screen pb-24">
       <div className="px-4 pt-6 pb-4">
         <h1 className="text-2xl font-bold text-foreground">Training</h1>
-        <p className="text-zinc-400 text-sm mt-0.5">Find and book sessions</p>
       </div>
       <div className="px-4">
       <TrainingClient
         key={`training-${tab}-${sp.coach ?? 'all'}`}
         initialTab={tab}
         athletesWithNext={athletesWithNext}
-        isAdmin={!!isAdmin}
         facilities={facilities ?? []}
         availabilitySessions={availabilitySessions}
         availabilityDate={sp.date ?? ''}
@@ -245,6 +338,9 @@ export default async function TrainingPage({
         preselectedWrestlerId={sp.wrestler ?? ''}
         parentWrestlerIds={parentWrestlerIds}
         availabilitySessionType={sp.type ?? 'all'}
+        coachIdsWithPublicOpen={coachIdsWithPublicOpen}
+        serviceTypesByCoach={serviceTypesByCoach}
+        requestSessionCoaches={requestSessionCoaches}
       />
       </div>
     </div>

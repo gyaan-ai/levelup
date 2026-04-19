@@ -71,7 +71,7 @@ export async function GET(req: NextRequest) {
   }
 }
 
-/** POST /api/reviews — create or update a review for this session. One review per coach per parent (session is the anchor row). */
+/** POST /api/reviews — upsert review for this session (unique session_id + parent_id). */
 export async function POST(req: NextRequest) {
   try {
     const headersList = await headers();
@@ -96,6 +96,9 @@ export async function POST(req: NextRequest) {
     }
     if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
       return NextResponse.json({ error: 'rating must be 1–5' }, { status: 400 });
+    }
+    if (comment && comment.length > 500) {
+      return NextResponse.json({ error: 'Comment must be 500 characters or less' }, { status: 400 });
     }
 
     // Load session and verify completed + parent is owner or participant (same logic as review page: admin-based so multi-kid + RLS don't block)
@@ -153,20 +156,6 @@ export async function POST(req: NextRequest) {
     const coachId = session.athlete_id as string;
     if (!coachId) {
       return NextResponse.json({ error: 'Session has no coach' }, { status: 400 });
-    }
-
-    const { data: existingForCoachRows } = await admin
-      .from('reviews')
-      .select('id, session_id')
-      .eq('parent_id', user.id)
-      .eq('athlete_id', coachId)
-      .limit(1);
-    const existingForCoach = existingForCoachRows?.[0];
-    if (existingForCoach && existingForCoach.session_id !== sessionId) {
-      return NextResponse.json(
-        { error: 'You already left feedback for this coach' },
-        { status: 400 }
-      );
     }
 
     const { data: priorReview } = await admin
