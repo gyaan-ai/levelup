@@ -23,24 +23,43 @@ export type SchoolBadgeColors = {
 };
 
 const SCHOOL_BADGE_COLORS: Record<string, SchoolBadgeColors> = {
-  'UNC': { bg: 'bg-blue-600', text: 'text-white' },
-  'NC State': { bg: 'bg-red-600', text: 'text-white' },
-  'NCSU': { bg: 'bg-red-600', text: 'text-white' },
-  'North Carolina State': { bg: 'bg-red-600', text: 'text-white' },
+  /** Carolina blue (digital) + navy text for contrast */
+  'UNC': {
+    bg: 'bg-[#4B9CD3]',
+    text: 'text-[#13294B]',
+    border: 'border border-[#13294B]/20',
+  },
+  /** NC State red */
+  'NC State': {
+    bg: 'bg-[#CC0000]',
+    text: 'text-white',
+    border: 'border border-[#990000]/40',
+  },
+  'NCSU': {
+    bg: 'bg-[#CC0000]',
+    text: 'text-white',
+    border: 'border border-[#990000]/40',
+  },
+  'North Carolina State': {
+    bg: 'bg-[#CC0000]',
+    text: 'text-white',
+    border: 'border border-[#990000]/40',
+  },
+  /** App State gold/yellow pill, black type */
   'App State': {
-    bg: 'bg-black',
-    text: 'text-[#FFCD00]',
-    border: 'border border-[#FFCD00]/60',
+    bg: 'bg-[#FFCD00]',
+    text: 'text-black',
+    border: 'border border-black/15',
   },
   'Appalachian State': {
-    bg: 'bg-black',
-    text: 'text-[#FFCD00]',
-    border: 'border border-[#FFCD00]/60',
+    bg: 'bg-[#FFCD00]',
+    text: 'text-black',
+    border: 'border border-black/15',
   },
   'Appalachian State University': {
-    bg: 'bg-black',
-    text: 'text-[#FFCD00]',
-    border: 'border border-[#FFCD00]/60',
+    bg: 'bg-[#FFCD00]',
+    text: 'text-black',
+    border: 'border border-black/15',
   },
 };
 

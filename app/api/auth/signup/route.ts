@@ -44,6 +44,17 @@ export async function POST(req: NextRequest) {
     }
     const invitePayload = typeof inviteToken === 'string' && inviteToken.trim() ? verifyInviteToken(inviteToken.trim()) : null;
 
+    if (role === 'parent') {
+      const fn = typeof firstName === 'string' ? firstName.trim() : '';
+      const ln = typeof lastName === 'string' ? lastName.trim() : '';
+      if (!fn || !ln) {
+        return NextResponse.json(
+          { error: 'First name and last name are required.' },
+          { status: 400 }
+        );
+      }
+    }
+
     // For athletes (coaches), require additional fields and coach type
     if (role === 'coach') {
       if (!firstName || !lastName || !school?.trim()) {
@@ -144,14 +155,22 @@ export async function POST(req: NextRequest) {
     const userId = authData.user.id;
     const emailNormalized = (email ?? '').trim().toLowerCase();
 
+    const usersInsert: Record<string, string> = {
+      id: userId,
+      email: emailNormalized,
+      role,
+    };
+    if (role === 'parent') {
+      usersInsert.first_name = String(firstName).trim();
+      usersInsert.last_name = String(lastName).trim();
+    }
+    if (role === 'youth_wrestler') {
+      usersInsert.first_name = String(firstName).trim();
+      usersInsert.last_name = String(lastName).trim();
+    }
+
     // Insert into users table (one user per email address; store normalized for consistency)
-    const { error: userError } = await supabaseAdmin
-      .from('users')
-      .insert({
-        id: userId,
-        email: emailNormalized,
-        role,
-      });
+    const { error: userError } = await supabaseAdmin.from('users').insert(usersInsert);
 
     if (userError) {
       // Rollback: delete auth user if user table insert fails

@@ -38,8 +38,10 @@ export type AdminUserRow = {
   school?: string | null;
   /** For coaches: true = visible on Browse Coaches, false = hidden. null = not a coach. */
   athlete_active?: boolean | null;
-  /** For parents: display names of their youth wrestlers (kids). */
+  /** For parents: display names of their youth wrestlers (kids). Inactive kids include " (inactive)". */
   kids_names?: string[] | null;
+  /** For parents: number of coach reviews submitted (from public.reviews). */
+  review_count?: number;
 };
 
 type SortOption = 'email_asc' | 'email_desc' | 'role' | 'created_desc' | 'created_asc' | 'login_desc' | 'login_asc';
@@ -76,7 +78,8 @@ export function AdminUsersClient({ initialUsers }: { initialUsers: AdminUserRow[
         const matchName = u.display_name?.toLowerCase().includes(q);
         const matchLast = (u.last_name ?? '').toLowerCase().includes(q);
         const matchFirst = (u.first_name ?? '').toLowerCase().includes(q);
-        if (!matchEmail && !matchName && !matchLast && !matchFirst) return false;
+        const matchId = u.id.toLowerCase().includes(q.toLowerCase());
+        if (!matchEmail && !matchName && !matchLast && !matchFirst && !matchId) return false;
       }
       return true;
     });
@@ -281,7 +284,7 @@ export function AdminUsersClient({ initialUsers }: { initialUsers: AdminUserRow[
             <div className="relative flex-1 min-w-[200px] max-w-xs">
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search by email or name..."
+                placeholder="Search email, name, or user id…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-8"
@@ -309,8 +312,9 @@ export function AdminUsersClient({ initialUsers }: { initialUsers: AdminUserRow[
                   <th className="text-left py-2 font-medium">Profile / Name</th>
                   <th className="text-left py-2 font-medium">Last name</th>
                   <th className="text-left py-2 font-medium">Email</th>
+                  <th className="text-left py-2 font-medium w-[7rem] font-normal text-muted-foreground">User ID</th>
                   <th className="text-left py-2 font-medium">Role</th>
-                  <th className="text-left py-2 font-medium">Kids / Athletes</th>
+                  <th className="text-left py-2 font-medium">Kids / activity</th>
                   <th className="text-left py-2 font-medium">Created</th>
                   <th className="text-left py-2 font-medium">Last login</th>
                   <th className="text-left py-2 font-medium">Status</th>
@@ -320,7 +324,7 @@ export function AdminUsersClient({ initialUsers }: { initialUsers: AdminUserRow[
               <tbody>
                 {filteredAndSorted.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="py-8 text-center text-muted-foreground">
+                    <td colSpan={10} className="py-8 text-center text-muted-foreground">
                       No users match filters.
                     </td>
                   </tr>
@@ -328,30 +332,65 @@ export function AdminUsersClient({ initialUsers }: { initialUsers: AdminUserRow[
                   filteredAndSorted.map((u) => (
                     <tr key={u.id} className={`border-b last:border-0 ${u.archived_at ? 'opacity-60' : ''}`}>
                       <td className="py-2">
-                        {u.display_name ? (
-                          <span className="font-medium">{u.display_name}</span>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                        {u.school && (
-                          <span className="block text-xs text-muted-foreground">{u.school}</span>
-                        )}
+                        <Link
+                          href={`/admin/users/${u.id}`}
+                          className="group block rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        >
+                          {u.display_name ? (
+                            <span className="font-medium group-hover:underline">{u.display_name}</span>
+                          ) : (
+                            <span className="text-muted-foreground group-hover:underline">View profile</span>
+                          )}
+                          {u.school && (
+                            <span className="block text-xs text-muted-foreground">{u.school}</span>
+                          )}
+                        </Link>
                       </td>
                       <td className="py-2 text-muted-foreground">{u.last_name?.trim() || '—'}</td>
                       <td className="py-2">
-                        <a href={`mailto:${u.email}`} className="text-accent hover:underline">
+                        <Link href={`/admin/users/${u.id}`} className="text-accent hover:underline block">
                           {u.email}
+                        </Link>
+                        <a href={`mailto:${u.email}`} className="text-xs text-muted-foreground hover:underline">
+                          Email
                         </a>
+                      </td>
+                      <td className="py-2">
+                        <code
+                          className="text-[10px] text-muted-foreground break-all cursor-help"
+                          title={u.id}
+                        >
+                          {u.id.slice(0, 8)}…
+                        </code>
                       </td>
                       <td className="py-2">
                         <Badge variant="outline">{ROLE_LABELS[u.role] ?? u.role}</Badge>
                       </td>
-                      <td className="py-2 max-w-[180px]">
-                        {u.kids_names?.length ? (
-                          <span className="text-muted-foreground text-xs">{u.kids_names.join(', ')}</span>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
+                      <td className="py-2 max-w-[220px]">
+                        <div className="text-xs text-muted-foreground space-y-1">
+                          {u.role === 'parent' ? (
+                            <>
+                              {u.kids_names?.length ? (
+                                <span>{u.kids_names.join(', ')}</span>
+                              ) : (
+                                <span className="italic">No wrestlers on file</span>
+                              )}
+                              {(u.review_count ?? 0) > 0 && (
+                                <span className="block text-foreground/90">
+                                  {u.review_count} coach review{u.review_count === 1 ? '' : 's'} (
+                                  <Link href="/admin/reviews" className="text-accent hover:underline">
+                                    see admin reviews
+                                  </Link>
+                                  )
+                                </span>
+                              )}
+                            </>
+                          ) : u.kids_names?.length ? (
+                            <span>{u.kids_names.join(', ')}</span>
+                          ) : (
+                            <span>—</span>
+                          )}
+                        </div>
                       </td>
                       <td className="py-2 text-muted-foreground">
                         {formatEST(new Date(u.created_at), 'MMM d, yyyy')}

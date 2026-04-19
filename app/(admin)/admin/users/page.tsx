@@ -73,12 +73,17 @@ export default async function AdminUsersPage() {
   if (parentIds.length > 0) {
     const { data: primaryKids } = await admin
       .from('youth_wrestlers')
-      .select('parent_id, first_name, last_name')
-      .in('parent_id', parentIds)
-      .eq('active', true);
+      .select('parent_id, first_name, last_name, active')
+      .in('parent_id', parentIds);
     for (const k of primaryKids ?? []) {
-      const row = k as { parent_id: string; first_name?: string | null; last_name?: string | null };
-      const name = [row.first_name, row.last_name].filter(Boolean).join(' ').trim() || '—';
+      const row = k as {
+        parent_id: string;
+        first_name?: string | null;
+        last_name?: string | null;
+        active?: boolean | null;
+      };
+      const base = [row.first_name, row.last_name].filter(Boolean).join(' ').trim() || '—';
+      const name = row.active === false ? `${base} (inactive)` : base;
       const list = kidsByParentId.get(row.parent_id) ?? [];
       list.push(name);
       kidsByParentId.set(row.parent_id, list);
@@ -91,13 +96,18 @@ export default async function AdminUsersPage() {
       const ywIds = [...new Set((linked as { youth_wrestler_id: string }[]).map((r) => r.youth_wrestler_id))];
       const { data: ywRows } = await admin
         .from('youth_wrestlers')
-        .select('id, first_name, last_name')
-        .in('id', ywIds)
-        .eq('active', true);
+        .select('id, first_name, last_name, active')
+        .in('id', ywIds);
       const ywNames = new Map<string, string>();
       for (const y of ywRows ?? []) {
-        const r = y as { id: string; first_name?: string | null; last_name?: string | null };
-        ywNames.set(r.id, [r.first_name, r.last_name].filter(Boolean).join(' ').trim() || '—');
+        const r = y as {
+          id: string;
+          first_name?: string | null;
+          last_name?: string | null;
+          active?: boolean | null;
+        };
+        const base = [r.first_name, r.last_name].filter(Boolean).join(' ').trim() || '—';
+        ywNames.set(r.id, r.active === false ? `${base} (inactive)` : base);
       }
       for (const r of linked as { parent_id: string; youth_wrestler_id: string }[]) {
         const name = ywNames.get(r.youth_wrestler_id);
@@ -110,20 +120,36 @@ export default async function AdminUsersPage() {
     }
   }
 
+  const reviewCountByParentId = new Map<string, number>();
+  if (parentIds.length > 0) {
+    const { data: reviewRows } = await admin.from('reviews').select('parent_id').in('parent_id', parentIds);
+    for (const row of reviewRows ?? []) {
+      const pid = (row as { parent_id: string }).parent_id;
+      if (!pid) continue;
+      reviewCountByParentId.set(pid, (reviewCountByParentId.get(pid) ?? 0) + 1);
+    }
+  }
+
   const users: AdminUserRow[] = userRows.map((u) => {
     const profile = u.role === 'coach' ? athleteMap.get(u.id) : null;
     const fromUsersName = [u.first_name, u.last_name].filter(Boolean).join(' ').trim() || null;
+    const emailLocal =
+      u.role === 'parent' && u.email?.includes('@')
+        ? (u.email.split('@')[0] ?? '').trim() || null
+        : null;
     const display_name =
       profile != null
         ? [profile.first_name, profile.last_name].filter(Boolean).join(' ').trim() || null
-        : fromUsersName;
+        : fromUsersName ?? emailLocal;
     const kids = u.role === 'parent' ? (kidsByParentId.get(u.id) ?? []) : null;
+    const review_count = u.role === 'parent' ? (reviewCountByParentId.get(u.id) ?? 0) : undefined;
     return {
       ...u,
       display_name: display_name ?? null,
       school: profile?.school ?? null,
       athlete_active: u.role === 'coach' ? (profile?.active ?? false) : null,
       kids_names: kids?.length ? kids : null,
+      review_count,
     };
   });
 
