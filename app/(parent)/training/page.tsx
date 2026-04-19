@@ -91,6 +91,49 @@ export default async function TrainingPage({
   const athletesList = (athletes || []) as Athlete[];
   const athleteIds = athletesList.map((a) => a.id);
 
+  type CoachFacilityRow = { coach_id: string; facility_id: string };
+  let coachFacilityRows: CoachFacilityRow[] = [];
+  if (athleteIds.length > 0) {
+    const { data: cfData } = await admin
+      .from('coach_facilities')
+      .select('coach_id, facility_id')
+      .in('coach_id', athleteIds);
+    coachFacilityRows = (cfData ?? []) as CoachFacilityRow[];
+  }
+  if (coachFacilityRows.length === 0 && athletesList.length > 0) {
+    for (const a of athletesList) {
+      if (a.facility_id) coachFacilityRows.push({ coach_id: a.id, facility_id: a.facility_id });
+      if (a.secondary_facility_id) {
+        coachFacilityRows.push({ coach_id: a.id, facility_id: a.secondary_facility_id });
+      }
+    }
+  }
+  const activeCoachIdSet = new Set(athleteIds);
+  coachFacilityRows = coachFacilityRows.filter((r) => activeCoachIdSet.has(r.coach_id));
+
+  const distinctCoachFacilityIds = [...new Set(coachFacilityRows.map((r) => r.facility_id))];
+  const { data: coachFilterFacilityRows } = distinctCoachFacilityIds.length
+    ? await admin
+        .from('facilities')
+        .select('id, name')
+        .in('id', distinctCoachFacilityIds)
+        .order('name', { ascending: true })
+    : { data: [] };
+
+  const coachIdsByFacilityId: Record<string, string[]> = {};
+  for (const r of coachFacilityRows) {
+    const list = coachIdsByFacilityId[r.facility_id] ?? [];
+    list.push(r.coach_id);
+    coachIdsByFacilityId[r.facility_id] = list;
+  }
+  for (const fid of Object.keys(coachIdsByFacilityId)) {
+    coachIdsByFacilityId[fid] = [...new Set(coachIdsByFacilityId[fid])];
+  }
+  const coachFilterLocations = (coachFilterFacilityRows ?? []).map((f: { id: string; name: string }) => ({
+    id: f.id,
+    name: f.name,
+  }));
+
   const reviewStatsMap = await fetchCoachReviewStatsMap(supabase, athleteIds);
   const athletesMerged = sortAthletesForBrowse(
     athletesList.map((a) => mergeCoachReviewStatsIntoAthlete(a, reviewStatsMap))
@@ -341,6 +384,8 @@ export default async function TrainingPage({
         coachIdsWithPublicOpen={coachIdsWithPublicOpen}
         serviceTypesByCoach={serviceTypesByCoach}
         requestSessionCoaches={requestSessionCoaches}
+        coachFilterLocations={coachFilterLocations}
+        coachIdsByFacilityId={coachIdsByFacilityId}
       />
       </div>
     </div>

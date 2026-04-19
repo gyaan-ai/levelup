@@ -12,8 +12,7 @@ export function ParentHomeDiscoverySection({
 }) {
   if (sessions.length === 0) return null;
   return (
-    <div className="mt-6 space-y-3">
-      <p className="text-sm text-zinc-400 text-center">Popular open sessions</p>
+    <div className="mt-4 space-y-2">
       {sessions.map((s) => (
         <HomeDiscoverySessionCard key={s.id} session={s} parentWrestlerIds={parentWrestlerIds} />
       ))}

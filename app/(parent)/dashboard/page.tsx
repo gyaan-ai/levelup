@@ -25,15 +25,24 @@ const DISCOVERY_SELECT = `
   id, scheduled_datetime, session_type, session_mode, join_policy,
   current_participants, max_participants, price_per_participant, duration_minutes,
   athlete_id, facility_id,
-  athletes:athlete_id(id, first_name, last_name, school, photo_url, average_rating, review_count),
+  athletes:athlete_id(id, first_name, last_name, school, photo_url, photo_focus_x, photo_focus_y, average_rating, review_count),
   facilities:facility_id(id, name),
   session_participants(id, youth_wrestler_id, youth_wrestlers:youth_wrestler_id(id, first_name, last_name))
 `;
 
+function discoveryBookedByFamily(session: DiscoverySession, familyYouthIds: Set<string>): boolean {
+  for (const p of session.session_participants ?? []) {
+    const row = p as { youth_wrestler_id?: string | null };
+    if (row.youth_wrestler_id && familyYouthIds.has(row.youth_wrestler_id)) return true;
+  }
+  return false;
+}
+
 async function fetchDiscoverySessions(
   admin: ReturnType<typeof createAdminClient>,
   parentId: string,
-  nowIso: string
+  nowIso: string,
+  familyYouthIds: Set<string>
 ): Promise<DiscoverySession[]> {
   const { data: follows } = await admin.from('coach_follows').select('coach_id').eq('parent_id', parentId);
   const followedIds = [...new Set((follows ?? []).map((f: { coach_id: string }) => f.coach_id))];
@@ -46,7 +55,7 @@ async function fetchDiscoverySessions(
       .in('status', ['scheduled', 'pending_payment'])
       .gte('scheduled_datetime', nowIso)
       .order('scheduled_datetime', { ascending: true })
-      .limit(24);
+      .limit(80);
     if (restrictToCoaches && restrictToCoaches.length > 0) {
       q = q.in('athlete_id', restrictToCoaches);
     }
@@ -54,20 +63,26 @@ async function fetchDiscoverySessions(
     return (data ?? []) as unknown as DiscoverySession[];
   };
 
-  const first = await runQuery(followedIds.length > 0 ? followedIds : null);
-  const filteredFirst = first.filter((s) => isSessionOpenForParentBrowse(s));
-  const out: DiscoverySession[] = filteredFirst.slice(0, 3);
-  const seen = new Set(out.map((s) => s.id));
-
-  if (out.length < 3) {
-    const second = await runQuery(null);
-    for (const s of second) {
+  const takeOpenNotBooked = (rows: DiscoverySession[], out: DiscoverySession[], seen: Set<string>) => {
+    for (const s of rows) {
       if (out.length >= 3) break;
       if (seen.has(s.id)) continue;
       if (!isSessionOpenForParentBrowse(s)) continue;
-      out.push(s as DiscoverySession);
+      if (discoveryBookedByFamily(s, familyYouthIds)) continue;
+      out.push(s);
       seen.add(s.id);
     }
+  };
+
+  const out: DiscoverySession[] = [];
+  const seen = new Set<string>();
+
+  const first = await runQuery(followedIds.length > 0 ? followedIds : null);
+  takeOpenNotBooked(first, out, seen);
+
+  if (out.length < 3) {
+    const second = await runQuery(null);
+    takeOpenNotBooked(second, out, seen);
   }
 
   return out.slice(0, 3);
@@ -211,7 +226,9 @@ export default async function HomePage() {
   }
 
   const discoverySessions =
-    (upcomingSessions ?? []).length === 0 ? await fetchDiscoverySessions(admin, user.id, nowISO) : [];
+    (upcomingSessions ?? []).length === 0
+      ? await fetchDiscoverySessions(admin, user.id, nowISO, youthWrestlerIdSet)
+      : [];
 
   type UpcomingRow = {
     id: string;
@@ -227,7 +244,13 @@ export default async function HomePage() {
     }>;
   };
 
-  const parentFirstName = (userData?.first_name ?? '').trim() || 'there';
+  const rawFirst = userData?.first_name;
+  const parentFirstName =
+    typeof rawFirst === 'string' &&
+    rawFirst.trim().length > 0 &&
+    rawFirst.trim().toLowerCase() !== 'null'
+      ? rawFirst.trim()
+      : null;
 
   return (
     <div className="min-h-screen pb-24">
@@ -245,7 +268,7 @@ export default async function HomePage() {
       <div className="px-4 pt-6 pb-2">
         <h1 className="text-sm font-medium text-zinc-500 uppercase tracking-wide">Home</h1>
         <p className="text-2xl font-bold text-foreground mt-1">
-          Hey {parentFirstName} 👋
+          {parentFirstName ? `Hey ${parentFirstName} 👋` : 'Hey there 👋'}
         </p>
       </div>
 

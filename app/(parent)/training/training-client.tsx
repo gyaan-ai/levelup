@@ -62,6 +62,10 @@ type Props = {
     school?: string;
     photo_url?: string | null;
   }>;
+  /** Facilities that have at least one active coach (coach_facilities); sorted by name. */
+  coachFilterLocations?: Array<{ id: string; name: string }>;
+  /** When a facility is selected, these coach ids match that location. */
+  coachIdsByFacilityId?: Record<string, string[]>;
 };
 
 export function TrainingClient({
@@ -80,6 +84,8 @@ export function TrainingClient({
   coachIdsWithPublicOpen = [],
   serviceTypesByCoach = {},
   requestSessionCoaches = [],
+  coachFilterLocations = [],
+  coachIdsByFacilityId = {},
 }: Props) {
   const tab = (initialTab === 'sessions' ? 'sessions' : 'coaches') as TabId;
   const [activeTab, setActiveTab] = useState<TabId>(tab);
@@ -133,6 +139,8 @@ export function TrainingClient({
           serviceTypesByCoach={serviceTypesByCoach}
           coachIdsWithOpen={coachIdsWithPublicOpen}
           preselectedWrestlerId={preselectedWrestlerId}
+          locationFacilities={coachFilterLocations}
+          coachIdsByFacilityId={coachIdsByFacilityId}
         />
       )}
     </>

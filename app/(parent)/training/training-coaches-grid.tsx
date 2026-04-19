@@ -11,30 +11,6 @@ import { formatEST } from '@/lib/format-date';
 import type { Athlete } from '@/types';
 import { useAuth } from '@/lib/auth/use-auth';
 
-const WEIGHT_CLASSES = [
-  'all',
-  '106',
-  '113',
-  '120',
-  '126',
-  '133',
-  '138',
-  '141',
-  '145',
-  '152',
-  '157',
-  '160',
-  '165',
-  '170',
-  '174',
-  '182',
-  '184',
-  '195',
-  '197',
-  '220',
-  '285',
-] as const;
-
 type SessionTypeFilter = 'all' | 'small_group' | 'partner' | 'private';
 
 export interface AthleteWithNext extends Athlete {
@@ -46,6 +22,8 @@ type Props = {
   serviceTypesByCoach: Record<string, string[]>;
   coachIdsWithOpen: string[];
   preselectedWrestlerId?: string;
+  locationFacilities: Array<{ id: string; name: string }>;
+  coachIdsByFacilityId: Record<string, string[]>;
 };
 
 function formatCoachNextLine(slot_date: string, _start_time: string): string {
@@ -58,10 +36,12 @@ export function TrainingCoachesGrid({
   serviceTypesByCoach,
   coachIdsWithOpen,
   preselectedWrestlerId = '',
+  locationFacilities,
+  coachIdsByFacilityId,
 }: Props) {
   const { user, userRole } = useAuth();
   const [followedCoachIds, setFollowedCoachIds] = useState<Set<string>>(new Set());
-  const [weight, setWeight] = useState<string>('all');
+  const [facilityId, setFacilityId] = useState<string>('all');
   const [sessionType, setSessionType] = useState<SessionTypeFilter>('all');
   const [availableOnly, setAvailableOnly] = useState(false);
 
@@ -78,11 +58,13 @@ export function TrainingCoachesGrid({
   }, [user, userRole]);
 
   const filtered = useMemo(() => {
+    const allowedByLocation =
+      facilityId === 'all'
+        ? null
+        : new Set(coachIdsByFacilityId[facilityId] ?? []);
+
     return athletes.filter((a) => {
-      if (weight !== 'all') {
-        const wc = String(a.weight_class ?? '').replace(/\D/g, '');
-        if (wc !== weight) return false;
-      }
+      if (allowedByLocation && !allowedByLocation.has(a.id)) return false;
       if (sessionType !== 'all') {
         const types = serviceTypesByCoach[a.id] ?? [];
         if (!types.includes(sessionType)) return false;
@@ -90,7 +72,7 @@ export function TrainingCoachesGrid({
       if (availableOnly && !coachIdsWithOpen.includes(a.id)) return false;
       return true;
     });
-  }, [athletes, weight, sessionType, availableOnly, serviceTypesByCoach, coachIdsWithOpen]);
+  }, [athletes, facilityId, sessionType, availableOnly, serviceTypesByCoach, coachIdsWithOpen, coachIdsByFacilityId]);
 
   const sorted = useMemo(() => {
     const copy = [...filtered];
@@ -114,58 +96,66 @@ export function TrainingCoachesGrid({
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
-        {WEIGHT_CLASSES.map((w) => (
-          <button
-            key={w}
-            type="button"
-            onClick={() => setWeight(w)}
-            className={`min-h-[44px] shrink-0 px-3 py-2 rounded-full text-sm font-medium border transition-colors ${
-              weight === w
-                ? 'bg-[#D4AF37]/20 text-[#D4AF37] border-[#D4AF37]/30'
-                : 'bg-zinc-900 text-zinc-300 border-zinc-800'
-            }`}
-          >
-            {w === 'all' ? 'All' : w}
-          </button>
-        ))}
-      </div>
-
-      <div className="flex gap-2 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
-        {(
-          [
-            ['all', 'All'],
-            ['small_group', 'Small Group'],
-            ['partner', 'Partner'],
-            ['private', 'Private'],
-          ] as const
-        ).map(([val, label]) => (
-          <button
-            key={val}
-            type="button"
-            onClick={() => setSessionType(val)}
-            className={`min-h-[44px] shrink-0 px-4 py-2 rounded-full text-sm font-medium border transition-colors ${
-              sessionType === val
-                ? 'bg-[#D4AF37]/20 text-[#D4AF37] border-[#D4AF37]/30'
-                : 'bg-zinc-900 text-zinc-300 border-zinc-800'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
-      <button
-        type="button"
-        onClick={() => setAvailableOnly((v) => !v)}
-        className={`min-h-[44px] w-full rounded-full text-sm font-medium border px-4 py-2 transition-colors ${
-          availableOnly
-            ? 'bg-[#D4AF37]/20 text-[#D4AF37] border-[#D4AF37]/30'
-            : 'bg-zinc-900 text-zinc-300 border-zinc-800'
-        }`}
+      <div
+        className="flex flex-nowrap items-stretch gap-2 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide"
+        role="toolbar"
+        aria-label="Coach filters"
       >
-        Available only — upcoming open sessions
-      </button>
+        <label className="sr-only" htmlFor="training-coach-location">
+          Location
+        </label>
+        <select
+          id="training-coach-location"
+          value={facilityId}
+          onChange={(e) => setFacilityId(e.target.value)}
+          className="min-h-[44px] w-full min-w-[10rem] flex-1 rounded-full border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/50 sm:max-w-[220px] sm:flex-none"
+        >
+          <option value="all">All locations</option>
+          {locationFacilities.map((f) => (
+            <option key={f.id} value={f.id}>
+              {f.name}
+            </option>
+          ))}
+        </select>
+
+        <div className="flex min-w-0 flex-1 items-center justify-center gap-2 overflow-x-auto scrollbar-hide px-1">
+          {(
+            [
+              ['all', 'All'],
+              ['small_group', 'Small Group'],
+              ['partner', 'Partner'],
+              ['private', 'Private'],
+            ] as const
+          ).map(([val, label]) => (
+            <button
+              key={val}
+              type="button"
+              onClick={() => setSessionType(val)}
+              className={`min-h-[44px] shrink-0 px-4 py-2 rounded-full text-sm font-medium border transition-colors ${
+                sessionType === val
+                  ? 'bg-[#D4AF37]/20 text-[#D4AF37] border-[#D4AF37]/30'
+                  : 'bg-zinc-900 text-zinc-300 border-zinc-800'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setAvailableOnly((v) => !v)}
+          aria-pressed={availableOnly}
+          title="Coaches with upcoming open sessions only"
+          className={`min-h-[44px] shrink-0 self-center whitespace-nowrap rounded-full border px-3 py-2 text-xs font-semibold transition-colors sm:px-4 sm:text-sm ${
+            availableOnly
+              ? 'bg-[#D4AF37]/20 text-[#D4AF37] border-[#D4AF37]/30'
+              : 'bg-zinc-900 text-zinc-300 border-zinc-800'
+          }`}
+        >
+          Available
+        </button>
+      </div>
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
         {sorted.map((a) => {

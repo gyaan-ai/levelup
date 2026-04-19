@@ -17,6 +17,8 @@ export interface Athlete {
   last_name: string;
   school: string;
   facility_id?: string;
+  /** Optional second training location; also mirrored in coach_facilities after migration. */
+  secondary_facility_id?: string | null;
   year?: 'Freshman' | 'Sophomore' | 'Junior' | 'Senior' | '5th Year';
   weight_class?: string;
   bio?: string;
