@@ -61,13 +61,19 @@ export function CoachHeaderMobile({ onSignOut }: Props) {
           </DialogHeader>
           <nav className="flex flex-col pt-2" aria-label="Coach pages">
             <Link href="/athlete-dashboard" className={linkClass} onClick={() => setOpen(false)}>
-              Home (dashboard)
-            </Link>
-            <Link href="/availability" className={linkClass} onClick={() => setOpen(false)}>
               Schedule
+            </Link>
+            <Link href="/coach-dashboard" className={linkClass} onClick={() => setOpen(false)}>
+              Dashboard
+            </Link>
+            <Link href="/coach-sessions/create" className={linkClass} onClick={() => setOpen(false)}>
+              Create session
             </Link>
             <Link href="/coach-sessions" className={linkClass} onClick={() => setOpen(false)}>
               My sessions
+            </Link>
+            <Link href="/availability" className={linkClass} onClick={() => setOpen(false)}>
+              Availability
             </Link>
             <Link href="/coach-roster" className={linkClass} onClick={() => setOpen(false)}>
               Roster

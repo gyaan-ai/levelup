@@ -299,10 +299,16 @@ export function BookingCard({
 
   const adminSmsRow =
     showAdminSmsTools && !isPast && showSessionSmsCopyAndTextGroup(session);
+  const coachSmsDialog =
+    variant === 'coach' && !isPast && showSessionSmsCopyAndTextGroup(session);
+  const coachBookedCount = Math.max(
+    session.current_participants ?? 0,
+    session.wrestlers.length
+  );
 
   return (
     <Card className={isPast ? 'bg-muted/20' : ''}>
-      {adminSmsRow && (
+      {(adminSmsRow || coachSmsDialog) && (
         <CoachTextGroupDialog
           sessionId={session.id}
           open={textGroupOpen}
@@ -374,7 +380,51 @@ export function BookingCard({
             {variant !== 'coach' && (
               <StarRating averageRating={session.coach.average_rating} reviewCount={session.coach.review_count} size="sm" />
             )}
-            {(session.max_participants ?? 1) > 1 && (
+            {variant === 'coach' && !isPast && (
+              <div className="rounded-lg border border-accent/25 bg-accent/10 px-3 py-3 space-y-2.5">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Users className="h-4 w-4 shrink-0 text-accent" />
+                  <span className="text-sm font-semibold text-foreground">
+                    {coachBookedCount === 0
+                      ? 'No athletes booked yet'
+                      : `${coachBookedCount} athlete${coachBookedCount !== 1 ? 's' : ''}`}
+                  </span>
+                  {(session.max_participants ?? 1) > 1 && (
+                    <CapacityBadge
+                      current={session.current_participants ?? 0}
+                      max={session.max_participants ?? 1}
+                      label="spots"
+                    />
+                  )}
+                </div>
+                {session.wrestlers.length > 0 ? (
+                  <p className="text-sm font-medium text-foreground leading-snug">{session.wrestlers.join(', ')}</p>
+                ) : coachBookedCount > 0 ? (
+                  <p className="text-sm text-muted-foreground">Roster names will appear here when loaded.</p>
+                ) : null}
+                {coachBookedCount > 0 && (
+                  <div className="flex flex-col sm:flex-row gap-2 pt-0.5">
+                    <CopySessionPhonesButton
+                      sessionId={session.id}
+                      className="min-h-[44px] touch-manipulation w-full sm:flex-1 border-accent/40"
+                    />
+                    {showSessionSmsCopyAndTextGroup(session) && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="min-h-[44px] touch-manipulation w-full sm:flex-1 gap-1 border-accent/50 text-accent"
+                        onClick={() => setTextGroupOpen(true)}
+                      >
+                        <Smartphone className="h-4 w-4 shrink-0" />
+                        Text group
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+            {variant !== 'coach' && (session.max_participants ?? 1) > 1 && (
               <p className="text-sm text-muted-foreground flex items-center gap-2">
                 <CapacityBadge
                   current={session.current_participants ?? 0}
@@ -383,7 +433,7 @@ export function BookingCard({
                 />
               </p>
             )}
-            {session.wrestlers.length > 0 && (
+            {variant !== 'coach' && session.wrestlers.length > 0 && (
               <p className="text-sm text-muted-foreground">
                 {session.wrestlers.join(', ')}
               </p>
@@ -752,7 +802,6 @@ export function BookingCard({
                 size="sm"
                 className="min-h-[40px] touch-manipulation"
               />
-              <CopySessionPhonesButton sessionId={session.id} className="min-h-[40px] touch-manipulation" />
               <Button
                 type="button"
                 variant="outline"

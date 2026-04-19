@@ -18,7 +18,7 @@ export default async function RateCardPage() {
   return (
     <div className="container mx-auto px-4 py-8 max-w-2xl">
       <div className="mb-6">
-        <BackLink fallbackHref="/athlete-dashboard" label="Back to Dashboard" />
+        <BackLink fallbackHref="/athlete-dashboard" label="Back to Schedule" />
       </div>
       <div className="mb-6">
         <h1 className="text-2xl font-bold">Pricing & Session Types</h1>

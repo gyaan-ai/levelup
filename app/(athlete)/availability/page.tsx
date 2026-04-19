@@ -31,7 +31,7 @@ export default async function AvailabilityPage() {
   return (
     <div className="container mx-auto px-4 py-8 max-w-4xl">
       <div className="mb-6">
-        <BackLink fallbackHref="/athlete-dashboard" label="Back to Home" />
+        <BackLink fallbackHref="/athlete-dashboard" label="Back to Schedule" />
       </div>
       <Card className="mb-6">
         <CardHeader>

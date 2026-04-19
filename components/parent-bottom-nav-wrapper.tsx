@@ -10,6 +10,7 @@ import { isParentRoute } from '@/lib/parent-routes';
 
 const COACH_ROUTES = [
   '/athlete-dashboard',
+  '/coach-dashboard',
   '/availability',
   '/coach-sessions',
   '/coach-roster',

@@ -182,25 +182,19 @@ export function Header() {
                     href="/athlete-dashboard"
                     className="text-white hover:text-accent transition-colors font-medium"
                   >
-                    Home
-                  </Link>
-                  <Link
-                    href="/availability"
-                    className="text-white hover:text-accent transition-colors font-medium"
-                  >
                     Schedule
                   </Link>
                   <Link
-                    href="/coach-sessions"
-                    className="text-white hover:text-accent transition-colors font-medium"
+                    href="/coach-sessions/create"
+                    className="text-[#D4AF37] hover:text-[#e8c85c] transition-colors font-semibold"
                   >
-                    My sessions
+                    Create
                   </Link>
                   <Link
-                    href="/coach-roster"
+                    href="/coach-earnings"
                     className="text-white hover:text-accent transition-colors font-medium"
                   >
-                    Roster
+                    Earnings
                   </Link>
                   <Link
                     href="/profile"
@@ -209,8 +203,32 @@ export function Header() {
                     Profile
                   </Link>
                   <Link
+                    href="/coach-dashboard"
+                    className="text-white/90 hover:text-accent transition-colors font-medium text-sm"
+                  >
+                    Dashboard
+                  </Link>
+                  <Link
+                    href="/coach-sessions"
+                    className="text-white hover:text-accent transition-colors font-medium text-sm"
+                  >
+                    My sessions
+                  </Link>
+                  <Link
+                    href="/availability"
+                    className="text-white hover:text-accent transition-colors font-medium text-sm"
+                  >
+                    Availability
+                  </Link>
+                  <Link
+                    href="/coach-roster"
+                    className="text-white hover:text-accent transition-colors font-medium text-sm"
+                  >
+                    Roster
+                  </Link>
+                  <Link
                     href="/rate-card"
-                    className="text-white hover:text-accent transition-colors font-medium"
+                    className="text-white hover:text-accent transition-colors font-medium text-sm"
                   >
                     Session types
                   </Link>

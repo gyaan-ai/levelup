@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Check, X, DollarSign, Smartphone, Trash2, Loader2, Share2, ExternalLink, CalendarPlus, Pencil } from 'lucide-react';
+import { Check, X, DollarSign, Smartphone, Trash2, Loader2, Share2, ExternalLink, CalendarPlus, Pencil, CalendarClock } from 'lucide-react';
 import { Textarea } from '@/components/ui/textarea';
 import { CoachTextGroupDialog } from '@/components/coach-text-group-dialog';
 import { CopySessionPhonesButton } from '@/components/copy-session-phones-button';
@@ -207,6 +207,7 @@ export function CoachSessionsClient({
       if (!res.ok) throw new Error(data.error || 'Failed');
       setSlotRequests((prev) => prev.filter((r) => r.id !== requestId));
       router.refresh();
+      window.dispatchEvent(new Event('coach-pending-refresh'));
     } catch (e: unknown) {
       alert(e instanceof Error ? e.message : 'Failed');
     } finally {
@@ -226,6 +227,7 @@ export function CoachSessionsClient({
       if (!res.ok) throw new Error(data.error || 'Failed');
       setRequests((prev) => prev.filter((r) => r.id !== requestId));
       router.refresh();
+      window.dispatchEvent(new Event('coach-pending-refresh'));
     } catch (e: unknown) {
       alert(e instanceof Error ? e.message : 'Failed');
     } finally {
@@ -253,6 +255,27 @@ export function CoachSessionsClient({
           onSent={() => router.refresh()}
         />
       )}
+      <div className="sticky top-0 z-20 -mx-4 px-4 pt-1 pb-3 mb-4 border-b border-border/90 bg-background/95 backdrop-blur-md supports-[backdrop-filter]:bg-background/85">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-stretch sm:gap-3">
+          <Button
+            asChild
+            size="lg"
+            className="w-full sm:flex-1 min-h-[48px] touch-manipulation bg-[#D4AF37] text-black hover:bg-[#c9a432] font-semibold shadow-sm"
+          >
+            <Link href="/coach-sessions/create">
+              <CalendarPlus className="h-5 w-5 mr-2 shrink-0" />
+              Create session
+            </Link>
+          </Button>
+          <Button variant="outline" asChild size="lg" className="w-full sm:w-auto min-h-[48px] touch-manipulation shrink-0">
+            <Link href="/availability">
+              <CalendarClock className="h-5 w-5 mr-2 shrink-0" />
+              Availability
+            </Link>
+          </Button>
+        </div>
+      </div>
+
       <div className="flex gap-2 border-b border-border mb-6 overflow-x-auto">
         {tabs.map((t) => (
           <button
@@ -290,26 +313,37 @@ export function CoachSessionsClient({
             upcomingSessions.map((session) => (
               <Card key={session.id}>
                 <CardContent className="p-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2 mb-1">
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                    <div className="min-w-0 space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <SessionTypeBadge sessionType={session.session_type} sessionMode={session.session_mode} />
+                      </div>
+                      <div className="rounded-lg border border-border/80 bg-muted/25 px-3 py-2.5">
+                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Athletes</p>
+                        <p className="text-base font-semibold text-foreground mt-0.5">
+                          {(() => {
+                            const n = session.current_participants ?? wrestlerNames(session).length;
+                            const names = wrestlerNames(session);
+                            if (n === 0 && names.length === 0) return 'No bookings yet';
+                            const label = `${Math.max(n, names.length)} athlete${Math.max(n, names.length) !== 1 ? 's' : ''}`;
+                            return names.length > 0 ? `${label}: ${names.join(', ')}` : label;
+                          })()}
+                        </p>
+                        {(session.max_participants ?? 1) > 1 && (
+                          <div className="mt-1.5">
+                            <CapacityBadge
+                              current={session.current_participants ?? 0}
+                              max={session.max_participants ?? 1}
+                              label="spots"
+                            />
+                          </div>
+                        )}
                       </div>
                       <p className="font-medium">
                         {formatEST(new Date(session.scheduled_datetime), 'EEE, MMM d')} · {formatEST(new Date(session.scheduled_datetime), 'h:mm a')}
                       </p>
-                      <p className="text-sm text-muted-foreground flex items-center gap-2 mt-0.5 flex-wrap">
-                        <span>{facilityName(session)}</span>
-                        <span className="inline-flex items-center gap-1.5">
-                          <CapacityBadge
-                            current={session.current_participants ?? 0}
-                            max={session.max_participants ?? 1}
-                            label=""
-                          />
-                          {wrestlerNames(session).length > 0 && ` ${wrestlerNames(session).join(', ')}`}
-                        </span>
-                      </p>
-                      <p className="text-sm font-medium text-accent mt-1 inline-flex items-center gap-1">
+                      <p className="text-sm text-muted-foreground">{facilityName(session)}</p>
+                      <p className="text-sm font-medium text-accent inline-flex items-center gap-1">
                         <DollarSign className="h-4 w-4" />
                         You make $
                         {coachPayoutUsd({
@@ -322,7 +356,25 @@ export function CoachSessionsClient({
                         }).toFixed(2)}
                       </p>
                     </div>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-2 sm:justify-end">
+                      {(session.current_participants ?? 0) > 0 && (
+                        <CopySessionPhonesButton
+                          sessionId={session.id}
+                          className="min-h-[44px] touch-manipulation border-accent/40"
+                        />
+                      )}
+                      {showSessionSmsCopyAndTextGroup(session) && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="min-h-[44px] touch-manipulation border-accent/50 text-accent"
+                          onClick={() => setTextGroupSession(session)}
+                        >
+                          <Smartphone className="h-4 w-4 mr-1" />
+                          Text group
+                        </Button>
+                      )}
                       <Button
                         variant="outline"
                         size="sm"
@@ -355,24 +407,6 @@ export function CoachSessionsClient({
                           Edit
                         </Link>
                       </Button>
-                      {showSessionSmsCopyAndTextGroup(session) && (
-                        <>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            className="min-h-[44px] touch-manipulation border-accent/50 text-accent"
-                            onClick={() => setTextGroupSession(session)}
-                          >
-                            <Smartphone className="h-4 w-4 mr-1" />
-                            Text group
-                          </Button>
-                          <CopySessionPhonesButton
-                            sessionId={session.id}
-                            className="min-h-[44px] touch-manipulation"
-                          />
-                        </>
-                      )}
                       <Button
                         variant="ghost"
                         size="sm"
