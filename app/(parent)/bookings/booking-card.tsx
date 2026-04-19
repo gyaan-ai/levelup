@@ -400,7 +400,10 @@ export function BookingCard({
                 {session.wrestlers.length > 0 ? (
                   <p className="text-sm font-medium text-foreground leading-snug">{session.wrestlers.join(', ')}</p>
                 ) : coachBookedCount > 0 ? (
-                  <p className="text-sm text-muted-foreground">Roster names will appear here when loaded.</p>
+                  <p className="text-sm text-muted-foreground flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin shrink-0" aria-hidden />
+                    Loading names…
+                  </p>
                 ) : null}
                 {coachBookedCount > 0 && (
                   <div className="flex flex-col sm:flex-row gap-2 pt-0.5">

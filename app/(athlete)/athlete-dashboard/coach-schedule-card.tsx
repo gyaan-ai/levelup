@@ -31,9 +31,12 @@ export type CoachSession = {
   /** Snapshot used with guild default for payout estimates */
   session_payout_rate?: number | null;
   facilities?: { id?: string; name?: string } | { id?: string; name?: string }[] | null;
+  duration_minutes?: number | null;
   session_participants?: Array<{
     amount_paid?: number | null;
     youth_wrestler_id?: string | null;
+    roster_first_name?: string | null;
+    roster_last_name?: string | null;
     youth_wrestlers?: { id: string; first_name?: string; last_name?: string } | { id: string; first_name?: string; last_name?: string }[] | null;
   }> | null;
 };

@@ -209,30 +209,6 @@ export function Header() {
                     Dashboard
                   </Link>
                   <Link
-                    href="/coach-sessions"
-                    className="text-white hover:text-accent transition-colors font-medium text-sm"
-                  >
-                    My sessions
-                  </Link>
-                  <Link
-                    href="/availability"
-                    className="text-white hover:text-accent transition-colors font-medium text-sm"
-                  >
-                    Availability
-                  </Link>
-                  <Link
-                    href="/coach-roster"
-                    className="text-white hover:text-accent transition-colors font-medium text-sm"
-                  >
-                    Roster
-                  </Link>
-                  <Link
-                    href="/rate-card"
-                    className="text-white hover:text-accent transition-colors font-medium text-sm"
-                  >
-                    Session types
-                  </Link>
-                  <Link
                     href="/inbox"
                     className="relative flex items-center justify-center min-h-[44px] min-w-[44px] p-1.5 text-white hover:text-accent transition-colors font-medium rounded hover:bg-white/10"
                     aria-label={inboxUnreadCount > 0 ? `Messages (${inboxUnreadCount} unread)` : 'Messages'}

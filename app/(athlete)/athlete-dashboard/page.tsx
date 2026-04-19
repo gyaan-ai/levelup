@@ -81,7 +81,9 @@ export default async function CoachHomePage() {
 
   const { data: upcomingSessions } = await supabase
     .from('sessions')
-    .select('*, facilities(id, name), session_participants(youth_wrestler_id, youth_wrestlers(id, first_name, last_name))')
+    .select(
+      '*, facilities(id, name), session_participants(youth_wrestler_id, roster_first_name, roster_last_name, amount_paid, youth_wrestlers(id, first_name, last_name))'
+    )
     .eq('athlete_id', coachId)
     .in('status', ['scheduled', 'pending_payment'])
     .gte('scheduled_datetime', nowIso)
@@ -142,27 +144,15 @@ export default async function CoachHomePage() {
   const coachFirstName = athlete?.first_name ?? null;
   const coachDisplayName =
     [athlete?.first_name, athlete?.last_name].filter(Boolean).join(' ').trim() || 'Coach';
-  const averageRating = athlete?.average_rating ?? null;
-
-  const { count: reviewCount } = await supabase
-    .from('reviews')
-    .select('*', { count: 'exact', head: true })
-    .eq('athlete_id', coachId);
-
   return (
     <div className="container mx-auto px-4 py-5 pb-24 md:py-8 max-w-full">
       <CoachScheduleClient
-        coachId={coachId}
         upcomingSessions={(upcomingSessions ?? []) as CoachSession[]}
         upcomingSessionsCount={upcomingSessionsCount ?? 0}
         pendingJoinRequests={requestsWithSession as JoinRequestItem[]}
         pendingSlotRequests={(slotRequestsRaw ?? []) as unknown as SlotRequestScheduleItem[]}
         coachFirstName={coachFirstName}
         coachDisplayName={coachDisplayName}
-        coachSchool={athlete?.school ?? null}
-        coachPhotoUrl={athlete?.photo_url ?? null}
-        averageRating={averageRating}
-        reviewCount={reviewCount ?? 0}
         payoutRate={Number(athlete?.payout_rate) || COACH_REVENUE_FRACTION}
       />
     </div>

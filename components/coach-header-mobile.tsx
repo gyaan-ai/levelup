@@ -69,18 +69,6 @@ export function CoachHeaderMobile({ onSignOut }: Props) {
             <Link href="/coach-sessions/create" className={linkClass} onClick={() => setOpen(false)}>
               Create session
             </Link>
-            <Link href="/coach-sessions" className={linkClass} onClick={() => setOpen(false)}>
-              My sessions
-            </Link>
-            <Link href="/availability" className={linkClass} onClick={() => setOpen(false)}>
-              Availability
-            </Link>
-            <Link href="/coach-roster" className={linkClass} onClick={() => setOpen(false)}>
-              Roster
-            </Link>
-            <Link href="/rate-card" className={linkClass} onClick={() => setOpen(false)}>
-              Session types
-            </Link>
             <Link href="/coach-earnings" className={linkClass} onClick={() => setOpen(false)}>
               Earnings
             </Link>

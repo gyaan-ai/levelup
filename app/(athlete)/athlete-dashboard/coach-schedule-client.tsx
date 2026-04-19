@@ -5,138 +5,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CalendarPlus, Check, Link2, Loader2, MessageCircle, Smartphone, X } from 'lucide-react';
+import { CalendarPlus, Check, Loader2, X } from 'lucide-react';
 import { formatEST } from '@/lib/format-date';
 import { COACH_REVENUE_FRACTION } from '@/lib/pricing';
-import { SessionTypeBadge } from '@/components/session-type-badge';
-import { copyTextToClipboard } from '@/lib/copy-to-clipboard';
-import {
-  BookingCard,
-  type BookingSession,
-  type CoachTransferSessionOption,
-} from '@/app/(parent)/bookings/booking-card';
 import type { CoachSession } from './coach-schedule-card';
 import { splitCoachSessionsByToday } from '@/lib/coach-schedule-split';
-
-function facilityName(s: CoachSession): string {
-  const f = s.facilities;
-  if (!f || typeof f !== 'object') return '—';
-  const arr = Array.isArray(f) ? f : [f];
-  const first = arr[0] as { name?: string } | null;
-  return first?.name ?? '—';
-}
-
-function facilityId(s: CoachSession): string | null {
-  const f = s.facilities;
-  if (!f || typeof f !== 'object') return null;
-  const arr = Array.isArray(f) ? f : [f];
-  const id = (arr[0] as { id?: string })?.id;
-  return id && String(id).trim() ? String(id) : null;
-}
-
-function wrestlerFullNames(s: CoachSession): string[] {
-  const parts = s.session_participants ?? [];
-  return parts
-    .map((p) => {
-      const yw = p.youth_wrestlers;
-      const o = Array.isArray(yw) ? yw[0] : yw;
-      return o && (o.first_name || o.last_name)
-        ? [o.first_name, o.last_name].filter(Boolean).join(' ').trim()
-        : null;
-    })
-    .filter((n): n is string => Boolean(n));
-}
-
-function participantCount(s: CoachSession): number {
-  const fromRows = Array.isArray(s.session_participants) ? s.session_participants.length : 0;
-  return Math.max(fromRows, s.current_participants ?? 0);
-}
-
-function primaryWrestlerId(s: CoachSession): string | null {
-  const parts = s.session_participants ?? [];
-  const first = parts[0];
-  return first ? (first as { youth_wrestler_id?: string }).youth_wrestler_id ?? null : null;
-}
-
-function coachTransferOptionsForSession(
-  all: CoachSession[],
-  currentId: string
-): CoachTransferSessionOption[] {
-  return all
-    .filter((x) => x.id !== currentId)
-    .map((x) => {
-      const actualParticipants = Array.isArray(x.session_participants) ? x.session_participants.length : 0;
-      const current = actualParticipants || x.current_participants || 0;
-      return {
-        id: x.id,
-        scheduled_datetime: x.scheduled_datetime,
-        facilityLabel: facilityName(x),
-        current_participants: current,
-        max_participants: x.max_participants ?? 1,
-      };
-    });
-}
-
-function isTentativeSession(s: CoachSession, current: number): boolean {
-  const max = s.max_participants ?? 1;
-  if (current >= max) return false;
-  const isGroup = s.session_type === 'group' || s.session_type === 'small_group';
-  const isPartnerOpen = s.session_mode === 'partner-open';
-  return isGroup || isPartnerOpen;
-}
-
-function toCoachBooking(
-  session: CoachSession,
-  coach: {
-    id: string;
-    name: string;
-    school: string | null;
-    photo_url: string | null | undefined;
-    average_rating: number | null | undefined;
-    review_count: number;
-  },
-  payoutRate: number
-): { session: BookingSession; coachEarnings: { projected: number; max: number } } {
-  const actualParticipants = Array.isArray(session.session_participants) ? session.session_participants.length : 0;
-  const current = actualParticipants || session.current_participants || 0;
-  const max = session.max_participants ?? 1;
-  const pricePerParticipant = Number(session.price_per_participant ?? 0);
-  const projected = Math.round(current * pricePerParticipant * payoutRate * 100) / 100;
-  const maxEarn = Math.round(max * pricePerParticipant * payoutRate * 100) / 100;
-
-  return {
-    session: {
-      id: session.id,
-      scheduled_datetime: session.scheduled_datetime,
-      status: session.status,
-      total_price: Number(session.total_price ?? 0),
-      price_per_participant: session.price_per_participant != null ? Number(session.price_per_participant) : undefined,
-      session_type: session.session_type,
-      session_mode: session.session_mode,
-      focus_area: session.focus_area ?? null,
-      focus_area_2: session.focus_area_2 ?? null,
-      current_participants: current,
-      max_participants: max,
-      partner_invite_code: session.partner_invite_code ?? null,
-      isTentative: isTentativeSession(session, current),
-      isOwner: true,
-      coach: {
-        name: coach.name,
-        school: coach.school ?? '',
-        id: coach.id,
-        photo_url: coach.photo_url,
-        average_rating: coach.average_rating ?? null,
-        review_count: coach.review_count,
-      },
-      facility: facilityName(session),
-      facility_id: facilityId(session),
-      wrestlers: wrestlerFullNames(session),
-      primaryWrestlerId: primaryWrestlerId(session),
-      joinPolicy: session.join_policy ?? null,
-    },
-    coachEarnings: { projected, max: maxEarn },
-  };
-}
+import { CoachScheduleSessionCard } from './coach-schedule-session-card';
 
 export type JoinRequestItem = {
   id: string;
@@ -172,17 +46,12 @@ export type SlotRequestScheduleItem = {
 };
 
 type Props = {
-  coachId: string;
   upcomingSessions: CoachSession[];
   upcomingSessionsCount: number;
   pendingJoinRequests: JoinRequestItem[];
   pendingSlotRequests: SlotRequestScheduleItem[];
   coachFirstName?: string | null;
   coachDisplayName: string;
-  coachSchool?: string | null;
-  coachPhotoUrl?: string | null;
-  averageRating?: number | null;
-  reviewCount?: number;
   payoutRate?: number;
 };
 
@@ -191,49 +60,13 @@ function sessionTypeWords(sessionType?: string | null): string {
   return sessionType.replace(/_/g, ' ');
 }
 
-async function openSmsForPhones(sessionId: string, kind: 'parents' | 'athletes') {
-  try {
-    const r = await fetch(`/api/sessions/${sessionId}/sms-phones`);
-    const data = (await r.json()) as {
-      commaParents?: string;
-      commaAthletes?: string;
-      error?: string;
-    };
-    if (!r.ok) {
-      window.alert(data.error || 'Could not load numbers.');
-      return;
-    }
-    const raw = kind === 'parents' ? data.commaParents : data.commaAthletes;
-    const phones = (raw ?? '')
-      .split(/\n/)
-      .map((s) => s.trim())
-      .filter(Boolean);
-    if (phones.length === 0) {
-      window.alert(kind === 'parents' ? 'No parent numbers on file yet.' : 'No athlete numbers on file yet.');
-      return;
-    }
-    const [first, ...rest] = phones;
-    if (rest.length > 0) {
-      await copyTextToClipboard(rest.join('\n'));
-    }
-    window.location.href = `sms:${first}`;
-  } catch {
-    window.alert('Something went wrong. Try again.');
-  }
-}
-
 export function CoachScheduleClient({
-  coachId,
   upcomingSessions,
   upcomingSessionsCount,
   pendingJoinRequests,
   pendingSlotRequests,
   coachFirstName,
   coachDisplayName,
-  coachSchool,
-  coachPhotoUrl,
-  averageRating,
-  reviewCount = 0,
   payoutRate = COACH_REVENUE_FRACTION,
 }: Props) {
   const router = useRouter();
@@ -242,27 +75,6 @@ export function CoachScheduleClient({
 
   const now = new Date();
   const { today, upcoming } = splitCoachSessionsByToday(upcomingSessions, now);
-
-  const coachBlock = {
-    id: coachId,
-    name: coachDisplayName,
-    school: coachSchool ?? null,
-    photo_url: coachPhotoUrl,
-    average_rating: averageRating,
-    review_count: reviewCount,
-  };
-
-  const handleCopyShare = async (sessionId: string) => {
-    const url = `${window.location.origin}/sessions/${sessionId}`;
-    await copyTextToClipboard(url);
-    if (typeof navigator !== 'undefined' && navigator.share) {
-      try {
-        await navigator.share({ title: 'Session', url });
-      } catch {
-        /* user cancelled */
-      }
-    }
-  };
 
   const handleApproveDecline = async (requestId: string, sessionId: string, action: 'approve' | 'decline') => {
     setLoadingId(requestId);
@@ -341,90 +153,15 @@ export function CoachScheduleClient({
             Today — {formatEST(now, 'EEEE, MMM d')}
           </h2>
           <div className="space-y-3">
-            {today.map((session) => {
-              const names = wrestlerFullNames(session);
-              const n = participantCount(session);
-              const max = session.max_participants ?? 1;
-              const dur = (session as { duration_minutes?: number }).duration_minutes ?? 60;
-              const rosterOk = n === 0 || names.length > 0;
-              return (
-                <div
-                  key={session.id}
-                  className="rounded-xl border border-[#D4AF37]/35 bg-[#D4AF37]/10 dark:bg-[#D4AF37]/15 px-4 py-4 space-y-3"
-                >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <SessionTypeBadge sessionType={session.session_type} sessionMode={session.session_mode} />
-                    <span className="text-sm text-muted-foreground">{dur} min</span>
-                  </div>
-                  <p className="font-semibold text-foreground">
-                    {formatEST(session.scheduled_datetime, 'h:mm a')}
-                    <span className="text-muted-foreground font-normal">
-                      {' '}
-                      · {sessionTypeWords(session.session_type)} · {facilityName(session)}
-                    </span>
-                  </p>
-                  <div className="border-t border-[#D4AF37]/25 pt-3">
-                    {!rosterOk ? (
-                      <p className="text-sm text-amber-800 dark:text-amber-200 font-medium">
-                        Loading roster… if this persists, open the session detail.
-                      </p>
-                    ) : n === 0 ? (
-                      <p className="text-sm text-muted-foreground">No athletes booked yet.</p>
-                    ) : (
-                      <ul className="space-y-1">
-                        {names.map((name) => (
-                          <li key={name} className="text-base font-medium text-foreground flex items-center gap-2">
-                            <span className="text-muted-foreground" aria-hidden>
-                              👤
-                            </span>
-                            {name}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                    {max > 1 && n > 0 && (
-                      <p className="text-xs text-muted-foreground mt-2">
-                        {n}/{max} filled
-                        {n < max ? ` — ${max - n} spot${max - n !== 1 ? 's' : ''} open` : ''}
-                      </p>
-                    )}
-                  </div>
-                  <div className="flex flex-col sm:flex-row gap-2 pt-1">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="min-h-[44px] touch-manipulation bg-background/80 border-border"
-                      onClick={() => handleCopyShare(session.id)}
-                    >
-                      <Link2 className="h-4 w-4 mr-2 shrink-0" />
-                      Share link
-                    </Button>
-                    {n > 0 && (
-                      <>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="min-h-[44px] touch-manipulation border-[#D4AF37]/50"
-                          onClick={() => openSmsForPhones(session.id, 'athletes')}
-                        >
-                          <MessageCircle className="h-4 w-4 mr-2 shrink-0" />
-                          Text athletes
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          className="min-h-[44px] touch-manipulation border-[#D4AF37]/50"
-                          onClick={() => openSmsForPhones(session.id, 'parents')}
-                        >
-                          <Smartphone className="h-4 w-4 mr-2 shrink-0" />
-                          Text parents
-                        </Button>
-                      </>
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+            {today.map((session) => (
+              <CoachScheduleSessionCard
+                key={session.id}
+                session={session}
+                payoutRate={payoutRate}
+                coachDisplayName={coachDisplayName}
+                emphasis="today"
+              />
+            ))}
           </div>
         </section>
       )}
@@ -564,18 +301,14 @@ export function CoachScheduleClient({
           <p className="text-sm text-muted-foreground">No later sessions — everything for today is above.</p>
         ) : (
           <div className="space-y-3">
-            {upcoming.map((session) => {
-              const { session: bookingSession, coachEarnings } = toCoachBooking(session, coachBlock, payoutRate);
-              return (
-                <BookingCard
-                  key={session.id}
-                  session={bookingSession}
-                  variant="coach"
-                  coachEarnings={coachEarnings}
-                  coachTransferSessionOptions={coachTransferOptionsForSession(upcomingSessions, session.id)}
-                />
-              );
-            })}
+            {upcoming.map((session) => (
+              <CoachScheduleSessionCard
+                key={session.id}
+                session={session}
+                payoutRate={payoutRate}
+                coachDisplayName={coachDisplayName}
+              />
+            ))}
           </div>
         )}
         {upcomingSessionsCount > upcomingSessions.length && (
