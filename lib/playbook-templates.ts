@@ -8,6 +8,7 @@ export type PlaybookActionType =
   | 'welcome_parent'
   | 'pre_session_athlete'
   | 'pre_session_parent'
+  | 'pre_session_broadcast'
   | 'post_session_athlete'
   | 'post_session_parent'
   | 'review_request'
@@ -47,6 +48,13 @@ export const PLAYBOOK_TEMPLATES: MessageTemplate[] = [
     label: 'Remind Parent',
     recipient: 'parent',
     template: `Hi [Parent]! Quick reminder that [Athlete] has a session with Coach [Coach] tomorrow at [Time] at [Facility]. See you there!`,
+  },
+  /** One text to parents + athletes: neutral wording (no “Hey [Athlete]” when the To: line is a parent). */
+  {
+    type: 'pre_session_broadcast',
+    label: 'Session reminder (group text)',
+    recipient: 'parent',
+    template: `Coach [Coach] (The Guild) — reminder: [Athlete] @ [Date] [Time], [Facility]. See you there!`,
   },
 
   // Post-session follow-ups

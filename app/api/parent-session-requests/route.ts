@@ -14,6 +14,10 @@ const SELECT_FIELDS = `
   facility_id,
   preferred_datetime,
   session_type,
+  duration_minutes,
+  counter_preferred_datetime,
+  counter_note,
+  payment_deadline_at,
   message,
   flexibility_note,
   status,
@@ -92,6 +96,7 @@ export async function POST(req: NextRequest) {
       facilityId?: string | null;
       preferredDatetime?: string | null;
       sessionType?: string | null;
+      durationMinutes?: number | null;
       message?: string | null;
       flexibilityNote?: string | null;
     };
@@ -148,6 +153,9 @@ export async function POST(req: NextRequest) {
         ? (sessionType as (typeof allowedSessionTypes)[number])
         : null;
 
+    const dmRaw = body.durationMinutes != null ? Number(body.durationMinutes) : 60;
+    const duration_minutes = [30, 60, 90, 120].includes(dmRaw) ? dmRaw : 60;
+
     const insertRow = {
       requesting_parent_id: user.id,
       youth_wrestler_id: youthWrestlerId,
@@ -155,6 +163,7 @@ export async function POST(req: NextRequest) {
       facility_id: resolvedFacilityId,
       preferred_datetime: preferredDatetime,
       session_type: st || null,
+      duration_minutes,
       message: message || null,
       flexibility_note: flex || null,
       status: 'pending' as const,

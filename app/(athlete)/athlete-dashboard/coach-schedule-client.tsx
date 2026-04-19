@@ -10,6 +10,7 @@ import { formatEST } from '@/lib/format-date';
 import { COACH_REVENUE_FRACTION } from '@/lib/pricing';
 import type { CoachSession } from './coach-schedule-card';
 import { splitCoachSessionsByToday } from '@/lib/coach-schedule-split';
+import { getSessionTypeDisplay } from '@/components/session-type-badge';
 import { CoachScheduleSessionCard } from './coach-schedule-session-card';
 
 export type JoinRequestItem = {
@@ -23,8 +24,8 @@ export type JoinRequestItem = {
   session?: {
     id: string;
     scheduled_datetime: string;
-    session_type?: string;
-    session_mode?: string;
+    session_type?: string | null;
+    session_mode?: string | null;
     facilities?: { name?: string } | null;
   };
 };
@@ -37,6 +38,7 @@ export type SlotRequestScheduleItem = {
   facility_id: string | null;
   preferred_datetime: string | null;
   session_type: string | null;
+  duration_minutes?: number | null;
   message: string | null;
   flexibility_note: string | null;
   status: string;
@@ -55,9 +57,8 @@ type Props = {
   payoutRate?: number;
 };
 
-function sessionTypeWords(sessionType?: string | null): string {
-  if (!sessionType) return 'Session';
-  return sessionType.replace(/_/g, ' ');
+function sessionTypeLabel(sessionType?: string | null, sessionMode?: string | null): string {
+  return getSessionTypeDisplay(sessionType, sessionMode).label;
 }
 
 export function CoachScheduleClient({
@@ -72,6 +73,9 @@ export function CoachScheduleClient({
   const router = useRouter();
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [slotNoteById, setSlotNoteById] = useState<Record<string, string>>({});
+  const [counterForId, setCounterForId] = useState<string | null>(null);
+  const [counterDtById, setCounterDtById] = useState<Record<string, string>>({});
+  const [counterNoteById, setCounterNoteById] = useState<Record<string, string>>({});
 
   const now = new Date();
   const { today, upcoming } = splitCoachSessionsByToday(upcomingSessions, now);
@@ -96,6 +100,9 @@ export function CoachScheduleClient({
   };
 
   const handleSlotRespond = async (requestId: string, action: 'approve' | 'decline') => {
+    if (action === 'decline') {
+      if (!window.confirm('Decline this session request? The parent will be notified.')) return;
+    }
     setLoadingId(requestId);
     try {
       const res = await fetch(`/api/parent-session-requests/${requestId}`, {
@@ -108,6 +115,37 @@ export function CoachScheduleClient({
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed');
+      setCounterForId(null);
+      router.refresh();
+      window.dispatchEvent(new Event('coach-pending-refresh'));
+    } catch (e: unknown) {
+      window.alert(e instanceof Error ? e.message : 'Failed');
+    } finally {
+      setLoadingId(null);
+    }
+  };
+
+  const submitCounter = async (requestId: string) => {
+    const raw = counterDtById[requestId]?.trim();
+    if (!raw) {
+      window.alert('Pick a date and time for the counter-proposal.');
+      return;
+    }
+    const iso = new Date(raw).toISOString();
+    setLoadingId(requestId);
+    try {
+      const res = await fetch(`/api/parent-session-requests/${requestId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'counter',
+          counterPreferredDatetime: iso,
+          counterNote: counterNoteById[requestId]?.trim() || null,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed');
+      setCounterForId(null);
       router.refresh();
       window.dispatchEvent(new Event('coach-pending-refresh'));
     } catch (e: unknown) {
@@ -181,7 +219,7 @@ export function CoachScheduleClient({
                 : '—';
               const fac = sess?.facilities;
               const facName = fac ? (fac as { name?: string }).name ?? '—' : '—';
-              const typeLabel = sessionTypeWords(sess?.session_type);
+              const typeLabel = sessionTypeLabel(sess?.session_type, sess?.session_mode);
               return (
                 <Card key={r.id} className="border-amber-500/40 bg-amber-500/5">
                   <CardContent className="p-4 space-y-3">
@@ -225,6 +263,7 @@ export function CoachScheduleClient({
               const facName = fac
                 ? (Array.isArray(fac) ? (fac[0] as { name?: string })?.name : (fac as { name?: string })?.name) ?? '—'
                 : '—';
+              const dur = r.duration_minutes ?? 60;
               const when = r.preferred_datetime
                 ? `${formatEST(new Date(r.preferred_datetime), 'EEE MMM d')} · ${formatEST(new Date(r.preferred_datetime), 'h:mm a')}`
                 : 'Time TBD';
@@ -233,11 +272,11 @@ export function CoachScheduleClient({
                   <CardContent className="p-4 space-y-3">
                     <p className="font-medium text-foreground">{name} — session request</p>
                     <p className="text-sm text-muted-foreground">
-                      {when} · {sessionTypeWords(r.session_type)} · {facName}
+                      {when} · {dur} min · {sessionTypeLabel(r.session_type, null)} · {facName}
                     </p>
                     {r.message ? <p className="text-sm text-muted-foreground">&ldquo;{r.message}&rdquo;</p> : null}
                     <label className="block text-xs text-muted-foreground" htmlFor={`slot-${r.id}`}>
-                      Optional note to parent
+                      Optional note to parent (approve / decline)
                     </label>
                     <textarea
                       id={`slot-${r.id}`}
@@ -246,6 +285,44 @@ export function CoachScheduleClient({
                       value={slotNoteById[r.id] ?? ''}
                       onChange={(e) => setSlotNoteById((prev) => ({ ...prev, [r.id]: e.target.value }))}
                     />
+                    {counterForId === r.id && (
+                      <div className="rounded-lg border border-border bg-background/80 p-3 space-y-2">
+                        <p className="text-xs font-medium text-foreground">Propose a different time</p>
+                        <input
+                          type="datetime-local"
+                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm min-h-[44px]"
+                          value={counterDtById[r.id] ?? ''}
+                          onChange={(e) => setCounterDtById((prev) => ({ ...prev, [r.id]: e.target.value }))}
+                        />
+                        <textarea
+                          rows={2}
+                          placeholder="Optional note (e.g. original slot is taken)"
+                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                          value={counterNoteById[r.id] ?? ''}
+                          onChange={(e) => setCounterNoteById((prev) => ({ ...prev, [r.id]: e.target.value }))}
+                        />
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="min-h-[44px]"
+                            onClick={() => void submitCounter(r.id)}
+                            disabled={loadingId === r.id}
+                          >
+                            Send counter
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="min-h-[44px]"
+                            onClick={() => setCounterForId(null)}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                     <div className="flex flex-wrap gap-2">
                       <Button
                         size="sm"
@@ -254,6 +331,16 @@ export function CoachScheduleClient({
                         disabled={loadingId === r.id}
                       >
                         Approve
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        className="min-h-[44px] touch-manipulation"
+                        onClick={() => setCounterForId((cur) => (cur === r.id ? null : r.id))}
+                        disabled={loadingId === r.id}
+                      >
+                        Counter
                       </Button>
                       <Button
                         variant="outline"

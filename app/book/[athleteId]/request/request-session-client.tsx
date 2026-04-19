@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Calendar } from '@/components/ui/calendar';
 import {
   Select,
   SelectContent,
@@ -19,6 +20,9 @@ import { BackLink } from '@/components/back-link';
 import { ProfileImage } from '@/components/profile-image';
 import { SchoolLogo } from '@/components/school-logo';
 import type { YouthWrestler } from '@/types';
+import { startOfDay } from 'date-fns';
+import { formatEST } from '@/lib/format-date';
+import { formatSlotDisplay, getDayOfWeek } from '@/lib/availability';
 
 type Athlete = {
   id: string;
@@ -39,6 +43,10 @@ type Props = {
   preselectedYouthWrestlerId?: string | null;
 };
 
+type AvailabilityByDay = { day_of_week: number; start_time: string; end_time: string }[];
+
+const SUGGESTIONS = ['Takedowns', 'Leg riding', 'Match prep', 'General technique'];
+
 export function RequestSessionClient({
   athlete,
   facilities,
@@ -51,11 +59,77 @@ export function RequestSessionClient({
   );
   const [facilityId, setFacilityId] = useState<string>('any');
   const [sessionType, setSessionType] = useState<string>('private');
-  const [preferredLocal, setPreferredLocal] = useState('');
+  const [durationMinutes, setDurationMinutes] = useState(60);
   const [message, setMessage] = useState('');
   const [flexibilityNote, setFlexibilityNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [availability, setAvailability] = useState<AvailabilityByDay | null>(null);
+  const [availabilityDates, setAvailabilityDates] = useState<Set<string>>(new Set());
+  const [blockedDates, setBlockedDates] = useState<Set<string>>(new Set());
+  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [selectedTime, setSelectedTime] = useState<string | null>(null);
+  const [slots, setSlots] = useState<string[]>([]);
+  const [slotsLoading, setSlotsLoading] = useState(false);
+
+  useEffect(() => {
+    let ok = true;
+    (async () => {
+      try {
+        const r = await fetch(`/api/availability?athleteId=${encodeURIComponent(athlete.id)}`);
+        const data = await r.json();
+        if (!ok || !r.ok) return;
+        if (Array.isArray(data.availability)) setAvailability(data.availability);
+        if (Array.isArray(data.availabilityDates)) setAvailabilityDates(new Set(data.availabilityDates));
+        if (Array.isArray(data.blockedDates)) setBlockedDates(new Set(data.blockedDates));
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      ok = false;
+    };
+  }, [athlete.id]);
+
+  const hasAvailability =
+    (availability?.length ?? 0) > 0 || (availabilityDates?.size ?? 0) > 0;
+  const daysWithSlots = new Set(availability?.map((a) => a.day_of_week) ?? []);
+
+  useEffect(() => {
+    if (!selectedDate) {
+      setSlots([]);
+      setSelectedTime(null);
+      return;
+    }
+    setSelectedTime(null);
+    let cancelled = false;
+    setSlotsLoading(true);
+    const dateStr = formatEST(selectedDate, 'yyyy-MM-dd');
+    fetch(`/api/availability/slots?athleteId=${encodeURIComponent(athlete.id)}&date=${dateStr}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (cancelled) return;
+        setSlots(Array.isArray(data.slots) ? data.slots : []);
+      })
+      .catch(() => {
+        if (!cancelled) setSlots([]);
+      })
+      .finally(() => {
+        if (!cancelled) setSlotsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [athlete.id, selectedDate]);
+
+  const buildPreferredIso = (): string | null => {
+    if (selectedDate && selectedTime) {
+      const dateStr = formatEST(selectedDate, 'yyyy-MM-dd');
+      return `${dateStr}T${selectedTime}:00`;
+    }
+    return null;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,13 +140,22 @@ export function RequestSessionClient({
       return;
     }
 
-    const preferredDatetime =
-      preferredLocal.trim() ? new Date(preferredLocal).toISOString() : null;
+    const preferredDatetime = buildPreferredIso();
     const msg = message.trim();
     const flex = flexibilityNote.trim();
 
-    if (!msg && !preferredDatetime && !flex) {
-      setError('Add a preferred date and time, a message, or when you are flexible.');
+    if (hasAvailability && (!selectedDate || !selectedTime)) {
+      setError('Choose a date and time from the coach’s available slots.');
+      return;
+    }
+
+    if (!preferredDatetime && !msg && !flex) {
+      setError('Add a preferred time, a message, or when you are flexible.');
+      return;
+    }
+
+    if (msg.length > 300) {
+      setError('Message must be 300 characters or less.');
       return;
     }
 
@@ -87,6 +170,7 @@ export function RequestSessionClient({
           facilityId: facilityId === 'any' ? null : facilityId,
           sessionType: sessionType === 'any' ? null : sessionType,
           preferredDatetime,
+          durationMinutes,
           message: msg || null,
           flexibilityNote: flex || null,
         }),
@@ -155,10 +239,65 @@ export function RequestSessionClient({
       <form onSubmit={handleSubmit} className="space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Details</CardTitle>
+            <CardTitle className="text-base">Pick time</CardTitle>
             <p className="text-sm text-muted-foreground">
-              The coach will see this in My sessions → Requests. They can approve or decline and add a note.
+              Times shown respect this coach’s availability. No payment until they approve.
             </p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex justify-center">
+              <Calendar
+                mode="single"
+                selected={selectedDate}
+                onSelect={setSelectedDate}
+                disabled={(date) => {
+                  if (date < startOfDay(new Date())) return true;
+                  const dateStr = formatEST(date, 'yyyy-MM-dd');
+                  if (blockedDates.has(dateStr)) return true;
+                  if (availabilityDates.has(dateStr)) return false;
+                  if (daysWithSlots.has(getDayOfWeek(date))) return false;
+                  return hasAvailability;
+                }}
+                className="rounded-md border"
+              />
+            </div>
+            {selectedDate && (
+              <div>
+                <h3 className="font-semibold mb-3 text-sm">Time (Eastern)</h3>
+                {slotsLoading ? (
+                  <p className="text-sm text-muted-foreground">Loading slots…</p>
+                ) : slots.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">No times available this day.</p>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {slots.map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setSelectedTime(t)}
+                        className={`min-h-[44px] p-2 rounded-lg border text-sm touch-manipulation ${
+                          selectedTime === t ? 'border-accent bg-accent text-black' : 'border-border hover:border-accent/50'
+                        }`}
+                      >
+                        {formatSlotDisplay(t)}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            {!hasAvailability && (
+              <p className="text-xs text-muted-foreground">
+                This coach has not published weekly hours yet. You can still send a message below with times that work
+                for you.
+              </p>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Details</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
@@ -184,11 +323,28 @@ export function RequestSessionClient({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="any">No preference</SelectItem>
                   <SelectItem value="private">Private (1:1)</SelectItem>
                   <SelectItem value="partner">Partner (2 athletes)</SelectItem>
-                  <SelectItem value="small_group">Small group</SelectItem>
-                  <SelectItem value="group">Group</SelectItem>
+                </SelectContent>
+              </Select>
+              {sessionType === 'partner' && (
+                <p className="text-xs text-muted-foreground">
+                  You can invite a second family after booking, or note in the message that you need a partner.
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label>Duration</Label>
+              <Select value={String(durationMinutes)} onValueChange={(v) => setDurationMinutes(Number(v))}>
+                <SelectTrigger className="min-h-[44px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="30">30 min</SelectItem>
+                  <SelectItem value="60">60 min</SelectItem>
+                  <SelectItem value="90">90 min</SelectItem>
+                  <SelectItem value="120">120 min</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -200,7 +356,7 @@ export function RequestSessionClient({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="any">No preference</SelectItem>
+                  <SelectItem value="any">Coach default</SelectItem>
                   {facilities.map((f) => (
                     <SelectItem key={f.id} value={f.id}>
                       {f.name}
@@ -211,27 +367,29 @@ export function RequestSessionClient({
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="when">Preferred date &amp; time (optional)</Label>
-              <input
-                id="when"
-                type="datetime-local"
-                className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                value={preferredLocal}
-                onChange={(e) => setPreferredLocal(e.target.value)}
-              />
-              <p className="text-xs text-muted-foreground">Leave blank if you are only describing flexibility below.</p>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="msg">Message</Label>
+              <Label htmlFor="msg">Note (optional, max 300)</Label>
+              <div className="flex flex-wrap gap-2 mb-1">
+                {SUGGESTIONS.map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    className="text-xs rounded-full border border-border px-2 py-1 hover:bg-muted"
+                    onClick={() => setMessage((prev) => (prev ? `${prev} ${s}` : s))}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
               <Textarea
                 id="msg"
                 rows={4}
-                placeholder="What you are looking for (goals, experience level, etc.)"
+                placeholder="What do you want to work on?"
                 value={message}
+                maxLength={300}
                 onChange={(e) => setMessage(e.target.value)}
                 className="resize-y min-h-[100px]"
               />
+              <p className="text-xs text-muted-foreground text-right">{message.length}/300</p>
             </div>
 
             <div className="space-y-2">
@@ -254,7 +412,7 @@ export function RequestSessionClient({
                   Sending…
                 </>
               ) : (
-                'Send request'
+                'Submit request'
               )}
             </Button>
           </CardContent>

@@ -44,6 +44,10 @@ export default async function ParentSessionRequestsPage({
       facility_id,
       preferred_datetime,
       session_type,
+      duration_minutes,
+      counter_preferred_datetime,
+      counter_note,
+      payment_deadline_at,
       message,
       flexibility_note,
       status,
@@ -74,7 +78,8 @@ export default async function ParentSessionRequestsPage({
       {sp.submitted === '1' && (
         <Card className="mb-6 border-accent/40 bg-accent/5">
           <CardContent className="py-4 text-sm">
-            Your request was sent. The coach will see it under My sessions → Requests.
+            Request sent. The coach will see it on their Schedule under pending requests and can approve, counter, or
+            decline.
           </CardContent>
         </Card>
       )}
@@ -90,6 +95,10 @@ export type SessionRequestRow = {
   facility_id: string | null;
   preferred_datetime: string | null;
   session_type: string | null;
+  duration_minutes?: number | null;
+  counter_preferred_datetime?: string | null;
+  counter_note?: string | null;
+  payment_deadline_at?: string | null;
   message: string | null;
   flexibility_note: string | null;
   status: string;

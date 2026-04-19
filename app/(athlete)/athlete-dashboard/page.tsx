@@ -129,6 +129,7 @@ export default async function CoachHomePage() {
       facility_id,
       preferred_datetime,
       session_type,
+      duration_minutes,
       message,
       flexibility_note,
       status,

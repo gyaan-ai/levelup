@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import { slotsForDay, slotsForDate, type AvailabilitySlot } from '@/lib/availability';
+import { formatEST } from '@/lib/format-date';
 
 export async function GET(req: NextRequest) {
   try {
@@ -27,7 +29,19 @@ export async function GET(req: NextRequest) {
     }
 
     const supabase = await createClient(tenant.slug);
+    const admin = createAdminClient(tenant.slug);
     const dateOnly = dateParam.split('T')[0];
+
+    const { data: blockRow } = await admin
+      .from('athlete_availability_blocks')
+      .select('id')
+      .eq('athlete_id', athleteId)
+      .eq('blocked_date', dateOnly)
+      .maybeSingle();
+
+    if (blockRow) {
+      return NextResponse.json({ slots: [] });
+    }
 
     // Date-specific slots for this date
     const { data: dateRows } = await supabase
@@ -80,6 +94,31 @@ export async function GET(req: NextRequest) {
       const [, timePart] = t.split('T');
       const [h, m] = (timePart || '').split(':').map((x) => parseInt(x, 10) || 0);
       booked.add(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`);
+    }
+
+    const twoHoursAgo = new Date(Date.now() - 2 * 3600 * 1000).toISOString();
+    const { data: holdRows } = await admin
+      .from('parent_session_requests')
+      .select('preferred_datetime, duration_minutes')
+      .eq('coach_id', athleteId)
+      .eq('status', 'pending')
+      .gte('created_at', twoHoursAgo);
+
+    for (const hrow of holdRows || []) {
+      const pd = (hrow as { preferred_datetime?: string | null }).preferred_datetime;
+      if (!pd) continue;
+      if (formatEST(new Date(pd), 'yyyy-MM-dd') !== dateOnly) continue;
+      const dur = Number((hrow as { duration_minutes?: number }).duration_minutes) || 60;
+      const start = formatEST(new Date(pd), 'HH:mm');
+      const [sh, sm] = start.split(':').map((x) => parseInt(x, 10) || 0);
+      let m0 = sh * 60 + sm;
+      const endM = m0 + dur;
+      while (m0 < endM) {
+        const hh = Math.floor(m0 / 60) % 24;
+        const mm = m0 % 60;
+        booked.add(`${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`);
+        m0 += 60;
+      }
     }
 
     const now = new Date();

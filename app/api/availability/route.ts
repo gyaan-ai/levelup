@@ -37,6 +37,18 @@ export async function GET(req: NextRequest) {
 
     const availabilityDates = [...new Set((dateRows || []).map((r) => r.slot_date))];
 
+    let blockedDates: string[] = [];
+    try {
+      const bRes = await supabase
+        .from('athlete_availability_blocks')
+        .select('blocked_date')
+        .eq('athlete_id', athleteId)
+        .gte('blocked_date', today);
+      blockedDates = [...new Set((bRes.data || []).map((r: { blocked_date: string }) => r.blocked_date))];
+    } catch {
+      /* table may not exist yet */
+    }
+
     // Legacy day_of_week for backward compat (used by slots API when merging)
     const { data: recurRows } = await supabase
       .from('athlete_availability')
@@ -49,7 +61,7 @@ export async function GET(req: NextRequest) {
       end_time: timeToHHmm(r.end_time),
     }));
 
-    return NextResponse.json({ availability, availabilityDates });
+    return NextResponse.json({ availability, availabilityDates, blockedDates });
   } catch (e) {
     console.error('Availability API error:', e);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

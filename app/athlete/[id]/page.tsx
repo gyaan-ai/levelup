@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import { Star, User, MapPin, Award, Shield, CheckCircle, MessageCircle, DollarSign, Pencil, Calendar, Users, ChevronRight, Share2 } from 'lucide-react';
+import { Star, User, MapPin, Award, Shield, CheckCircle, MessageCircle, DollarSign, Pencil, Calendar, Clock, Users, ChevronRight, Share2 } from 'lucide-react';
 import { BackLink } from '@/components/back-link';
 import { formatEST } from '@/lib/format-date';
 import { SessionTypeBadge } from '@/components/session-type-badge';
@@ -20,6 +20,7 @@ import { DeleteAthleteProfileButton } from '@/components/delete-athlete-profile-
 import { ProfileImage } from '@/components/profile-image';
 import { isBackgroundCheckValidForDisplay, isSafeSportValidForDisplay } from '@/lib/athletes';
 import { getSchoolBadgeColors, schoolBadgeClassName } from '@/lib/school-logos';
+import { summarizeWeeklyAvailability, type WeeklyAvailabilityRow } from '@/lib/availability';
 
 function CoachProfileUnavailable() {
   return (
@@ -188,6 +189,12 @@ export default async function AthleteProfilePage({
     });
 
   const rateCardProducts: RateCardItem[] = rateCardFromServices.length > 0 ? rateCardFromServices : rateCardFromProducts;
+
+  const { data: weeklyAvailRows } = await supabase
+    .from('athlete_availability')
+    .select('day_of_week, start_time, end_time')
+    .eq('athlete_id', id);
+  const availabilitySummaryLines = summarizeWeeklyAvailability((weeklyAvailRows ?? []) as WeeklyAvailabilityRow[]);
 
   // Fetch upcoming public sessions for this coach
   const nowISO = new Date().toISOString();
@@ -492,6 +499,28 @@ export default async function AthleteProfilePage({
                 Get directions (Google Maps)
               </a>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {availabilitySummaryLines.length > 0 && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5" />
+              Availability
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Typical hours for private or partner session requests (Eastern). Open small-group sessions are listed
+              separately above.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-1 text-sm text-foreground">
+              {availabilitySummaryLines.map((line) => (
+                <li key={line}>{line}</li>
+              ))}
+            </ul>
           </CardContent>
         </Card>
       )}

@@ -27,6 +27,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { RequestFacilityBlock } from '@/components/request-facility-block';
+import { CoachProfileAvailabilitySection } from '@/components/coach-profile-availability-section';
 import { Check, Copy, Globe, Lock, Share2 } from 'lucide-react';
 import { BackLink } from '@/components/back-link';
 import Link from 'next/link';
@@ -340,6 +341,8 @@ export default function ProfilePage() {
               </div>
             </div>
           )}
+
+          {isCoachProfile && <CoachProfileAvailabilitySection />}
 
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">

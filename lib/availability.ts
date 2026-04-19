@@ -89,3 +89,37 @@ export function slotsForDate(rows: AvailabilitySlotDate[]): string[] {
   }
   return [...set].sort();
 }
+
+const DOW_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
+
+export type WeeklyAvailabilityRow = {
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+};
+
+/** Human-readable lines for public coach profile (Eastern labels). */
+export function summarizeWeeklyAvailability(rows: WeeklyAvailabilityRow[]): string[] {
+  if (!rows?.length) return [];
+  type Window = { start: string; end: string };
+  const byDay = new Map<number, Window[]>();
+  for (const r of rows) {
+    const d = r.day_of_week;
+    if (d < 0 || d > 6) continue;
+    const start = timeToHHmm(r.start_time);
+    const end = timeToHHmm(r.end_time);
+    const list = byDay.get(d) ?? [];
+    list.push({ start, end });
+    byDay.set(d, list);
+  }
+  const lines: string[] = [];
+  for (let d = 0; d <= 6; d++) {
+    const windows = byDay.get(d);
+    if (!windows?.length) continue;
+    windows.sort((a, b) => a.start.localeCompare(b.start));
+    const label = DOW_SHORT[d];
+    const parts = windows.map((w) => `${formatSlotDisplay(w.start)} – ${formatSlotDisplay(w.end)}`);
+    lines.push(`${label} · ${parts.join(', ')}`);
+  }
+  return lines;
+}

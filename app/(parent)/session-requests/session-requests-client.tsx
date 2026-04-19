@@ -28,6 +28,33 @@ export function SessionRequestsClient({ initialRows }: { initialRows: SessionReq
   const router = useRouter();
   const [rows, setRows] = useState(initialRows);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [counterActionId, setCounterActionId] = useState<string | null>(null);
+
+  const respondCounter = async (id: string, action: 'accept_counter' | 'decline_counter') => {
+    if (action === 'decline_counter' && !window.confirm('Decline this proposed time?')) return;
+    setCounterActionId(id);
+    try {
+      const res = await fetch(`/api/parent-session-requests/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed');
+      if (action === 'accept_counter' && data.sessionId) {
+        window.location.href = '/cart/checkout';
+        return;
+      }
+      setRows((prev) =>
+        prev.map((r) => (r.id === id ? { ...r, status: action === 'accept_counter' ? 'approved' : 'declined' } : r))
+      );
+      router.refresh();
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : 'Failed');
+    } finally {
+      setCounterActionId(null);
+    }
+  };
 
   const cancel = async (id: string) => {
     if (!window.confirm('Cancel this request?')) return;
@@ -55,7 +82,7 @@ export function SessionRequestsClient({ initialRows }: { initialRows: SessionReq
         <CardContent className="py-10 text-center text-muted-foreground text-sm space-y-3">
           <p>No session requests yet.</p>
           <p>
-            From a coach&apos;s booking page, use{' '}
+            From a coach profile or booking page, use{' '}
             <span className="text-foreground font-medium">Request a session</span> when you need a time
             that isn&apos;t listed.
           </p>
@@ -77,7 +104,22 @@ export function SessionRequestsClient({ initialRows }: { initialRows: SessionReq
         const when = r.preferred_datetime
           ? formatEST(new Date(r.preferred_datetime), 'EEE, MMM d · h:mm a')
           : null;
+        const dur = r.duration_minutes ?? 60;
         const pending = r.status === 'pending';
+        const counterWhen = r.counter_preferred_datetime
+          ? formatEST(new Date(r.counter_preferred_datetime), 'EEE, MMM d · h:mm a')
+          : null;
+
+        const badgeClass =
+          r.status === 'pending'
+            ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
+            : r.status === 'countered'
+              ? 'bg-[#D4AF37]/20 text-amber-800 dark:text-amber-200'
+              : r.status === 'approved'
+                ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
+                : r.status === 'declined' || r.status === 'expired'
+                  ? 'bg-muted text-muted-foreground'
+                  : 'bg-muted text-muted-foreground';
 
         return (
           <Card key={r.id}>
@@ -86,23 +128,50 @@ export function SessionRequestsClient({ initialRows }: { initialRows: SessionReq
                 <div>
                   <p className="font-medium text-foreground">{coach || 'Coach'}</p>
                   <p className="text-sm text-muted-foreground">
-                    {kid}{when ? ` · ${when}` : ''}
+                    {kid}
+                    {when ? ` · ${when}` : ''}
+                    {when ? ` · ${dur} min` : ''}
                   </p>
                 </div>
-                <span
-                  className={`text-xs font-medium uppercase px-2 py-0.5 rounded ${
-                    r.status === 'pending'
-                      ? 'bg-amber-500/15 text-amber-600 dark:text-amber-400'
-                      : r.status === 'approved'
-                        ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400'
-                        : r.status === 'declined'
-                          ? 'bg-destructive/15 text-destructive'
-                          : 'bg-muted text-muted-foreground'
-                  }`}
-                >
-                  {r.status}
+                <span className={`text-xs font-medium uppercase px-2 py-0.5 rounded ${badgeClass}`}>
+                  {r.status === 'countered' ? 'Action needed' : r.status}
                 </span>
               </div>
+              {r.status === 'countered' && counterWhen && (
+                <div className="rounded-md border border-[#D4AF37]/40 bg-[#D4AF37]/10 px-3 py-2 text-sm space-y-2">
+                  <p>
+                    <span className="font-medium">{coach || 'Coach'}</span> proposed{' '}
+                    <span className="font-medium">{counterWhen}</span>.
+                    {r.counter_note ? (
+                      <>
+                        {' '}
+                        <span className="text-muted-foreground">— {r.counter_note}</span>
+                      </>
+                    ) : null}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="min-h-[44px]"
+                      disabled={counterActionId === r.id}
+                      onClick={() => void respondCounter(r.id, 'accept_counter')}
+                    >
+                      {counterActionId === r.id ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Accept time'}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="min-h-[44px]"
+                      disabled={counterActionId === r.id}
+                      onClick={() => void respondCounter(r.id, 'decline_counter')}
+                    >
+                      Decline
+                    </Button>
+                  </div>
+                </div>
+              )}
               {facName(r.facilities) && (
                 <p className="text-sm text-muted-foreground">Facility: {facName(r.facilities)}</p>
               )}
@@ -118,6 +187,18 @@ export function SessionRequestsClient({ initialRows }: { initialRows: SessionReq
                   <span className="text-muted-foreground">Coach: </span>
                   {r.coach_response}
                 </p>
+              )}
+              {r.status === 'approved' && r.created_session_id && (
+                <div className="pt-2 space-y-2">
+                  <Button asChild className="min-h-[44px] w-full sm:w-auto">
+                    <Link href="/cart/checkout">Complete booking (checkout)</Link>
+                  </Button>
+                  {r.payment_deadline_at && (
+                    <p className="text-xs text-muted-foreground">
+                      Please pay by {formatEST(new Date(r.payment_deadline_at), 'MMM d, h:mm a')} Eastern.
+                    </p>
+                  )}
+                </div>
               )}
               {r.responded_at && !pending && (
                 <p className="text-xs text-muted-foreground">

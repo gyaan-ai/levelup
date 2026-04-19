@@ -13,6 +13,7 @@ import { copyTextToClipboard } from '@/lib/copy-to-clipboard';
 import { fillTemplate, getTemplate } from '@/lib/playbook-templates';
 import { sessionParticipantDisplayNames } from '@/lib/session-participant-display-name';
 import { cn } from '@/lib/utils';
+import { getSessionTypeDisplay } from '@/components/session-type-badge';
 import type { CoachSession } from './coach-schedule-card';
 
 function facilityLabel(s: CoachSession): string {
@@ -31,11 +32,6 @@ function participantPaidSum(s: CoachSession): number {
 function registeredCount(s: CoachSession): number {
   const rows = Array.isArray(s.session_participants) ? s.session_participants.length : 0;
   return Math.max(rows, s.current_participants ?? 0);
-}
-
-function sessionTypeUpper(sessionType?: string | null): string {
-  if (!sessionType) return 'SESSION';
-  return sessionType.replace(/_/g, ' ').toUpperCase();
 }
 
 function payoutSummary(session: CoachSession, payoutRate: number): { projected: number; max: number } {
@@ -182,7 +178,8 @@ export function CoachScheduleSessionCard({ session, payoutRate, coachDisplayName
           ? `$${max.toFixed(0)} if full`
           : '—';
 
-  const headerLine = `${sessionTypeUpper(session.session_type)} · ${formatEST(dt, 'EEE, MMM d')} · ${formatEST(dt, 'h:mm a')} · ${dur} min`;
+  const typeLabelUpper = getSessionTypeDisplay(session.session_type, session.session_mode).label.toUpperCase();
+  const headerLine = `${typeLabelUpper} · ${formatEST(dt, 'EEE, MMM d')} · ${formatEST(dt, 'h:mm a')}`;
 
   const openCombinedSms = async () => {
     if (nRegistered === 0) {
@@ -212,9 +209,11 @@ export function CoachScheduleSessionCard({ session, payoutRate, coachDisplayName
         return;
       }
       const namesStr = effectiveNames.join(', ');
-      const template = getTemplate('pre_session_athlete')?.template ?? '';
+      const template =
+        getTemplate('pre_session_broadcast')?.template ??
+        'Coach [Coach] (The Guild) — reminder: [Athlete] @ [Date] [Time], [Facility]. See you there!';
       const smsBody = fillTemplate(template, {
-        athleteName: namesStr || 'everyone',
+        athleteName: namesStr || 'your athlete',
         coachName: coachDisplayName,
         date: formatEST(dt, 'EEE, MMM d'),
         time: formatEST(dt, 'h:mm a'),
@@ -300,7 +299,9 @@ export function CoachScheduleSessionCard({ session, payoutRate, coachDisplayName
         aria-expanded={expanded}
       >
         <p className="text-sm font-semibold text-foreground leading-snug">{headerLine}</p>
-        <p className="text-sm text-foreground mt-1.5">{fac}</p>
+        <p className="text-sm text-foreground mt-1.5">
+          {fac} · {dur} min
+        </p>
         <div className="mt-3 flex items-start gap-2 min-h-[1.5rem]">
           <span className="text-muted-foreground shrink-0" aria-hidden>
             👤
@@ -332,6 +333,16 @@ export function CoachScheduleSessionCard({ session, payoutRate, coachDisplayName
       <div className="px-4 pb-4 flex flex-col sm:flex-row gap-2" onClick={(e) => e.stopPropagation()}>
         <Button
           type="button"
+          variant="default"
+          className="min-h-[44px] touch-manipulation flex-1"
+          onClick={() => void openCombinedSms()}
+          disabled={nRegistered === 0}
+        >
+          <MessageCircle className="h-4 w-4 mr-2 shrink-0" />
+          Text
+        </Button>
+        <Button
+          type="button"
           variant="outline"
           className="min-h-[44px] touch-manipulation flex-1 border-[#D4AF37]/40"
           onClick={() => void handleShare()}
@@ -347,16 +358,6 @@ export function CoachScheduleSessionCard({ session, payoutRate, coachDisplayName
               Share
             </>
           )}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          className="min-h-[44px] touch-manipulation flex-1 border-[#D4AF37]/40"
-          onClick={() => void openCombinedSms()}
-          disabled={nRegistered === 0}
-        >
-          <MessageCircle className="h-4 w-4 mr-2 shrink-0" />
-          Text
         </Button>
       </div>
 
