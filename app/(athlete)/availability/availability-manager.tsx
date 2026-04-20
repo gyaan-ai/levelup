@@ -33,7 +33,10 @@ export function AvailabilityManager() {
   const [adding, setAdding] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [applyLoading, setApplyLoading] = useState(false);
-  const [applyMessage, setApplyMessage] = useState<string | null>(null);
+  const [applyBanner, setApplyBanner] = useState<{
+    tone: 'success' | 'error' | 'neutral';
+    msg: string;
+  } | null>(null);
 
   const refreshSlots = useCallback(async () => {
     const r = await fetch('/api/availability/me');
@@ -73,7 +76,7 @@ export function AvailabilityManager() {
   }, [refreshWeekly]);
 
   const handleApplyWeekly = async () => {
-    setApplyMessage(null);
+    setApplyBanner(null);
     setApplyLoading(true);
     try {
       const r = await fetch('/api/coach/availability/apply-weekly-slots', {
@@ -84,13 +87,22 @@ export function AvailabilityManager() {
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || 'Could not apply weekly hours');
       await refreshSlots();
-      setApplyMessage(
+      setApplyBanner(
         data.added > 0
-          ? `Added ${data.added} opening${data.added === 1 ? '' : 's'} for the next two weeks (skips blocked days and times you already added).`
-          : String(data.message || 'No new openings — you may already be covered for those days.')
+          ? {
+              tone: 'success',
+              msg: `Added ${data.added} opening${data.added === 1 ? '' : 's'} for the next two weeks (skips blocked days and times you already added).`,
+            }
+          : {
+              tone: 'neutral',
+              msg: String(data.message || 'No new openings — you may already be covered for those days.'),
+            }
       );
     } catch (e) {
-      setApplyMessage(e instanceof Error ? e.message : 'Something went wrong');
+      setApplyBanner({
+        tone: 'error',
+        msg: e instanceof Error ? e.message : 'Something went wrong',
+      });
     } finally {
       setApplyLoading(false);
     }
