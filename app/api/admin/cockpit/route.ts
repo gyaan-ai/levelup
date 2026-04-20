@@ -6,6 +6,7 @@ import { getTenantByDomain } from '@/config/tenants';
 import { startOfDay, endOfDay, subDays, subMonths } from 'date-fns';
 import { toZonedTime, fromZonedTime } from 'date-fns-tz';
 import { APP_TIMEZONE } from '@/lib/format-date';
+import { COACH_REVENUE_FRACTION } from '@/lib/pricing';
 
 /** Given a date YYYY-MM-DD in Eastern, return ISO range for that calendar day (for DB queries). */
 function dayRangeInTz(dateStr: string, tz: string): { start: string; end: string } {
@@ -212,10 +213,18 @@ export async function GET(req: NextRequest) {
     const bookingRowsRaw = bookingsRes.data ?? [];
     let revenueThatDay = 0;
     const sessionIdsForEconomics = new Set<string>();
+    /** Gross from booking rows in this period, per session (for coach share when athlete_payment not set). */
+    const grossBySessionInPeriod = new Map<string, number>();
     for (const b of bookingRowsRaw as { session_id?: string; amount_paid?: number | null }[]) {
       if (b.session_id) sessionIdsForEconomics.add(b.session_id);
       const amt = b.amount_paid;
-      if (amt != null && Number(amt) > 0) revenueThatDay += Number(amt);
+      if (amt != null && Number(amt) > 0) {
+        const n = Number(amt);
+        revenueThatDay += n;
+        if (b.session_id) {
+          grossBySessionInPeriod.set(b.session_id, (grossBySessionInPeriod.get(b.session_id) ?? 0) + n);
+        }
+      }
     }
     const bookingCount = bookingRowsRaw.length;
 
@@ -226,11 +235,25 @@ export async function GET(req: NextRequest) {
     if (sessionIdList.length > 0) {
       const { data: sessFin } = await admin
         .from('sessions')
-        .select('athlete_payment, org_fee, stripe_fee')
+        .select('id, athlete_payment, org_fee, stripe_fee, session_payout_rate')
         .in('id', sessionIdList);
       for (const s of sessFin ?? []) {
-        const row = s as { athlete_payment?: number | null; org_fee?: number | null; stripe_fee?: number | null };
-        coachPayoutsAllocated += Number(row.athlete_payment ?? 0);
+        const row = s as {
+          id: string;
+          athlete_payment?: number | null;
+          org_fee?: number | null;
+          stripe_fee?: number | null;
+          session_payout_rate?: number | null;
+        };
+        const storedCoach = Number(row.athlete_payment ?? 0);
+        const periodGross = grossBySessionInPeriod.get(row.id) ?? 0;
+        const rate =
+          row.session_payout_rate != null && !Number.isNaN(Number(row.session_payout_rate))
+            ? Number(row.session_payout_rate)
+            : COACH_REVENUE_FRACTION;
+        const coachAlloc =
+          storedCoach > 0 ? storedCoach : Math.round(periodGross * rate * 100) / 100;
+        coachPayoutsAllocated += coachAlloc;
         stripeFeesTotal += Number(row.stripe_fee ?? 0);
         orgFeesGuildTotal += Number(row.org_fee ?? 0);
       }

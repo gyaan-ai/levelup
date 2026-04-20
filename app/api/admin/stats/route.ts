@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { NextResponse } from 'next/server';
+import { coachPayoutUsd } from '@/lib/coach-session-payout';
 
 export const dynamic = 'force-dynamic';
 
@@ -34,6 +35,9 @@ type SessionStatsRow = {
   session_type?: string | null;
   status?: string | null;
   athlete_payment?: number | null;
+  price_per_participant?: number | null;
+  current_participants?: number | null;
+  session_payout_rate?: number | null;
   session_participants?: SessionParticipantRow[] | null;
 };
 
@@ -42,6 +46,17 @@ function sessionRevenue(s: SessionStatsRow): number {
     (sum, p) => sum + Number(p.amount_paid ?? 0),
     0
   );
+}
+
+function sessionCoachPayout(s: SessionStatsRow): number {
+  const participant_amount_paid_sum = sessionRevenue(s);
+  return coachPayoutUsd({
+    athlete_payment: s.athlete_payment,
+    price_per_participant: s.price_per_participant,
+    current_participants: s.current_participants,
+    participant_amount_paid_sum,
+    session_payout_rate: s.session_payout_rate ?? null,
+  });
 }
 
 export async function GET(request: Request) {
@@ -63,6 +78,9 @@ export async function GET(request: Request) {
       session_type,
       status,
       athlete_payment,
+      price_per_participant,
+      current_participants,
+      session_payout_rate,
       session_participants (
         amount_paid
       )
@@ -93,7 +111,7 @@ export async function GET(request: Request) {
   );
 
   const totalRevenue = rows.reduce((sum, s) => sum + sessionRevenue(s), 0);
-  const totalCoachPayout = rows.reduce((sum, s) => sum + Number(s.athlete_payment ?? 0), 0);
+  const totalCoachPayout = rows.reduce((sum, s) => sum + sessionCoachPayout(s), 0);
   const platformFee = totalRevenue - totalCoachPayout;
 
   return NextResponse.json({

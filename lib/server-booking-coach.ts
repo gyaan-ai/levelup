@@ -7,6 +7,8 @@ export type VerifiedBookingCoach = {
   last_name: string;
   active: boolean;
   facility_id: string | null;
+  /** Coach revenue share of gross (e.g. 0.8); used when creating sessions from parent book flow */
+  payout_rate?: number | null;
 };
 
 export type VerifyCoachFailure = {
@@ -44,7 +46,7 @@ export async function verifyCoachForParentBooking(
 ): Promise<VerifyCoachResult> {
   const { data: athlete, error } = await admin
     .from('athletes')
-    .select('id, first_name, last_name, active, facility_id')
+    .select('id, first_name, last_name, active, facility_id, payout_rate')
     .eq('id', coachId)
     .maybeSingle();
 

@@ -14,6 +14,7 @@ import { ensureAutoFamilyDiscountForParent } from '@/lib/family-auto-discount';
 import { checkoutAllowSavedAccountPercent, resolveCheckoutPercentOff } from '@/lib/checkout-promo';
 import { normalizeCoachOrWrestlerId, verifyCoachForParentBooking } from '@/lib/server-booking-coach';
 import { isPennyTestPricingEnabled } from '@/lib/penny-test-pricing';
+import { resolveCoachPayoutRate } from '@/lib/coach-session-payout';
 
 export async function POST(req: NextRequest) {
   try {
@@ -143,7 +144,9 @@ export async function POST(req: NextRequest) {
     const scheduledDatetime = easternWallDateTimeToUtcIso(scheduledDate, scheduledTime);
     
     const testModePenny = isPennyTestPricingEnabled();
-    const athletePayment = testModePenny ? 0.50 : totalPrice; // what we pay the coach (you pay manually)
+    const coachShareRate = resolveCoachPayoutRate({
+      coach_payout_rate: coachCheck.coach.payout_rate ?? null,
+    });
     const basePrice = testModePenny ? 0.50 : priceAfterPct;
     const stripeChargeAmount = basePrice;
     const orgFee = 0;
@@ -203,7 +206,9 @@ export async function POST(req: NextRequest) {
         scheduled_datetime: scheduledDatetime,
         duration_minutes: durationMinutes,
         total_price: basePrice,
-        athlete_payment: athletePayment,
+        /** Coach share is derived via session_payout_rate × roster / amount_paid (see coachPayoutUsd); never store 100% of gross here */
+        athlete_payment: 0,
+        session_payout_rate: coachShareRate,
         org_fee: orgFee,
         stripe_fee: stripeFee,
         paid_with_credit: false,

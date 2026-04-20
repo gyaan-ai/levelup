@@ -20,6 +20,17 @@ import {
 } from './admin-dashboard-client';
 import { coachPayoutUsd } from '@/lib/coach-session-payout';
 
+function sessionCoachShareUsd(s: AdminSession): number {
+  return coachPayoutUsd({
+    athlete_payment: s.athlete_payment,
+    price_per_participant: s.price_per_participant,
+    current_participants: s.current_participants,
+    participant_amount_paid_sum: s.participant_amount_paid_sum,
+    session_payout_rate: s.session_payout_rate ?? null,
+    coach_payout_rate: s.coach_payout_rate ?? null,
+  });
+}
+
 function roundRatingAvg(sum: number, count: number): number {
   return Math.round((sum / count) * 100) / 100;
 }
@@ -347,11 +358,13 @@ export default async function AdminPage() {
     totalRevenue: sessions.reduce((sum, s) => sum + s.total_price, 0),
     totalOrgFees: sessions.reduce((sum, s) => sum + s.org_fee, 0),
     totalStripeFees: sessions.reduce((sum, s) => sum + s.stripe_fee, 0),
-    totalAthletePayments: sessions.reduce((sum, s) => sum + s.athlete_payment, 0),
+    totalAthletePayments: sessions.reduce((sum, s) => sum + sessionCoachShareUsd(s), 0),
     upcomingOpenRevenue: sessions.filter((s) => ['scheduled', 'pending_payment'].includes(s.status) && new Date(s.scheduled_datetime) >= new Date()).reduce((sum, s) => sum + s.total_price, 0),
     upcomingOpenOrgFees: sessions.filter((s) => ['scheduled', 'pending_payment'].includes(s.status) && new Date(s.scheduled_datetime) >= new Date()).reduce((sum, s) => sum + s.org_fee, 0),
     upcomingOpenStripeFees: sessions.filter((s) => ['scheduled', 'pending_payment'].includes(s.status) && new Date(s.scheduled_datetime) >= new Date()).reduce((sum, s) => sum + s.stripe_fee, 0),
-    upcomingOpenAthletePayments: sessions.filter((s) => ['scheduled', 'pending_payment'].includes(s.status) && new Date(s.scheduled_datetime) >= new Date()).reduce((sum, s) => sum + s.athlete_payment, 0),
+    upcomingOpenAthletePayments: sessions
+      .filter((s) => ['scheduled', 'pending_payment'].includes(s.status) && new Date(s.scheduled_datetime) >= new Date())
+      .reduce((sum, s) => sum + sessionCoachShareUsd(s), 0),
     sessionCount: sessions.length,
     completedCount: sessions.filter((s) => s.status === 'completed').length,
     pendingPaymentCount: sessions.filter((s) => s.status === 'pending_payment').length,

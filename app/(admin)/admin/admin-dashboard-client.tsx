@@ -1183,7 +1183,7 @@ export function AdminDashboardClient({
       };
       
       existing.session_count += 1;
-      existing.total_earnings += Number(s.athlete_payment) || 0;
+      existing.total_earnings += sessionPayoutAmountUsd(s);
       
       if (s.status === 'completed') existing.completed_count += 1;
       if (s.status === 'scheduled') existing.open_count += 1;
@@ -1479,10 +1479,10 @@ export function AdminDashboardClient({
     const coachBreakdown = new Map<string, { name: string; school: string; revenue: number; payout: number; sessions: number; open: number }>();
 
     for (const s of filteredSess) {
-      // participant_amount_paid_sum = what parents ACTUALLY paid
-      // athlete_payment = what coach earns for this session
+      // participant_amount_paid_sum = line amounts on roster (often list price until Stripe settles)
+      // Coach share = sessionPayoutAmountUsd (80% default of paid sum / roster estimate; athlete_payment when set at payout)
       const parentsPaid = Number(s.participant_amount_paid_sum) || 0;
-      const coachPaid = Number(s.athlete_payment) || 0;
+      const coachPaid = sessionPayoutAmountUsd(s);
       
       if (s.status === 'completed') {
         // COMPLETED = Revenue earned, coach payout owed
