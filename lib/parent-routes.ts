@@ -8,6 +8,8 @@ const PARENT_ROUTES = [
   '/browse',
   '/bookings',
   '/inbox',
+  '/notifications',
+  '/session-requests',
   '/account',
   '/my-wrestlers',
   '/my-coaches',

@@ -21,7 +21,13 @@ type LeaderboardData = {
   totalCoaches: number;
 };
 
-export function CoachRankCard({ coachId }: { coachId: string }) {
+type Props = {
+  coachId: string;
+  /** When set, show top N coaches by completed sessions under your rank */
+  topSessionsListSize?: number;
+};
+
+export function CoachRankCard({ coachId, topSessionsListSize }: Props) {
   const [data, setData] = useState<LeaderboardData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -46,10 +52,20 @@ export function CoachRankCard({ coachId }: { coachId: string }) {
   if (!data) return null;
 
   const myStats = data.leaderboard.find(c => c.id === coachId);
-  if (!myStats) return null;
-
-  const { sessionRank, ratingRank, sessionCount, isOnFire, averageRating, reviewCount } = myStats;
   const totalCoaches = data.totalCoaches;
+
+  const topBySessions = topSessionsListSize
+    ? [...data.leaderboard].sort((a, b) => b.sessionCount - a.sessionCount).slice(0, topSessionsListSize)
+    : [];
+
+  if (!myStats && !topSessionsListSize) return null;
+
+  const sessionRank = myStats?.sessionRank ?? null;
+  const ratingRank = myStats?.ratingRank ?? null;
+  const sessionCount = myStats?.sessionCount ?? 0;
+  const isOnFire = myStats?.isOnFire ?? false;
+  const averageRating = myStats?.averageRating ?? null;
+  const reviewCount = myStats?.reviewCount ?? 0;
 
   // Determine badges
   const badges: { icon: React.ReactNode; label: string; color: string }[] = [];
@@ -81,47 +97,80 @@ export function CoachRankCard({ coachId }: { coachId: string }) {
   return (
     <Card className="border-accent/30 bg-gradient-to-r from-primary to-primary/80">
       <CardContent className="p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="h-12 w-12 rounded-full bg-[#D4AF37]/20 flex items-center justify-center">
-              <Medal className="h-6 w-6 text-[#D4AF37]" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Your Rank</p>
-              <p className="text-2xl font-bold text-foreground">
-                #{sessionRank} <span className="text-sm font-normal text-muted-foreground">of {totalCoaches}</span>
-              </p>
-              <p className="text-xs text-muted-foreground">{sessionCount} sessions completed</p>
-            </div>
-          </div>
-          
-          {badges.length > 0 && (
-            <div className="flex flex-col gap-1.5">
-              {badges.map((badge, i) => (
-                <div 
-                  key={i}
-                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium ${badge.color}`}
-                >
-                  {badge.icon}
-                  {badge.label}
+        {myStats ? (
+          <>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-12 w-12 rounded-full bg-[#D4AF37]/20 flex items-center justify-center">
+                  <Medal className="h-6 w-6 text-[#D4AF37]" />
                 </div>
-              ))}
+                <div>
+                  <p className="text-sm text-muted-foreground">Your rank</p>
+                  <p className="text-2xl font-bold text-foreground">
+                    #{myStats.sessionRank}{' '}
+                    <span className="text-sm font-normal text-muted-foreground">of {totalCoaches}</span>
+                  </p>
+                  <p className="text-xs text-muted-foreground">{sessionCount} sessions completed</p>
+                </div>
+              </div>
+
+              {badges.length > 0 && (
+                <div className="flex flex-col gap-1.5 sm:items-end">
+                  {badges.map((badge, i) => (
+                    <div
+                      key={i}
+                      className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-medium ${badge.color}`}
+                    >
+                      {badge.icon}
+                      {badge.label}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-          )}
-        </div>
-        
-        {averageRating && reviewCount > 0 && (
-          <div className="mt-3 pt-3 border-t border-accent/20 flex items-center gap-4 text-sm">
-            <div className="flex items-center gap-1">
-              <Star className="h-4 w-4 text-[#D4AF37] fill-[#D4AF37]" />
-              <span className="font-medium">{averageRating.toFixed(1)}</span>
-              <span className="text-muted-foreground">({reviewCount} reviews)</span>
-            </div>
-            {ratingRank && (
-              <span className="text-muted-foreground">
-                #{ratingRank} in ratings
-              </span>
+
+            {averageRating && reviewCount > 0 && (
+              <div className="mt-3 pt-3 border-t border-accent/20 flex flex-wrap items-center gap-4 text-sm">
+                <div className="flex items-center gap-1">
+                  <Star className="h-4 w-4 text-[#D4AF37] fill-[#D4AF37]" />
+                  <span className="font-medium">{averageRating.toFixed(1)}</span>
+                  <span className="text-muted-foreground">({reviewCount} reviews)</span>
+                </div>
+                {ratingRank && (
+                  <span className="text-muted-foreground">
+                    #{ratingRank} in ratings
+                  </span>
+                )}
+              </div>
             )}
+          </>
+        ) : (
+          <p className="text-sm text-muted-foreground">
+            Your profile isn&apos;t on the public leaderboard yet (inactive or new). Top coaches by completed sessions are
+            below.
+          </p>
+        )}
+
+        {topBySessions.length > 0 && (
+          <div className={myStats ? 'mt-4 pt-4 border-t border-accent/20' : ''}>
+            <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+              Top coaches · completed sessions
+            </p>
+            <ul className="space-y-2">
+              {topBySessions.map((c, idx) => (
+                <li
+                  key={c.id}
+                  className={`flex items-center justify-between gap-2 text-sm ${c.id === coachId ? 'font-semibold text-[#D4AF37]' : ''}`}
+                >
+                  <span className="min-w-0 truncate">
+                    <span className="tabular-nums text-muted-foreground mr-2">{idx + 1}.</span>
+                    {c.name}
+                    {c.id === coachId ? <span className="sr-only"> (you)</span> : null}
+                  </span>
+                  <span className="tabular-nums shrink-0 text-muted-foreground">{c.sessionCount}</span>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
       </CardContent>

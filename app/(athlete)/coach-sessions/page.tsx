@@ -7,7 +7,7 @@ import { purgeEmptyPastSessions } from '@/lib/purge-empty-past-sessions';
 import { CoachSessionsClient, type CommunitySession, type SlotRequestItem } from './coach-sessions-client';
 import type { CoachSession } from '@/app/(athlete)/athlete-dashboard/coach-schedule-card';
 import { CopyCoachAllAthletePhonesButton } from '@/components/copy-coach-all-athlete-phones-button';
-import { COACH_REVENUE_FRACTION } from '@/lib/pricing';
+import { normalizeCoachRevenueShareRate } from '@/lib/pricing';
 
 export const dynamic = 'force-dynamic';
 
@@ -51,7 +51,10 @@ export default async function CoachSessionsPage({
   // The coach ID to use for queries - either the viewed coach or the logged-in user
   const coachId = viewAsCoachId || user.id;
 
-  const { data: athlete } = await supabase.from('athletes').select('*').eq('id', coachId).maybeSingle();
+  const { data: athlete } =
+    userData?.role === 'admin'
+      ? await admin.from('athletes').select('*').eq('id', coachId).maybeSingle()
+      : await supabase.from('athletes').select('*').eq('id', coachId).maybeSingle();
   
   // Missing athlete row — must complete signup; incomplete profile is OK (banner on home)
   if (!viewAsCoachId && !athlete) {
@@ -174,7 +177,9 @@ export default async function CoachSessionsPage({
           session?: { id: string; scheduled_datetime: string; session_type?: string; session_mode?: string; facilities?: { name?: string } | null };
         }>}
         pendingSlotRequests={(slotRequestsRaw ?? []) as unknown as SlotRequestItem[]}
-        payoutRate={athlete?.payout_rate ?? COACH_REVENUE_FRACTION}
+        payoutRate={normalizeCoachRevenueShareRate(
+          athlete?.payout_rate != null ? Number(athlete.payout_rate) : null
+        )}
         communitySessions={(communitySessions ?? []) as unknown as CommunitySession[]}
       />
     </div>

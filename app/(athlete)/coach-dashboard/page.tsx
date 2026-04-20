@@ -6,7 +6,7 @@ import { getTenantByDomain } from '@/config/tenants';
 import { isProfileComplete } from '@/lib/athletes';
 import { formatEST } from '@/lib/format-date';
 import { coachPayoutUsd } from '@/lib/coach-session-payout';
-import { COACH_REVENUE_FRACTION } from '@/lib/pricing';
+import { normalizeCoachRevenueShareRate } from '@/lib/pricing';
 import { CoachDashboardClient } from './coach-dashboard-client';
 
 export const dynamic = 'force-dynamic';
@@ -47,7 +47,12 @@ export default async function CoachDashboardPage() {
   const coachId = viewAsCoachId || user.id;
   const isViewingAsCoach = !!viewAsCoachId;
 
-  const { data: athlete } = await supabase.from('athletes').select('*').eq('id', coachId).maybeSingle();
+  const admin = createAdminClient(tenant.slug);
+
+  const { data: athlete } =
+    userData?.role === 'admin'
+      ? await admin.from('athletes').select('*').eq('id', coachId).maybeSingle()
+      : await supabase.from('athletes').select('*').eq('id', coachId).maybeSingle();
 
   if (!athlete) {
     if (isViewingAsCoach) {
@@ -76,10 +81,10 @@ export default async function CoachDashboardPage() {
   if (!isViewingAsCoach && coachStatus === 'rejected') redirect('/coach-pending');
 
   const needsOnboarding = !isViewingAsCoach && !isProfileComplete(athlete);
-  const payoutRate = Number(athlete?.payout_rate) || COACH_REVENUE_FRACTION;
+  const payoutRate = normalizeCoachRevenueShareRate(
+    athlete?.payout_rate != null ? Number(athlete.payout_rate) : null
+  );
   const nowIso = new Date().toISOString();
-
-  const admin = createAdminClient(tenant.slug);
 
   const { data: pastSessionsRaw } = await admin
     .from('sessions')

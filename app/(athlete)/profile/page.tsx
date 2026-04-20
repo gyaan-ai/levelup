@@ -48,7 +48,7 @@ type ProfileFormValues = z.infer<typeof profileSchema>;
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { user, userRole, effectiveRole } = useAuth();
+  const { user, userRole, effectiveRole, viewAsCoachId } = useAuth();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -82,7 +82,12 @@ export default function ProfilePage() {
       try {
         const response = await fetch('/api/athletes/profile');
         const contentType = response.headers.get('content-type') ?? '';
-        let data: { athlete?: any; facilities?: any[] } = {};
+        let data: {
+          athlete?: any;
+          facilities?: any[];
+          error?: string;
+          needsCoachSelection?: boolean;
+        } = {};
         if (contentType.includes('application/json')) {
           try {
             data = await response.json();
@@ -90,6 +95,14 @@ export default function ProfilePage() {
             setError('Failed to load profile data');
             return;
           }
+        }
+
+        if (data.needsCoachSelection && data.error) {
+          setError(data.error);
+        } else if (!response.ok && data.error) {
+          setError(data.error);
+        } else if (data.error && !data.athlete) {
+          setError(data.error);
         }
 
         if (data.athlete) {
@@ -261,11 +274,14 @@ export default function ProfilePage() {
   }
 
   const isCoachProfile = effectiveRole === 'coach' || userRole === 'coach';
+  /** Public /coach/[id] is the athlete row id — use impersonation target when admin previews as coach */
+  const coachPublicId =
+    userRole === 'coach' ? user?.id ?? null : userRole === 'admin' && viewAsCoachId ? viewAsCoachId : null;
   const publicSessionsLink =
-    user?.id &&
+    coachPublicId &&
     (process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, '') ||
       (typeof window !== 'undefined' ? window.location.origin : '')) +
-      `/coach/${user.id}`;
+      `/coach/${coachPublicId}`;
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-2xl">
@@ -291,6 +307,11 @@ export default function ProfilePage() {
           {error && (
             <div className="mb-4 p-3 bg-destructive/10 border border-destructive rounded-md">
               <p className="text-sm text-destructive">{error}</p>
+              {userRole === 'admin' && effectiveRole === 'coach' && !viewAsCoachId && (
+                <p className="text-xs text-destructive/90 mt-2">
+                  Open the header menu, choose Preview as → Coach, and pick the coach whose profile you want to edit.
+                </p>
+              )}
             </div>
           )}
 
@@ -300,7 +321,7 @@ export default function ProfilePage() {
             </div>
           )}
 
-          {isCoachProfile && user?.id && publicSessionsLink && (
+          {isCoachProfile && coachPublicId && publicSessionsLink && (
             <div className="mb-6 rounded-lg border border-border bg-muted/30 p-4 space-y-3">
               <div className="flex items-start gap-2">
                 <Share2 className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
@@ -338,7 +359,7 @@ export default function ProfilePage() {
                     )}
                   </Button>
                   <Button type="button" variant="secondary" size="sm" asChild>
-                    <Link href={`/coach/${user.id}`} target="_blank" rel="noopener noreferrer">
+                    <Link href={`/coach/${coachPublicId}`} target="_blank" rel="noopener noreferrer">
                       Open
                     </Link>
                   </Button>

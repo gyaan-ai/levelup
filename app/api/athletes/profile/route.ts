@@ -1,9 +1,43 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { headers } from 'next/headers';
+import { cookies, headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import { normalizeZelleInput } from '@/lib/zelle';
+
+async function resolveProfileAthleteId(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  authUserId: string
+): Promise<
+  | { ok: true; athleteUserId: string; useAdminRead: boolean }
+  | { ok: false; status: number; error: string }
+> {
+  const { data: userData, error } = await supabase
+    .from('users')
+    .select('role')
+    .eq('id', authUserId)
+    .maybeSingle();
+
+  if (error) {
+    return { ok: false, status: 500, error: error.message };
+  }
+  if (userData?.role === 'coach') {
+    return { ok: true, athleteUserId: authUserId, useAdminRead: false };
+  }
+  if (userData?.role === 'admin') {
+    const cookieStore = await cookies();
+    const viewAs = cookieStore.get('levelup_view_as_coach_id')?.value?.trim();
+    if (!viewAs) {
+      return {
+        ok: false,
+        status: 400,
+        error: 'Choose a coach in the header (preview as coach) to load that coach profile.',
+      };
+    }
+    return { ok: true, athleteUserId: viewAs, useAdminRead: true };
+  }
+  return { ok: false, status: 403, error: 'Forbidden' };
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -22,11 +56,31 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get athlete profile
-    const { data: athlete, error } = await supabase
+    const { data: facilitiesForAnyCase } = await supabase
+      .from('facilities')
+      .select('*')
+      .order('name');
+
+    const resolved = await resolveProfileAthleteId(supabase, user.id);
+    if (!resolved.ok) {
+      const status = resolved.status;
+      if (status === 400) {
+        return NextResponse.json({
+          athlete: null,
+          facilities: facilitiesForAnyCase || [],
+          error: resolved.error,
+          needsCoachSelection: true,
+        });
+      }
+      return NextResponse.json({ error: resolved.error }, { status });
+    }
+
+    const readClient = resolved.useAdminRead ? createAdminClient(tenant.slug) : supabase;
+
+    const { data: athlete, error } = await readClient
       .from('athletes')
       .select('*')
-      .eq('id', user.id)
+      .eq('id', resolved.athleteUserId)
       .single();
 
     if (error && error.code !== 'PGRST116') { // PGRST116 = not found
@@ -34,21 +88,15 @@ export async function GET(req: NextRequest) {
     }
 
     // Cell phone lives on users.phone (not athletes)
-    const { data: userRow } = await supabase
+    const { data: userRow } = await readClient
       .from('users')
       .select('phone')
-      .eq('id', user.id)
+      .eq('id', resolved.athleteUserId)
       .maybeSingle();
-
-    // Get facilities for dropdown
-    const { data: facilities } = await supabase
-      .from('facilities')
-      .select('*')
-      .order('name');
 
     return NextResponse.json({
       athlete: athlete ? { ...athlete, phone: userRow?.phone ?? null } : null,
-      facilities: facilities || [],
+      facilities: facilitiesForAnyCase || [],
     });
   } catch (error) {
     console.error('Error fetching athlete profile:', error);
@@ -83,16 +131,11 @@ export async function PUT(req: NextRequest) {
     const focusX = photoFocusX != null ? clamp(Number(photoFocusX)) : undefined;
     const focusY = photoFocusY != null ? clamp(Number(photoFocusY)) : undefined;
 
-    // Check if user is an athlete
-    const { data: userData } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (!userData || userData.role !== 'coach') {
-      return NextResponse.json({ error: 'User is not an athlete' }, { status: 400 });
+    const resolved = await resolveProfileAthleteId(supabase, user.id);
+    if (!resolved.ok) {
+      return NextResponse.json({ error: resolved.error }, { status: resolved.status });
     }
+    const targetAthleteId = resolved.athleteUserId;
 
     // Cell phone is stored on users.phone (athletes.phone was removed)
     let phoneForUser: string | null | undefined = undefined;
@@ -119,7 +162,7 @@ export async function PUT(req: NextRequest) {
       const { error: phoneErr } = await supabaseAdmin
         .from('users')
         .update({ phone: phoneForUser })
-        .eq('id', user.id);
+        .eq('id', targetAthleteId);
       if (phoneErr) {
         console.error('users.phone update error:', phoneErr);
         return NextResponse.json(
@@ -135,7 +178,7 @@ export async function PUT(req: NextRequest) {
     const { data: existing, error: fetchError } = await supabaseAdmin
       .from('athletes')
       .select('first_name, last_name, school')
-      .eq('id', user.id)
+      .eq('id', targetAthleteId)
       .maybeSingle();
 
     if (fetchError) {
@@ -166,12 +209,12 @@ export async function PUT(req: NextRequest) {
     const { data: updateResult, error: updateError } = await supabaseAdmin
       .from('athletes')
       .update(updateData)
-      .eq('id', user.id)
+      .eq('id', targetAthleteId)
       .select('id');
 
     // If UPDATE succeeded (affected at least 1 row), persist phone on users and return
     if (updateResult && updateResult.length > 0) {
-      console.log('Profile updated successfully for user:', user.id);
+      console.log('Profile updated successfully for user:', targetAthleteId);
 
       const phoneFail = await applyUserPhone();
       if (phoneFail) return phoneFail;
@@ -180,7 +223,7 @@ export async function PUT(req: NextRequest) {
       const { data: verified } = await supabaseAdmin
         .from('athletes')
         .select('bio, photo_url, weight_class')
-        .eq('id', user.id)
+        .eq('id', targetAthleteId)
         .single();
 
       console.log('Verified profile data:', verified);
@@ -194,7 +237,7 @@ export async function PUT(req: NextRequest) {
 
     // Log if update returned 0 rows
     if (!updateError && (!updateResult || updateResult.length === 0)) {
-      console.warn('UPDATE returned 0 rows for user:', user.id, 'Attempting INSERT...');
+      console.warn('UPDATE returned 0 rows for user:', targetAthleteId, 'Attempting INSERT...');
     }
 
     // If UPDATE affected 0 rows, record doesn't exist - try INSERT
@@ -214,11 +257,11 @@ export async function PUT(req: NextRequest) {
     const { data: signupData } = await supabaseAdmin
       .from('athletes')
       .select('first_name, last_name, school')
-      .eq('id', user.id)
+      .eq('id', targetAthleteId)
       .maybeSingle();
 
     const insertData = {
-      id: user.id,
+      id: targetAthleteId,
       first_name: signupData?.first_name || existing?.first_name || 'Athlete',
       last_name: signupData?.last_name || existing?.last_name || 'User',
       school: signupData?.school || existing?.school || '',
@@ -236,7 +279,7 @@ export async function PUT(req: NextRequest) {
         const { error: retryUpdateError } = await supabaseAdmin
           .from('athletes')
           .update(updateData)
-          .eq('id', user.id);
+          .eq('id', targetAthleteId);
 
         if (retryUpdateError) {
           console.error('Retry update error:', retryUpdateError);

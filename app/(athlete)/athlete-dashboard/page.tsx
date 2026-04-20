@@ -2,7 +2,8 @@ import { redirect } from 'next/navigation';
 import { headers, cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
-import { COACH_REVENUE_FRACTION } from '@/lib/pricing';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { normalizeCoachRevenueShareRate } from '@/lib/pricing';
 import { CoachScheduleClient, type JoinRequestItem, type SlotRequestScheduleItem } from './coach-schedule-client';
 import type { CoachSession } from './coach-schedule-card';
 
@@ -33,11 +34,11 @@ export default async function CoachHomePage() {
   const coachId = viewAsCoachId || user.id;
   const isViewingAsCoach = !!viewAsCoachId;
 
-  const { data: athlete } = await supabase
-    .from('athletes')
-    .select('*')
-    .eq('id', coachId)
-    .maybeSingle();
+  const admin = userData?.role === 'admin' ? createAdminClient(tenant.slug) : null;
+
+  const { data: athlete } = admin
+    ? await admin.from('athletes').select('*').eq('id', coachId).maybeSingle()
+    : await supabase.from('athletes').select('*').eq('id', coachId).maybeSingle();
 
   if (!athlete) {
     if (isViewingAsCoach) {
@@ -154,7 +155,9 @@ export default async function CoachHomePage() {
         pendingSlotRequests={(slotRequestsRaw ?? []) as unknown as SlotRequestScheduleItem[]}
         coachFirstName={coachFirstName}
         coachDisplayName={coachDisplayName}
-        payoutRate={Number(athlete?.payout_rate) || COACH_REVENUE_FRACTION}
+        payoutRate={normalizeCoachRevenueShareRate(
+          athlete?.payout_rate != null ? Number(athlete.payout_rate) : null
+        )}
       />
     </div>
   );

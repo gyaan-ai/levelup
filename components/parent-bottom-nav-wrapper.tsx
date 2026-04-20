@@ -20,6 +20,7 @@ const COACH_ROUTES = [
   '/rate-card',
   '/small-group-sessions',
   '/notifications',
+  '/inbox',
   '/messages',
   '/workspaces',
 ];

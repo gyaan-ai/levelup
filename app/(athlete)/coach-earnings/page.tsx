@@ -7,7 +7,8 @@ import { Card, CardContent } from '@/components/ui/card';
 import { DollarSign, TrendingUp, Clock } from 'lucide-react';
 import { formatEST } from '@/lib/format-date';
 import { coachPayoutUsd } from '@/lib/coach-session-payout';
-import { COACH_REVENUE_FRACTION } from '@/lib/pricing';
+import { coachRevenueSharePercentDisplay, normalizeCoachRevenueShareRate } from '@/lib/pricing';
+import { CoachRankCard } from '@/components/coach-rank-card';
 
 export const dynamic = 'force-dynamic';
 
@@ -46,14 +47,22 @@ export default async function CoachEarningsPage() {
     userData?.role === 'admin' ? cookieStore.get('levelup_view_as_coach_id')?.value : null;
   const coachId = viewAsCoachId || user.id;
 
-  const { data: athlete } = await supabase.from('athletes').select('first_name, payout_rate').eq('id', coachId).maybeSingle();
-
-  const payoutRate = athlete?.payout_rate ?? COACH_REVENUE_FRACTION;
-
-  const nowIso = new Date().toISOString();
-
   // Service role so admins "viewing as coach" still read that coach's sessions (RLS is auth.uid()-scoped).
   const admin = createAdminClient(tenant.slug);
+
+  const { data: athlete } =
+    userData?.role === 'admin'
+      ? await admin.from('athletes').select('first_name, payout_rate').eq('id', coachId).maybeSingle()
+      : await supabase.from('athletes').select('first_name, payout_rate').eq('id', coachId).maybeSingle();
+
+  const payoutRate = normalizeCoachRevenueShareRate(
+    athlete?.payout_rate != null ? Number(athlete.payout_rate) : null
+  );
+  const payoutPercentDisplay = coachRevenueSharePercentDisplay(
+    athlete?.payout_rate != null ? Number(athlete.payout_rate) : null
+  );
+
+  const nowIso = new Date().toISOString();
 
   const { data: pastSessionsRaw, error: pastError } = await admin
     .from('sessions')
@@ -118,9 +127,11 @@ export default async function CoachEarningsPage() {
     .limit(10);
 
   const projectedEarnings = (upcomingSessions ?? []).reduce((sum, s) => {
-    const rate = s.session_payout_rate ?? payoutRate;
+    const rate = normalizeCoachRevenueShareRate(
+      s.session_payout_rate != null ? Number(s.session_payout_rate) : payoutRate
+    );
     const totalPrice = Number(s.total_price || 0);
-    return sum + totalPrice * Number(rate);
+    return sum + totalPrice * rate;
   }, 0);
 
   return (
@@ -130,13 +141,19 @@ export default async function CoachEarningsPage() {
         <div className="text-right">
           <p className="text-sm text-muted-foreground">Your rate</p>
           <p className="font-semibold text-foreground">
-            {Math.round(payoutRate * 100)}%
+            {payoutPercentDisplay}%
             {payoutRate >= 0.9 && (
               <span className="ml-1 text-xs text-[#D4AF37] font-medium">(Founding Coach)</span>
             )}
           </p>
         </div>
       </div>
+
+      {!(userData?.role === 'admin' && !viewAsCoachId) ? (
+        <div className="mb-6">
+          <CoachRankCard coachId={coachId} topSessionsListSize={5} />
+        </div>
+      ) : null}
 
       {userData?.role === 'admin' && !viewAsCoachId && (
         <p className="text-sm text-muted-foreground mb-4 rounded-md border border-border bg-muted/30 px-3 py-2">
@@ -189,10 +206,11 @@ export default async function CoachEarningsPage() {
       <Card className="mb-6">
         <CardContent className="p-4">
           <p className="text-sm text-muted-foreground">
-            Your payout rate: <span className="font-medium text-foreground">{(Number(payoutRate) * 100).toFixed(0)}%</span>
+            Your payout rate:{' '}
+            <span className="font-medium text-foreground">{payoutPercentDisplay}%</span>
           </p>
           <p className="text-xs text-muted-foreground mt-1">
-            You earn {(Number(payoutRate) * 100).toFixed(0)}% of each session&apos;s total price after payment processing.
+            You earn {payoutPercentDisplay}% of each session&apos;s total price after payment processing.
           </p>
         </CardContent>
       </Card>

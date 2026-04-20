@@ -7,7 +7,7 @@
  *   coach share = that total × rate (default 80% via `COACH_REVENUE_FRACTION`; overrides on `session_payout_rate` / `athletes.payout_rate`).
  * - Otherwise estimate from roster: list price per slot × participants × coach share.
  */
-import { COACH_REVENUE_FRACTION } from '@/lib/pricing';
+import { COACH_REVENUE_FRACTION, normalizeCoachRevenueShareRate } from '@/lib/pricing';
 
 export type SessionCoachPayoutFields = {
   athlete_payment?: number | null;
@@ -27,13 +27,13 @@ export function resolveCoachPayoutRate(
   explicitRate?: number
 ): number {
   if (explicitRate != null && !Number.isNaN(Number(explicitRate))) {
-    return Number(explicitRate);
+    return normalizeCoachRevenueShareRate(Number(explicitRate));
   }
   if (session.session_payout_rate != null && !Number.isNaN(Number(session.session_payout_rate))) {
-    return Number(session.session_payout_rate);
+    return normalizeCoachRevenueShareRate(Number(session.session_payout_rate));
   }
   if (session.coach_payout_rate != null && !Number.isNaN(Number(session.coach_payout_rate))) {
-    return Number(session.coach_payout_rate);
+    return normalizeCoachRevenueShareRate(Number(session.coach_payout_rate));
   }
   return COACH_REVENUE_FRACTION;
 }
