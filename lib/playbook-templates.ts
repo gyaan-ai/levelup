@@ -12,7 +12,8 @@ export type PlaybookActionType =
   | 'post_session_athlete'
   | 'post_session_parent'
   | 'review_request'
-  | 'birthday';
+  | 'birthday'
+  | 'birthday_parent';
 
 export interface MessageTemplate {
   type: PlaybookActionType;
@@ -68,7 +69,7 @@ export const PLAYBOOK_TEMPLATES: MessageTemplate[] = [
     type: 'post_session_parent',
     label: 'Follow-up Parent',
     recipient: 'parent',
-    template: `Hi [Parent]! [Athlete] did great today. We worked on [techniques]. Happy to answer any questions. Looking forward to the next session!`,
+    template: `Hi [Parent]! [Athlete] did great today. Happy to answer any questions or help book the next session. Looking forward to more work on the mat!`,
   },
 
   // Review request
@@ -85,6 +86,12 @@ export const PLAYBOOK_TEMPLATES: MessageTemplate[] = [
     label: 'Happy Birthday',
     recipient: 'athlete',
     template: `Happy Birthday [Athlete]! Hope you have an awesome day. Looking forward to seeing you on the mat soon!`,
+  },
+  {
+    type: 'birthday_parent',
+    label: 'Birthday (parent)',
+    recipient: 'parent',
+    template: `Hi [Parent]! Please wish [Athlete] a happy birthday from Coach [Coach] — hope they have a great day. See you on the mat soon!`,
   },
 ];
 

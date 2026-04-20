@@ -96,7 +96,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       } else if (target === 'broadcast:both') {
         hint = 'No phone numbers found. Parents or athletes need cell numbers on file.';
       } else if (target === 'broadcast:parents') {
-        hint = 'No parent phone numbers on file. Parents need a cell on their account or athlete profile.';
+        hint =
+          'No parent numbers resolved. Parents should add a cell on their account (Account); athlete profile cell is only a fallback.';
       }
       return NextResponse.json({ error: hint, target, ...result }, { status: 400 });
     }

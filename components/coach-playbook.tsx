@@ -58,6 +58,7 @@ interface PlaybookData {
     phone: string | null;
     date_of_birth: string;
     wished: boolean;
+    parent?: { id: string; first_name: string; last_name: string; phone: string | null } | null;
   }>;
 }
 
@@ -67,12 +68,20 @@ interface TextButtonProps {
   onAction: () => void;
   actioned: boolean;
   loading?: boolean;
+  /** Parents drive booking — shown first and highlighted. */
+  audience?: 'parent' | 'athlete';
 }
 
-function TextButton({ phone, message, onAction, actioned, loading }: TextButtonProps) {
+function TextButton({ phone, message, onAction, actioned, loading, audience = 'athlete' }: TextButtonProps) {
   const [sent, setSent] = useState(actioned);
 
-  if (!phone) return <span className="text-xs text-muted-foreground">No phone</span>;
+  if (!phone) {
+    return (
+      <span className="text-xs text-muted-foreground whitespace-nowrap">
+        {audience === 'parent' ? 'No parent phone' : 'No athlete phone'}
+      </span>
+    );
+  }
 
   const handleClick = () => {
     const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
@@ -102,20 +111,26 @@ function TextButton({ phone, message, onAction, actioned, loading }: TextButtonP
     );
   }
 
+  const isParent = audience === 'parent';
+
   return (
     <Button
-      variant="outline"
+      variant={isParent ? 'default' : 'outline'}
       size="sm"
       onClick={handleClick}
       disabled={loading}
-      className="h-8 min-h-[44px] touch-manipulation"
+      className={
+        isParent
+          ? 'h-8 min-h-[44px] touch-manipulation bg-[#D4AF37] hover:bg-[#c9a432] text-black border-0'
+          : 'h-8 min-h-[44px] touch-manipulation'
+      }
     >
       {loading ? (
         <Loader2 className="h-4 w-4 animate-spin" />
       ) : (
         <>
           <MessageSquare className="h-4 w-4 mr-1" />
-          Text
+          {isParent ? 'Text parent' : 'Text athlete'}
         </>
       )}
     </Button>
@@ -196,6 +211,10 @@ export function CoachPlaybook() {
             {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
           </Button>
         </div>
+        <p className="text-xs text-muted-foreground mt-2 max-w-xl">
+          Text <span className="font-medium text-foreground/90">parents</span> first when you can — they usually drive
+          scheduling and rebooks.
+        </p>
       </CardHeader>
 
       {expanded && (
@@ -248,17 +267,19 @@ export function CoachPlaybook() {
                           {session?.scheduled_datetime && formatEST(new Date(session.scheduled_datetime), 'EEE, MMM d')}
                         </p>
                       </div>
-                      <div className="flex gap-1 shrink-0">
+                      <div className="flex flex-wrap gap-1 shrink-0 justify-end">
                         <TextButton
-                          phone={athlete?.phone ?? null}
-                          message={athleteMsg}
-                          onAction={() => recordAction(booking.session_id, booking.id, 'athlete', athlete?.id ?? null, 'welcome')}
-                          actioned={booking.welcomed}
-                        />
-                        <TextButton
+                          audience="parent"
                           phone={parent?.phone ?? null}
                           message={parentMsg}
                           onAction={() => recordAction(booking.session_id, booking.id, 'parent', parent?.id ?? null, 'welcome')}
+                          actioned={booking.welcomed}
+                        />
+                        <TextButton
+                          audience="athlete"
+                          phone={athlete?.phone ?? null}
+                          message={athleteMsg}
+                          onAction={() => recordAction(booking.session_id, booking.id, 'athlete', athlete?.id ?? null, 'welcome')}
                           actioned={booking.welcomed}
                         />
                       </div>
@@ -293,23 +314,40 @@ export function CoachPlaybook() {
                           {formatEST(new Date(session.scheduled_datetime), 'h:mm a')} at {facility?.name ?? 'TBD'}
                         </p>
                       </div>
-                      <div className="flex gap-1 shrink-0">
-                        {regs.slice(0, 2).map(reg => {
+                      <div className="flex flex-col gap-1.5 items-end shrink-0">
+                        {regs.map((reg) => {
                           const athlete = Array.isArray(reg.youth_wrestlers) ? reg.youth_wrestlers[0] : reg.youth_wrestlers;
-                          const msg = fillTemplate(getTemplate('pre_session_athlete')?.template || '', {
+                          const parent = Array.isArray(reg.users) ? reg.users[0] : reg.users;
+                          const athleteMsg = fillTemplate(getTemplate('pre_session_athlete')?.template || '', {
                             athleteName: athlete?.first_name ?? 'there',
                             coachName,
                             time: formatEST(new Date(session.scheduled_datetime), 'h:mm a'),
                             facility: facility?.name ?? '',
                           });
+                          const parentMsg = fillTemplate(getTemplate('pre_session_parent')?.template || '', {
+                            parentName: parent?.first_name ?? 'there',
+                            athleteName: athlete?.first_name ?? 'your athlete',
+                            coachName,
+                            time: formatEST(new Date(session.scheduled_datetime), 'h:mm a'),
+                            facility: facility?.name ?? '',
+                          });
                           return (
-                            <TextButton
-                              key={reg.id}
-                              phone={athlete?.phone ?? null}
-                              message={msg}
-                              onAction={() => recordAction(session.id, reg.id, 'athlete', athlete?.id ?? null, 'pre_session')}
-                              actioned={session.reminded}
-                            />
+                            <div key={reg.id} className="flex flex-wrap gap-1 justify-end">
+                              <TextButton
+                                audience="parent"
+                                phone={parent?.phone ?? null}
+                                message={parentMsg}
+                                onAction={() => recordAction(session.id, reg.id, 'parent', parent?.id ?? null, 'pre_session')}
+                                actioned={session.reminded}
+                              />
+                              <TextButton
+                                audience="athlete"
+                                phone={athlete?.phone ?? null}
+                                message={athleteMsg}
+                                onAction={() => recordAction(session.id, reg.id, 'athlete', athlete?.id ?? null, 'pre_session')}
+                                actioned={session.reminded}
+                              />
+                            </div>
                           );
                         })}
                       </div>
@@ -343,21 +381,36 @@ export function CoachPlaybook() {
                           {formatEST(new Date(session.scheduled_datetime), 'EEE, MMM d')}
                         </p>
                       </div>
-                      <div className="flex gap-1 shrink-0">
-                        {regs.slice(0, 2).map(reg => {
+                      <div className="flex flex-col gap-1.5 items-end shrink-0">
+                        {regs.map((reg) => {
                           const athlete = Array.isArray(reg.youth_wrestlers) ? reg.youth_wrestlers[0] : reg.youth_wrestlers;
-                          const msg = fillTemplate(getTemplate('post_session_athlete')?.template || '', {
+                          const parent = Array.isArray(reg.users) ? reg.users[0] : reg.users;
+                          const athleteMsg = fillTemplate(getTemplate('post_session_athlete')?.template || '', {
                             athleteName: athlete?.first_name ?? 'there',
                             coachName,
                           });
+                          const parentMsg = fillTemplate(getTemplate('post_session_parent')?.template || '', {
+                            parentName: parent?.first_name ?? 'there',
+                            athleteName: athlete?.first_name ?? 'your athlete',
+                            coachName,
+                          });
                           return (
-                            <TextButton
-                              key={reg.id}
-                              phone={athlete?.phone ?? null}
-                              message={msg}
-                              onAction={() => recordAction(session.id, reg.id, 'athlete', athlete?.id ?? null, 'post_session')}
-                              actioned={session.followedUp}
-                            />
+                            <div key={reg.id} className="flex flex-wrap gap-1 justify-end">
+                              <TextButton
+                                audience="parent"
+                                phone={parent?.phone ?? null}
+                                message={parentMsg}
+                                onAction={() => recordAction(session.id, reg.id, 'parent', parent?.id ?? null, 'post_session')}
+                                actioned={session.followedUp}
+                              />
+                              <TextButton
+                                audience="athlete"
+                                phone={athlete?.phone ?? null}
+                                message={athleteMsg}
+                                onAction={() => recordAction(session.id, reg.id, 'athlete', athlete?.id ?? null, 'post_session')}
+                                actioned={session.followedUp}
+                              />
+                            </div>
                           );
                         })}
                       </div>
@@ -378,7 +431,13 @@ export function CoachPlaybook() {
               <div className="space-y-2">
                 {data.upcomingBirthdays.filter(b => !b.wished).map(athlete => {
                   const days = daysUntilBirthday(athlete.date_of_birth);
-                  const msg = fillTemplate(getTemplate('birthday')?.template || '', {
+                  const parent = athlete.parent;
+                  const athleteMsg = fillTemplate(getTemplate('birthday')?.template || '', {
+                    athleteName: athlete.first_name,
+                    coachName,
+                  });
+                  const parentMsg = fillTemplate(getTemplate('birthday_parent')?.template || '', {
+                    parentName: parent?.first_name ?? 'there',
                     athleteName: athlete.first_name,
                     coachName,
                   });
@@ -396,12 +455,22 @@ export function CoachPlaybook() {
                           {days === 0 ? "Today!" : days === 1 ? "Tomorrow" : `In ${days} days`}
                         </p>
                       </div>
-                      <TextButton
-                        phone={athlete.phone}
-                        message={msg}
-                        onAction={() => recordAction(null, null, 'athlete', athlete.id, 'birthday')}
-                        actioned={athlete.wished}
-                      />
+                      <div className="flex flex-wrap gap-1 shrink-0 justify-end">
+                        <TextButton
+                          audience="parent"
+                          phone={parent?.phone ?? null}
+                          message={parentMsg}
+                          onAction={() => recordAction(null, null, 'parent', parent?.id ?? null, 'birthday')}
+                          actioned={athlete.wished}
+                        />
+                        <TextButton
+                          audience="athlete"
+                          phone={athlete.phone}
+                          message={athleteMsg}
+                          onAction={() => recordAction(null, null, 'athlete', athlete.id, 'birthday')}
+                          actioned={athlete.wished}
+                        />
+                      </div>
                     </div>
                   );
                 })}

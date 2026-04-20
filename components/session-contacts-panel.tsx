@@ -91,7 +91,6 @@ export function SessionContactsPanel({ sessionId, participantCount = 0, classNam
 
               return (
                 <div key={contact.participantId} className="bg-muted/50 rounded-lg p-3 space-y-1">
-                  {/* Athlete info */}
                   {athlete && (
                     <>
                       <div className="flex items-center justify-between">
@@ -104,8 +103,6 @@ export function SessionContactsPanel({ sessionId, participantCount = 0, classNam
                           )}
                         </span>
                       </div>
-                      
-                      {/* Birthday display */}
                       {birthdayDisplay && (
                         <div className={cn(
                           'flex items-center gap-1.5 text-xs',
@@ -115,24 +112,25 @@ export function SessionContactsPanel({ sessionId, participantCount = 0, classNam
                           {birthdayDisplay}
                         </div>
                       )}
-
-                      {/* Athlete phone */}
-                      {athlete.phone && (
-                        <ContactInfoRow
-                          label="Athlete"
-                          phone={athlete.phone}
-                        />
-                      )}
                     </>
                   )}
 
-                  {/* Parent info */}
                   {parent && parent.phone && (
                     <ContactInfoRow
                       label="Parent"
                       name={`${parent.firstName} ${parent.lastName}`}
                       phone={parent.phone}
                     />
+                  )}
+
+                  {athlete?.phone && (
+                    <ContactInfoRow label="Athlete" phone={athlete.phone} />
+                  )}
+
+                  {parent?.phone && athlete?.phone && (
+                    <p className="text-[10px] text-muted-foreground pt-1">
+                      Prefer texting the parent for scheduling and rebooks when both numbers are listed.
+                    </p>
                   )}
                 </div>
               );

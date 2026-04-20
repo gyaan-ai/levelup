@@ -167,9 +167,9 @@ export function CoachTextGroupDialog({ sessionId, open, onOpenChange, sessionLab
     options.filter((o) => o.group === 'everyone').length > 0
       ? options.filter((o) => o.group === 'everyone')
       : [
-          { value: 'broadcast:parents', label: 'All parents', group: 'everyone' as const },
-          { value: 'broadcast:athletes', label: 'All athletes', group: 'everyone' as const },
-          { value: 'broadcast:both', label: 'Everyone (parents + athletes, deduped)', group: 'everyone' as const },
+          { value: 'broadcast:parents', label: 'All parents (recommended)', group: 'everyone' as const },
+          { value: 'broadcast:athletes', label: 'All athletes (wrestler cells only)', group: 'everyone' as const },
+          { value: 'broadcast:both', label: 'Parents + athletes (deduped)', group: 'everyone' as const },
         ];
   const individualOpts = options.filter((o) => o.group === 'individual');
 
@@ -177,18 +177,18 @@ export function CoachTextGroupDialog({ sessionId, open, onOpenChange, sessionLab
     target.startsWith('parent:') || target.startsWith('athlete:')
       ? 'Sends one SMS to that person’s number on file.'
       : target === 'broadcast:athletes'
-        ? 'Athlete cell on each wrestler profile only.'
+        ? 'Athlete cells on wrestler profiles only — use for mat-day logistics, not booking.'
         : target === 'broadcast:both'
           ? 'Parents + athletes — one SMS per unique number.'
-          : 'Parent accounts (or athlete cell as fallback).';
+          : 'Parent account cells first (recommended for booking); athlete cell only if parent has none.';
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
+            <DialogTitle className="flex items-center gap-2">
             <Smartphone className="h-5 w-5 text-accent" />
-            Text the group
+            Text families
           </DialogTitle>
           <DialogDescription className="text-left space-y-2">
             <span className="block text-foreground/90">{sessionLabel}</span>
@@ -268,22 +268,22 @@ export function CoachTextGroupDialog({ sessionId, open, onOpenChange, sessionLab
                       variant="secondary"
                       size="sm"
                       className="justify-start min-h-[44px]"
-                      disabled={!phones.commaAll}
-                      onClick={() => copyPhones('all', phones.commaAll)}
+                      disabled={!phones.commaParents}
+                      onClick={() => copyPhones('parents', phones.commaParents)}
                     >
                       <Copy className="h-4 w-4 mr-2 shrink-0" />
-                      {copiedKind === 'all' ? 'Copied!' : 'Copy all Cell #s (deduped)'}
+                      {copiedKind === 'parents' ? 'Copied!' : 'Copy parent Cell #s (recommended)'}
                     </Button>
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
                       className="justify-start min-h-[44px]"
-                      disabled={!phones.commaParents}
-                      onClick={() => copyPhones('parents', phones.commaParents)}
+                      disabled={!phones.commaAll}
+                      onClick={() => copyPhones('all', phones.commaAll)}
                     >
                       <Copy className="h-4 w-4 mr-2 shrink-0" />
-                      {copiedKind === 'parents' ? 'Copied!' : 'Copy parent Cell #s only'}
+                      {copiedKind === 'all' ? 'Copied!' : 'Copy all #s (one line per signup)'}
                     </Button>
                     <Button
                       type="button"
@@ -297,9 +297,10 @@ export function CoachTextGroupDialog({ sessionId, open, onOpenChange, sessionLab
                       {copiedKind === 'athletes' ? 'Copied!' : 'Copy athlete Cell #s only'}
                     </Button>
                   </div>
-                  {!phones.commaAll && (
+                  {!phones.commaParents && !phones.commaAthletes && (
                     <p className="text-xs text-amber-700 dark:text-amber-300">
-                      No cells on file for this session — add numbers on parent accounts or athlete profiles.
+                      No cells on file — parents should add a cell on their account (best for coach texts); athlete
+                      profile is a fallback.
                     </p>
                   )}
                   {(phones.skippedParents > 0 || phones.skippedAthletes > 0) && phones.commaAll && (

@@ -23,6 +23,8 @@ import { getSchoolBadgeColors, schoolBadgeClassName } from '@/lib/school-logos';
 import { summarizeWeeklyAvailability, type WeeklyAvailabilityRow } from '@/lib/availability';
 import { GUILD_COACH_PROFILE_RATES } from '@/lib/coach-session-pricing';
 import { IN_APP_MESSAGING_PAUSED_MESSAGE } from '@/lib/in-app-messaging';
+import { ContactInfoRow } from '@/components/contact-info-row';
+import { hasMinPhoneDigits } from '@/lib/phone';
 
 function CoachProfileUnavailable() {
   return (
@@ -184,6 +186,13 @@ export default async function AthleteProfilePage({
     .order('scheduled_datetime', { ascending: true })
     .limit(5);
 
+  let coachPhoneForContact: string | null = null;
+  if (canInteractAsParentOrAdmin) {
+    const { data: coachUserRow } = await admin.from('users').select('phone').eq('id', id).maybeSingle();
+    const raw = (coachUserRow as { phone?: string | null } | null)?.phone;
+    coachPhoneForContact = raw && hasMinPhoneDigits(raw) ? raw : null;
+  }
+
   return (
     <div className="container mx-auto px-4 py-8 max-w-5xl">
       <div className="mb-6">
@@ -306,6 +315,14 @@ export default async function AthleteProfilePage({
                 {canInteractAsParentOrAdmin && (
                   <>
                     <p className="text-sm text-muted-foreground max-w-lg">{IN_APP_MESSAGING_PAUSED_MESSAGE}</p>
+                    {coachPhoneForContact ? (
+                      <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 max-w-lg">
+                        <ContactInfoRow label="Coach cell" name={athlete.first_name} phone={coachPhoneForContact} />
+                        <p className="text-xs text-muted-foreground mt-2">
+                          On your phone, use the message icon to open your texting app.
+                        </p>
+                      </div>
+                    ) : null}
                     <p className="text-sm text-muted-foreground">
                       <Link href={`/coach/${athlete.id}`} className="text-accent font-medium underline">
                         Open public schedule

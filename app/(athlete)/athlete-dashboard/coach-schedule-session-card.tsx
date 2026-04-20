@@ -339,7 +339,7 @@ export function CoachScheduleSessionCard({ session, payoutRate, coachDisplayName
           disabled={nRegistered === 0}
         >
           <MessageCircle className="h-4 w-4 mr-2 shrink-0" />
-          Text
+          Text parents
         </Button>
         <Button
           type="button"
@@ -367,6 +367,9 @@ export function CoachScheduleSessionCard({ session, payoutRate, coachDisplayName
           onClick={(e) => e.stopPropagation()}
         >
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Contact info</p>
+          <p className="text-xs text-muted-foreground">
+            Text the <span className="font-medium text-foreground/90">parent</span> first when possible — they usually handle booking and follow-up.
+          </p>
           {contactsLoading ? (
             <div className="flex justify-center py-4">
               <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
@@ -381,12 +384,9 @@ export function CoachScheduleSessionCard({ session, payoutRate, coachDisplayName
               return (
                 <div key={c.participantId} className="rounded-lg border border-border/80 bg-background/80 p-3 space-y-2">
                   {athlete && (
-                    <>
-                      <p className="font-medium text-sm text-foreground">
-                        {athlete.firstName} {athlete.lastName}
-                      </p>
-                      {athlete.phone && <ContactInfoRow label="Athlete" phone={athlete.phone} />}
-                    </>
+                    <p className="font-medium text-sm text-foreground">
+                      {athlete.firstName} {athlete.lastName}
+                    </p>
                   )}
                   {parent && (
                     <>
@@ -398,6 +398,7 @@ export function CoachScheduleSessionCard({ session, payoutRate, coachDisplayName
                       )}
                     </>
                   )}
+                  {athlete?.phone && <ContactInfoRow label="Athlete" phone={athlete.phone} />}
                 </div>
               );
             })

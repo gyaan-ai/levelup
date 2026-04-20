@@ -147,12 +147,19 @@ export async function GET() {
     .from('session_registrations')
     .select(`
       youth_wrestler_id,
+      parent_id,
       youth_wrestlers (
         id,
         first_name,
         last_name,
         phone,
         date_of_birth
+      ),
+      users (
+        id,
+        first_name,
+        last_name,
+        phone
       )
     `)
     .eq('status', 'confirmed')
@@ -174,9 +181,12 @@ export async function GET() {
     })
     .map(reg => {
       const athlete = Array.isArray(reg.youth_wrestlers) ? reg.youth_wrestlers[0] : reg.youth_wrestlers;
-      return athlete;
+      const parent = Array.isArray(reg.users) ? reg.users[0] : reg.users;
+      if (!athlete) return null;
+      return { ...athlete, parent };
     })
-    .filter((v, i, a) => a.findIndex(t => t?.id === v?.id) === i); // Dedupe
+    .filter((v): v is NonNullable<typeof v> => v != null)
+    .filter((v, i, a) => a.findIndex(t => t?.id === v.id) === i); // Dedupe by athlete
 
   // Get existing playbook actions to mark what's been done
   const { data: existingActions } = await supabase

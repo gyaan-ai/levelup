@@ -57,9 +57,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
     type Opt = { value: string; label: string; group: 'everyone' | 'individual' };
     const options: Opt[] = [
-      { value: 'broadcast:parents', label: 'All parents', group: 'everyone' },
-      { value: 'broadcast:athletes', label: 'All athletes', group: 'everyone' },
-      { value: 'broadcast:both', label: 'Everyone (parents + athletes, deduped)', group: 'everyone' },
+      { value: 'broadcast:parents', label: 'All parents (recommended)', group: 'everyone' },
+      { value: 'broadcast:athletes', label: 'All athletes (wrestler cells only)', group: 'everyone' },
+      { value: 'broadcast:both', label: 'Parents + athletes (deduped numbers)', group: 'everyone' },
     ];
 
     const parentIds = [...new Set(rows.map((r) => r.parent_id as string).filter(Boolean))];
