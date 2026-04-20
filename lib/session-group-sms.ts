@@ -8,15 +8,23 @@ type Admin = SupabaseClient;
 export type SmsAudience = 'parents' | 'athletes' | 'both';
 
 /**
+ * Parent account only (`users.phone`). No athlete cell — use for coach “text parents” paste/SMS.
+ */
+export async function resolveParentAccountSmsPhone(admin: Admin, parentId: string): Promise<string | null> {
+  const { data: u } = await admin.from('users').select('phone').eq('id', parentId).maybeSingle();
+  return normalizePhone(u?.phone ?? undefined);
+}
+
+/**
  * Resolve SMS for a parent: users.phone first, then athlete cell on youth_wrestlers (fallback).
+ * Prefer this for automated sends when reaching someone is more important than strict parent-only.
  */
 export async function resolveParentSmsPhone(
   admin: Admin,
   parentId: string,
   youthWrestlerId: string | null
 ): Promise<string | null> {
-  const { data: u } = await admin.from('users').select('phone').eq('id', parentId).maybeSingle();
-  const up = normalizePhone(u?.phone ?? undefined);
+  const up = await resolveParentAccountSmsPhone(admin, parentId);
   if (up) return up;
   if (youthWrestlerId) {
     const { data: yw } = await admin.from('youth_wrestlers').select('phone').eq('id', youthWrestlerId).maybeSingle();
@@ -252,9 +260,7 @@ export async function getSessionSmsPhonesForPersonalText(
   const parentRows: SessionSmsPhoneRow[] = [];
   let skippedParents = 0;
   for (const pid of parentIds) {
-    const first = rows.find((r) => r.parent_id === pid);
-    const ywId = (first as { youth_wrestler_id?: string | null } | undefined)?.youth_wrestler_id ?? null;
-    const phone = await resolveParentSmsPhone(admin, pid, ywId);
+    const phone = await resolveParentAccountSmsPhone(admin, pid);
     if (!phone) {
       skippedParents += 1;
       continue;
@@ -294,17 +300,15 @@ export async function getSessionSmsPhonesForPersonalText(
   const commaAthletes = [...new Set(athleteRows.map((r) => r.phone))].map(fmt).join(sep);
 
   /**
-   * "Copy all" for Messages: one line per **session_participant** row using the same phone rule
-   * as SMS to parents (`resolveParentSmsPhone`). Repeats the same formatted number when one parent
-   * has multiple kids on the session (intentional — some paste targets need one line per kid).
-   * Do **not** dedupe by E.164 here — that collapsed multiple families to a single line when numbers matched.
+   * "Copy all" / coach Text parents: one line per **session_participant** using parent account phone
+   * only (`resolveParentAccountSmsPhone` — no athlete cell fallback). Repeats when one parent has
+   * multiple kids on the session. Do **not** dedupe by E.164 here.
    */
   const linesPerParticipant: string[] = [];
   for (const r of rows) {
     const pid = r.parent_id as string | undefined;
-    const ywid = (r as { youth_wrestler_id?: string | null }).youth_wrestler_id ?? null;
     if (!pid) continue;
-    const phone = await resolveParentSmsPhone(admin, pid, ywid);
+    const phone = await resolveParentAccountSmsPhone(admin, pid);
     if (!phone) continue;
     linesPerParticipant.push(fmt(phone));
   }
