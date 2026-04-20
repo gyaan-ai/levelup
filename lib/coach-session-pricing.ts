@@ -52,11 +52,17 @@ export async function getCoachDisplayedParentRates(
   const fromServices: Partial<Record<CoachCreateSessionType, number>> = {};
 
   for (const t of types) {
-    const matching = (rows ?? []).filter((r) => (r as { session_type: string }).session_type === t);
-    if (matching.length === 0) continue;
-    const hour = matching.filter((r) => (r as { duration_minutes: number }).duration_minutes === 60);
-    const pool = hour.length > 0 ? hour : matching;
-    fromServices[t] = Math.min(...pool.map((r) => Number((r as { parent_price: unknown }).parent_price)));
+    // Public profile shows the 1-hour tier only. Using Math.min across all durations
+    // surfaced stale rows (e.g. legacy $45 partner on a shorter duration) over the 60m rate.
+    const hourOnly = (rows ?? []).filter(
+      (r) =>
+        (r as { session_type: string }).session_type === t &&
+        (r as { duration_minutes: number }).duration_minutes === 60
+    );
+    if (hourOnly.length === 0) continue;
+    fromServices[t] = Math.min(
+      ...hourOnly.map((r) => Number((r as { parent_price: unknown }).parent_price))
+    );
   }
 
   const productFallback = await getRecommendedPricesForCoach(admin, athleteId);
