@@ -33,6 +33,21 @@ import { IN_APP_MESSAGING_ENABLED } from '@/lib/in-app-messaging';
 
 type Coach = { id: string; first_name: string; last_name: string; school: string | null };
 
+/** Mobile Log in / Book strip: omit on home (hero CTAs) and auth flows (redundant with page). */
+function showLoggedOutMobileQuickBar(pathname: string): boolean {
+  if (pathname === '/') return false;
+  if (
+    pathname.startsWith('/login') ||
+    pathname.startsWith('/signup') ||
+    pathname.startsWith('/forgot-password') ||
+    pathname.startsWith('/reset-password') ||
+    pathname.startsWith('/invite-parent')
+  ) {
+    return false;
+  }
+  return true;
+}
+
 export function Header() {
   const tenant = useTenant();
   const pathname = usePathname();
@@ -110,7 +125,7 @@ export function Header() {
     <>
       <header className="bg-primary text-white border-b border-accent/20 sticky top-0 z-50 pt-[env(safe-area-inset-top,0px)]">
       {/* Mobile logged-out quick actions */}
-      {!user && pathname !== '/' && (
+      {!user && showLoggedOutMobileQuickBar(pathname) && (
         <div className="md:hidden bg-accent px-4 py-2">
           <div className="flex items-center gap-2">
             <Button asChild variant="secondary" size="sm" className="flex-1 bg-black text-white hover:bg-black/90">
