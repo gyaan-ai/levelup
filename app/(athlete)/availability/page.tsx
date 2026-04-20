@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { BackLink } from '@/components/back-link';
+import { CoachProfileAvailabilitySection } from '@/components/coach-profile-availability-section';
 import { AvailabilityManager } from './availability-manager';
 
 export default async function AvailabilityPage() {
@@ -35,12 +36,14 @@ export default async function AvailabilityPage() {
       </div>
       <Card className="mb-6">
         <CardHeader>
-          <CardTitle>When can you coach?</CardTitle>
+          <CardTitle>Your coaching calendar</CardTitle>
           <CardDescription>
-            Add the times you are free. Parents can only book when you add slots. More times = more bookings.
+            Set your <strong>weekly template</strong> once, tap <strong>Quick fill</strong> to roll it into the next two
+            weeks, then fine-tune single days below. Parents only see times you add here.
           </CardDescription>
         </CardHeader>
       </Card>
+      <CoachProfileAvailabilitySection embedInAvailabilityHub />
       <AvailabilityManager />
     </div>
   );

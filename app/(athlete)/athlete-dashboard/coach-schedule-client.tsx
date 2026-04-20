@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CalendarPlus, Check, Loader2, X } from 'lucide-react';
+import { CalendarClock, CalendarPlus, Check, Loader2, X } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -228,15 +228,23 @@ export function CoachScheduleClient({
             {coachFirstName ? `Hey ${coachFirstName}` : 'Your sessions'} — who&apos;s booked, what&apos;s pending.
           </p>
         </div>
-        <Button
-          asChild
-          className="min-h-[44px] touch-manipulation bg-[#D4AF37] hover:bg-[#c9a432] text-black font-semibold shrink-0 w-full sm:w-auto"
-        >
-          <Link href="/coach-sessions/create">
-            <CalendarPlus className="h-4 w-4 mr-2" />
-            Create
-          </Link>
-        </Button>
+        <div className="flex flex-col gap-2 w-full sm:w-auto sm:flex-row sm:shrink-0">
+          <Button
+            asChild
+            className="min-h-[44px] touch-manipulation bg-[#D4AF37] hover:bg-[#c9a432] text-black font-semibold w-full sm:w-auto"
+          >
+            <Link href="/coach-sessions/create">
+              <CalendarPlus className="h-4 w-4 mr-2 shrink-0" />
+              Create session
+            </Link>
+          </Button>
+          <Button variant="outline" asChild className="min-h-[44px] touch-manipulation w-full sm:w-auto border-[#D4AF37]/50">
+            <Link href="/availability">
+              <CalendarClock className="h-4 w-4 mr-2 shrink-0" />
+              Update openings
+            </Link>
+          </Button>
+        </div>
       </div>
 
       {today.length > 0 && (

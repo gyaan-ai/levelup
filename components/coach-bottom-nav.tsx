@@ -20,7 +20,7 @@ const ITEMS: readonly {
   },
   {
     href: '/coach-sessions/create',
-    label: 'Create',
+    label: 'New session',
     icon: CirclePlus,
     match: (p) => p === '/coach-sessions/create' || p.startsWith('/coach-sessions/create/'),
   },

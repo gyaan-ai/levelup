@@ -13,7 +13,13 @@ type BlockRow = { id: string; blocked_date: string; reason: string | null };
 
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
 
-export function CoachProfileAvailabilitySection() {
+type CoachAvailSectionProps = {
+  /** When true, copy references Quick fill on the same page. */
+  embedInAvailabilityHub?: boolean;
+};
+
+export function CoachProfileAvailabilitySection(props: CoachAvailSectionProps = {}) {
+  const { embedInAvailabilityHub = false } = props;
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -130,12 +136,21 @@ export function CoachProfileAvailabilitySection() {
       <CardHeader>
         <CardTitle>Availability</CardTitle>
         <CardDescription>
-          Weekly hours (Eastern) tell parents when they can request private or partner sessions. Date-specific openings
-          are still managed on{' '}
-          <Link href="/availability" className="text-accent font-medium underline">
-            the calendar page
-          </Link>
-          .
+          {embedInAvailabilityHub ? (
+            <>
+              Weekly template (Eastern) for private and partner requests. Use <strong>Quick fill</strong> below to copy
+              these hours onto the next two weeks, then tweak individual days if needed.
+            </>
+          ) : (
+            <>
+              Weekly hours (Eastern) tell parents when they can request private or partner sessions. Date-specific
+              openings are on{' '}
+              <Link href="/availability" className="text-accent font-medium underline">
+                the calendar page
+              </Link>
+              .
+            </>
+          )}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">

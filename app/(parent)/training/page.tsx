@@ -1,10 +1,12 @@
 import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
+import { addDays, parseISO } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
-import { APP_TIMEZONE } from '@/lib/format-date';
+import { APP_TIMEZONE, formatEST } from '@/lib/format-date';
+import type { CoachDateFilterData } from '@/lib/training-coach-date-filter';
 import { Athlete } from '@/types';
 import { TrainingClient } from './training-client';
 import {
@@ -134,6 +136,89 @@ export default async function TrainingPage({
     name: f.name,
   }));
 
+  /** Coaches tab: optional date filter (Eastern calendar) — next ~120 days of index data. */
+  const nowIso = new Date().toISOString();
+  const todayEastern = formatEST(new Date(), 'yyyy-MM-dd');
+  const coachDateHorizonEnd = formatEST(addDays(parseISO(todayEastern), 120), 'yyyy-MM-dd');
+  const horizonUtcEnd = new Date(Date.now() + 130 * 86400000).toISOString();
+
+  const { data: pubSessionsForDateFilter } = athleteIds.length
+    ? await supabase
+        .from('sessions')
+        .select(
+          `athlete_id, scheduled_datetime, join_policy, status, current_participants, max_participants, session_participants(id)`
+        )
+        .in('athlete_id', athleteIds)
+        .eq('join_policy', 'public')
+        .in('status', ['scheduled', 'pending_payment'])
+        .gte('scheduled_datetime', nowIso)
+        .lte('scheduled_datetime', horizonUtcEnd)
+    : { data: [] };
+
+  const openPublicCoachIdsByDate: Record<string, string[]> = {};
+  const pubDateSets = new Map<string, Set<string>>();
+  for (const row of pubSessionsForDateFilter ?? []) {
+    if (!isSessionOpenForParentBrowse(row as Parameters<typeof isSessionOpenForParentBrowse>[0])) continue;
+    const r = row as { athlete_id: string; scheduled_datetime: string };
+    const dateKey = formatEST(r.scheduled_datetime, 'yyyy-MM-dd');
+    if (dateKey < todayEastern || dateKey > coachDateHorizonEnd) continue;
+    if (!pubDateSets.has(dateKey)) pubDateSets.set(dateKey, new Set());
+    pubDateSets.get(dateKey)!.add(r.athlete_id);
+  }
+  for (const [k, set] of pubDateSets) openPublicCoachIdsByDate[k] = [...set];
+
+  const { data: weeklyAvailRows } = athleteIds.length
+    ? await supabase.from('athlete_availability').select('athlete_id, day_of_week').in('athlete_id', athleteIds)
+    : { data: [] };
+  const weeklyDowByCoach: Record<string, number[]> = {};
+  for (const r of weeklyAvailRows ?? []) {
+    const row = r as { athlete_id: string; day_of_week: number };
+    const list = weeklyDowByCoach[row.athlete_id] ?? [];
+    if (!list.includes(row.day_of_week)) list.push(row.day_of_week);
+    weeklyDowByCoach[row.athlete_id] = list;
+  }
+
+  const { data: slotRowsHorizon } = athleteIds.length
+    ? await supabase
+        .from('athlete_availability_slots')
+        .select('athlete_id, slot_date')
+        .in('athlete_id', athleteIds)
+        .gte('slot_date', todayEastern)
+        .lte('slot_date', coachDateHorizonEnd)
+    : { data: [] };
+  const slotDatesByCoach: Record<string, string[]> = {};
+  for (const r of slotRowsHorizon ?? []) {
+    const row = r as { athlete_id: string; slot_date: string };
+    const list = slotDatesByCoach[row.athlete_id] ?? [];
+    if (!list.includes(row.slot_date)) list.push(row.slot_date);
+    slotDatesByCoach[row.athlete_id] = list;
+  }
+
+  const { data: blockRowsHorizon } = athleteIds.length
+    ? await supabase
+        .from('athlete_availability_blocks')
+        .select('athlete_id, blocked_date')
+        .in('athlete_id', athleteIds)
+        .gte('blocked_date', todayEastern)
+        .lte('blocked_date', coachDateHorizonEnd)
+    : { data: [] };
+  const blockedDatesByCoach: Record<string, string[]> = {};
+  for (const r of blockRowsHorizon ?? []) {
+    const row = r as { athlete_id: string; blocked_date: string };
+    const list = blockedDatesByCoach[row.athlete_id] ?? [];
+    const bd = String(row.blocked_date).slice(0, 10);
+    if (!list.includes(bd)) list.push(bd);
+    blockedDatesByCoach[row.athlete_id] = list;
+  }
+
+  const coachDateFilterData: CoachDateFilterData = {
+    openPublicCoachIdsByDate,
+    weeklyDowByCoach,
+    slotDatesByCoach,
+    blockedDatesByCoach,
+  };
+  const coachDateFilterBounds = { minYmd: todayEastern, maxYmd: coachDateHorizonEnd };
+
   const reviewStatsMap = await fetchCoachReviewStatsMap(supabase, athleteIds);
   const athletesMerged = sortAthletesForBrowse(
     athletesList.map((a) => mergeCoachReviewStatsIntoAthlete(a, reviewStatsMap))
@@ -157,7 +242,6 @@ export default async function TrainingPage({
   }
 
   // Fallback: coaches with no availability slots — use their earliest upcoming session (e.g. small group)
-  const nowIso = new Date().toISOString();
   const { data: upcomingSessions } = athleteIds.length
     ? await supabase
         .from('sessions')
@@ -386,6 +470,8 @@ export default async function TrainingPage({
         requestSessionCoaches={requestSessionCoaches}
         coachFilterLocations={coachFilterLocations}
         coachIdsByFacilityId={coachIdsByFacilityId}
+        coachDateFilterData={coachDateFilterData}
+        coachDateFilterBounds={coachDateFilterBounds}
       />
       </div>
     </div>

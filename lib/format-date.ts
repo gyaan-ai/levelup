@@ -3,6 +3,7 @@
  * All dates and times are displayed and interpreted in Eastern. Do not show or reference other timezones.
  */
 
+import { parseISO } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
 
 export const APP_TIMEZONE = 'America/New_York';
@@ -33,4 +34,13 @@ export function easternCalendarDaysBetween(
   const u0 = Date.UTC(y0, m0 - 1, d0);
   const u1 = Date.UTC(y1, m1 - 1, d1);
   return (u1 - u0) / 86400000;
+}
+
+/**
+ * Day of week for a calendar `yyyy-MM-dd` in Eastern (0 = Sunday … 6 = Saturday),
+ * matching `athlete_availability.day_of_week` / PostgreSQL `EXTRACT(DOW)`.
+ */
+export function easternSundayZeroDowFromYmd(ymd: string): number {
+  const i = parseInt(formatInTimeZone(parseISO(`${ymd}T12:00:00`), APP_TIMEZONE, 'i'), 10);
+  return i === 7 ? 0 : i;
 }

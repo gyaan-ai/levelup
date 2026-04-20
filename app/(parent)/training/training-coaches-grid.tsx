@@ -1,13 +1,18 @@
 'use client';
 
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useId } from 'react';
 import Link from 'next/link';
+import { parseISO } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Heart } from 'lucide-react';
 import { ProfileImage } from '@/components/profile-image';
 import { SchoolLogo } from '@/components/school-logo';
 import { StarRating } from '@/components/star-rating';
 import { formatEST } from '@/lib/format-date';
+import {
+  coachIdsMatchingDateFilter,
+  type CoachDateFilterData,
+} from '@/lib/training-coach-date-filter';
 import type { Athlete } from '@/types';
 import { useAuth } from '@/lib/auth/use-auth';
 
@@ -24,6 +29,8 @@ type Props = {
   preselectedWrestlerId?: string;
   locationFacilities: Array<{ id: string; name: string }>;
   coachIdsByFacilityId: Record<string, string[]>;
+  coachDateFilterData: CoachDateFilterData;
+  coachDateFilterBounds: { minYmd: string; maxYmd: string };
 };
 
 function formatCoachNextLine(slot_date: string, _start_time: string): string {
@@ -38,12 +45,16 @@ export function TrainingCoachesGrid({
   preselectedWrestlerId = '',
   locationFacilities,
   coachIdsByFacilityId,
+  coachDateFilterData,
+  coachDateFilterBounds,
 }: Props) {
   const { user, userRole } = useAuth();
+  const dateInputId = useId();
   const [followedCoachIds, setFollowedCoachIds] = useState<Set<string>>(new Set());
   const [facilityId, setFacilityId] = useState<string>('all');
   const [sessionType, setSessionType] = useState<SessionTypeFilter>('all');
   const [availableOnly, setAvailableOnly] = useState(false);
+  const [filterDate, setFilterDate] = useState<string>('');
 
   useEffect(() => {
     if (!user || (userRole !== 'parent' && userRole !== 'admin')) return;
@@ -56,6 +67,19 @@ export function TrainingCoachesGrid({
       })
       .catch(() => {});
   }, [user, userRole]);
+
+  const allCoachIds = useMemo(() => athletes.map((a) => a.id), [athletes]);
+
+  const dateCoachSet = useMemo(
+    () =>
+      coachIdsMatchingDateFilter(
+        filterDate || null,
+        sessionType,
+        coachDateFilterData,
+        allCoachIds
+      ),
+    [filterDate, sessionType, coachDateFilterData, allCoachIds]
+  );
 
   const filtered = useMemo(() => {
     const allowedByLocation =
@@ -70,9 +94,19 @@ export function TrainingCoachesGrid({
         if (!types.includes(sessionType)) return false;
       }
       if (availableOnly && !coachIdsWithOpen.includes(a.id)) return false;
+      if (dateCoachSet && !dateCoachSet.has(a.id)) return false;
       return true;
     });
-  }, [athletes, facilityId, sessionType, availableOnly, serviceTypesByCoach, coachIdsWithOpen, coachIdsByFacilityId]);
+  }, [
+    athletes,
+    facilityId,
+    sessionType,
+    availableOnly,
+    serviceTypesByCoach,
+    coachIdsWithOpen,
+    coachIdsByFacilityId,
+    dateCoachSet,
+  ]);
 
   const sorted = useMemo(() => {
     const copy = [...filtered];
@@ -94,6 +128,8 @@ export function TrainingCoachesGrid({
       ? `/athlete/${id}?youthWrestlerId=${encodeURIComponent(preselectedWrestlerId)}`
       : `/athlete/${id}`;
 
+  const showDateEmpty = Boolean(filterDate) && sorted.length === 0;
+
   return (
     <div className="space-y-4">
       <div
@@ -108,7 +144,7 @@ export function TrainingCoachesGrid({
           id="training-coach-location"
           value={facilityId}
           onChange={(e) => setFacilityId(e.target.value)}
-          className="min-h-[44px] w-full min-w-[10rem] flex-1 rounded-full border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/50 sm:max-w-[220px] sm:flex-none"
+          className="min-h-[44px] w-full min-w-[10rem] flex-1 rounded-full border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/50 sm:max-w-[200px] sm:flex-none"
         >
           <option value="all">All locations</option>
           {locationFacilities.map((f) => (
@@ -118,7 +154,7 @@ export function TrainingCoachesGrid({
           ))}
         </select>
 
-        <div className="flex min-w-0 flex-1 items-center justify-center gap-2 overflow-x-auto scrollbar-hide px-1">
+        <div className="flex min-w-0 flex-1 items-center justify-start gap-2 overflow-x-auto scrollbar-hide px-1">
           {(
             [
               ['all', 'All'],
@@ -142,6 +178,35 @@ export function TrainingCoachesGrid({
           ))}
         </div>
 
+        <div className="flex shrink-0 items-center gap-2">
+          <label className="sr-only" htmlFor={dateInputId}>
+            Filter coaches by date
+          </label>
+          {filterDate ? (
+            <button
+              type="button"
+              onClick={() => setFilterDate('')}
+              className="flex min-h-[44px] max-w-[11rem] items-center gap-1 rounded-full border border-[#D4AF37]/40 bg-zinc-900 px-3 py-2 text-sm font-medium text-[#D4AF37] touch-manipulation"
+              aria-label={`Clear date filter ${formatEST(parseISO(`${filterDate}T12:00:00`), 'EEE MMM d')}`}
+            >
+              <span className="truncate">{formatEST(parseISO(`${filterDate}T12:00:00`), 'EEE MMM d')}</span>
+              <span className="text-lg leading-none" aria-hidden>
+                ×
+              </span>
+            </button>
+          ) : (
+            <input
+              id={dateInputId}
+              type="date"
+              min={coachDateFilterBounds.minYmd}
+              max={coachDateFilterBounds.maxYmd}
+              value={filterDate}
+              onChange={(e) => setFilterDate(e.target.value)}
+              className="min-h-[44px] w-[min(100%,11rem)] min-w-[10rem] rounded-full border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/50 [color-scheme:dark]"
+            />
+          )}
+        </div>
+
         <button
           type="button"
           onClick={() => setAvailableOnly((v) => !v)}
@@ -156,6 +221,22 @@ export function TrainingCoachesGrid({
           Available
         </button>
       </div>
+
+      {showDateEmpty ? (
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 px-4 py-6 text-center">
+          <p className="text-sm text-zinc-300">
+            No coaches available on {formatEST(parseISO(`${filterDate}T12:00:00`), 'EEE MMM d')} — try another day
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            className="mt-4 min-h-[44px] w-full max-w-sm border-[#D4AF37] text-[#D4AF37] hover:bg-[#D4AF37]/10"
+            onClick={() => setFilterDate('')}
+          >
+            Clear date filter
+          </Button>
+        </div>
+      ) : null}
 
       <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
         {sorted.map((a) => {

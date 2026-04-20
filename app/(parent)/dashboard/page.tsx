@@ -165,6 +165,46 @@ export default async function HomePage() {
     (reviewIdRows ?? []).map((r: { session_id: string }) => r.session_id).filter(Boolean)
   );
 
+  /** Earliest completed session per (youth_wrestler_id, coach athlete_id) — reviews only for that first session. */
+  const earliestCompletedByYouthCoach = new Map<string, { id: string; scheduled_datetime: string }>();
+  if (youthWrestlerIds.length > 0) {
+    const { data: historyRows } = await supabase
+      .from('session_participants')
+      .select(
+        `
+        youth_wrestler_id,
+        sessions!inner(id, athlete_id, status, scheduled_datetime)
+      `
+      )
+      .in('youth_wrestler_id', youthWrestlerIds)
+      .eq('sessions.status', 'completed');
+
+    type HistoryRow = {
+      youth_wrestler_id: string;
+      sessions:
+        | { id: string; athlete_id: string; status: string; scheduled_datetime: string }
+        | { id: string; athlete_id: string; status: string; scheduled_datetime: string }[]
+        | null;
+    };
+
+    for (const row of (historyRows ?? []) as HistoryRow[]) {
+      const yid = row.youth_wrestler_id;
+      const sessRaw = row.sessions;
+      const sess = Array.isArray(sessRaw) ? sessRaw[0] : sessRaw;
+      if (!sess?.athlete_id || !sess.id) continue;
+      const key = `${yid}:${sess.athlete_id}`;
+      const next = { id: sess.id, scheduled_datetime: sess.scheduled_datetime };
+      const prev = earliestCompletedByYouthCoach.get(key);
+      if (
+        !prev ||
+        next.scheduled_datetime < prev.scheduled_datetime ||
+        (next.scheduled_datetime === prev.scheduled_datetime && next.id < prev.id)
+      ) {
+        earliestCompletedByYouthCoach.set(key, next);
+      }
+    }
+  }
+
   const { data: completedSessions } = familySessionIds.length > 0
     ? await supabase
         .from('sessions')
@@ -213,6 +253,14 @@ export default async function HomePage() {
       });
     }
     if (attendingAthletes.length === 0) continue;
+    const coachId = raw.athlete_id ?? '';
+    if (!coachId) continue;
+    const isFirstSessionWithCoachForSomeAthlete = attendingAthletes.some((a) => {
+      const first = earliestCompletedByYouthCoach.get(`${a.id}:${coachId}`);
+      return first?.id === raw.id;
+    });
+    if (!isFirstSessionWithCoachForSomeAthlete) continue;
+
     const coach = Array.isArray(raw.athletes) ? raw.athletes[0] : raw.athletes;
     reviewPayloads.push({
       id: raw.id,

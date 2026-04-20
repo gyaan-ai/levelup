@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { FindTrainingClient } from '@/app/(parent)/find-training/find-training-client';
 import { TrainingCoachesGrid } from '@/app/(parent)/training/training-coaches-grid';
 import type { Athlete } from '@/types';
+import type { CoachDateFilterData } from '@/lib/training-coach-date-filter';
 
 type TabId = 'sessions' | 'coaches';
 
@@ -66,6 +67,8 @@ type Props = {
   coachFilterLocations?: Array<{ id: string; name: string }>;
   /** When a facility is selected, these coach ids match that location. */
   coachIdsByFacilityId?: Record<string, string[]>;
+  coachDateFilterData: CoachDateFilterData;
+  coachDateFilterBounds: { minYmd: string; maxYmd: string };
 };
 
 export function TrainingClient({
@@ -86,6 +89,8 @@ export function TrainingClient({
   requestSessionCoaches = [],
   coachFilterLocations = [],
   coachIdsByFacilityId = {},
+  coachDateFilterData,
+  coachDateFilterBounds,
 }: Props) {
   const tab = (initialTab === 'sessions' ? 'sessions' : 'coaches') as TabId;
   const [activeTab, setActiveTab] = useState<TabId>(tab);
@@ -141,6 +146,8 @@ export function TrainingClient({
           preselectedWrestlerId={preselectedWrestlerId}
           locationFacilities={coachFilterLocations}
           coachIdsByFacilityId={coachIdsByFacilityId}
+          coachDateFilterData={coachDateFilterData}
+          coachDateFilterBounds={coachDateFilterBounds}
         />
       )}
     </>
