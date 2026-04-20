@@ -18,7 +18,7 @@ import { formatSlotDisplay } from '@/lib/availability';
 import { COACH_REVENUE_FRACTION } from '@/lib/pricing';
 import type { CoachSession } from './coach-schedule-card';
 import { splitCoachSessionsByToday } from '@/lib/coach-schedule-split';
-import { getSessionTypeDisplay } from '@/components/session-type-badge';
+import { getSessionTypeDisplay } from '@/lib/session-type-display';
 import { CoachScheduleSessionCard } from './coach-schedule-session-card';
 
 export type JoinRequestItem = {

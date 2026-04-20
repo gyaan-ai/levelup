@@ -68,6 +68,7 @@ export async function fetchCoachMapPins(
   | { ok: true; pins: CoachMapPin[]; cities: string[]; stats: CoachMapStats }
   | { ok: false; error: string }
 > {
+  try {
   const admin = createAdminClient(tenantSlug);
 
   const { data: facilities, error: facErr } = await admin
@@ -234,4 +235,8 @@ export async function fetchCoachMapPins(
       coachesLinkedToGeocodedFacilities,
     },
   };
+  } catch (e) {
+    console.error('[fetchCoachMapPins]', e);
+    return { ok: false, error: 'Failed to load map data' };
+  }
 }

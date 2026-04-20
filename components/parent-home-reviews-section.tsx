@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Star } from 'lucide-react';
 import { formatEST } from '@/lib/format-date';
-import { getSessionTypeDisplay } from '@/components/session-type-badge';
+import { getSessionTypeDisplay } from '@/lib/session-type-display';
 import { ParentHomeReviewSheet, type ReviewSessionPayload } from '@/components/parent-home-review-sheet';
 
 type YouthOption = { id: string; first_name?: string; last_name?: string };

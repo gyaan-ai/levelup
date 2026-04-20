@@ -23,9 +23,9 @@ export async function GET() {
     }
 
     const [balance, credits, history] = await Promise.all([
-      getUserCreditBalance(user.id),
-      getUserCredits(user.id),
-      getCreditHistory(user.id),
+      getUserCreditBalance(user.id, tenant.slug),
+      getUserCredits(user.id, tenant.slug),
+      getCreditHistory(user.id, tenant.slug),
     ]);
 
     return NextResponse.json({

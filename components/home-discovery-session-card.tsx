@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/lib/cart-context';
 import { formatEST } from '@/lib/format-date';
-import { getSessionTypeDisplay } from '@/components/session-type-badge';
+import { getSessionTypeDisplay } from '@/lib/session-type-display';
 import { ProfileImage } from '@/components/profile-image';
 import { getEffectiveFilledCount, isSessionOpenForParentBrowse } from '@/lib/sessions';
 

@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/select';
 import { Star, Loader2 } from 'lucide-react';
 import { formatEST } from '@/lib/format-date';
-import { getSessionTypeDisplay } from '@/components/session-type-badge';
+import { getSessionTypeDisplay } from '@/lib/session-type-display';
 
 export type ReviewSessionPayload = {
   id: string;

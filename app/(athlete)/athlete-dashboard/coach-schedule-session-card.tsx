@@ -13,7 +13,7 @@ import { copyTextToClipboard } from '@/lib/copy-to-clipboard';
 import { fillTemplate, getTemplate } from '@/lib/playbook-templates';
 import { sessionParticipantDisplayNames } from '@/lib/session-participant-display-name';
 import { cn } from '@/lib/utils';
-import { getSessionTypeDisplay } from '@/components/session-type-badge';
+import { getSessionTypeDisplay } from '@/lib/session-type-display';
 import type { CoachSession } from './coach-schedule-card';
 
 function facilityLabel(s: CoachSession): string {

@@ -9,7 +9,7 @@ import { getTenantByDomain } from '@/config/tenants';
 import { Button } from '@/components/ui/button';
 import { YouthWrestler } from '@/types';
 import { formatEST } from '@/lib/format-date';
-import { getSessionTypeDisplay } from '@/components/session-type-badge';
+import { getSessionTypeDisplay } from '@/lib/session-type-display';
 import { ensureAutoFamilyDiscountForParent } from '@/lib/family-auto-discount';
 import { checkoutAllowSavedAccountPercent } from '@/lib/checkout-promo';
 import { getUserCreditBalance } from '@/lib/credits';

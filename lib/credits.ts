@@ -1,65 +1,95 @@
-'use server';
-
 import { createAdminClient } from '@/lib/supabase/admin';
 
+/** Maps `public.credits` rows for callers that expect the legacy `UserCredit` shape. */
 export type UserCredit = {
   id: string;
   user_id: string;
+  /** Original issued amount */
   amount: number;
+  /** Remaining on this row (use this for spending). */
+  remaining: number;
   reason: string;
-  source_type: 'cancellation' | 'refund' | 'manual' | 'promo';
+  source_type: string;
   source_id: string | null;
-  expires_at: string;
+  expires_at: string | null;
   used_at: string | null;
   used_for_session_id: string | null;
   created_at: string;
 };
 
+function mapCreditRow(row: Record<string, unknown>): UserCredit {
+  return {
+    id: row.id as string,
+    user_id: row.parent_id as string,
+    amount: Number(row.amount ?? 0),
+    remaining: Number(row.remaining ?? 0),
+    reason: (row.description as string) ?? '',
+    source_type: String(row.source ?? ''),
+    source_id: (row.source_session_id as string) ?? null,
+    expires_at: (row.expires_at as string) ?? null,
+    used_at: null,
+    used_for_session_id: null,
+    created_at: row.created_at as string,
+  };
+}
+
+function mapGrantSource(
+  sourceType: 'cancellation' | 'refund' | 'manual' | 'promo'
+): 'cancellation' | 'coach_cancellation' | 'admin_grant' | 'promotion' {
+  if (sourceType === 'cancellation' || sourceType === 'refund') return 'cancellation';
+  if (sourceType === 'promo') return 'promotion';
+  return 'admin_grant';
+}
+
 /**
- * Get total available (unused, non-expired) credit balance for a user
+ * Total available Guild credit for a parent (`public.credits`: parent_id, remaining).
  */
 export async function getUserCreditBalance(userId: string, tenantSlug = 'guild'): Promise<number> {
   const admin = createAdminClient(tenantSlug);
-  
+  const nowIso = new Date().toISOString();
+
   const { data, error } = await admin
     .from('credits')
-    .select('amount')
-    .eq('user_id', userId)
-    .is('used_at', null)
-    .gt('expires_at', new Date().toISOString());
+    .select('remaining, expires_at')
+    .eq('parent_id', userId)
+    .gt('remaining', 0);
 
   if (error) {
     console.error('Error fetching credit balance:', error);
     return 0;
   }
 
-  return data?.reduce((sum, credit) => sum + Number(credit.amount), 0) ?? 0;
+  return (data ?? []).reduce((sum, row: { remaining: unknown; expires_at: string | null }) => {
+    if (row.expires_at && row.expires_at <= nowIso) return sum;
+    return sum + Number(row.remaining ?? 0);
+  }, 0);
 }
 
 /**
- * Get all available credits for a user (for display purposes)
+ * Available credit rows for display / FIFO apply.
  */
 export async function getUserCredits(userId: string, tenantSlug = 'guild'): Promise<UserCredit[]> {
   const admin = createAdminClient(tenantSlug);
-  
+  const nowIso = new Date().toISOString();
+
   const { data, error } = await admin
     .from('credits')
     .select('*')
-    .eq('user_id', userId)
-    .is('used_at', null)
-    .gt('expires_at', new Date().toISOString())
-    .order('expires_at', { ascending: true }); // Use oldest expiring first
+    .eq('parent_id', userId)
+    .gt('remaining', 0)
+    .or(`expires_at.is.null,expires_at.gt.${nowIso}`)
+    .order('expires_at', { ascending: true, nullsFirst: false });
 
   if (error) {
     console.error('Error fetching credits:', error);
     return [];
   }
 
-  return data ?? [];
+  return (data ?? []).map((row) => mapCreditRow(row as Record<string, unknown>));
 }
 
 /**
- * Grant credit to a user (e.g., after session cancellation)
+ * Grant credit (`public.credits`) — e.g. after cancellation.
  */
 export async function grantCredit({
   userId,
@@ -76,18 +106,18 @@ export async function grantCredit({
   sourceId?: string;
   tenantSlug?: string;
 }): Promise<{ success: boolean; creditId?: string; error?: string }> {
-  // Use admin client to bypass RLS for granting credits
   const admin = createAdminClient(tenantSlug ?? 'guild');
 
-  // Create the credit
   const { data: credit, error: creditError } = await admin
     .from('credits')
     .insert({
-      user_id: userId,
+      parent_id: userId,
       amount,
-      reason,
-      source_type: sourceType,
-      source_id: sourceId ?? null,
+      remaining: amount,
+      source: mapGrantSource(sourceType),
+      source_session_id: sourceId ?? null,
+      description: reason,
+      expires_at: null,
     })
     .select('id')
     .single();
@@ -97,27 +127,17 @@ export async function grantCredit({
     return { success: false, error: creditError.message };
   }
 
-  // Log the transaction
-  await admin.from('credit_transactions').insert({
-    user_id: userId,
-    credit_id: credit.id,
-    amount,
-    type: 'credit',
-    description: reason,
-  });
-
-  return { success: true, creditId: credit.id };
+  return { success: true, creditId: credit.id as string };
 }
 
 /**
- * Apply credits for a session purchase
- * Returns the amount of credits actually used
+ * Apply credits toward a session: decrement `remaining`, append `credit_usage` rows.
  */
 export async function applyCredits({
   userId,
   amount,
   sessionId,
-  description,
+  description: _description,
   tenantSlug,
 }: {
   userId: string;
@@ -126,61 +146,47 @@ export async function applyCredits({
   description: string;
   tenantSlug?: string;
 }): Promise<{ usedAmount: number; creditIds: string[] }> {
-  // Use admin client to bypass RLS for using credits
+  void _description;
   const admin = createAdminClient(tenantSlug ?? 'guild');
+  const credits = await getUserCredits(userId, tenantSlug ?? 'guild');
 
-  // Get available credits ordered by expiration (use oldest first)
-  const credits = await getUserCredits(userId);
-  
   let remainingToUse = amount;
   const usedCreditIds: string[] = [];
+  const nowIso = new Date().toISOString();
 
   for (const credit of credits) {
     if (remainingToUse <= 0) break;
 
-    const creditAmount = Number(credit.amount);
-    const amountToUse = Math.min(creditAmount, remainingToUse);
+    const available = Number(credit.remaining);
+    if (available <= 0) continue;
 
-    if (amountToUse === creditAmount) {
-      // Use entire credit
-      await admin
-        .from('credits')
-        .update({
-          used_at: new Date().toISOString(),
-          used_for_session_id: sessionId,
-        })
-        .eq('id', credit.id);
-    } else {
-      // Partial use - mark original as used and create new credit for remainder
-      await admin
-        .from('credits')
-        .update({
-          used_at: new Date().toISOString(),
-          used_for_session_id: sessionId,
-          amount: amountToUse, // Update to reflect what was actually used
-        })
-        .eq('id', credit.id);
+    const amountToUse = Math.min(available, remainingToUse);
+    const newRemaining = available - amountToUse;
 
-      // Create new credit for the remainder
-      await admin.from('credits').insert({
-        user_id: userId,
-        amount: creditAmount - amountToUse,
-        reason: `Remainder from partial credit use`,
-        source_type: credit.source_type,
-        source_id: credit.source_id,
-        expires_at: credit.expires_at,
-      });
+    const { error: updErr } = await admin
+      .from('credits')
+      .update({ remaining: newRemaining, updated_at: nowIso })
+      .eq('id', credit.id);
+
+    if (updErr) {
+      console.error('applyCredits update failed:', updErr);
+      break;
     }
 
-    // Log the debit transaction
-    await admin.from('credit_transactions').insert({
-      user_id: userId,
+    const { error: useErr } = await admin.from('credit_usage').insert({
       credit_id: credit.id,
-      amount: -amountToUse,
-      type: 'debit',
-      description,
       session_id: sessionId,
+      amount: amountToUse,
     });
+
+    if (useErr) {
+      console.error('applyCredits credit_usage insert failed:', useErr);
+      await admin
+        .from('credits')
+        .update({ remaining: available, updated_at: nowIso })
+        .eq('id', credit.id);
+      break;
+    }
 
     usedCreditIds.push(credit.id);
     remainingToUse -= amountToUse;
@@ -192,16 +198,22 @@ export async function applyCredits({
   };
 }
 
-/**
- * Get credit transaction history for a user
- */
+/** Recent credit applications for wallet / API (from `credit_usage`). */
 export async function getCreditHistory(userId: string, tenantSlug = 'guild') {
   const admin = createAdminClient(tenantSlug);
 
+  const { data: creditRows, error: cErr } = await admin.from('credits').select('id').eq('parent_id', userId);
+  if (cErr) {
+    console.error('Error fetching credit history (credits):', cErr);
+    return [];
+  }
+  const ids = (creditRows ?? []).map((c: { id: string }) => c.id);
+  if (ids.length === 0) return [];
+
   const { data, error } = await admin
-    .from('credit_transactions')
-    .select('*')
-    .eq('user_id', userId)
+    .from('credit_usage')
+    .select('id, amount, session_id, created_at, credit_id')
+    .in('credit_id', ids)
     .order('created_at', { ascending: false })
     .limit(50);
 
@@ -210,5 +222,15 @@ export async function getCreditHistory(userId: string, tenantSlug = 'guild') {
     return [];
   }
 
-  return data ?? [];
+  return (data ?? []).map(
+    (u: { id: string; amount: unknown; session_id: string | null; created_at: string; credit_id: string }) => ({
+      id: u.id,
+      amount: -Math.abs(Number(u.amount)),
+      type: 'debit' as const,
+      description: 'Applied to booking',
+      created_at: u.created_at,
+      session_id: u.session_id,
+      credit_id: u.credit_id,
+    })
+  );
 }

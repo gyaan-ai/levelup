@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/popover';
 import { useCart } from '@/lib/cart-context';
 import { formatEST } from '@/lib/format-date';
-import { getSessionTypeDisplay } from '@/components/session-type-badge';
+import { getSessionTypeDisplay } from '@/lib/session-type-display';
 
 export function CartDropdown() {
   const { items, removeItem, clearCart, total, count } = useCart();
