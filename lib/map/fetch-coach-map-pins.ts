@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin';
+import { fetchCoachReviewStatsMap, getCoachReviewStatsForId } from '@/lib/coach-review-stats';
 import { isSessionOpenForParentBrowse } from '@/lib/sessions';
 
 export type SessionKind = 'private' | 'partner' | 'small_group';
@@ -132,6 +133,8 @@ export async function fetchCoachMapPins(
     }>
   >();
 
+  const reviewStatsMap = await fetchCoachReviewStatsMap(admin, coachIds);
+
   if (coachIds.length > 0) {
     const { data: sessions, error: sessErr } = await admin
       .from('sessions')
@@ -194,6 +197,7 @@ export async function fetchCoachMapPins(
         const part = addr.split(',')[0]?.trim();
         if (part) citySet.add(part);
       }
+      const rev = getCoachReviewStatsForId(reviewStatsMap, c.id as string);
       pins.push({
         pinKey: `${c.id}:${fid}`,
         coachId: c.id as string,
@@ -204,8 +208,8 @@ export async function fetchCoachMapPins(
         year: (c.year as string | null) ?? null,
         weightClass: (c.weight_class as string | null) ?? null,
         averageRating:
-          c.average_rating != null ? Number(Number(c.average_rating).toFixed(1)) : null,
-        reviewCount: Math.max(0, Number(c.review_count) || 0),
+          rev.review_count > 0 ? Number(rev.average_rating.toFixed(1)) : null,
+        reviewCount: rev.review_count,
         facilityId: f.id as string,
         facilityName: f.name as string,
         facilityAddress: addr,
