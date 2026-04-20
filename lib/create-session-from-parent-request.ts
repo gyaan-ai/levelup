@@ -6,6 +6,7 @@ import type { JoinPolicy } from '@/types';
 import { COACH_REVENUE_FRACTION } from '@/lib/pricing';
 import { hasMinPhoneDigits } from '@/lib/phone';
 import { maybeBackfillRosterSnapshot } from '@/lib/session-roster-snapshot';
+import { isPennyTestPricingEnabled } from '@/lib/penny-test-pricing';
 
 export type RequestSessionKind = 'private' | 'partner';
 
@@ -159,7 +160,7 @@ export async function createSessionFromParentRequest(
   }
   partner_invite_code = code;
 
-  const testModePenny = process.env.TEST_MODE_PENNY_PRICING === 'true';
+  const testModePenny = isPennyTestPricingEnabled();
   const basePrice = testModePenny ? 0.50 : pricing.totalPrice;
   const athletePayment = testModePenny ? 0.50 : pricing.athletePayment;
 

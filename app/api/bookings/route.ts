@@ -13,6 +13,7 @@ import { maybeBackfillRosterSnapshot } from '@/lib/session-roster-snapshot';
 import { ensureAutoFamilyDiscountForParent } from '@/lib/family-auto-discount';
 import { checkoutAllowSavedAccountPercent, resolveCheckoutPercentOff } from '@/lib/checkout-promo';
 import { normalizeCoachOrWrestlerId, verifyCoachForParentBooking } from '@/lib/server-booking-coach';
+import { isPennyTestPricingEnabled } from '@/lib/penny-test-pricing';
 
 export async function POST(req: NextRequest) {
   try {
@@ -142,7 +143,7 @@ export async function POST(req: NextRequest) {
     const [datePart] = scheduledDate.split('T');
     const scheduledDatetime = `${datePart}T${scheduledTime}`;
     
-    const testModePenny = process.env.TEST_MODE_PENNY_PRICING === 'true';
+    const testModePenny = isPennyTestPricingEnabled();
     const athletePayment = testModePenny ? 0.50 : totalPrice; // what we pay the coach (you pay manually)
     const basePrice = testModePenny ? 0.50 : priceAfterPct;
     const stripeChargeAmount = basePrice;

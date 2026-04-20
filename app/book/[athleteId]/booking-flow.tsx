@@ -525,7 +525,7 @@ export function BookingFlow({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6 order-1 lg:order-none">
+        <div className="order-2 lg:order-1 lg:col-span-2 space-y-6">
           <Card>
             <CardContent className="pt-6">
               <div className="flex justify-between mb-2">
@@ -956,8 +956,8 @@ export function BookingFlow({
           )}
         </div>
 
-        {/* Summary sidebar */}
-        <div className="lg:col-span-1 order-2 lg:order-none">
+        {/* Summary sidebar — first on small screens so totals sit above steps / pay */}
+        <div className="order-1 lg:order-2 lg:col-span-1">
           <Card className="lg:sticky lg:top-4">
             <CardHeader>
               <CardTitle>Booking Summary</CardTitle>
