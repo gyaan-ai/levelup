@@ -43,6 +43,15 @@ function is24h(s: string): boolean {
   return /^\d{1,2}:\d{2}$/.test(s) && !s.match(/\s*(AM|PM)/i);
 }
 
+/** Local calendar day for yyyy-MM-dd (matches date picker). */
+function parseYmdLocal(ymd: string): Date | undefined {
+  const parts = ymd.split('-').map((x) => parseInt(x, 10));
+  if (parts.length !== 3 || parts.some((n) => Number.isNaN(n))) return undefined;
+  const [y, m, d] = parts;
+  if (!y || m < 1 || m > 12 || d < 1 || d > 31) return undefined;
+  return new Date(y, m - 1, d);
+}
+
 interface Athlete {
   id: string;
   first_name: string;
@@ -82,6 +91,9 @@ interface BookingFlowProps {
   preselectedYouthWrestlerId?: string | null;
   /** When false (default), percent discount only if user applies a valid promo on this flow. */
   checkoutUsesSavedAccountDiscount?: boolean;
+  /** Deep-link from training / shared links: yyyy-MM-dd and HH:mm as returned by availability slots API. */
+  initialBookingDate?: string | null;
+  initialBookingTime?: string | null;
 }
 
 type AvailabilityByDay = { day_of_week: number; start_time: string; end_time: string }[];
@@ -94,6 +106,8 @@ export function BookingFlow({
   products = [],
   preselectedYouthWrestlerId = null,
   checkoutUsesSavedAccountDiscount = false,
+  initialBookingDate = null,
+  initialBookingTime = null,
 }: BookingFlowProps) {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
@@ -124,6 +138,7 @@ export function BookingFlow({
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [freeEntitlements, setFreeEntitlements] = useState({ free1on1: 0, free2Athlete: 0 });
+  const [initialSlotSeeded, setInitialSlotSeeded] = useState(false);
 
   const sessionMode: SessionMode | null =
     sessionChoice === '1-on-1' ? 'private'
@@ -252,6 +267,30 @@ export function BookingFlow({
     })();
     return () => { ok = false; };
   }, [athlete.id]);
+
+  useEffect(() => {
+    if (!initialBookingDate) return;
+    const d = parseYmdLocal(initialBookingDate);
+    if (!d) return;
+    setSelectedDate(d);
+  }, [initialBookingDate]);
+
+  useEffect(() => {
+    if (initialSlotSeeded || !initialBookingTime || !selectedDate || slotsLoading) return;
+    const ymd = formatEST(selectedDate, 'yyyy-MM-dd');
+    if (initialBookingDate && ymd !== initialBookingDate) return;
+    if (slots.includes(initialBookingTime)) {
+      setSelectedTime(initialBookingTime);
+      setInitialSlotSeeded(true);
+    }
+  }, [
+    initialBookingDate,
+    initialBookingTime,
+    selectedDate,
+    slots,
+    slotsLoading,
+    initialSlotSeeded,
+  ]);
 
   const hasAvailability =
     (availability?.length ?? 0) > 0 || (availabilityDates?.size ?? 0) > 0;
@@ -471,14 +510,14 @@ export function BookingFlow({
               {athlete.school}
             </p>
             <p className="text-sm text-muted-foreground mt-3 max-w-xl">
-              Don&apos;t see a time that works?{' '}
+              Need a time outside these openings?{' '}
               <Link
                 href={`/book/${athlete.id}/request`}
                 className="text-accent font-medium underline underline-offset-2 hover:no-underline"
               >
-                Request a session
+                Ask for a custom time
               </Link>{' '}
-              and the coach will respond from My sessions → Requests.
+              (coach reviews before you pay).
             </p>
           </div>
         </div>

@@ -31,6 +31,7 @@ import { CoachProfileAvailabilitySection } from '@/components/coach-profile-avai
 import { Check, Copy, Globe, Lock, Share2 } from 'lucide-react';
 import { BackLink } from '@/components/back-link';
 import Link from 'next/link';
+import { IN_APP_MESSAGING_ENABLED } from '@/lib/in-app-messaging';
 
 const profileSchema = z.object({
   weightClass: z.string().optional(),
@@ -270,9 +271,13 @@ export default function ProfilePage() {
     <div className="container mx-auto px-4 py-8 max-w-2xl">
       <div className="flex flex-wrap items-center gap-4 mb-6">
         <BackLink fallbackHref="/athlete-dashboard" label="Back to Schedule" />
-        <Link href="/inbox" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
-          Inbox
-        </Link>
+        {IN_APP_MESSAGING_ENABLED ? (
+          <Link href="/inbox" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground">
+            Inbox
+          </Link>
+        ) : (
+          <span className="text-sm text-muted-foreground">Messages (web paused)</span>
+        )}
       </div>
 
       <Card>

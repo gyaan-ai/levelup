@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/dialog';
 import { NotificationBell } from '@/components/notification-bell';
 import { useNotificationCount } from '@/lib/hooks/use-notification-count';
+import { IN_APP_MESSAGING_ENABLED } from '@/lib/in-app-messaging';
 import { useInboxUnreadCount } from '@/lib/hooks/use-inbox-unread-count';
 
 type Props = {
@@ -19,30 +20,32 @@ type Props = {
 };
 
 /**
- * Mobile-only: inbox + notifications + overflow menu so coach header matches desktop links.
+ * Mobile-only: optional inbox + notifications + overflow menu so coach header matches desktop links.
  */
 export function CoachHeaderMobile({ onSignOut }: Props) {
   const [open, setOpen] = useState(false);
   const [notificationCount, refreshNotifications] = useNotificationCount(true);
-  const [inboxUnreadCount] = useInboxUnreadCount(true);
+  const [inboxUnreadCount] = useInboxUnreadCount(IN_APP_MESSAGING_ENABLED);
 
   const linkClass =
     'block w-full text-left py-3 px-1 text-base font-medium text-foreground border-b border-border/60 last:border-0 hover:text-accent transition-colors';
 
   return (
     <div className="flex items-center gap-0.5 shrink-0">
-      <Link
-        href="/inbox"
-        className="relative flex items-center justify-center min-h-[44px] min-w-[44px] p-1.5 text-white hover:text-accent rounded-md hover:bg-white/10"
-        aria-label={inboxUnreadCount > 0 ? `Messages (${inboxUnreadCount} unread)` : 'Messages'}
-      >
-        <Mail className="h-5 w-5" />
-        {inboxUnreadCount > 0 && (
-          <span className="absolute top-0.5 right-0.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center text-[10px] font-bold bg-accent text-black rounded-full">
-            {inboxUnreadCount > 99 ? '99+' : inboxUnreadCount}
-          </span>
-        )}
-      </Link>
+      {IN_APP_MESSAGING_ENABLED ? (
+        <Link
+          href="/inbox"
+          className="relative flex items-center justify-center min-h-[44px] min-w-[44px] p-1.5 text-white hover:text-accent rounded-md hover:bg-white/10"
+          aria-label={inboxUnreadCount > 0 ? `Messages (${inboxUnreadCount} unread)` : 'Messages'}
+        >
+          <Mail className="h-5 w-5" />
+          {inboxUnreadCount > 0 && (
+            <span className="absolute top-0.5 right-0.5 min-w-[18px] h-[18px] px-1 flex items-center justify-center text-[10px] font-bold bg-accent text-black rounded-full">
+              {inboxUnreadCount > 99 ? '99+' : inboxUnreadCount}
+            </span>
+          )}
+        </Link>
+      ) : null}
       <NotificationBell count={notificationCount} onRefresh={refreshNotifications} />
       <Button
         type="button"

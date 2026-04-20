@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import { Star, User, MapPin, Award, Shield, CheckCircle, MessageCircle, DollarSign, Pencil, Calendar, Clock, Users, ChevronRight } from 'lucide-react';
+import { Star, User, MapPin, Award, Shield, CheckCircle, DollarSign, Pencil, Calendar, Clock, Users, ChevronRight } from 'lucide-react';
 import { BackLink } from '@/components/back-link';
 import { formatEST } from '@/lib/format-date';
 import { SessionTypeBadge } from '@/components/session-type-badge';
@@ -22,6 +22,7 @@ import { isBackgroundCheckValidForDisplay, isSafeSportValidForDisplay } from '@/
 import { getSchoolBadgeColors, schoolBadgeClassName } from '@/lib/school-logos';
 import { summarizeWeeklyAvailability, type WeeklyAvailabilityRow } from '@/lib/availability';
 import { GUILD_COACH_PROFILE_RATES } from '@/lib/coach-session-pricing';
+import { IN_APP_MESSAGING_PAUSED_MESSAGE } from '@/lib/in-app-messaging';
 
 function CoachProfileUnavailable() {
   return (
@@ -274,25 +275,15 @@ export default async function AthleteProfilePage({
                 )}
               </div>
 
-              {/* Parents/admins: book, message, optional request. Coaches: edit own profile only (no admin shortcut here). */}
+              {/* Parents/admins: book, custom-time request. Coaches: edit own profile only (no admin shortcut here). */}
               <div className="flex flex-col gap-3 max-w-xl">
                 <div className="flex flex-wrap items-center gap-3">
                   {canInteractAsParentOrAdmin && (
-                    <>
-                      <Link href={bookHref}>
-                        <Button size="lg" variant="premium" className="w-full sm:w-auto touch-manipulation">
-                          Book with {athlete.first_name}
-                        </Button>
-                      </Link>
-                      {user && (
-                        <Link href={`/inbox/thread/${user.id}/${athlete.id}`}>
-                          <Button size="lg" variant="outline" className="w-full sm:w-auto touch-manipulation">
-                            <MessageCircle className="h-4 w-4 mr-2" />
-                            Message
-                          </Button>
-                        </Link>
-                      )}
-                    </>
+                    <Link href={bookHref}>
+                      <Button size="lg" variant="premium" className="w-full sm:w-auto touch-manipulation">
+                        Book with {athlete.first_name}
+                      </Button>
+                    </Link>
                   )}
                   {isOwnProfile && (
                     <Link href="/profile">
@@ -307,18 +298,21 @@ export default async function AthleteProfilePage({
                   <div className="flex flex-col sm:flex-row flex-wrap gap-3">
                     <Link href={requestHref}>
                       <Button size="lg" variant="outline" className="w-full sm:w-auto border-[#D4AF37]/50 touch-manipulation">
-                        Request a session
+                        Ask for a custom time
                       </Button>
                     </Link>
                   </div>
                 )}
                 {canInteractAsParentOrAdmin && (
-                  <p className="text-sm text-muted-foreground">
-                    <Link href={`/coach/${athlete.id}`} className="text-accent font-medium underline">
-                      Open public schedule
-                    </Link>
-                    <span className="hidden sm:inline"> — share that page if someone needs your link.</span>
-                  </p>
+                  <>
+                    <p className="text-sm text-muted-foreground max-w-lg">{IN_APP_MESSAGING_PAUSED_MESSAGE}</p>
+                    <p className="text-sm text-muted-foreground">
+                      <Link href={`/coach/${athlete.id}`} className="text-accent font-medium underline">
+                        Open public schedule
+                      </Link>
+                      <span className="hidden sm:inline"> — share that page if someone needs your link.</span>
+                    </p>
+                  </>
                 )}
               </div>
             </div>

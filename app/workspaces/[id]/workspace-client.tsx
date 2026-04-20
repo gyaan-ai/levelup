@@ -13,6 +13,7 @@ import { BackLink } from '@/components/back-link';
 import { SchoolLogo } from '@/components/school-logo';
 import { SessionsSection } from '@/components/workspace/sessions-section';
 import { ActionItemsSection } from '@/components/workspace/action-items-section';
+import { IN_APP_MESSAGING_ENABLED, IN_APP_MESSAGING_PAUSED_MESSAGE } from '@/lib/in-app-messaging';
 
 type Goal = { id: string; content: string; created_at: string; completed_at?: string | null };
 type Media = { id: string; file_name: string; media_type: string; description?: string | null; viewUrl?: string | null; created_at: string; uploaded_by?: { name?: string } | string | null };
@@ -57,7 +58,15 @@ type SessionItem = {
   summary: SessionSummary | null;
 };
 
-export function WorkspaceClient({ workspaceId, isCoach = false }: { workspaceId: string; isCoach?: boolean }) {
+export function WorkspaceClient({
+  workspaceId,
+  isCoach = false,
+  workspaceHomeHref = '/dashboard',
+}: {
+  workspaceId: string;
+  isCoach?: boolean;
+  workspaceHomeHref?: string;
+}) {
   const router = useRouter();
   const [data, setData] = useState<{
     workspace: {
@@ -89,7 +98,7 @@ export function WorkspaceClient({ workspaceId, isCoach = false }: { workspaceId:
   const load = useCallback(async () => {
     const res = await fetch(`/api/workspaces/${workspaceId}`);
     if (!res.ok) {
-      router.push('/inbox');
+      router.push(workspaceHomeHref);
       return;
     }
     const json = await res.json();
@@ -97,7 +106,7 @@ export function WorkspaceClient({ workspaceId, isCoach = false }: { workspaceId:
     setEditingMediaId(null);
     setMediaNoteDraft('');
     setDeletingMediaId(null);
-  }, [workspaceId, router]);
+  }, [workspaceId, router, workspaceHomeHref]);
 
   useEffect(() => {
     load();
@@ -241,7 +250,7 @@ export function WorkspaceClient({ workspaceId, isCoach = false }: { workspaceId:
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="mb-6">
-        <BackLink fallbackHref="/inbox" label="Back to Community" />
+        <BackLink fallbackHref={workspaceHomeHref} label="Back" />
       </div>
 
       <div className="mb-8">
@@ -261,20 +270,24 @@ export function WorkspaceClient({ workspaceId, isCoach = false }: { workspaceId:
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <MessageCircle className="h-5 w-5" />
-            Messages
+            {IN_APP_MESSAGING_ENABLED ? 'Messages' : 'Chat'}
           </CardTitle>
           <CardDescription>
-            All messaging happens in Community. Use DMs and groups there to coordinate with this coach and wrestler.
+            {IN_APP_MESSAGING_ENABLED
+              ? 'All messaging happens in Community. Use DMs and groups there to coordinate with this coach and wrestler.'
+              : IN_APP_MESSAGING_PAUSED_MESSAGE}
           </CardDescription>
         </CardHeader>
-        <CardContent>
-          <Link href="/inbox">
-            <Button variant="outline" className="gap-2">
-              <MessageCircle className="h-4 w-4" />
-              Open Community
-            </Button>
-          </Link>
-        </CardContent>
+        {IN_APP_MESSAGING_ENABLED ? (
+          <CardContent>
+            <Link href="/inbox">
+              <Button variant="outline" className="gap-2">
+                <MessageCircle className="h-4 w-4" />
+                Open Community
+              </Button>
+            </Link>
+          </CardContent>
+        ) : null}
       </Card>
 
       <ActionItemsSection workspaceId={workspaceId} isCoach={userRole === 'coach'} />

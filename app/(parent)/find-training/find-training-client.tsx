@@ -1043,7 +1043,7 @@ export function FindTrainingClient({
                     className="shrink-0 min-h-[44px] bg-[#D4AF37] hover:bg-[#c9a432] text-black font-semibold text-sm"
                     asChild
                   >
-                    <Link href={reqHref}>Request session</Link>
+                    <Link href={reqHref}>Custom time</Link>
                   </Button>
                 </div>
               );

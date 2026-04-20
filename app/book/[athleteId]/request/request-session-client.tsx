@@ -42,6 +42,8 @@ type Props = {
   youthWrestlers: YouthWrestler[];
   preselectedYouthWrestlerId?: string | null;
   initialSessionType?: 'private' | 'partner';
+  /** True when coach has weekly or dated availability — request flow is for off-calendar times only. */
+  coachHasPublishedAvailability: boolean;
 };
 
 type AvailabilityByDay = { day_of_week: number; start_time: string; end_time: string }[];
@@ -54,6 +56,7 @@ export function RequestSessionClient({
   youthWrestlers,
   preselectedYouthWrestlerId = null,
   initialSessionType,
+  coachHasPublishedAvailability,
 }: Props) {
   const router = useRouter();
   const [youthWrestlerId, setYouthWrestlerId] = useState(
@@ -99,6 +102,11 @@ export function RequestSessionClient({
   const daysWithSlots = new Set(availability?.map((a) => a.day_of_week) ?? []);
 
   useEffect(() => {
+    if (coachHasPublishedAvailability) {
+      setSlots([]);
+      setSelectedTime(null);
+      return;
+    }
     if (!selectedDate) {
       setSlots([]);
       setSelectedTime(null);
@@ -123,7 +131,7 @@ export function RequestSessionClient({
     return () => {
       cancelled = true;
     };
-  }, [athlete.id, selectedDate]);
+  }, [athlete.id, selectedDate, coachHasPublishedAvailability]);
 
   const buildPreferredIso = (): string | null => {
     if (selectedDate && selectedTime) {
@@ -145,11 +153,6 @@ export function RequestSessionClient({
     const preferredDatetime = buildPreferredIso();
     const msg = message.trim();
     const flex = flexibilityNote.trim();
-
-    if (hasAvailability && (!selectedDate || !selectedTime)) {
-      setError('Choose a date and time from the coach’s available slots.');
-      return;
-    }
 
     if (!preferredDatetime && !msg && !flex) {
       setError('Add a preferred time, a message, or when you are flexible.');
@@ -214,6 +217,12 @@ export function RequestSessionClient({
     );
   }
 
+  const bookQuery =
+    preselectedYouthWrestlerId != null && String(preselectedYouthWrestlerId).trim() !== ''
+      ? `?youthWrestlerId=${encodeURIComponent(preselectedYouthWrestlerId)}`
+      : '';
+  const bookHref = `/book/${athlete.id}${bookQuery}`;
+
   return (
     <div className="container mx-auto px-4 py-6 sm:py-8 max-w-lg">
       <div className="mb-4">
@@ -230,7 +239,9 @@ export function RequestSessionClient({
           fallbackIconClassName="h-7 w-7 text-muted-foreground"
         />
         <div>
-          <h1 className="text-xl font-bold">Request a session</h1>
+          <h1 className="text-xl font-bold">
+            {coachHasPublishedAvailability ? 'Ask for a custom time' : 'Request a session'}
+          </h1>
           <p className="text-sm text-muted-foreground flex items-center gap-2">
             <SchoolLogo school={athlete.school} size="sm" />
             {athlete.first_name} {athlete.last_name}
@@ -239,63 +250,80 @@ export function RequestSessionClient({
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Pick time</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Times shown respect this coach’s availability. No payment until they approve.
-            </p>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex justify-center">
-              <Calendar
-                mode="single"
-                selected={selectedDate}
-                onSelect={setSelectedDate}
-                disabled={(date) => {
-                  if (date < startOfDay(new Date())) return true;
-                  const dateStr = formatEST(date, 'yyyy-MM-dd');
-                  if (blockedDates.has(dateStr)) return true;
-                  if (availabilityDates.has(dateStr)) return false;
-                  if (daysWithSlots.has(getDayOfWeek(date))) return false;
-                  return hasAvailability;
-                }}
-                className="rounded-md border"
-              />
-            </div>
-            {selectedDate && (
-              <div>
-                <h3 className="font-semibold mb-3 text-sm">Time (Eastern)</h3>
-                {slotsLoading ? (
-                  <p className="text-sm text-muted-foreground">Loading slots…</p>
-                ) : slots.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No times available this day.</p>
-                ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                    {slots.map((t) => (
-                      <button
-                        key={t}
-                        type="button"
-                        onClick={() => setSelectedTime(t)}
-                        className={`min-h-[44px] p-2 rounded-lg border text-sm touch-manipulation ${
-                          selectedTime === t ? 'border-accent bg-accent text-black' : 'border-border hover:border-accent/50'
-                        }`}
-                      >
-                        {formatSlotDisplay(t)}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-            {!hasAvailability && (
-              <p className="text-xs text-muted-foreground">
-                This coach has not added calendar openings yet. You can still send a message below with times that work
-                for you.
+        {coachHasPublishedAvailability ? (
+          <Card className="border-accent/30 bg-accent/5">
+            <CardHeader>
+              <CardTitle className="text-base">Book a listed time first</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Times on {athlete.first_name}&apos;s calendar can be booked right away (checkout). Use this form only for
+                times outside those openings or special situations — the coach will review before you pay.
               </p>
-            )}
-          </CardContent>
-        </Card>
+            </CardHeader>
+            <CardContent>
+              <Button asChild className="w-full min-h-[44px] bg-[#D4AF37] hover:bg-[#c9a432] text-black font-semibold">
+                <Link href={bookHref}>Book with {athlete.first_name}</Link>
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Pick time (optional)</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                Suggest a time if you like. No payment until the coach approves.
+              </p>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex justify-center">
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={setSelectedDate}
+                  disabled={(date) => {
+                    if (date < startOfDay(new Date())) return true;
+                    const dateStr = formatEST(date, 'yyyy-MM-dd');
+                    if (blockedDates.has(dateStr)) return true;
+                    if (availabilityDates.has(dateStr)) return false;
+                    if (daysWithSlots.has(getDayOfWeek(date))) return false;
+                    return hasAvailability;
+                  }}
+                  className="rounded-md border"
+                />
+              </div>
+              {selectedDate && (
+                <div>
+                  <h3 className="font-semibold mb-3 text-sm">Time (Eastern)</h3>
+                  {slotsLoading ? (
+                    <p className="text-sm text-muted-foreground">Loading slots…</p>
+                  ) : slots.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No times available this day.</p>
+                  ) : (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {slots.map((t) => (
+                        <button
+                          key={t}
+                          type="button"
+                          onClick={() => setSelectedTime(t)}
+                          className={`min-h-[44px] p-2 rounded-lg border text-sm touch-manipulation ${
+                            selectedTime === t ? 'border-accent bg-accent text-black' : 'border-border hover:border-accent/50'
+                          }`}
+                        >
+                          {formatSlotDisplay(t)}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+              {!hasAvailability && (
+                <p className="text-xs text-muted-foreground">
+                  This coach has not added calendar openings yet. You can still send a message below with times that work
+                  for you.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )}
 
         <Card>
           <CardHeader>

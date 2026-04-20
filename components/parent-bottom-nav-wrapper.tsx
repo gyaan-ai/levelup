@@ -16,7 +16,6 @@ const COACH_ROUTES = [
   '/coach-roster',
   '/coach-earnings',
   '/coach-reviews',
-  '/inbox',
   '/profile',
   '/rate-card',
   '/small-group-sessions',
@@ -29,7 +28,7 @@ const YOUTH_WRESTLER_ROUTES = [
   '/youth-dashboard',
   '/workspaces',
   '/small-group-sessions',
-  '/inbox',
+  '/browse',
   '/notifications',
 ];
 

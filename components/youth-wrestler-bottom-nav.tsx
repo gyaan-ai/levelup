@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, LayoutGrid, Users, MessageCircle, Bell } from 'lucide-react';
+import { Home, LayoutGrid, Users, Search, Bell } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 /** 5 items max. Same pattern as parent/coach: one bottom nav on mobile. */
@@ -10,7 +10,7 @@ const ITEMS = [
   { href: '/youth-dashboard', label: 'Home', icon: Home },
   { href: '/workspaces', label: 'Workspaces', icon: LayoutGrid },
   { href: '/small-group-sessions', label: 'Group', icon: Users },
-  { href: '/inbox', label: 'Messages', icon: MessageCircle },
+  { href: '/browse', label: 'Browse', icon: Search },
   { href: '/notifications', label: 'Notifications', icon: Bell },
 ] as const;
 

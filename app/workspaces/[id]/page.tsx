@@ -25,13 +25,23 @@ export default async function WorkspacePage({
   if (!workspace) notFound();
 
   const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
+  const role = userData?.role;
+  const workspaceDeniedRedirect =
+    role === 'coach'
+      ? '/athlete-dashboard'
+      : role === 'youth_wrestler'
+        ? '/youth-dashboard'
+        : role === 'admin'
+          ? '/admin'
+          : '/dashboard';
   const hasAccess =
     workspace.parent_id === user.id ||
     workspace.athlete_id === user.id ||
     workspace.youth_wrestler_id === user.id ||
-    userData?.role === 'admin';
-  if (!hasAccess) redirect('/inbox');
+    role === 'admin';
+  if (!hasAccess) redirect(workspaceDeniedRedirect);
 
   const isCoach = workspace.athlete_id === user.id;
-  return <WorkspaceClient workspaceId={id} isCoach={isCoach} />;
+  const workspaceHomeHref = workspaceDeniedRedirect;
+  return <WorkspaceClient workspaceId={id} isCoach={isCoach} workspaceHomeHref={workspaceHomeHref} />;
 }

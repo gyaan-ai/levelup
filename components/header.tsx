@@ -29,6 +29,7 @@ import { BrandLogo } from '@/components/brand-logo';
 import { CartDropdown } from '@/components/cart-dropdown';
 import { createClient } from '@/lib/supabase/client';
 import { CoachHeaderMobile } from '@/components/coach-header-mobile';
+import { IN_APP_MESSAGING_ENABLED } from '@/lib/in-app-messaging';
 
 type Coach = { id: string; first_name: string; last_name: string; school: string | null };
 
@@ -38,7 +39,9 @@ export function Header() {
   const { user, userRole, viewAsRole, effectiveRole, viewAsCoachId, setViewAsRole, setViewAsCoachId, loading, signOut } = useAuth();
   const router = useRouter();
   const [notificationCount, refreshNotifications] = useNotificationCount(!!user);
-  const showInboxIcon = effectiveRole === 'parent' || effectiveRole === 'coach' || effectiveRole === 'youth_wrestler';
+  const showInboxIcon =
+    IN_APP_MESSAGING_ENABLED &&
+    (effectiveRole === 'parent' || effectiveRole === 'coach' || effectiveRole === 'youth_wrestler');
   const [inboxUnreadCount, refreshInboxUnread] = useInboxUnreadCount(!!user && showInboxIcon);
   
   // Coach picker state

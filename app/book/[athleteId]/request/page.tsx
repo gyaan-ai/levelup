@@ -4,12 +4,40 @@ import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
 import { RequestSessionClient } from './request-session-client';
 
+function normalizeBookTimeParam(raw: string): string | null {
+  const m = raw.trim().match(/^(\d{1,2}):(\d{2})$/);
+  if (!m) return null;
+  const h = parseInt(m[1], 10);
+  const min = parseInt(m[2], 10);
+  if (h < 0 || h > 23 || min < 0 || min > 59) return null;
+  return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+}
+
+async function coachHasPublishedAvailability(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  athleteId: string
+): Promise<boolean> {
+  const { data: recur } = await supabase.from('athlete_availability').select('id').eq('athlete_id', athleteId).limit(1);
+  if (recur && recur.length > 0) return true;
+  try {
+    const { data: slots } = await supabase
+      .from('athlete_availability_slots')
+      .select('id')
+      .eq('athlete_id', athleteId)
+      .limit(1);
+    if (slots && slots.length > 0) return true;
+  } catch {
+    /* table may not exist */
+  }
+  return false;
+}
+
 export default async function RequestSessionPage({
   params,
   searchParams,
 }: {
   params: Promise<{ athleteId: string }>;
-  searchParams: Promise<{ youthWrestlerId?: string; sessionType?: string }>;
+  searchParams: Promise<{ youthWrestlerId?: string; sessionType?: string; date?: string; time?: string }>;
 }) {
   const { athleteId } = await params;
   const sp = await searchParams;
@@ -34,6 +62,16 @@ export default async function RequestSessionPage({
   if (userData?.role === 'coach') redirect('/athlete-dashboard');
   if (userData?.role !== 'parent' && userData?.role !== 'admin') redirect('/browse');
 
+  const dateQ = sp.date?.trim();
+  const timeNorm = sp.time?.trim() ? normalizeBookTimeParam(sp.time) : null;
+  if (dateQ && /^\d{4}-\d{2}-\d{2}$/.test(dateQ) && timeNorm) {
+    const qs = new URLSearchParams();
+    qs.set('date', dateQ);
+    qs.set('time', timeNorm);
+    if (preselectedYouthWrestlerId) qs.set('youthWrestlerId', preselectedYouthWrestlerId);
+    redirect(`/book/${athleteId}?${qs.toString()}`);
+  }
+
   const { data: athlete, error: athleteError } = await supabase
     .from('athletes')
     .select('id, first_name, last_name, school, photo_url, photo_focus_x, photo_focus_y')
@@ -52,6 +90,8 @@ export default async function RequestSessionPage({
 
   const { data: facilities } = await supabase.from('facilities').select('id, name, school').order('name');
 
+  const coachHasCalendar = await coachHasPublishedAvailability(supabase, athleteId);
+
   return (
     <RequestSessionClient
       athlete={athlete}
@@ -59,6 +99,7 @@ export default async function RequestSessionPage({
       youthWrestlers={youthWrestlers ?? []}
       preselectedYouthWrestlerId={preselectedYouthWrestlerId}
       initialSessionType={initialSessionType}
+      coachHasPublishedAvailability={coachHasCalendar}
     />
   );
 }

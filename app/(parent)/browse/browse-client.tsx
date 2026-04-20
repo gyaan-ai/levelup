@@ -28,8 +28,6 @@ import { getSchoolBadgeColors, schoolBadgeClassName } from '@/lib/school-logos';
 
 interface AthleteWithNext extends Athlete {
   nextAvailable?: { slot_date: string; start_time: string } | null;
-  /** Strong CTA: availability exists but no upcoming public bookable session. */
-  showRequestSessionPrimary?: boolean;
 }
 
 interface BrowseAthletesClientProps {
@@ -371,41 +369,22 @@ export function BrowseAthletesClient({ initialAthletes, isAdmin, initialYouthWre
                         </Button>
                         <FollowCoachButton coachId={athlete.id} />
                       </div>
-                      {athlete.showRequestSessionPrimary ? (
-                        <>
-                          <Button
-                            className="w-full min-h-[44px] bg-[#D4AF37] hover:bg-[#c9a432] text-black font-semibold"
-                            size="sm"
-                            asChild
-                          >
-                            <Link href={requestHref}>
-                              <Calendar className="h-4 w-4 mr-2 shrink-0" />
-                              Request a session
-                            </Link>
-                          </Button>
-                          <Button className="w-full" variant="secondary" size="sm" asChild>
-                            <Link href={bookHref}>
-                              <Calendar className="h-4 w-4 mr-2 shrink-0" />
-                              See availability
-                            </Link>
-                          </Button>
-                        </>
-                      ) : (
-                        <>
-                          <Button className="w-full" variant="secondary" size="sm" asChild>
-                            <Link href={bookHref}>
-                              <Calendar className="h-4 w-4 mr-2 shrink-0" />
-                              See availability
-                            </Link>
-                          </Button>
-                          <Link
-                            href={requestHref}
-                            className="text-sm text-center text-accent font-medium underline underline-offset-2 hover:no-underline min-h-[44px] flex items-center justify-center"
-                          >
-                            Need a different time? Request a session
-                          </Link>
-                        </>
-                      )}
+                      <Button
+                        className="w-full min-h-[44px] bg-[#D4AF37] hover:bg-[#c9a432] text-black font-semibold"
+                        size="sm"
+                        asChild
+                      >
+                        <Link href={bookHref}>
+                          <Calendar className="h-4 w-4 mr-2 shrink-0" />
+                          See availability
+                        </Link>
+                      </Button>
+                      <Link
+                        href={requestHref}
+                        className="text-sm text-center text-accent font-medium underline underline-offset-2 hover:no-underline min-h-[44px] flex items-center justify-center"
+                      >
+                        Need a custom time? Ask the coach
+                      </Link>
                       <a
                         href={`/training?tab=sessions&coach=${encodeURIComponent(athlete.id)}${initialYouthWrestlerId ? `&wrestler=${encodeURIComponent(initialYouthWrestlerId)}` : ''}`}
                         className="text-xs text-muted-foreground hover:text-foreground underline text-center block"

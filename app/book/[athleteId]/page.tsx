@@ -11,11 +11,23 @@ export default async function BookPage({
   searchParams,
 }: {
   params: Promise<{ athleteId: string }>;
-  searchParams: Promise<{ youthWrestlerId?: string }>;
+  searchParams: Promise<{ youthWrestlerId?: string; date?: string; time?: string }>;
 }) {
   const { athleteId } = await params;
   const sp = await searchParams;
   const preselectedYouthWrestlerId = sp.youthWrestlerId ?? null;
+  const dateRaw = sp.date?.trim();
+  const initialBookingDate =
+    dateRaw && /^\d{4}-\d{2}-\d{2}$/.test(dateRaw) ? dateRaw : null;
+  const timeRaw = sp.time?.trim();
+  const timeMatch = timeRaw?.match(/^(\d{1,2}):(\d{2})$/);
+  const initialBookingTime = (() => {
+    if (!timeMatch) return null;
+    const h = parseInt(timeMatch[1], 10);
+    const min = parseInt(timeMatch[2], 10);
+    if (h < 0 || h > 23 || min < 0 || min > 59) return null;
+    return `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+  })();
   const headersList = await headers();
   const host = headersList.get('host') || '';
   const tenant = getTenantByDomain(host);
@@ -139,6 +151,8 @@ export default async function BookPage({
       products={products}
       preselectedYouthWrestlerId={preselectedYouthWrestlerId}
       checkoutUsesSavedAccountDiscount={checkoutAllowSavedAccountPercent()}
+      initialBookingDate={initialBookingDate}
+      initialBookingTime={initialBookingTime}
     />
   );
 }
