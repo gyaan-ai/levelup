@@ -130,7 +130,7 @@ export async function sendCoachNewSignupSms(
     zelle_email: athleteRow?.zelle_email ?? undefined,
   });
   if (!phone) return;
-  const body = `LevelUp: Someone signed up for your session on ${dateStr}. Check My sessions in the app.`;
+  const body = `LevelUp: New booking for ${dateStr}. Check My sessions in the app.`;
   await sendSms(phone, body, {
     admin,
     messageType: 'coach_new_signup',

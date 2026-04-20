@@ -1,5 +1,9 @@
 # Locations & Facilities — How to Handle Coaches’ Clubs
 
+## Copy / terminology
+
+In user-facing product copy, prefer **wrestling room** or **facility**. Avoid **gym** (too generic).
+
 **Current state**
 - **facilities** table: global list (name, school, address). Seeded by admin; not created in-app.
 - Each **coach** has one **facility_id** (primary “where I train”).
@@ -7,7 +11,7 @@
 - Coaches only **choose** from existing facilities; they can’t add “my club” or multiple venues.
 
 **Goal**
-- Let coaches use their clubs and other venues (NCAA room, club gym).
+- Let coaches use their clubs and other venues (NCAA wrestling room, club facility).
 - Avoid duplicate entries when two coaches use the same club.
 - Keep it simple (MVP, then mobile).
 

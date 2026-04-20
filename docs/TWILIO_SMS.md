@@ -1,6 +1,6 @@
 # Twilio SMS for coach alerts
 
-When someone signs up for a coach’s session, the coach gets:
+When someone books or signs up for a coach’s session, the coach gets:
 
 1. **In-app notification** (always) — “Someone signed up for your session … Check My sessions.”
 2. **SMS** (optional) — if Twilio is configured and the coach has a phone on file.
@@ -24,8 +24,10 @@ If neither is set or neither looks like a valid phone, we only send the in-app n
 
 ## Where SMS is sent
 
-- **Stripe webhook** — after a paid signup (checkout.session.completed, register payment path): in-app notification + SMS if phone set.
+- **Stripe webhook** — after a paid booking or signup (`checkout.session.completed`): private booking, register path, and cart checkout; in-app notification + SMS if phone set.
 - **Register API** — after a free/direct signup (session owner add, or free small group): in-app notification + SMS if phone set.
+- **Cart checkout (credits only)** — when the cart is fully paid with credits (no Stripe): in-app notification + SMS if phone set (one SMS per session per checkout).
+- **Private booking API** — when the charge is below Stripe’s minimum and the session is confirmed without card payment: SMS in addition to the existing in-app notification at booking time.
 
 ## Testing
 

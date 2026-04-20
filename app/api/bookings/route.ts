@@ -15,6 +15,7 @@ import { checkoutAllowSavedAccountPercent, resolveCheckoutPercentOff } from '@/l
 import { normalizeCoachOrWrestlerId, verifyCoachForParentBooking } from '@/lib/server-booking-coach';
 import { isPennyTestPricingEnabled } from '@/lib/penny-test-pricing';
 import { resolveCoachPayoutRate } from '@/lib/coach-session-payout';
+import { sendCoachNewSignupSms } from '@/lib/twilio';
 
 export async function POST(req: NextRequest) {
   try {
@@ -320,7 +321,10 @@ export async function POST(req: NextRequest) {
         .from('session_participants')
         .update({ paid: true })
         .eq('session_id', session.id);
-      
+
+      const dateStr = formatEST(new Date(scheduledDatetime), 'EEE MMM d, h:mm a');
+      await sendCoachNewSignupSms(admin, athleteIdNorm, dateStr, session.id).catch(() => {});
+
       return NextResponse.json({
         sessionId: session.id,
         partnerInviteCode: session.partner_invite_code ?? undefined,

@@ -22,6 +22,12 @@ const SLOTS_24H = [
 
 type Slot = { id: string; slot_date: string; start_time: string; end_time: string };
 
+function slotAlreadyInList(list: Slot[], slotDate: string, start: string, end: string): boolean {
+  return list.some(
+    (s) => s.slot_date === slotDate && s.start_time === start && s.end_time === end
+  );
+}
+
 export function AvailabilityManager() {
   const [list, setList] = useState<Slot[]>([]);
   const [loading, setLoading] = useState(true);
@@ -67,9 +73,23 @@ export function AvailabilityManager() {
     }
     setAdding(true);
     try {
+      const toAdd = selectedDates.filter(
+        (d) => !slotAlreadyInList(list, formatEST(d, 'yyyy-MM-dd'), start, end)
+      );
+      const skippedExact = selectedDates.length - toAdd.length;
+      if (toAdd.length === 0) {
+        window.alert(
+          skippedExact > 0
+            ? `You already have this opening (${formatSlotDisplay(start)}–${formatSlotDisplay(end)}) on every date you selected. It’s listed under Upcoming openings — remove a slot there if you want to change it, or pick different dates or times.`
+            : 'Nothing to add.'
+        );
+        return;
+      }
+
       let firstError: string | null = null;
-      let ok = 0;
-      for (const d of selectedDates) {
+      let succeeded = 0;
+      let serverDuplicate = 0;
+      for (const d of toAdd) {
         const slotDate = formatEST(d, 'yyyy-MM-dd');
         const r = await fetch('/api/availability/me', {
           method: 'POST',
@@ -80,17 +100,32 @@ export function AvailabilityManager() {
         if (!r.ok) {
           if (!firstError) firstError = (data.error as string) || 'Failed to add';
         } else {
-          ok++;
+          succeeded++;
+          if (data.duplicate) serverDuplicate++;
         }
       }
       await refreshSlots();
       if (firstError) {
         window.alert(
-          ok > 0
-            ? `Added ${ok} slot(s). Some dates failed: ${firstError}`
+          succeeded > 0
+            ? `Saved ${succeeded} slot(s). Some dates failed: ${firstError}`
             : firstError
         );
       } else {
+        const newOrUpdated = succeeded - serverDuplicate;
+        const infoParts: string[] = [];
+        if (newOrUpdated > 0) infoParts.push(`Added ${newOrUpdated} opening${newOrUpdated === 1 ? '' : 's'}`);
+        if (serverDuplicate > 0) {
+          infoParts.push(
+            `${serverDuplicate} already had this time (left as-is)`
+          );
+        }
+        if (skippedExact > 0) {
+          infoParts.push(`${skippedExact} not sent — already on your list`);
+        }
+        if (infoParts.length > 1 || serverDuplicate > 0 || skippedExact > 0) {
+          window.alert(infoParts.join('. ') + '.');
+        }
         setSelectedDates([]);
         setStart('09:00');
         setEnd('17:00');
@@ -135,7 +170,8 @@ export function AvailabilityManager() {
           <CardTitle>Your calendar</CardTitle>
           <CardDescription>
             Select one or more dates, choose when you&apos;re open, then add. Parents use these times for private and
-            partner requests. Repeat for other time windows or weeks as needed.
+            partner requests. If a day already appears under Upcoming openings with the same start and end, you
+            don&apos;t need to add it again — use Remove there if you want to change it.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">

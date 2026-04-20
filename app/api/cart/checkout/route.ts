@@ -10,6 +10,8 @@ import { getEffectiveFilledCount } from '@/lib/sessions';
 import { getUserCreditBalance, applyCredits } from '@/lib/credits';
 import { ensureAutoFamilyDiscountForParent } from '@/lib/family-auto-discount';
 import { checkoutAllowSavedAccountPercent, resolveCheckoutPercentOff } from '@/lib/checkout-promo';
+import { createNotification } from '@/lib/notifications';
+import { sendCoachNewSignupSms } from '@/lib/twilio';
 
 type CartLine = { sessionId: string; wrestlerId: string };
 
@@ -283,6 +285,7 @@ export async function POST(req: NextRequest) {
           (s as { current_participants?: number }).current_participants ?? 0
         );
       }
+      const coachNotifySentForSession = new Set<string>();
       for (const meta of sessionMetadata) {
         await applyCredits({
           userId: user.id,
@@ -304,6 +307,24 @@ export async function POST(req: NextRequest) {
         const next = (currentCountBySession.get(meta.session_id) ?? 0) + 1;
         currentCountBySession.set(meta.session_id, next);
         await admin.from('sessions').update({ current_participants: next }).eq('id', meta.session_id);
+
+        if (!coachNotifySentForSession.has(meta.session_id)) {
+          coachNotifySentForSession.add(meta.session_id);
+          const sRow = sessionById.get(meta.session_id);
+          const coachId = sRow?.athlete_id as string | undefined;
+          const sched = sRow?.scheduled_datetime as string | undefined;
+          if (coachId && coachId !== user.id) {
+            const dateStr = sched ? formatEST(new Date(sched), 'EEE MMM d, h:mm a') : 'your session';
+            await createNotification(admin, {
+              user_id: coachId,
+              type: 'session_booked',
+              title: 'Someone just booked your session',
+              body: `New booking for ${dateStr}. Check My sessions.`,
+              data: { session_id: meta.session_id },
+            }).catch((e) => console.warn('Cart credits: coach notification failed', e));
+            await sendCoachNewSignupSms(admin, coachId, dateStr, meta.session_id).catch(() => {});
+          }
+        }
       }
 
       return NextResponse.json({

@@ -96,6 +96,49 @@ export async function POST(req: NextRequest) {
     const start = pad(start_time);
     const end = pad(end_time);
 
+    const { data: existing } = await db
+      .from('athlete_availability_slots')
+      .select('id, slot_date, start_time, end_time')
+      .eq('athlete_id', actor.coachId)
+      .eq('slot_date', slotDate)
+      .eq('start_time', start)
+      .maybeSingle();
+
+    if (existing) {
+      const existingEnd =
+        typeof existing.end_time === 'string' ? pad(existing.end_time) : pad(String(existing.end_time));
+      if (existingEnd === end) {
+        return NextResponse.json({
+          availability: {
+            id: existing.id,
+            slot_date: existing.slot_date,
+            start_time: timeToHHmm(existing.start_time),
+            end_time: timeToHHmm(existing.end_time),
+          },
+          duplicate: true,
+        });
+      }
+      const { data: row, error: upErr } = await db
+        .from('athlete_availability_slots')
+        .update({ end_time: end })
+        .eq('id', existing.id)
+        .eq('athlete_id', actor.coachId)
+        .select('id, slot_date, start_time, end_time')
+        .single();
+      if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 });
+      if (!row) return NextResponse.json({ error: 'Update failed' }, { status: 500 });
+      notifyAvailabilityFollowers(tenant.slug, actor.coachId);
+      return NextResponse.json({
+        availability: {
+          id: row.id,
+          slot_date: row.slot_date,
+          start_time: timeToHHmm(row.start_time),
+          end_time: timeToHHmm(row.end_time),
+        },
+        updatedEnd: true,
+      });
+    }
+
     const { data: row, error } = await db
       .from('athlete_availability_slots')
       .insert({
@@ -107,7 +150,29 @@ export async function POST(req: NextRequest) {
       .select('id, slot_date, start_time, end_time')
       .single();
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) {
+      if (error.code === '23505') {
+        const { data: again } = await db
+          .from('athlete_availability_slots')
+          .select('id, slot_date, start_time, end_time')
+          .eq('athlete_id', actor.coachId)
+          .eq('slot_date', slotDate)
+          .eq('start_time', start)
+          .maybeSingle();
+        if (again) {
+          return NextResponse.json({
+            availability: {
+              id: again.id,
+              slot_date: again.slot_date,
+              start_time: timeToHHmm(again.start_time),
+              end_time: timeToHHmm(again.end_time),
+            },
+            duplicate: true,
+          });
+        }
+      }
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
 
     notifyAvailabilityFollowers(tenant.slug, actor.coachId);
 
