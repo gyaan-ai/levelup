@@ -133,10 +133,41 @@ export function TrainingCoachesGrid({
   return (
     <div className="space-y-4">
       <div
-        className="flex flex-nowrap items-stretch gap-2 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide"
+        className="flex flex-wrap items-center gap-2 gap-y-3 pb-2"
         role="toolbar"
         aria-label="Coach filters"
       >
+        <div className="flex shrink-0 items-center gap-2">
+          {filterDate ? (
+            <button
+              type="button"
+              onClick={() => setFilterDate('')}
+              className="flex min-h-[44px] max-w-[11rem] items-center gap-1 rounded-full border border-[#D4AF37]/40 bg-zinc-900 px-3 py-2 text-sm font-medium text-[#D4AF37] touch-manipulation"
+              aria-label={`Clear date filter ${formatEST(parseISO(`${filterDate}T12:00:00`), 'EEE MMM d')}`}
+            >
+              <span className="truncate">{formatEST(parseISO(`${filterDate}T12:00:00`), 'EEE MMM d')}</span>
+              <span className="text-lg leading-none" aria-hidden>
+                ×
+              </span>
+            </button>
+          ) : (
+            <div className="relative flex min-h-[44px] w-[11rem] shrink-0 items-center justify-center rounded-full border border-zinc-800 bg-zinc-900 px-3 text-sm font-medium text-zinc-300 touch-manipulation [&:focus-within]:ring-2 [&:focus-within]:ring-[#D4AF37]/50">
+              <span className="pointer-events-none select-none">Date</span>
+              <input
+                id={dateInputId}
+                type="date"
+                min={coachDateFilterBounds.minYmd}
+                max={coachDateFilterBounds.maxYmd}
+                value={filterDate}
+                onChange={(e) => setFilterDate(e.target.value)}
+                onClick={(e) => e.stopPropagation()}
+                className="absolute inset-0 z-10 h-full w-full cursor-pointer rounded-full border-0 bg-transparent p-0 text-base opacity-[0.01] [color-scheme:dark]"
+                aria-label="Filter coaches by date"
+              />
+            </div>
+          )}
+        </div>
+
         <label className="sr-only" htmlFor="training-coach-location">
           Location
         </label>
@@ -144,7 +175,7 @@ export function TrainingCoachesGrid({
           id="training-coach-location"
           value={facilityId}
           onChange={(e) => setFacilityId(e.target.value)}
-          className="min-h-[44px] w-[min(100%,11rem)] shrink-0 rounded-full border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/50 sm:w-auto sm:min-w-[10rem] sm:max-w-[200px]"
+          className="min-h-[44px] w-full min-w-[10rem] max-w-[min(100%,20rem)] shrink-0 rounded-full border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/50 sm:w-auto"
         >
           <option value="all">All locations</option>
           {locationFacilities.map((f) => (
@@ -154,8 +185,7 @@ export function TrainingCoachesGrid({
           ))}
         </select>
 
-        {/* shrink-0: avoid flex-1 min-w-0 collapsing this row to 0px on mobile (was hiding "All" and stacking the date input against the location select as a blank pill). */}
-        <div className="flex shrink-0 items-center justify-start gap-2 overflow-x-auto scrollbar-hide px-1">
+        <div className="flex flex-wrap items-center gap-2">
           {(
             [
               ['all', 'All'],
@@ -177,39 +207,6 @@ export function TrainingCoachesGrid({
               {label}
             </button>
           ))}
-        </div>
-
-        <div className="flex shrink-0 items-center gap-2">
-          {filterDate ? (
-            <button
-              type="button"
-              onClick={() => setFilterDate('')}
-              className="flex min-h-[44px] max-w-[11rem] items-center gap-1 rounded-full border border-[#D4AF37]/40 bg-zinc-900 px-3 py-2 text-sm font-medium text-[#D4AF37] touch-manipulation"
-              aria-label={`Clear date filter ${formatEST(parseISO(`${filterDate}T12:00:00`), 'EEE MMM d')}`}
-            >
-              <span className="truncate">{formatEST(parseISO(`${filterDate}T12:00:00`), 'EEE MMM d')}</span>
-              <span className="text-lg leading-none" aria-hidden>
-                ×
-              </span>
-            </button>
-          ) : (
-            <label
-              htmlFor={dateInputId}
-              className="relative flex min-h-[44px] w-[11rem] shrink-0 cursor-pointer items-center justify-center rounded-full border border-zinc-800 bg-zinc-900 px-3 text-sm font-medium text-zinc-300 touch-manipulation focus-within:ring-2 focus-within:ring-[#D4AF37]/50"
-            >
-              <span className="pointer-events-none select-none">Date</span>
-              <input
-                id={dateInputId}
-                type="date"
-                min={coachDateFilterBounds.minYmd}
-                max={coachDateFilterBounds.maxYmd}
-                value={filterDate}
-                onChange={(e) => setFilterDate(e.target.value)}
-                className="absolute inset-0 cursor-pointer opacity-0"
-                aria-label="Filter coaches by date"
-              />
-            </label>
-          )}
         </div>
 
         <button
