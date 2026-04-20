@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
-import { fromZonedTime } from 'date-fns-tz';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
-import { APP_TIMEZONE } from '@/lib/format-date';
+import { easternWallDateTimeToUtcIso } from '@/lib/format-date';
 import { notifySessionScheduledFollowers } from '@/lib/notify-session-scheduled-followers';
 
 /**
@@ -118,11 +117,7 @@ export async function PATCH(
       updates.price_per_participant = price;
     }
     if (body.scheduledDate && body.scheduledTime) {
-      const [datePart] = body.scheduledDate.split('T');
-      const timePart = body.scheduledTime.includes(':') ? body.scheduledTime : `${body.scheduledTime}:00`;
-      const localIso = `${datePart}T${timePart.length === 5 ? `${timePart}:00` : timePart}`;
-      const utcDate = fromZonedTime(localIso, APP_TIMEZONE);
-      updates.scheduled_datetime = utcDate.toISOString();
+      updates.scheduled_datetime = easternWallDateTimeToUtcIso(body.scheduledDate, body.scheduledTime);
     }
     
     // published column doesn't exist in DB - skip this logic

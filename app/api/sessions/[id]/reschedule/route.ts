@@ -3,6 +3,7 @@ import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
+import { easternWallDateTimeToUtcIso } from '@/lib/format-date';
 
 export async function PATCH(
   req: NextRequest,
@@ -35,8 +36,7 @@ export async function PATCH(
       );
     }
 
-    const [datePart] = scheduledDate.split('T');
-    const scheduledDatetime = `${datePart}T${scheduledTime}`;
+    const scheduledDatetime = easternWallDateTimeToUtcIso(scheduledDate, scheduledTime);
     const dt = new Date(scheduledDatetime);
     if (Number.isNaN(dt.getTime())) {
       return NextResponse.json({ error: 'Invalid date or time' }, { status: 400 });

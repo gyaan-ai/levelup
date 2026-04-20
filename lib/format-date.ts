@@ -4,7 +4,7 @@
  */
 
 import { parseISO } from 'date-fns';
-import { formatInTimeZone } from 'date-fns-tz';
+import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
 
 export const APP_TIMEZONE = 'America/New_York';
 
@@ -43,4 +43,15 @@ export function easternCalendarDaysBetween(
 export function easternSundayZeroDowFromYmd(ymd: string): number {
   const i = parseInt(formatInTimeZone(parseISO(`${ymd}T12:00:00`), APP_TIMEZONE, 'i'), 10);
   return i === 7 ? 0 : i;
+}
+
+/**
+ * Calendar date + clock time chosen in Eastern → UTC ISO for `timestamptz` columns.
+ * Without this, Postgres treats naive `YYYY-MM-DDTHH:mm` as UTC and My bookings shows the wrong time.
+ */
+export function easternWallDateTimeToUtcIso(scheduledDate: string, scheduledTime: string): string {
+  const [datePart] = scheduledDate.split('T');
+  const timePart = scheduledTime.includes(':') ? scheduledTime : `${scheduledTime}:00`;
+  const localIso = `${datePart}T${timePart.length === 5 ? `${timePart}:00` : timePart}`;
+  return fromZonedTime(localIso, APP_TIMEZONE).toISOString();
 }

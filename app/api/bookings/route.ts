@@ -7,7 +7,7 @@ import { generateInviteCode } from '@/lib/sessions';
 import { getStripeInstance } from '@/lib/stripe/webhooks';
 import { createNotification } from '@/lib/notifications';
 import type { SessionMode, JoinPolicy } from '@/types';
-import { formatEST } from '@/lib/format-date';
+import { easternWallDateTimeToUtcIso, formatEST } from '@/lib/format-date';
 import { hasMinPhoneDigits } from '@/lib/phone';
 import { maybeBackfillRosterSnapshot } from '@/lib/session-roster-snapshot';
 import { ensureAutoFamilyDiscountForParent } from '@/lib/family-auto-discount';
@@ -140,8 +140,7 @@ export async function POST(req: NextRequest) {
       ? totalPrice * (1 - percentOff / 100)
       : totalPrice;
 
-    const [datePart] = scheduledDate.split('T');
-    const scheduledDatetime = `${datePart}T${scheduledTime}`;
+    const scheduledDatetime = easternWallDateTimeToUtcIso(scheduledDate, scheduledTime);
     
     const testModePenny = isPennyTestPricingEnabled();
     const athletePayment = testModePenny ? 0.50 : totalPrice; // what we pay the coach (you pay manually)

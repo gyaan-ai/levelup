@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
-import { fromZonedTime } from 'date-fns-tz';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantFromRequestHeaders, resolveHostnameFromHeaders } from '@/config/tenants';
 import { generateInviteCode } from '@/lib/sessions';
-import { APP_TIMEZONE } from '@/lib/format-date';
+import { easternWallDateTimeToUtcIso } from '@/lib/format-date';
 import { notifySessionScheduledFollowers } from '@/lib/notify-session-scheduled-followers';
 import {
   getRecommendedPricePerParticipant,
@@ -86,12 +85,7 @@ export async function POST(req: NextRequest) {
 
     const admin = createAdminClient(tenant.slug);
 
-    const [datePart] = scheduledDate.split('T');
-    // Interpret date + time as Eastern; store UTC so display (formatEST) shows correct time
-    const timePart = scheduledTime.includes(':') ? scheduledTime : `${scheduledTime}:00`;
-    const localIso = `${datePart}T${timePart.length === 5 ? `${timePart}:00` : timePart}`;
-    const utcDate = fromZonedTime(localIso, APP_TIMEZONE);
-    const scheduledDatetime = utcDate.toISOString();
+    const scheduledDatetime = easternWallDateTimeToUtcIso(scheduledDate, scheduledTime);
     const rawMax = Number(maxParticipants);
     const max =
       sessionType === 'private'
