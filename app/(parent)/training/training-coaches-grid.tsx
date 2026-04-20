@@ -177,11 +177,21 @@ export function TrainingCoachesGrid({
               </button>
             </PopoverTrigger>
             <PopoverContent
-              className="w-auto border-zinc-700 bg-zinc-950 p-0 text-foreground"
               align="start"
-              sideOffset={6}
+              sideOffset={8}
+              collisionPadding={16}
+              className={cn(
+                'z-[200] w-auto max-w-[min(calc(100vw-2rem),20rem)] border border-zinc-200 bg-white p-2 text-zinc-900 shadow-2xl',
+                'sm:max-w-none sm:min-w-[280px] sm:p-3'
+              )}
             >
               <CalendarGrid
+                className="w-full bg-transparent p-1 text-zinc-900 sm:p-2"
+                classNames={{
+                  weekday: 'text-center text-[0.8rem] font-medium text-zinc-500 py-2',
+                  outside: 'text-zinc-400 opacity-70 aria-selected:opacity-40',
+                  disabled: 'text-zinc-300 opacity-60',
+                }}
                 mode="single"
                 selected={filterDate ? parseISO(`${filterDate}T12:00:00`) : undefined}
                 onSelect={(d) => {
