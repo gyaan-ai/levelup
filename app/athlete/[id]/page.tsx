@@ -22,7 +22,6 @@ import { isBackgroundCheckValidForDisplay, isSafeSportValidForDisplay } from '@/
 import { getSchoolBadgeColors, schoolBadgeClassName } from '@/lib/school-logos';
 import { summarizeWeeklyAvailability, type WeeklyAvailabilityRow } from '@/lib/availability';
 import { COACH_PROFILE_PUBLIC_RATE_ROWS, getCoachDisplayedParentRates } from '@/lib/coach-session-pricing';
-import { IN_APP_MESSAGING_PAUSED_MESSAGE } from '@/lib/in-app-messaging';
 import { ContactInfoRow } from '@/components/contact-info-row';
 import { hasMinPhoneDigits } from '@/lib/phone';
 
@@ -316,7 +315,6 @@ export default async function AthleteProfilePage({
                 )}
                 {canInteractAsParentOrAdmin && (
                   <>
-                    <p className="text-sm text-muted-foreground max-w-lg">{IN_APP_MESSAGING_PAUSED_MESSAGE}</p>
                     {coachPhoneForContact ? (
                       <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 max-w-lg">
                         <ContactInfoRow label="Coach cell" name={athlete.first_name} phone={coachPhoneForContact} />
