@@ -456,18 +456,9 @@ export function BookingCard({
               {variant === 'coach' && coachEarnings ? (
                 (() => {
                   const { projected, max } = coachEarnings;
-                  const maxP = Math.max(1, session.max_participants ?? 1);
-                  if (maxP <= 1) {
-                    if (projected > 0) return `Earning: $${projected.toFixed(0)}`;
-                    if (max > 0) return `Up to $${max.toFixed(0)} when booked`;
-                    return '—';
-                  }
-                  if (projected > 0) {
-                    return projected < max
-                      ? `Earning: $${projected.toFixed(0)} (of $${max.toFixed(0)} if full)`
-                      : `Earning: $${projected.toFixed(0)}`;
-                  }
-                  return max > 0 ? `$${max.toFixed(0)} if full` : '—';
+                  if (projected > 0) return `Earning: $${projected.toFixed(0)}`;
+                  if (max > 0) return `Up to $${max.toFixed(0)} when booked`;
+                  return '—';
                 })()
               ) : session.amountPaid != null && session.amountPaid > 0
                 ? `You paid $${Number(session.amountPaid).toFixed(2)}`

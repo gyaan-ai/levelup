@@ -6,7 +6,7 @@ export type SessionKind = 'private' | 'partner' | 'small_group';
 /** Why the map might show zero pins (for empty-state copy). */
 export type CoachMapStats = {
   facilitiesWithCoordinates: number;
-  /** Active coaches whose primary or secondary facility has lat/lng. */
+  /** Coaches (active or pending application) whose primary or secondary facility has lat/lng. */
   coachesLinkedToGeocodedFacilities: number;
 };
 
@@ -93,13 +93,16 @@ export async function fetchCoachMapPins(
     };
   }
 
+  // Include approved coaches (active) and pending applications (active=false, status=pending)
+  // so the regional map reflects everyone tied to a geocoded facility — see coach-application-signup.
   const { data: coaches, error: coachErr } = await admin
     .from('athletes')
     .select(
       'id, first_name, last_name, photo_url, school, year, weight_class, average_rating, review_count, facility_id, secondary_facility_id'
     )
-    .eq('active', true)
-    .or('status.eq.active,status.is.null');
+    .neq('status', 'rejected')
+    .neq('status', 'suspended')
+    .or('active.eq.true,status.eq.pending');
 
   if (coachErr) {
     console.error('[fetchCoachMapPins] athletes', coachErr);

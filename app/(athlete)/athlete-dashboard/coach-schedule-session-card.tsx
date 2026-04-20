@@ -162,21 +162,12 @@ export function CoachScheduleSessionCard({ session, payoutRate, coachDisplayName
   }, [expanded, contactsFetched, session.id]);
 
   const { projected, max } = payoutSummary(session, payoutRate);
-  const maxP = Math.max(1, session.max_participants ?? 1);
   const earningsLine =
-    maxP <= 1
-      ? projected > 0
-        ? `Your share: $${projected.toFixed(0)}`
-        : max > 0
-          ? `Up to $${max.toFixed(0)} when booked`
-          : '—'
-      : projected > 0
-        ? projected < max
-          ? `Your share: $${projected.toFixed(0)} · $${max.toFixed(0)} when full`
-          : `Your share: $${projected.toFixed(0)}`
-        : max > 0
-          ? `$${max.toFixed(0)} when full`
-          : '—';
+    projected > 0
+      ? `Your share: $${projected.toFixed(0)}`
+      : max > 0
+        ? `Up to $${max.toFixed(0)} when booked`
+        : '—';
 
   const typeLabelUpper = getSessionTypeDisplay(session.session_type, session.session_mode).label.toUpperCase();
   const headerLine = `${typeLabelUpper} · ${formatEST(dt, 'EEE, MMM d')} · ${formatEST(dt, 'h:mm a')}`;

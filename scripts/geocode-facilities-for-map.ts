@@ -5,7 +5,7 @@
  * The map does **not** use `users.zip_code`. Pins come only from:
  *   - `facilities.latitude` + `facilities.longitude` (both non-null), and
  *   - `athletes.facility_id` or `athletes.secondary_facility_id` pointing at that facility,
- *   - coach row `active` + status as in `lib/map/fetch-coach-map-pins.ts`.
+ *   - coach row included by `lib/map/fetch-coach-map-pins.ts` (active or pending application; not rejected/suspended).
  * Collecting ZIPs on accounts is useful for ops/comms; map placement still requires geocoded facilities.
  *
  * ## Going forward (operational)
