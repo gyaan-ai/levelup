@@ -16,6 +16,13 @@ export const COACH_SESSION_FALLBACK_USD: Record<CoachCreateSessionType, number> 
   private: 75,
 };
 
+/** Fixed rates on every public coach profile (parent-facing). */
+export const GUILD_COACH_PROFILE_RATES: readonly { label: string; amountUsd: number }[] = [
+  { label: 'Small groups', amountUsd: COACH_SESSION_FALLBACK_USD.small_group },
+  { label: 'Partners', amountUsd: COACH_SESSION_FALLBACK_USD.partner },
+  { label: 'Private', amountUsd: COACH_SESSION_FALLBACK_USD.private },
+];
+
 /**
  * Parent price per spot (or per private session) from products + athlete_products override.
  */

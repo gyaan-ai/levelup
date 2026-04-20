@@ -21,6 +21,7 @@ import { ProfileImage } from '@/components/profile-image';
 import { isBackgroundCheckValidForDisplay, isSafeSportValidForDisplay } from '@/lib/athletes';
 import { getSchoolBadgeColors, schoolBadgeClassName } from '@/lib/school-logos';
 import { summarizeWeeklyAvailability, type WeeklyAvailabilityRow } from '@/lib/availability';
+import { GUILD_COACH_PROFILE_RATES } from '@/lib/coach-session-pricing';
 
 function CoachProfileUnavailable() {
   return (
@@ -147,49 +148,6 @@ export default async function AthleteProfilePage({
   const canEdit = isOwnProfile || isAdmin;
   const athleteName = `${athlete.first_name} ${athlete.last_name}`.trim() || 'This coach';
 
-  // Rate card: coach-built services (preferred) or org products
-  const admin = createAdminClient(tenantSlug);
-  const { data: coachServices } = await admin
-    .from('athlete_services')
-    .select('id, duration_minutes, session_type, max_participants, parent_price, display_order')
-    .eq('athlete_id', id)
-    .eq('active', true)
-    .order('display_order', { ascending: true })
-    .order('duration_minutes', { ascending: true });
-
-  const durationLabel = (m: number) => m === 30 ? '30 min' : m === 60 ? '1 hr' : m === 90 ? '1 hr 30 min' : m === 120 ? '2 hr' : `${m} min`;
-  const typeLabel = (t: string) => t === 'private' ? 'Private (1:1)' : t === 'partner' ? 'Partner (1:2)' : 'Small group';
-
-  type RateCardItem = { id: string; name: string; price: number; description?: string; min_participants?: number; max_participants?: number };
-  const rateCardFromServices: RateCardItem[] = (coachServices ?? []).map((s) => ({
-    id: s.id,
-    name: `${durationLabel(s.duration_minutes)} · ${typeLabel(s.session_type)}${s.session_type === 'small_group' ? ` (up to ${s.max_participants})` : ''}`,
-    price: Number(s.parent_price),
-  }));
-
-  const { data: allProducts } = await admin
-    .from('products')
-    .select('id, name, slug, description, parent_price, min_participants, max_participants, display_order')
-    .eq('active', true)
-    .order('display_order', { ascending: true });
-  const { data: athleteProducts } = await admin
-    .from('athlete_products')
-    .select('product_id, enabled, custom_parent_price')
-    .eq('athlete_id', id);
-  const disabledIds = new Set(
-    (athleteProducts || []).filter((ap) => ap.enabled === false).map((ap) => ap.product_id)
-  );
-  const apMap = new Map((athleteProducts || []).map((ap) => [ap.product_id, ap]));
-  const rateCardFromProducts: RateCardItem[] = (allProducts || [])
-    .filter((p) => !disabledIds.has(p.id))
-    .map((p) => {
-      const ap = apMap.get(p.id);
-      const price = ap?.custom_parent_price != null ? Number(ap.custom_parent_price) : Number(p.parent_price);
-      return { id: p.id, name: p.name, price, description: p.description ?? undefined, min_participants: p.min_participants, max_participants: p.max_participants };
-    });
-
-  const rateCardProducts: RateCardItem[] = rateCardFromServices.length > 0 ? rateCardFromServices : rateCardFromProducts;
-
   const { data: weeklyAvailRows } = await supabase
     .from('athlete_availability')
     .select('day_of_week, start_time, end_time')
@@ -205,6 +163,7 @@ export default async function AthleteProfilePage({
     availabilitySummaryLines.length > 0 || (datedSlotCount ?? 0) > 0;
 
   // Fetch upcoming public sessions for this coach
+  const admin = createAdminClient(tenantSlug);
   const nowISO = new Date().toISOString();
   const { data: upcomingSessions } = await admin
     .from('sessions')
@@ -555,40 +514,32 @@ export default async function AthleteProfilePage({
         </Card>
       )}
 
-      {/* Rate card: session types & pricing */}
-      {rateCardProducts.length > 0 && (
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <DollarSign className="h-5 w-5" />
-              Session types & rates
-            </CardTitle>
-            <p className="text-sm text-muted-foreground">
-              Prices per participant. You&apos;ll choose date and time when you book.
-            </p>
-          </CardHeader>
-          <CardContent>
-            <ul className="space-y-4">
-              {rateCardProducts.map((p) => (
-                <li key={p.id} className="flex flex-wrap items-center justify-between gap-2 py-2 border-b last:border-0">
-                  <div>
-                    <p className="font-medium">{p.name}</p>
-                    {p.description != null && p.description !== '' && (
-                      <p className="text-sm text-muted-foreground">{p.description}</p>
-                    )}
-                    {p.min_participants != null && p.max_participants != null && p.min_participants !== p.max_participants && (
-                      <p className="text-xs text-muted-foreground">
-                        {p.min_participants}–{p.max_participants} participants
-                      </p>
-                    )}
-                  </div>
-                  <p className="text-lg font-semibold shrink-0">${p.price.toFixed(2)}</p>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-      )}
+      {/* Standard Guild session rates (same on every coach profile) */}
+      <Card className="mb-6">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <DollarSign className="h-5 w-5" />
+            Session types & rates
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Standard Guild pricing. Small groups and partners are per participant; private is one-on-one. You&apos;ll
+            choose date and time when you book.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <ul className="space-y-4">
+            {GUILD_COACH_PROFILE_RATES.map((row) => (
+              <li
+                key={row.label}
+                className="flex flex-wrap items-center justify-between gap-2 py-2 border-b last:border-0"
+              >
+                <p className="font-medium">{row.label}</p>
+                <p className="text-lg font-semibold shrink-0">${row.amountUsd}</p>
+              </li>
+            ))}
+          </ul>
+        </CardContent>
+      </Card>
 
       {/* What parents say — ratings and comments (anonymous; no names shown) */}
       {reviews.length > 0 && (
