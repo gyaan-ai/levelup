@@ -697,13 +697,23 @@ function CoachCardContent({
         <p className="text-xs text-accent">{Math.round(distanceMiles * 10) / 10} miles away</p>
       )}
 
-      <div className="flex flex-col gap-2 sm:flex-row">
-        <Button asChild variant="premium" size="sm" className="w-full">
-          <Link href={`/athlete/${pin.coachId}`}>View profile</Link>
-        </Button>
-        <Button asChild variant="outline" size="sm" className="w-full border-accent/40 text-accent">
-          <Link href={findTrainingHref}>See sessions</Link>
-        </Button>
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <Button asChild variant="premium" size="sm" className="w-full">
+            <Link href={`/book/${pin.coachId}`}>Book a session</Link>
+          </Button>
+          <Button asChild variant="outline" size="sm" className="w-full border-accent/40 text-accent">
+            <Link href={findTrainingHref}>See open sessions</Link>
+          </Button>
+        </div>
+        <p className="text-center">
+          <Link
+            href={`/athlete/${pin.coachId}`}
+            className="text-xs text-white/55 underline-offset-2 hover:text-white/85 hover:underline"
+          >
+            View profile
+          </Link>
+        </p>
       </div>
     </div>
   );
