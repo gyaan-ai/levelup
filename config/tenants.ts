@@ -95,6 +95,7 @@ export const tenants: Record<string, TenantConfig> = {
     facilities: [
       { name: "UNC Wrestling Room", school: "UNC" },
       { name: "NC State Wrestling Room", school: "NC State" },
+      { name: "Appalachian State Wrestling Facility", school: "Appalachian State" },
     ],
 
     features: {
