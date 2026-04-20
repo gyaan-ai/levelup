@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { BackLink } from '@/components/back-link';
@@ -16,6 +17,9 @@ export const metadata = {
   description:
     'Quick-start resources for coaches in The Guild: phone shortcut, availability, sessions, and payouts.',
 };
+
+/** Curated links; load with service role after authz so coach RLS quirks never hide admin-published how-tos. */
+export const dynamic = 'force-dynamic';
 
 /** Guild default: mobile shortcut tutorial (override with NEXT_PUBLIC_COACH_HELP_HOME_SCREEN_VIDEO_URL). */
 const DEFAULT_HOME_SCREEN_VIDEO_URL =
@@ -84,7 +88,8 @@ export default async function CoachHelpPage() {
     redirect('/login');
   }
 
-  const { data: resourceRows, error: coachHelpResourcesError } = await supabase
+  const admin = createAdminClient(tenant.slug);
+  const { data: resourceRows, error: coachHelpResourcesError } = await admin
     .from('coach_help_resources')
     .select('id, title, url, created_at')
     .order('created_at', { ascending: false });

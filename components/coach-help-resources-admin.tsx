@@ -28,9 +28,14 @@ type StatRow = {
   down_count: number;
 };
 
-function videoKeyLabel(key: string): string {
+function videoKeyLabel(key: string, resources: CoachHelpResourceRow[]): string {
   if (key === COACH_HELP_FEATURED_HOME_SCREEN_KEY) return 'Featured · home screen tutorial';
-  if (key.startsWith('resource:')) return `Extra how-to (${key.slice('resource:'.length).slice(0, 8)}…)`;
+  if (key.startsWith('resource:')) {
+    const id = key.slice('resource:'.length);
+    const r = resources.find((x) => x.id === id);
+    if (r?.title) return r.title;
+    return `Extra how-to (${id.slice(0, 8)}…)`;
+  }
   return key;
 }
 
@@ -220,7 +225,7 @@ export function CoachHelpResourcesAdmin({ initialResources }: Props) {
                 <tbody>
                   {stats.map((s) => (
                     <tr key={s.video_key} className="border-b border-border/50 last:border-0">
-                      <td className="p-2 max-w-[200px]">{videoKeyLabel(s.video_key)}</td>
+                      <td className="p-2 max-w-[200px]">{videoKeyLabel(s.video_key, initialResources)}</td>
                       <td className="p-2 tabular-nums">{s.view_count}</td>
                       <td className="p-2 tabular-nums">{s.unique_viewers}</td>
                       <td className="p-2 tabular-nums">{s.up_count}</td>
