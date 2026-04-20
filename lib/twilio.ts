@@ -37,13 +37,40 @@ export type SmsLogContext = {
 
 /**
  * Send an SMS. No-op if Twilio is not configured or to is invalid.
- * Optionally logs to message_log if admin client is provided.
+ * When `logCtx.admin` is set, every attempt is written to `message_log` (sent, Twilio error, missing config, bad number, or network error).
  */
 export async function sendSms(to: string, body: string, logCtx?: SmsLogContext): Promise<boolean> {
   const config = getConfig();
-  if (!config) return false;
   const phone = normalizePhone(to);
-  if (!phone) return false;
+  const rawToHint = to && String(to).trim() ? String(to).trim().slice(0, 48) : null;
+
+  const logFailure = async (errorDetail: string) => {
+    if (!logCtx?.admin) return;
+    await logMessage(logCtx.admin, {
+      channel: 'sms',
+      recipientId: logCtx.recipientId,
+      recipientPhone: phone ?? rawToHint,
+      recipientLabel: logCtx.recipientLabel,
+      messageType: logCtx.messageType ?? 'sms',
+      body,
+      sessionId: logCtx.sessionId,
+      coachId: logCtx.coachId,
+      status: 'failed',
+      errorDetail,
+    });
+  };
+
+  if (!config) {
+    await logFailure(
+      'Twilio not configured (set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER on the server).',
+    );
+    return false;
+  }
+  if (!phone) {
+    await logFailure('Invalid or missing phone number (could not normalize to E.164).');
+    return false;
+  }
+
   try {
     const res = await fetch(
       `https://api.twilio.com/2010-04-01/Accounts/${config.accountSid}/Messages.json`,
@@ -63,26 +90,11 @@ export async function sendSms(to: string, body: string, logCtx?: SmsLogContext):
     if (!res.ok) {
       const err = await res.text();
       console.warn('Twilio SMS failed', res.status, err);
-      // Log failed SMS
-      if (logCtx?.admin) {
-        void logMessage(logCtx.admin, {
-          channel: 'sms',
-          recipientId: logCtx.recipientId,
-          recipientPhone: phone,
-          recipientLabel: logCtx.recipientLabel,
-          messageType: logCtx.messageType ?? 'sms',
-          body,
-          sessionId: logCtx.sessionId,
-          coachId: logCtx.coachId,
-          status: 'failed',
-          errorDetail: err,
-        });
-      }
+      await logFailure(`Twilio HTTP ${res.status}: ${err.slice(0, 500)}`);
       return false;
     }
-    // Log successful SMS
     if (logCtx?.admin) {
-      void logMessage(logCtx.admin, {
+      await logMessage(logCtx.admin, {
         channel: 'sms',
         recipientId: logCtx.recipientId,
         recipientPhone: phone,
@@ -97,6 +109,7 @@ export async function sendSms(to: string, body: string, logCtx?: SmsLogContext):
     return true;
   } catch (e) {
     console.warn('Twilio SMS error', e);
+    await logFailure(e instanceof Error ? e.message : String(e));
     return false;
   }
 }

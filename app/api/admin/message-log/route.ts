@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { headers } from 'next/headers';
+import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 
@@ -10,6 +11,13 @@ export async function GET(req: Request) {
   if (!tenant) {
     return NextResponse.json({ error: 'Unknown tenant' }, { status: 400 });
   }
+
+  const supabase = await createClient(tenant.slug);
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
+  if (userData?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
   const admin = createAdminClient(tenant.slug);
 
   const url = new URL(req.url);

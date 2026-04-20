@@ -65,19 +65,23 @@ export async function notifySessionScheduledFollowers(
 
     const smsBody = `${coachName}: new session ${when}. Book: ${link}`.slice(0, 1600);
     const sentPhones = new Set<string>();
+    const smsTasks: Promise<boolean>[] = [];
     for (const p of parents ?? []) {
       const phone = normalizePhone(p.phone ?? undefined);
       if (!phone || sentPhones.has(phone)) continue;
       sentPhones.add(phone);
-      void sendSms(phone, smsBody, {
-        admin,
-        messageType: 'coach_new_session',
-        recipientId: p.id,
-        recipientLabel: 'Parent (follower)',
-        sessionId: opts.sessionId,
-        coachId,
-      });
+      smsTasks.push(
+        sendSms(phone, smsBody, {
+          admin,
+          messageType: 'coach_new_session',
+          recipientId: p.id,
+          recipientLabel: 'Parent (follower)',
+          sessionId: opts.sessionId,
+          coachId,
+        }),
+      );
     }
+    await Promise.all(smsTasks);
   } catch (e) {
     console.warn('notifySessionScheduledFollowers failed:', e);
   }
