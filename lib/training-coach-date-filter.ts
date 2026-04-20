@@ -11,12 +11,12 @@ export type CoachDateFilterData = {
   blockedDatesByCoach: Record<string, string[]>;
 };
 
-export type CoachSessionTypeFilter = 'all' | 'small_group' | 'partner' | 'private';
+export type CoachSessionTypeFilter = 'all' | 'small_group' | 'partner_private';
 
 /**
  * When `dateYmd` is set, returns coach ids allowed by the Coaches-tab date rule:
  * - All or Small group: public open sessions that day
- * - Partner or Private: weekly or dated availability that day, not blocked
+ * - Partner / Private: weekly or dated availability that day, not blocked
  * - All: union of both
  *
  * Does not apply service-type offerings (caller intersects with `serviceTypesByCoach`).

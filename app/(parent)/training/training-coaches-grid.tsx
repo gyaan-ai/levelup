@@ -1,14 +1,21 @@
 'use client';
 
-import { useMemo, useState, useEffect, useId } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { parseISO } from 'date-fns';
 import { Button } from '@/components/ui/button';
-import { Heart } from 'lucide-react';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '@/components/ui/popover';
+import { Calendar as CalendarGrid } from '@/components/ui/calendar';
+import { Calendar, Heart } from 'lucide-react';
 import { ProfileImage } from '@/components/profile-image';
 import { SchoolLogo } from '@/components/school-logo';
 import { StarRating } from '@/components/star-rating';
 import { formatEST } from '@/lib/format-date';
+import { cn } from '@/lib/utils';
 import {
   coachIdsMatchingDateFilter,
   type CoachDateFilterData,
@@ -16,7 +23,7 @@ import {
 import type { Athlete } from '@/types';
 import { useAuth } from '@/lib/auth/use-auth';
 
-type SessionTypeFilter = 'all' | 'small_group' | 'partner' | 'private';
+type SessionTypeFilter = 'all' | 'small_group' | 'partner_private';
 
 export interface AthleteWithNext extends Athlete {
   nextAvailable?: { slot_date: string; start_time: string } | null;
@@ -49,7 +56,7 @@ export function TrainingCoachesGrid({
   coachDateFilterBounds,
 }: Props) {
   const { user, userRole } = useAuth();
-  const dateInputId = useId();
+  const [dateOpen, setDateOpen] = useState(false);
   const [followedCoachIds, setFollowedCoachIds] = useState<Set<string>>(new Set());
   const [facilityId, setFacilityId] = useState<string>('all');
   const [sessionType, setSessionType] = useState<SessionTypeFilter>('all');
@@ -91,7 +98,11 @@ export function TrainingCoachesGrid({
       if (allowedByLocation && !allowedByLocation.has(a.id)) return false;
       if (sessionType !== 'all') {
         const types = serviceTypesByCoach[a.id] ?? [];
-        if (!types.includes(sessionType)) return false;
+        if (sessionType === 'small_group') {
+          if (!types.includes('small_group')) return false;
+        } else if (!types.includes('partner') && !types.includes('private')) {
+          return false;
+        }
       }
       if (availableOnly && !coachIdsWithOpen.includes(a.id)) return false;
       if (dateCoachSet && !dateCoachSet.has(a.id)) return false;
@@ -137,35 +148,73 @@ export function TrainingCoachesGrid({
         role="toolbar"
         aria-label="Coach filters"
       >
-        <div className="flex shrink-0 items-center gap-2">
+        <div
+          className={cn(
+            'flex min-h-[44px] shrink-0 items-stretch overflow-hidden rounded-full border bg-zinc-900',
+            filterDate ? 'border-[#D4AF37]/40' : 'border-zinc-800'
+          )}
+        >
+          <Popover open={dateOpen} onOpenChange={setDateOpen}>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                className={cn(
+                  'flex min-w-[7.5rem] max-w-[12rem] items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/50 sm:min-w-[9rem]',
+                  filterDate ? 'text-[#D4AF37]' : 'text-zinc-300'
+                )}
+                aria-label={
+                  filterDate
+                    ? `Filter by date, ${formatEST(parseISO(`${filterDate}T12:00:00`), 'EEE MMM d')}. Open calendar.`
+                    : 'Filter coaches by date'
+                }
+              >
+                <Calendar className="h-4 w-4 shrink-0 opacity-90" aria-hidden />
+                <span className="truncate">
+                  {filterDate
+                    ? formatEST(parseISO(`${filterDate}T12:00:00`), 'EEE MMM d')
+                    : 'Date'}
+                </span>
+              </button>
+            </PopoverTrigger>
+            <PopoverContent
+              className="w-auto border-zinc-700 bg-zinc-950 p-0 text-foreground"
+              align="start"
+              sideOffset={6}
+            >
+              <CalendarGrid
+                mode="single"
+                selected={filterDate ? parseISO(`${filterDate}T12:00:00`) : undefined}
+                onSelect={(d) => {
+                  if (!d) return;
+                  setFilterDate(formatEST(d, 'yyyy-MM-dd'));
+                  setDateOpen(false);
+                }}
+                defaultMonth={
+                  filterDate
+                    ? parseISO(`${filterDate}T12:00:00`)
+                    : parseISO(`${coachDateFilterBounds.minYmd}T12:00:00`)
+                }
+                disabled={(d) => {
+                  const ymd = formatEST(d, 'yyyy-MM-dd');
+                  return ymd < coachDateFilterBounds.minYmd || ymd > coachDateFilterBounds.maxYmd;
+                }}
+                initialFocus
+              />
+            </PopoverContent>
+          </Popover>
           {filterDate ? (
             <button
               type="button"
-              onClick={() => setFilterDate('')}
-              className="flex min-h-[44px] max-w-[11rem] items-center gap-1 rounded-full border border-[#D4AF37]/40 bg-zinc-900 px-3 py-2 text-sm font-medium text-[#D4AF37] touch-manipulation"
-              aria-label={`Clear date filter ${formatEST(parseISO(`${filterDate}T12:00:00`), 'EEE MMM d')}`}
+              onClick={() => {
+                setFilterDate('');
+                setDateOpen(false);
+              }}
+              className="border-l border-zinc-800 px-2.5 text-lg leading-none text-zinc-400 hover:text-[#D4AF37] touch-manipulation"
+              aria-label="Clear date filter"
             >
-              <span className="truncate">{formatEST(parseISO(`${filterDate}T12:00:00`), 'EEE MMM d')}</span>
-              <span className="text-lg leading-none" aria-hidden>
-                ×
-              </span>
+              ×
             </button>
-          ) : (
-            <div className="relative flex min-h-[44px] w-[11rem] shrink-0 items-center justify-center rounded-full border border-zinc-800 bg-zinc-900 px-3 text-sm font-medium text-zinc-300 touch-manipulation [&:focus-within]:ring-2 [&:focus-within]:ring-[#D4AF37]/50">
-              <span className="pointer-events-none select-none">Date</span>
-              <input
-                id={dateInputId}
-                type="date"
-                min={coachDateFilterBounds.minYmd}
-                max={coachDateFilterBounds.maxYmd}
-                value={filterDate}
-                onChange={(e) => setFilterDate(e.target.value)}
-                onClick={(e) => e.stopPropagation()}
-                className="absolute inset-0 z-10 h-full w-full cursor-pointer rounded-full border-0 bg-transparent p-0 text-base opacity-[0.01] [color-scheme:dark]"
-                aria-label="Filter coaches by date"
-              />
-            </div>
-          )}
+          ) : null}
         </div>
 
         <label className="sr-only" htmlFor="training-coach-location">
@@ -185,29 +234,19 @@ export function TrainingCoachesGrid({
           ))}
         </select>
 
-        <div className="flex flex-wrap items-center gap-2">
-          {(
-            [
-              ['all', 'All'],
-              ['small_group', 'Small Group'],
-              ['partner', 'Partner'],
-              ['private', 'Private'],
-            ] as const
-          ).map(([val, label]) => (
-            <button
-              key={val}
-              type="button"
-              onClick={() => setSessionType(val)}
-              className={`min-h-[44px] shrink-0 px-4 py-2 rounded-full text-sm font-medium border transition-colors ${
-                sessionType === val
-                  ? 'bg-[#D4AF37]/20 text-[#D4AF37] border-[#D4AF37]/30'
-                  : 'bg-zinc-900 text-zinc-300 border-zinc-800'
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        <label className="sr-only" htmlFor="training-coach-session-type">
+          Session type
+        </label>
+        <select
+          id="training-coach-session-type"
+          value={sessionType}
+          onChange={(e) => setSessionType(e.target.value as SessionTypeFilter)}
+          className="min-h-[44px] w-full min-w-[10rem] max-w-[min(100%,20rem)] shrink-0 rounded-full border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/50 sm:w-auto"
+        >
+          <option value="all">All types</option>
+          <option value="small_group">Small group</option>
+          <option value="partner_private">Partner / Private</option>
+        </select>
 
         <button
           type="button"
