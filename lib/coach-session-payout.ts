@@ -9,6 +9,21 @@
  */
 import { COACH_REVENUE_FRACTION, normalizeCoachRevenueShareRate } from '@/lib/pricing';
 
+/**
+ * For **upcoming** sessions, ignore `athlete_payment` so projected earnings match
+ * paid totals × rate (same basis as "when full"). Stored payout is only meaningful
+ * after the session is marked completed.
+ */
+export function athletePaymentForCoachEstimate(session: {
+  status?: string;
+  athlete_payment?: number | null;
+}): number | null {
+  if (session.status !== 'completed') return null;
+  const ap = session.athlete_payment;
+  if (ap == null || Number(ap) <= 0) return null;
+  return Number(ap);
+}
+
 export type SessionCoachPayoutFields = {
   athlete_payment?: number | null;
   price_per_participant?: number | null;

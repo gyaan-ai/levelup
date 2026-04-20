@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { AddToCalendarButton } from '@/components/add-to-calendar-button';
 import { ContactInfoRow } from '@/components/contact-info-row';
 import { formatEST } from '@/lib/format-date';
-import { coachPayoutUsd } from '@/lib/coach-session-payout';
+import { athletePaymentForCoachEstimate, coachPayoutUsd } from '@/lib/coach-session-payout';
 import { copyTextToClipboard } from '@/lib/copy-to-clipboard';
 import { fillTemplate, getTemplate } from '@/lib/playbook-templates';
 import { sessionParticipantDisplayNames } from '@/lib/session-participant-display-name';
@@ -43,7 +43,7 @@ function payoutSummary(session: CoachSession, payoutRate: number): { projected: 
   const rate = session.session_payout_rate ?? payoutRate;
   const projected = coachPayoutUsd(
     {
-      athlete_payment: session.athlete_payment,
+      athlete_payment: athletePaymentForCoachEstimate(session),
       price_per_participant: session.price_per_participant,
       current_participants: current,
       participant_amount_paid_sum: paid > 0 ? paid : null,
@@ -166,16 +166,16 @@ export function CoachScheduleSessionCard({ session, payoutRate, coachDisplayName
   const earningsLine =
     maxP <= 1
       ? projected > 0
-        ? `Earning: $${projected.toFixed(0)}`
+        ? `Your share: $${projected.toFixed(0)}`
         : max > 0
           ? `Up to $${max.toFixed(0)} when booked`
           : '—'
       : projected > 0
         ? projected < max
-          ? `Earning: $${projected.toFixed(0)} · $${max.toFixed(0)} if full`
-          : `Earning: $${projected.toFixed(0)}`
+          ? `Your share: $${projected.toFixed(0)} · $${max.toFixed(0)} when full`
+          : `Your share: $${projected.toFixed(0)}`
         : max > 0
-          ? `$${max.toFixed(0)} if full`
+          ? `$${max.toFixed(0)} when full`
           : '—';
 
   const typeLabelUpper = getSessionTypeDisplay(session.session_type, session.session_mode).label.toUpperCase();

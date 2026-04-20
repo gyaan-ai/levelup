@@ -11,7 +11,7 @@ import { Calendar as CalendarIcon, List, LayoutGrid, CalendarDays, MessageCircle
 import { UpcomingSessionActions } from './upcoming-session-actions';
 import { startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns';
 import { formatEST } from '@/lib/format-date';
-import { coachPayoutUsd } from '@/lib/coach-session-payout';
+import { athletePaymentForCoachEstimate, coachPayoutUsd } from '@/lib/coach-session-payout';
 
 export type CoachSession = {
   id: string;
@@ -49,7 +49,7 @@ function participantPaidSum(s: CoachSession): number {
 
 function coachPayoutEstimate(s: CoachSession) {
   return coachPayoutUsd({
-    athlete_payment: s.athlete_payment,
+    athlete_payment: athletePaymentForCoachEstimate(s),
     price_per_participant: s.price_per_participant,
     current_participants: s.current_participants,
     participant_amount_paid_sum: participantPaidSum(s) > 0 ? participantPaidSum(s) : null,
