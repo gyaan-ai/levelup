@@ -72,7 +72,7 @@ export function BookingConfirmedClient({
         If no partner joins by {deadlineStr}, we&apos;ll email you options.
       </p>
       <Button asChild>
-        <Link href="/dashboard">View My Sessions</Link>
+        <Link href="/bookings">View My bookings</Link>
       </Button>
     </div>
   );

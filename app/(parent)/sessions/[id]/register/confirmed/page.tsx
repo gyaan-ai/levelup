@@ -4,7 +4,6 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain, tenants } from '@/config/tenants';
 import Link from 'next/link';
-import { BackLink } from '@/components/back-link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, Calendar, MapPin } from 'lucide-react';
@@ -152,11 +151,9 @@ export default async function SessionRegisterConfirmedPage({
             <Button asChild variant={session.athlete_id ? 'outline' : 'default'} className="w-full" size="lg">
               <Link href="/training">Book another session</Link>
             </Button>
-            <BackLink
-              fallbackHref="/bookings"
-              label="Done — Back to My bookings"
-              className="inline-flex h-11 w-full items-center justify-center rounded-md border border-input bg-background px-8 text-sm font-medium ring-offset-background hover:bg-accent hover:text-accent-foreground"
-            />
+            <Button asChild variant="outline" className="w-full" size="lg">
+              <Link href="/bookings">Done — Back to My bookings</Link>
+            </Button>
           </div>
         </CardContent>
       </Card>
