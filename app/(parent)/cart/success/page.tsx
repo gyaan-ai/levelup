@@ -9,7 +9,7 @@ import { getStripeInstance } from '@/lib/stripe/webhooks';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { maybeBackfillRosterSnapshot } from '@/lib/session-roster-snapshot';
 import { createNotification } from '@/lib/notifications';
-import { sendCoachNewSignupSms } from '@/lib/twilio';
+import { notifyCoachAndAdminsNewBooking } from '@/lib/twilio';
 import { formatEST } from '@/lib/format-date';
 
 export const metadata = {
@@ -122,7 +122,7 @@ export default async function CartSuccessPage({
                 body: `New signup for ${dateStr}. Check My sessions.`,
                 data: { session_id: sessionId },
               }).catch(() => {});
-              await sendCoachNewSignupSms(admin, coachId, dateStr).catch(() => {});
+              await notifyCoachAndAdminsNewBooking(admin, coachId, dateStr, sessionId).catch(() => {});
             }
           }
         }

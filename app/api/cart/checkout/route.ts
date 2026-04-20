@@ -11,7 +11,7 @@ import { getUserCreditBalance, applyCredits } from '@/lib/credits';
 import { ensureAutoFamilyDiscountForParent } from '@/lib/family-auto-discount';
 import { checkoutAllowSavedAccountPercent, resolveCheckoutPercentOff } from '@/lib/checkout-promo';
 import { createNotification } from '@/lib/notifications';
-import { sendCoachNewSignupSms } from '@/lib/twilio';
+import { notifyCoachAndAdminsNewBooking } from '@/lib/twilio';
 
 type CartLine = { sessionId: string; wrestlerId: string };
 
@@ -322,7 +322,7 @@ export async function POST(req: NextRequest) {
               body: `New booking for ${dateStr}. Check My sessions.`,
               data: { session_id: meta.session_id },
             }).catch((e) => console.warn('Cart credits: coach notification failed', e));
-            await sendCoachNewSignupSms(admin, coachId, dateStr, meta.session_id).catch(() => {});
+            await notifyCoachAndAdminsNewBooking(admin, coachId, dateStr, meta.session_id).catch(() => {});
           }
         }
       }

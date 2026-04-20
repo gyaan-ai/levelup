@@ -4,7 +4,7 @@ import { getStripeInstance, getWebhookSecret } from '@/lib/stripe/webhooks';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain, tenants } from '@/config/tenants';
 import { createNotification } from '@/lib/notifications';
-import { sendCoachNewSignupSms } from '@/lib/twilio';
+import { notifyCoachAndAdminsNewBooking } from '@/lib/twilio';
 import { formatEST } from '@/lib/format-date';
 import { headers } from 'next/headers';
 import { maybeBackfillRosterSnapshot } from '@/lib/session-roster-snapshot';
@@ -183,7 +183,7 @@ export async function POST(req: NextRequest) {
                   body: `New booking for ${dateStr}. Check My sessions.`,
                   data: { session_id: sid },
                 }).catch((e) => console.warn('Cart webhook: coach notification failed', e));
-                await sendCoachNewSignupSms(supabase, coachId, dateStr).catch(() => {});
+                await notifyCoachAndAdminsNewBooking(supabase, coachId, dateStr, sid).catch(() => {});
               }
             }
           } else {
@@ -213,7 +213,7 @@ export async function POST(req: NextRequest) {
                   data: { session_id: sid, link: cartNotifyBaseUrl ? `${cartNotifyBaseUrl}/athlete-dashboard` : '/athlete-dashboard' },
                   coachId,
                 }).catch((e) => console.warn('Cart webhook: coach notification failed', e));
-                await sendCoachNewSignupSms(supabase, coachId, dateStr).catch(() => {});
+                await notifyCoachAndAdminsNewBooking(supabase, coachId, dateStr, sid).catch(() => {});
               }
             }
           }
@@ -398,7 +398,7 @@ export async function POST(req: NextRequest) {
             body: `New booking for ${dateStr}. Check My sessions.`,
             data: { session_id: sessionId },
           }).catch((e) => console.warn('Webhook: coach notification failed', e));
-          await sendCoachNewSignupSms(supabase, coachId, dateStr).catch(() => {});
+          await notifyCoachAndAdminsNewBooking(supabase, coachId, dateStr, sessionId).catch(() => {});
         }
         return NextResponse.json({ received: true });
       }
@@ -444,7 +444,7 @@ export async function POST(req: NextRequest) {
           body: `Someone booked ${dateStr}. Check My sessions.`,
           data: { session_id: sessionId },
         }).catch((e) => console.warn('Webhook: coach notification failed', e));
-        await sendCoachNewSignupSms(supabase, coachId, dateStr).catch(() => {});
+        await notifyCoachAndAdminsNewBooking(supabase, coachId, dateStr, sessionId).catch(() => {});
       }
 
       if (earlyAdopterEntitlementId) {

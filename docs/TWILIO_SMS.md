@@ -12,6 +12,9 @@ Add to `.env.local` (and your host’s env, e.g. Vercel):
 - `TWILIO_ACCOUNT_SID` — from Twilio console
 - `TWILIO_AUTH_TOKEN` — from Twilio console  
 - `TWILIO_FROM_NUMBER` — Twilio phone number (e.g. +1XXXXXXXXXX)
+- **`ADMIN_BOOKING_ALERT_PHONES`** (optional) — comma-separated cell numbers (10-digit US or E.164) that receive an **ops** copy of every booking/signup SMS (in addition to the coach). Same number as the coach is only texted once (coach copy).
+
+You can also omit that env and rely on **`users.phone`** for every user with **`role = admin`** — those numbers get the same ops copy (deduped with the env list).
 
 ## Coach phone
 
@@ -23,6 +26,9 @@ We look for a coach phone in this order:
 If neither is set or neither looks like a valid phone, we only send the in-app notification.
 
 ## Where SMS is sent
+
+- **Coach** — same as before: `users.phone` or phone-shaped `athletes.zelle_email`.
+- **Ops / admin** — on the same events, a second message goes to `ADMIN_BOOKING_ALERT_PHONES` and to every admin user with `users.phone` (see `notifyCoachAndAdminsNewBooking` in `lib/twilio.ts`).
 
 - **Stripe webhook** — after a paid booking or signup (`checkout.session.completed`): private booking, register path, and cart checkout; in-app notification + SMS if phone set.
 - **Register API** — after a free/direct signup (session owner add, or free small group): in-app notification + SMS if phone set.

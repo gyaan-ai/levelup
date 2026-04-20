@@ -376,10 +376,16 @@ export default function ProfilePage() {
                   your availability calendar.
                 </CardDescription>
               </CardHeader>
-              <CardContent>
+              <CardContent className="space-y-3">
                 <Button asChild variant="outline" className="min-h-[44px] touch-manipulation">
                   <Link href="/availability">Manage availability</Link>
                 </Button>
+                <p className="text-sm text-muted-foreground">
+                  <Link href="/coach-help" className="text-accent font-medium underline">
+                    Coach help
+                  </Link>
+                  {' — '}start with the home-screen video, then availability and sessions.
+                </p>
               </CardContent>
             </Card>
           )}

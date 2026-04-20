@@ -111,9 +111,87 @@ function pickCoachPhone(row: { phone?: string; zelle_email?: string } | null): s
   return null;
 }
 
+async function resolveCoachSmsE164(admin: SupabaseAdmin, coachUserId: string): Promise<string | null> {
+  const [{ data: userRow }, { data: athleteRow }] = await Promise.all([
+    admin.from('users').select('phone').eq('id', coachUserId).maybeSingle(),
+    admin.from('athletes').select('zelle_email').eq('id', coachUserId).maybeSingle(),
+  ]);
+  const raw = pickCoachPhone({
+    phone: userRow?.phone ?? undefined,
+    zelle_email: athleteRow?.zelle_email ?? undefined,
+  });
+  return raw ? normalizePhone(raw) : null;
+}
+
+/** Comma-separated phones in env + any `users.phone` for role=admin. Deduped E.164. */
+async function collectAdminBookingAlertPhonesE164(admin: SupabaseAdmin): Promise<string[]> {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  const push = (raw: string | null | undefined) => {
+    const n = normalizePhone(raw ?? undefined);
+    if (n && !seen.has(n)) {
+      seen.add(n);
+      out.push(n);
+    }
+  };
+  const envRaw = process.env.ADMIN_BOOKING_ALERT_PHONES || '';
+  for (const part of envRaw.split(',')) push(part.trim());
+
+  const { data: admins } = await admin.from('users').select('phone').eq('role', 'admin');
+  for (const row of admins ?? []) push((row as { phone?: string }).phone);
+
+  return out;
+}
+
+function shortSessionRef(sessionId: string): string {
+  return sessionId.replace(/-/g, '').slice(0, 10);
+}
+
+/**
+ * Coach SMS + optional ops SMS for every new booking/signup.
+ * Ops numbers: `ADMIN_BOOKING_ALERT_PHONES` (comma-separated) plus all admin users with `users.phone`.
+ * Skips texting the same number twice when coach and ops share a cell.
+ */
+export async function notifyCoachAndAdminsNewBooking(
+  admin: SupabaseAdmin,
+  coachUserId: string,
+  dateStr: string,
+  sessionId?: string
+): Promise<void> {
+  await sendCoachNewSignupSms(admin, coachUserId, dateStr, sessionId);
+
+  const coachE164 = await resolveCoachSmsE164(admin, coachUserId);
+  const opsTargets = await collectAdminBookingAlertPhonesE164(admin);
+  if (opsTargets.length === 0) return;
+
+  const { data: athlete } = await admin
+    .from('athletes')
+    .select('first_name, last_name')
+    .eq('id', coachUserId)
+    .maybeSingle();
+  const coachLabel = athlete
+    ? [athlete.first_name, athlete.last_name].filter(Boolean).join(' ').trim() || 'Coach'
+    : 'Coach';
+  const ref = sessionId ? shortSessionRef(sessionId) : '';
+  const body = ref
+    ? `LevelUp (ops): New booking ${dateStr} · ${coachLabel}. Ref ${ref}`
+    : `LevelUp (ops): New booking ${dateStr} · ${coachLabel}.`;
+
+  for (const to of opsTargets) {
+    if (coachE164 && to === coachE164) continue;
+    await sendSms(to, body, {
+      admin,
+      messageType: 'admin_booking_alert',
+      recipientLabel: 'Admin ops',
+      sessionId,
+      coachId: coachUserId,
+    });
+  }
+}
+
 /**
  * If the coach has a phone on file (users.phone or athletes.zelle_email when phone-shaped), send SMS.
- * Call after createNotification for session_booked.
+ * Prefer {@link notifyCoachAndAdminsNewBooking} for booking flows so ops can get a copy.
  */
 export async function sendCoachNewSignupSms(
   admin: SupabaseAdmin,
@@ -121,14 +199,7 @@ export async function sendCoachNewSignupSms(
   dateStr: string,
   sessionId?: string
 ): Promise<void> {
-  const [{ data: userRow }, { data: athleteRow }] = await Promise.all([
-    admin.from('users').select('phone').eq('id', coachUserId).maybeSingle(),
-    admin.from('athletes').select('zelle_email').eq('id', coachUserId).maybeSingle(),
-  ]);
-  const phone = pickCoachPhone({
-    phone: userRow?.phone ?? undefined,
-    zelle_email: athleteRow?.zelle_email ?? undefined,
-  });
+  const phone = await resolveCoachSmsE164(admin, coachUserId);
   if (!phone) return;
   const body = `LevelUp: New booking for ${dateStr}. Check My sessions in the app.`;
   await sendSms(phone, body, {

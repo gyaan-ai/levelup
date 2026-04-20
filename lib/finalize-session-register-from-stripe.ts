@@ -2,7 +2,7 @@ import { getStripeInstance } from '@/lib/stripe/webhooks';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { tenants } from '@/config/tenants';
 import { createNotification } from '@/lib/notifications';
-import { sendCoachNewSignupSms } from '@/lib/twilio';
+import { notifyCoachAndAdminsNewBooking } from '@/lib/twilio';
 import { formatEST } from '@/lib/format-date';
 import { maybeBackfillRosterSnapshot } from '@/lib/session-roster-snapshot';
 
@@ -108,7 +108,7 @@ export async function finalizeRegisterFromCheckoutSession(
           body: `New booking for ${dateStr}. Check My sessions.`,
           data: { session_id: sessionId },
         }).catch((e) => console.warn('finalizeRegister: coach notification failed', e));
-        await sendCoachNewSignupSms(supabase, coachId, dateStr).catch(() => {});
+        await notifyCoachAndAdminsNewBooking(supabase, coachId, dateStr, sessionId).catch(() => {});
       }
     } else {
       await supabase

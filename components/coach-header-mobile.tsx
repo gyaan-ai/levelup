@@ -78,6 +78,9 @@ export function CoachHeaderMobile({ onSignOut }: Props) {
             <Link href="/coach-reviews" className={linkClass} onClick={() => setOpen(false)}>
               Reviews
             </Link>
+            <Link href="/coach-help" className={linkClass} onClick={() => setOpen(false)}>
+              Coach help
+            </Link>
             <Link href="/profile" className={linkClass} onClick={() => setOpen(false)}>
               Profile
             </Link>

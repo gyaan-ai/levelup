@@ -12,6 +12,7 @@ const COACH_ROUTES = [
   '/athlete-dashboard',
   '/coach-dashboard',
   '/availability',
+  '/coach-help',
   '/coach-sessions',
   '/coach-roster',
   '/coach-earnings',

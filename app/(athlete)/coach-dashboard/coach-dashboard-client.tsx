@@ -188,6 +188,10 @@ export function CoachDashboardClient({
         <Link href="/coach-roster" className="text-accent font-medium underline">
           Roster
         </Link>
+        {' · '}
+        <Link href="/coach-help" className="text-accent font-medium underline">
+          Coach help
+        </Link>
       </p>
     </div>
   );

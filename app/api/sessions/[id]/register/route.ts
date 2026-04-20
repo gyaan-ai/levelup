@@ -7,7 +7,7 @@ import { getStripeInstance } from '@/lib/stripe/webhooks';
 import { formatEST } from '@/lib/format-date';
 import { createRegisterConfirmationToken } from '@/lib/confirmation-token';
 import { createNotification } from '@/lib/notifications';
-import { sendCoachNewSignupSms } from '@/lib/twilio';
+import { notifyCoachAndAdminsNewBooking } from '@/lib/twilio';
 import { hasMinPhoneDigits } from '@/lib/phone';
 import { maybeBackfillRosterSnapshot } from '@/lib/session-roster-snapshot';
 import { finalizeRegisterFromCheckoutSession } from '@/lib/finalize-session-register-from-stripe';
@@ -148,7 +148,7 @@ export async function POST(
           body: `New signup for ${dateStr}. Check My sessions.`,
           data: { session_id: sessionId },
         }).catch((e) => console.warn('Register: coach notification failed', e));
-        await sendCoachNewSignupSms(admin, coachId, dateStr).catch(() => {});
+        await notifyCoachAndAdminsNewBooking(admin, coachId, dateStr, sessionId).catch(() => {});
       }
       return NextResponse.json({ added: true });
     }
