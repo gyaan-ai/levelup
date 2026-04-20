@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CalendarClock, CalendarPlus, Check, Loader2, X } from 'lucide-react';
+import { CalendarClock, CalendarPlus, Check, CircleHelp, Loader2, X } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -222,6 +222,13 @@ export function CoachScheduleClient({
               className="text-sm font-semibold text-[#D4AF37] hover:underline whitespace-nowrap"
             >
               Dashboard →
+            </Link>
+            <Link
+              href="/coach-help"
+              className="inline-flex items-center gap-1 text-sm font-semibold text-[#D4AF37] hover:underline whitespace-nowrap"
+            >
+              <CircleHelp className="h-4 w-4 shrink-0" aria-hidden />
+              Coach help
             </Link>
           </div>
           <p className="text-muted-foreground text-sm md:text-base mt-1">

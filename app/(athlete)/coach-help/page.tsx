@@ -7,7 +7,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { BackLink } from '@/components/back-link';
 import { Button } from '@/components/ui/button';
 import { CalendarClock, ExternalLink, LayoutDashboard, Smartphone, Video } from 'lucide-react';
-import { CoachHelpResourcesAdmin } from '@/components/coach-help-resources-admin';
 import { CoachHelpVideoEngagement } from '@/components/coach-help-video-engagement';
 import { CoachHelpQuestions, type CoachHelpQuestionRow } from '@/components/coach-help-questions';
 import { COACH_HELP_FEATURED_HOME_SCREEN_KEY } from '@/lib/coach-help-video-keys';
@@ -295,7 +294,24 @@ export default async function CoachHelpPage() {
           </CardContent>
         </Card>
 
-        {isAdmin ? <CoachHelpResourcesAdmin initialResources={extraResources} /> : null}
+        {isAdmin ? (
+          <Card className="border-dashed border-amber-700/40 bg-amber-950/5 dark:bg-amber-950/10">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Admin</CardTitle>
+              <CardDescription>
+                Add or remove extra how-to links, and view engagement stats, on the admin Coach help page.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button asChild variant="outline" className="min-h-[44px]">
+                <Link href="/admin/coach-help">Open admin Coach help</Link>
+              </Button>
+              <p className="text-xs text-muted-foreground mt-3">
+                Reply to coach questions in the <strong className="text-foreground font-medium">Questions</strong> section above on this page.
+              </p>
+            </CardContent>
+          </Card>
+        ) : null}
       </div>
     </div>
   );

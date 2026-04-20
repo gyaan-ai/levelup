@@ -5150,6 +5150,9 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
             <Link href="/admin/reviews" className="block px-3 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
               Reviews
             </Link>
+            <Link href="/admin/coach-help" className="block px-3 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
+              Coach help
+            </Link>
           </div>
         </div>
       </aside>

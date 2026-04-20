@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Calendar, CirclePlus, DollarSign, User } from 'lucide-react';
+import { Calendar, CircleHelp, CirclePlus, DollarSign, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useCoachPendingRequestsCount } from '@/lib/hooks/use-coach-pending-requests-count';
 
@@ -29,6 +29,12 @@ const ITEMS: readonly {
     label: 'Earnings',
     icon: DollarSign,
     match: (p) => p === '/coach-earnings' || p.startsWith('/coach-earnings/'),
+  },
+  {
+    href: '/coach-help',
+    label: 'Help',
+    icon: CircleHelp,
+    match: (p) => p === '/coach-help' || p.startsWith('/coach-help/'),
   },
   {
     href: '/profile',
@@ -77,7 +83,7 @@ export function CoachBottomNav() {
             </div>
             <span
               className={cn(
-                'mt-1 transition-all duration-200 max-w-[4.5rem] truncate leading-tight',
+                'mt-1 transition-all duration-200 max-w-[3.75rem] sm:max-w-[4.5rem] truncate leading-tight',
                 isActive ? 'opacity-100' : 'opacity-70'
               )}
             >
