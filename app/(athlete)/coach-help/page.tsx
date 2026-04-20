@@ -7,10 +7,10 @@ import { getTenantByDomain } from '@/config/tenants';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { BackLink } from '@/components/back-link';
 import { Button } from '@/components/ui/button';
-import { CalendarClock, ExternalLink, LayoutDashboard, Smartphone, Video } from 'lucide-react';
-import { CoachHelpVideoEngagement } from '@/components/coach-help-video-engagement';
+import { CalendarClock, LayoutDashboard, Smartphone, Video } from 'lucide-react';
+import { CoachHelpVideoEngagement, type CoachHelpVideoSummary } from '@/components/coach-help-video-engagement';
 import { CoachHelpQuestions, type CoachHelpQuestionRow } from '@/components/coach-help-questions';
-import { COACH_HELP_FEATURED_HOME_SCREEN_KEY } from '@/lib/coach-help-video-keys';
+import { COACH_HELP_FEATURED_HOME_SCREEN_KEY, resourceVideoKey } from '@/lib/coach-help-video-keys';
 
 export const metadata = {
   title: 'Coach help | The Guild',
@@ -62,6 +62,50 @@ function loomEmbedSrc(url: string): string | null {
 
 function videoEmbedSrc(url: string): string | null {
   return youtubeEmbedSrc(url) ?? loomEmbedSrc(url);
+}
+
+type SupabaseServer = Awaited<ReturnType<typeof createClient>>;
+
+async function loadVideoEngagementForKey(
+  supabase: SupabaseServer,
+  userId: string,
+  videoKey: string
+): Promise<{ summary: CoachHelpVideoSummary; questions: CoachHelpQuestionRow[] }> {
+  const summary: CoachHelpVideoSummary = {
+    myViewCount: 0,
+    upCount: 0,
+    downCount: 0,
+    myVote: null,
+  };
+  let questions: CoachHelpQuestionRow[] = [];
+
+  const [vcRes, voteRowRes, voteRpcRes, qRes] = await Promise.all([
+    supabase
+      .from('coach_help_views')
+      .select('*', { count: 'exact', head: true })
+      .eq('video_key', videoKey)
+      .eq('user_id', userId),
+    supabase.from('coach_help_votes').select('vote').eq('video_key', videoKey).eq('user_id', userId).maybeSingle(),
+    supabase.rpc('coach_help_vote_summary', { p_video_key: videoKey }),
+    supabase
+      .from('coach_help_questions')
+      .select('id, user_id, video_key, body, created_at, answer_text, answered_at, answered_by')
+      .eq('video_key', videoKey)
+      .order('created_at', { ascending: false }),
+  ]);
+
+  if (!vcRes.error) summary.myViewCount = vcRes.count ?? 0;
+  if (!voteRowRes.error && voteRowRes.data && (voteRowRes.data.vote === 1 || voteRowRes.data.vote === -1)) {
+    summary.myVote = voteRowRes.data.vote;
+  }
+  if (!voteRpcRes.error && Array.isArray(voteRpcRes.data) && voteRpcRes.data[0]) {
+    const row = voteRpcRes.data[0] as { up_count?: unknown; down_count?: unknown };
+    summary.upCount = Number(row.up_count ?? 0);
+    summary.downCount = Number(row.down_count ?? 0);
+  }
+  if (!qRes.error && qRes.data) questions = qRes.data as CoachHelpQuestionRow[];
+
+  return { summary, questions };
 }
 
 export default async function CoachHelpPage() {
@@ -151,6 +195,14 @@ export default async function CoachHelpPage() {
     console.error('coach_help_questions fetch:', featuredQuestionsErr.message);
   }
 
+  const extraWithEngagement = await Promise.all(
+    extraResources.map(async (r) => {
+      const videoKey = resourceVideoKey(r.id);
+      const { summary, questions } = await loadVideoEngagementForKey(supabase, user.id, videoKey);
+      return { ...r, videoKey, summary, questions };
+    })
+  );
+
   const homeScreenVideoUrl =
     process.env.NEXT_PUBLIC_COACH_HELP_HOME_SCREEN_VIDEO_URL?.trim() || DEFAULT_HOME_SCREEN_VIDEO_URL;
   const embedSrc = videoEmbedSrc(homeScreenVideoUrl);
@@ -165,8 +217,8 @@ export default async function CoachHelpPage() {
         <h1 className="text-2xl font-bold text-foreground font-serif md:text-3xl">Coach help</h1>
         <p className="text-muted-foreground mt-2 text-sm md:text-base">
           This page is your fast path to getting productive in <strong className="text-foreground font-medium">The Guild</strong>{' '}
-          — booking flow, your schedule, and how parents find you. Start with the home-screen shortcut video, then skim
-          the guides below.
+          — booking flow, your schedule, and how parents find you. Start with the home-screen shortcut, then watch any
+          extra tutorials and skim the written guides below.
         </p>
       </div>
 
@@ -202,33 +254,43 @@ export default async function CoachHelpPage() {
           </CardContent>
         </Card>
 
-        {extraResources.length > 0 ? (
-          <Card>
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <Video className="h-5 w-5 text-[#D4AF37]" aria-hidden />
-                <CardTitle className="text-lg">More how-tos</CardTitle>
-              </div>
-              <CardDescription>Additional Loom or YouTube walkthroughs — open in a new tab if you prefer.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-2 text-sm">
-              <ul className="space-y-2">
-                {extraResources.map((r) => (
-                  <li key={r.id}>
-                    <a
-                      href={r.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 font-medium text-foreground underline-offset-4 hover:underline"
-                    >
-                      {r.title}
-                      <ExternalLink className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
+        {extraWithEngagement.length > 0 ? (
+          <div className="space-y-6">
+            <h2 className="text-lg font-semibold text-foreground font-serif">More how-tos</h2>
+            {extraWithEngagement.map((r) => {
+              const emb = videoEmbedSrc(r.url);
+              return (
+                <Card key={r.id} className="border-[#D4AF37]/40 shadow-sm">
+                  <CardHeader>
+                    <div className="flex items-center gap-2">
+                      <Video className="h-5 w-5 text-[#D4AF37]" aria-hidden />
+                      <CardTitle className="text-lg">{r.title}</CardTitle>
+                    </div>
+                    <CardDescription>
+                      {emb
+                        ? 'Watch in the player below or open in a new tab.'
+                        : 'Open in a new tab — add a standard Loom share or YouTube link for an in-page player.'}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4 text-sm text-muted-foreground">
+                    <CoachHelpVideoEngagement
+                      videoKey={r.videoKey}
+                      embedSrc={emb}
+                      watchUrl={r.url}
+                      iframeTitle={r.title}
+                      initialSummary={r.summary}
+                    />
+                    <CoachHelpQuestions
+                      videoKey={r.videoKey}
+                      currentUserId={user.id}
+                      isAdmin={isAdmin}
+                      initialQuestions={r.questions}
+                    />
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
         ) : null}
 
         <Card>
