@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import Link from 'next/link';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,13 +9,8 @@ import { Loader2, Trash2 } from 'lucide-react';
 
 type BlockRow = { id: string; blocked_date: string; reason: string | null };
 
-type CoachAvailSectionProps = {
-  /** Where this card is shown — adjusts helper text only */
-  variant?: 'calendar-hub' | 'profile';
-};
-
-export function CoachProfileAvailabilitySection(props: CoachAvailSectionProps = {}) {
-  const { variant = 'profile' } = props;
+/** Full-day blocks for request flow; used on the availability calendar page below weekly hours. */
+export function CoachProfileAvailabilitySection() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -96,20 +90,8 @@ export function CoachProfileAvailabilitySection(props: CoachAvailSectionProps = 
       <CardHeader>
         <CardTitle>Block full days off</CardTitle>
         <CardDescription>
-          {variant === 'calendar-hub' ? (
-            <>
-              Optional: mark whole days you&apos;re not taking private or partner requests. Your bookable hours are the
-              dated openings you add in the calendar above.
-            </>
-          ) : (
-            <>
-              Mark whole days parents can&apos;t request you. Add your open hours on the{' '}
-              <Link href="/availability" className="text-accent font-medium underline">
-                availability calendar
-              </Link>
-              .
-            </>
-          )}
+          Optional: mark whole days you&apos;re not taking private or partner requests. Your bookable hours are the
+          dated openings you add in the calendar above.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">

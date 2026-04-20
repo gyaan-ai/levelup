@@ -1,8 +1,10 @@
+import type { Metadata } from 'next';
 import { headers } from 'next/headers';
 import { Playfair_Display } from 'next/font/google';
 import { getTenantByDomain } from '@/config/tenants';
 import { Analytics } from '@vercel/analytics/next';
 import { ThemeProvider } from '@/components/theme-provider';
+import { PwaInstallProvider, PwaInstallBanner } from '@/components/pwa-install-provider';
 import { AuthProvider } from '@/lib/auth/auth-provider';
 import { CartProvider } from '@/lib/cart-context';
 import { Header } from '@/components/header';
@@ -24,23 +26,36 @@ export const viewport = {
   viewportFit: 'cover',
 } as const;
 
-export const metadata = {
-  title: 'The Guild | Elite Wrestling Technique Instruction',
-  description:
-    'Train with NCAA wrestlers and elite coaches in your community for private technique instruction. Master your wrestling through top-level coaching.',
-  keywords:
-    'the guild wrestling, wrestling lessons, NCAA wrestlers, elite coaches, elite technique, private lessons',
-  icons: {
-    icon: '/favicon.ico',
-    apple: '/apple-touch-icon.png',
-  },
-  appleWebApp: {
-    capable: true,
-    statusBarStyle: 'black-translucent',
-    title: 'The Guild',
-  },
-  manifest: '/manifest.json',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const headersList = await headers();
+  const host = headersList.get('host') || '';
+  const tenant = getTenantByDomain(host);
+  const appleTitle = tenant?.productName ?? 'The Guild';
+  const title = tenant
+    ? `${tenant.productName} | Elite Wrestling Technique Instruction`
+    : 'The Guild | Elite Wrestling Technique Instruction';
+
+  return {
+    title,
+    description:
+      'Train with NCAA wrestlers and elite coaches in your community for private technique instruction. Master your wrestling through top-level coaching.',
+    keywords:
+      'the guild wrestling, wrestling lessons, NCAA wrestlers, elite coaches, elite technique, private lessons',
+    icons: {
+      icon: '/favicon.ico',
+      apple: [
+        { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+        { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+      ],
+    },
+    appleWebApp: {
+      capable: true,
+      statusBarStyle: 'black-translucent',
+      title: appleTitle,
+    },
+    manifest: '/manifest.json',
+  };
+}
 
 const deploymentSha = process.env.VERCEL_GIT_COMMIT_SHA ?? '';
 
@@ -79,17 +94,18 @@ export default async function RootLayout({
     <html {...htmlProps}>
       <body className="flex flex-col min-h-screen font-sans bg-background text-foreground">
         <ThemeProvider tenant={tenant}>
-          <AuthProvider tenantSlug={tenant.slug}>
-            <CartProvider>
-              <Header />
-              <main className="flex-1 pb-[env(safe-area-inset-bottom)]">
-                <ParentBottomNavWrapper>
-                  {children}
-                </ParentBottomNavWrapper>
-              </main>
-              <Footer />
-            </CartProvider>
-          </AuthProvider>
+          <PwaInstallProvider>
+            <AuthProvider tenantSlug={tenant.slug}>
+              <CartProvider>
+                <Header />
+                <PwaInstallBanner />
+                <main className="flex-1 pb-[env(safe-area-inset-bottom)]">
+                  <ParentBottomNavWrapper>{children}</ParentBottomNavWrapper>
+                </main>
+                <Footer />
+              </CartProvider>
+            </AuthProvider>
+          </PwaInstallProvider>
         </ThemeProvider>
         <Analytics />
       </body>

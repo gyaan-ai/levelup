@@ -27,7 +27,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { RequestFacilityBlock } from '@/components/request-facility-block';
-import { CoachProfileAvailabilitySection } from '@/components/coach-profile-availability-section';
 import { Check, Copy, DollarSign, Globe, Lock, Share2 } from 'lucide-react';
 import { BackLink } from '@/components/back-link';
 import Link from 'next/link';
@@ -368,7 +367,22 @@ export default function ProfilePage() {
             </div>
           )}
 
-          {isCoachProfile && <CoachProfileAvailabilitySection />}
+          {isCoachProfile && (
+            <Card className="mb-6">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base">Availability</CardTitle>
+                <CardDescription>
+                  Your bookable hours and blocking full days off live on one page so they stay in sync—manage them on
+                  your availability calendar.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button asChild variant="outline" className="min-h-[44px] touch-manipulation">
+                  <Link href="/availability">Manage availability</Link>
+                </Button>
+              </CardContent>
+            </Card>
+          )}
 
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">

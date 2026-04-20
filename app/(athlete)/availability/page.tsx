@@ -44,7 +44,7 @@ export default async function AvailabilityPage() {
         </CardHeader>
       </Card>
       <AvailabilityManager />
-      <CoachProfileAvailabilitySection variant="calendar-hub" />
+      <CoachProfileAvailabilitySection />
     </div>
   );
 }
