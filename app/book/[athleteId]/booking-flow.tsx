@@ -938,7 +938,7 @@ export function BookingFlow({
                 )}
                 {(sessionMode === 'partner-invite' || sessionMode === 'partner-open') && !willUseFreeSession && (
                   <p className="text-sm text-muted-foreground">
-                    Second spot: partner will pay $40 when they join.
+                    Second spot: partner will pay $50 when they join.
                   </p>
                 )}
                 <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mt-4">

@@ -24,7 +24,7 @@ type Facility = { id: string; name: string; school: string; address?: string | n
 const SESSION_PRESETS = {
   small_group: { label: 'Small Group', price: 30, maxParticipants: 6, duration: 60 },
   partner: { label: 'Partner Session', price: 50, maxParticipants: 2, duration: 60 },
-  private: { label: 'Private Session', price: 75, maxParticipants: 1, duration: 60 },
+  private: { label: 'Private Session', price: 60, maxParticipants: 1, duration: 60 },
 } as const;
 
 type SessionTypeKey = keyof typeof SESSION_PRESETS;
@@ -240,7 +240,7 @@ export function CreateSessionForm({
                 <SelectContent>
                   <SelectItem value="small_group">Small Group (suggested $30/person)</SelectItem>
                   <SelectItem value="partner">Partner Session (suggested $50/person)</SelectItem>
-                  <SelectItem value="private">Private Session (suggested $75)</SelectItem>
+                  <SelectItem value="private">Private Session (suggested $60)</SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground mt-1">

@@ -33,7 +33,7 @@ export function getSessionPrice(
     case 'private':
       return { total: pricing.oneOnOne, basePrice: pricing.oneOnOne, pricePerParticipant: pricing.oneOnOne };
     case 'sibling':
-      const perAthlete = pricing.twoAthlete / 2; // $40 per wrestler
+      const perAthlete = pricing.twoAthlete / 2;
       return {
         total: perAthlete * numParticipants,
         basePrice: undefined,

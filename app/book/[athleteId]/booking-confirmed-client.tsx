@@ -43,7 +43,7 @@ export function BookingConfirmedClient({
   return (
     <div className="space-y-6">
       <p className="text-muted-foreground">
-        Your session is pending a partner. Share the link below so someone can join and pay $40.
+        Your session is pending a partner. Share the link below so someone can join and pay $50.
       </p>
       <div className="space-y-2">
         <p className="text-sm font-medium">Shareable link</p>

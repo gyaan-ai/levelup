@@ -13,7 +13,7 @@ const PRODUCT_SLUG: Record<CoachCreateSessionType, string> = {
 export const COACH_SESSION_FALLBACK_USD: Record<CoachCreateSessionType, number> = {
   small_group: 30,
   partner: 50,
-  private: 75,
+  private: 60,
 };
 
 /** Fixed rates on every public coach profile (parent-facing). */
@@ -22,6 +22,50 @@ export const GUILD_COACH_PROFILE_RATES: readonly { label: string; amountUsd: num
   { label: 'Partners', amountUsd: COACH_SESSION_FALLBACK_USD.partner },
   { label: 'Private', amountUsd: COACH_SESSION_FALLBACK_USD.private },
 ];
+
+/** Order and labels for public coach profile rate list (amounts come from services or product fallback). */
+export const COACH_PROFILE_PUBLIC_RATE_ROWS: readonly {
+  sessionType: CoachCreateSessionType;
+  label: string;
+  sublabel: string;
+}[] = [
+  { sessionType: 'small_group', label: 'Small groups', sublabel: 'per participant' },
+  { sessionType: 'partner', label: 'Partners', sublabel: 'per participant' },
+  { sessionType: 'private', label: 'Private', sublabel: 'one-on-one' },
+];
+
+/**
+ * Parent-facing $ amounts on coach profile: prefers active athlete_services (60 min tier if present),
+ * else minimum price for that type; falls back to org products / COACH_SESSION_FALLBACK.
+ */
+export async function getCoachDisplayedParentRates(
+  admin: SupabaseClient,
+  athleteId: string
+): Promise<Record<CoachCreateSessionType, number>> {
+  const { data: rows } = await admin
+    .from('athlete_services')
+    .select('session_type, parent_price, duration_minutes')
+    .eq('athlete_id', athleteId)
+    .eq('active', true);
+
+  const types: CoachCreateSessionType[] = ['private', 'partner', 'small_group'];
+  const fromServices: Partial<Record<CoachCreateSessionType, number>> = {};
+
+  for (const t of types) {
+    const matching = (rows ?? []).filter((r) => (r as { session_type: string }).session_type === t);
+    if (matching.length === 0) continue;
+    const hour = matching.filter((r) => (r as { duration_minutes: number }).duration_minutes === 60);
+    const pool = hour.length > 0 ? hour : matching;
+    fromServices[t] = Math.min(...pool.map((r) => Number((r as { parent_price: unknown }).parent_price)));
+  }
+
+  const productFallback = await getRecommendedPricesForCoach(admin, athleteId);
+  return {
+    private: fromServices.private ?? productFallback.private,
+    partner: fromServices.partner ?? productFallback.partner,
+    small_group: fromServices.small_group ?? productFallback.small_group,
+  };
+}
 
 /**
  * Parent price per spot (or per private session) from products + athlete_products override.

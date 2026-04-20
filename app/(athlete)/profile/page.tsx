@@ -28,7 +28,7 @@ import {
 } from '@/components/ui/select';
 import { RequestFacilityBlock } from '@/components/request-facility-block';
 import { CoachProfileAvailabilitySection } from '@/components/coach-profile-availability-section';
-import { Check, Copy, Globe, Lock, Share2 } from 'lucide-react';
+import { Check, Copy, DollarSign, Globe, Lock, Share2 } from 'lucide-react';
 import { BackLink } from '@/components/back-link';
 import Link from 'next/link';
 import { IN_APP_MESSAGING_ENABLED } from '@/lib/in-app-messaging';
@@ -640,12 +640,6 @@ export default function ProfilePage() {
           </Form>
         </CardContent>
       </Card>
-
-      <div className="mt-6">
-        <Link href="/rate-card" className="text-sm text-accent hover:underline">
-          Manage pricing &amp; session types →
-        </Link>
-      </div>
 
       <dialog
         ref={visibilityModalRef}

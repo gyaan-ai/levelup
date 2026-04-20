@@ -105,7 +105,8 @@ export const tenants: Record<string, TenantConfig> = {
 
     pricing: {
       oneOnOne: 60,
-      twoAthlete: 80,
+      /** Total for two athletes; half = $50/person partner default */
+      twoAthlete: 100,
       groupRate: 30,
       pools: {
         five: 375,

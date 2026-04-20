@@ -21,7 +21,7 @@ import { ProfileImage } from '@/components/profile-image';
 import { isBackgroundCheckValidForDisplay, isSafeSportValidForDisplay } from '@/lib/athletes';
 import { getSchoolBadgeColors, schoolBadgeClassName } from '@/lib/school-logos';
 import { summarizeWeeklyAvailability, type WeeklyAvailabilityRow } from '@/lib/availability';
-import { GUILD_COACH_PROFILE_RATES } from '@/lib/coach-session-pricing';
+import { COACH_PROFILE_PUBLIC_RATE_ROWS, getCoachDisplayedParentRates } from '@/lib/coach-session-pricing';
 import { IN_APP_MESSAGING_PAUSED_MESSAGE } from '@/lib/in-app-messaging';
 import { ContactInfoRow } from '@/components/contact-info-row';
 import { hasMinPhoneDigits } from '@/lib/phone';
@@ -192,6 +192,8 @@ export default async function AthleteProfilePage({
     const raw = (coachUserRow as { phone?: string | null } | null)?.phone;
     coachPhoneForContact = raw && hasMinPhoneDigits(raw) ? raw : null;
   }
+
+  const displayedParentRates = await getCoachDisplayedParentRates(admin, id);
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-5xl">
@@ -489,7 +491,6 @@ export default async function AthleteProfilePage({
         </Card>
       )}
 
-      {/* Standard Guild session rates (same on every coach profile) */}
       <Card className="mb-6">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -497,19 +498,22 @@ export default async function AthleteProfilePage({
             Session types & rates
           </CardTitle>
           <p className="text-sm text-muted-foreground">
-            Standard Guild pricing. Small groups and partners are per participant; private is one-on-one. You&apos;ll
-            choose date and time when you book.
+            Starting rates for this coach (from their rate card). Small group and partner are per participant; private
+            is one session. You&apos;ll pick date and time when you book.
           </p>
         </CardHeader>
         <CardContent>
           <ul className="space-y-4">
-            {GUILD_COACH_PROFILE_RATES.map((row) => (
+            {COACH_PROFILE_PUBLIC_RATE_ROWS.map((row) => (
               <li
-                key={row.label}
+                key={row.sessionType}
                 className="flex flex-wrap items-center justify-between gap-2 py-2 border-b last:border-0"
               >
-                <p className="font-medium">{row.label}</p>
-                <p className="text-lg font-semibold shrink-0">${row.amountUsd}</p>
+                <div>
+                  <p className="font-medium">{row.label}</p>
+                  <p className="text-xs text-muted-foreground">{row.sublabel}</p>
+                </div>
+                <p className="text-lg font-semibold shrink-0">${displayedParentRates[row.sessionType]}</p>
               </li>
             ))}
           </ul>
