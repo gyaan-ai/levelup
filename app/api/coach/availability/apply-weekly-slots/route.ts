@@ -3,6 +3,7 @@ import { addDays, parseISO } from 'date-fns';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
+import { dbForCoachActor, resolveCoachActorId } from '@/lib/coach-actor-server';
 import { formatEST, easternSundayZeroDowFromYmd } from '@/lib/format-date';
 import { notifyAvailabilityFollowers } from '@/lib/notify-availability-followers';
 
@@ -37,8 +38,10 @@ export async function POST(req: NextRequest) {
     } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
-    if (userData?.role !== 'coach') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const actor = await resolveCoachActorId(supabase, user.id);
+    if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
+
+    const db = dbForCoachActor(tenant.slug, actor, supabase);
 
     const body = (await req.json().catch(() => ({}))) as { days?: unknown };
     let days = Number(body.days);
@@ -51,7 +54,7 @@ export async function POST(req: NextRequest) {
     const { data: windows, error: winErr } = await supabase
       .from('athlete_availability')
       .select('day_of_week, start_time, end_time')
-      .eq('athlete_id', user.id);
+      .eq('athlete_id', actor.coachId);
 
     if (winErr) return NextResponse.json({ error: winErr.message }, { status: 500 });
     if (!windows?.length) {
@@ -67,7 +70,7 @@ export async function POST(req: NextRequest) {
     const { data: blockRows, error: blockErr } = await supabase
       .from('athlete_availability_blocks')
       .select('blocked_date')
-      .eq('athlete_id', user.id)
+      .eq('athlete_id', actor.coachId)
       .gte('blocked_date', todayEastern)
       .lte('blocked_date', endDateStr);
 
@@ -82,7 +85,7 @@ export async function POST(req: NextRequest) {
     const { data: existingRows, error: exErr } = await supabase
       .from('athlete_availability_slots')
       .select('slot_date, start_time')
-      .eq('athlete_id', user.id)
+      .eq('athlete_id', actor.coachId)
       .gte('slot_date', todayEastern)
       .lte('slot_date', endDateStr);
 
@@ -113,7 +116,7 @@ export async function POST(req: NextRequest) {
         if (existingKeys.has(key)) continue;
         existingKeys.add(key);
         insertRows.push({
-          athlete_id: user.id,
+          athlete_id: actor.coachId,
           slot_date: dateStr,
           start_time: start,
           end_time: end,
@@ -128,10 +131,10 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const { error: insErr } = await supabase.from('athlete_availability_slots').insert(insertRows);
+    const { error: insErr } = await db.from('athlete_availability_slots').insert(insertRows);
     if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 });
 
-    notifyAvailabilityFollowers(tenant.slug, user.id);
+    notifyAvailabilityFollowers(tenant.slug, actor.coachId);
 
     return NextResponse.json({ added: insertRows.length, days });
   } catch (e) {

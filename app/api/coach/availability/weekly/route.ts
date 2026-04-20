@@ -3,6 +3,7 @@ import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
 import { timeToHHmm } from '@/lib/availability';
+import { dbForCoachActor, resolveCoachActorId } from '@/lib/coach-actor-server';
 
 type WindowInput = { day_of_week: number; start_time: string; end_time: string };
 
@@ -33,13 +34,13 @@ export async function GET() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
-    if (userData?.role !== 'coach') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const actor = await resolveCoachActorId(supabase, user.id);
+    if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
 
     const { data: rows, error } = await supabase
       .from('athlete_availability')
       .select('id, day_of_week, start_time, end_time')
-      .eq('athlete_id', user.id)
+      .eq('athlete_id', actor.coachId)
       .order('day_of_week', { ascending: true })
       .order('start_time', { ascending: true });
 
@@ -70,8 +71,10 @@ export async function PUT(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
-    if (userData?.role !== 'coach') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const actor = await resolveCoachActorId(supabase, user.id);
+    if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
+
+    const db = dbForCoachActor(tenant.slug, actor, supabase);
 
     const body = (await req.json()) as { windows?: WindowInput[] };
     const raw = Array.isArray(body.windows) ? body.windows : [];
@@ -86,7 +89,7 @@ export async function PUT(req: NextRequest) {
       }
     }
 
-    const { error: delErr } = await supabase.from('athlete_availability').delete().eq('athlete_id', user.id);
+    const { error: delErr } = await db.from('athlete_availability').delete().eq('athlete_id', actor.coachId);
     if (delErr) return NextResponse.json({ error: delErr.message }, { status: 500 });
 
     if (raw.length === 0) {
@@ -94,13 +97,13 @@ export async function PUT(req: NextRequest) {
     }
 
     const insertRows = raw.map((w) => ({
-      athlete_id: user.id,
+      athlete_id: actor.coachId,
       day_of_week: w.day_of_week,
       start_time: padTime(w.start_time),
       end_time: padTime(w.end_time),
     }));
 
-    const { error: insErr } = await supabase.from('athlete_availability').insert(insertRows);
+    const { error: insErr } = await db.from('athlete_availability').insert(insertRows);
     if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 });
 
     return NextResponse.json({ ok: true });

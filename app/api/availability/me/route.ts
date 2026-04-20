@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
 import { timeToHHmm } from '@/lib/availability';
 import { notifyAvailabilityFollowers } from '@/lib/notify-availability-followers';
+import { dbForCoachActor, resolveCoachActorId } from '@/lib/coach-actor-server';
 
 export async function GET() {
   try {
@@ -16,13 +17,13 @@ export async function GET() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
-    if (userData?.role !== 'coach') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const actor = await resolveCoachActorId(supabase, user.id);
+    if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
 
     const { data: rows, error } = await supabase
       .from('athlete_availability_slots')
       .select('id, slot_date, start_time, end_time')
-      .eq('athlete_id', user.id)
+      .eq('athlete_id', actor.coachId)
       .gte('slot_date', new Date().toISOString().slice(0, 10))
       .order('slot_date', { ascending: true })
       .order('start_time', { ascending: true });
@@ -59,8 +60,10 @@ export async function POST(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
-    if (userData?.role !== 'coach') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const actor = await resolveCoachActorId(supabase, user.id);
+    if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
+
+    const db = dbForCoachActor(tenant.slug, actor, supabase);
 
     const body = (await req.json()) as { slot_date: string; start_time: string; end_time: string };
     const { slot_date, start_time, end_time } = body;
@@ -93,10 +96,10 @@ export async function POST(req: NextRequest) {
     const start = pad(start_time);
     const end = pad(end_time);
 
-    const { data: row, error } = await supabase
+    const { data: row, error } = await db
       .from('athlete_availability_slots')
       .insert({
-        athlete_id: user.id,
+        athlete_id: actor.coachId,
         slot_date: slotDate,
         start_time: start,
         end_time: end,
@@ -106,7 +109,7 @@ export async function POST(req: NextRequest) {
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-    notifyAvailabilityFollowers(tenant.slug, user.id);
+    notifyAvailabilityFollowers(tenant.slug, actor.coachId);
 
     return NextResponse.json({
       availability: {
@@ -133,22 +136,24 @@ export async function DELETE(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
-    if (userData?.role !== 'coach') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    const actor = await resolveCoachActorId(supabase, user.id);
+    if (!actor.ok) return NextResponse.json({ error: actor.error }, { status: actor.status });
+
+    const db = dbForCoachActor(tenant.slug, actor, supabase);
 
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
     if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 });
 
-    const { error } = await supabase
+    const { error } = await db
       .from('athlete_availability_slots')
       .delete()
       .eq('id', id)
-      .eq('athlete_id', user.id);
+      .eq('athlete_id', actor.coachId);
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-    notifyAvailabilityFollowers(tenant.slug, user.id);
+    notifyAvailabilityFollowers(tenant.slug, actor.coachId);
 
     return NextResponse.json({ ok: true });
   } catch (e) {
