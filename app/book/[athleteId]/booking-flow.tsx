@@ -184,6 +184,7 @@ export function BookingFlow({
   const hasPercentDiscount =
     effectivePercentOff != null && effectivePercentOff >= 1 && effectivePercentOff <= 100;
 
+  const partnerPerPersonFallback = Math.round(tenantPricing.twoAthlete / 2);
   const firstPrivateProduct = products.find(p => p.slug === 'private' || (p.min_participants === 1 && p.max_participants === 1));
   const firstPartnerProduct = products.find(p => p.slug === 'partner' || (p.min_participants <= 2 && p.max_participants >= 2));
   const numParticipants = selectedWrestlers.length;
@@ -661,7 +662,7 @@ export function BookingFlow({
                           {freeEntitlements.free2Athlete > 0 ? (
                             <span className="text-accent">Free session included</span>
                           ) : (
-                            <>${firstPartnerProduct ? firstPartnerProduct.parent_price.toFixed(0) : '40'} <span className="text-base font-normal text-muted-foreground">per person</span></>
+                            <>${firstPartnerProduct ? firstPartnerProduct.parent_price.toFixed(0) : partnerPerPersonFallback} <span className="text-base font-normal text-muted-foreground">per person</span></>
                           )}
                         </p>
                       </CardContent>
@@ -685,7 +686,7 @@ export function BookingFlow({
                         {freeEntitlements.free2Athlete > 0 ? (
                           <span className="text-accent">Free session included</span>
                         ) : (
-                          <>${(firstSiblingProduct?.parent_price ?? 40).toFixed(0)} per wrestler (Total: ${((firstSiblingProduct?.parent_price ?? 40) * numSelected).toFixed(0)})</>
+                          <>${(firstSiblingProduct?.parent_price ?? partnerPerPersonFallback).toFixed(0)} per wrestler (Total: ${((firstSiblingProduct?.parent_price ?? partnerPerPersonFallback) * numSelected).toFixed(0)})</>
                         )}
                       </p>
                     </CardContent>
