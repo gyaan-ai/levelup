@@ -27,7 +27,7 @@ export function AvailabilityManager() {
   const [list, setList] = useState<Slot[]>([]);
   const [loading, setLoading] = useState(true);
   const [weeklyWindowCount, setWeeklyWindowCount] = useState(0);
-  const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
+  const [selectedDates, setSelectedDates] = useState<Date[]>([]);
   const [start, setStart] = useState<string>('09:00');
   const [end, setEnd] = useState<string>('17:00');
   const [adding, setAdding] = useState(false);
@@ -109,8 +109,8 @@ export function AvailabilityManager() {
   };
 
   const handleAdd = async () => {
-    if (!selectedDate) {
-      window.alert('Please select a date.');
+    if (selectedDates.length === 0) {
+      window.alert('Please select one or more dates.');
       return;
     }
     const startM = parseInt(start.split(':')[0], 10) * 60 + parseInt(start.split(':')[1] || '0', 10);
@@ -121,18 +121,34 @@ export function AvailabilityManager() {
     }
     setAdding(true);
     try {
-      const slotDate = formatEST(selectedDate, 'yyyy-MM-dd');
-      const r = await fetch('/api/availability/me', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ slot_date: slotDate, start_time: start, end_time: end }),
-      });
-      const data = await r.json();
-      if (!r.ok) throw new Error(data.error || 'Failed to add');
+      let firstError: string | null = null;
+      let ok = 0;
+      for (const d of selectedDates) {
+        const slotDate = formatEST(d, 'yyyy-MM-dd');
+        const r = await fetch('/api/availability/me', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ slot_date: slotDate, start_time: start, end_time: end }),
+        });
+        const data = await r.json();
+        if (!r.ok) {
+          if (!firstError) firstError = (data.error as string) || 'Failed to add';
+        } else {
+          ok++;
+        }
+      }
       await refreshSlots();
-      setSelectedDate(undefined);
-      setStart('09:00');
-      setEnd('17:00');
+      if (firstError) {
+        window.alert(
+          ok > 0
+            ? `Added ${ok} slot(s). Some dates failed: ${firstError}`
+            : firstError
+        );
+      } else {
+        setSelectedDates([]);
+        setStart('09:00');
+        setEnd('17:00');
+      }
     } catch (e) {
       window.alert(e instanceof Error ? e.message : 'Failed to add slot');
     } finally {
@@ -213,22 +229,28 @@ export function AvailabilityManager() {
         <CardHeader>
           <CardTitle>Add a time slot</CardTitle>
           <CardDescription>
-            Pick a date, pick start and end time, then tap Add. Parents see these when they book private or partner
+            Select one or more dates on the calendar (tap again to deselect), choose start and end time, then tap Add
+            to apply the same window to every selected day. Parents see these when they book private or partner
             sessions.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
           <div>
-            <label className="text-sm font-medium mb-2 block">Date</label>
+            <label className="text-sm font-medium mb-2 block">Dates</label>
             <div className="flex justify-center">
               <Calendar
-                mode="single"
-                selected={selectedDate}
-                onSelect={setSelectedDate}
+                mode="multiple"
+                selected={selectedDates}
+                onSelect={(dates) => setSelectedDates(dates ?? [])}
                 disabled={(date) => date < startOfDay(new Date())}
                 className="rounded-md border"
               />
             </div>
+            {selectedDates.length > 0 ? (
+              <p className="text-xs text-muted-foreground text-center mt-2">
+                {selectedDates.length} day{selectedDates.length === 1 ? '' : 's'} selected
+              </p>
+            ) : null}
           </div>
           <div className="flex flex-wrap items-end gap-4">
             <div className="w-28">
@@ -261,8 +283,8 @@ export function AvailabilityManager() {
                 </SelectContent>
               </Select>
             </div>
-            <Button onClick={() => void handleAdd()} disabled={adding || !selectedDate}>
-              {adding ? 'Adding…' : 'Add slot'}
+            <Button onClick={() => void handleAdd()} disabled={adding || selectedDates.length === 0}>
+              {adding ? 'Adding…' : selectedDates.length > 1 ? `Add slot (${selectedDates.length} days)` : 'Add slot'}
             </Button>
           </div>
         </CardContent>

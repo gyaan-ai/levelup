@@ -241,7 +241,7 @@ export function CoachScheduleClient({
           <Button variant="outline" asChild className="min-h-[44px] touch-manipulation w-full sm:w-auto border-[#D4AF37]/50">
             <Link href="/availability">
               <CalendarClock className="h-4 w-4 mr-2 shrink-0" />
-              Update openings
+              Update my availability
             </Link>
           </Button>
         </div>

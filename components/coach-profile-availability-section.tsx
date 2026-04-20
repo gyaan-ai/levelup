@@ -27,7 +27,8 @@ export function CoachProfileAvailabilitySection(props: CoachAvailSectionProps = 
   const [blocks, setBlocks] = useState<BlockRow[]>([]);
   const [newBlockDate, setNewBlockDate] = useState('');
   const [newBlockReason, setNewBlockReason] = useState('');
-  const [pickDay, setPickDay] = useState<number>(1);
+  /** 0–6 (Sun–Sat); same start/end applied to each selected day when adding a window */
+  const [selectedDays, setSelectedDays] = useState<number[]>([]);
   const [pickStart, setPickStart] = useState('15:00');
   const [pickEnd, setPickEnd] = useState('19:00');
 
@@ -78,7 +79,24 @@ export function CoachProfileAvailabilitySection(props: CoachAvailSectionProps = 
   };
 
   const addWindow = () => {
-    setWindows((prev) => [...prev, { day_of_week: pickDay, start_time: pickStart, end_time: pickEnd }]);
+    if (selectedDays.length === 0) {
+      setError('Select at least one day for this window.');
+      return;
+    }
+    const startM =
+      parseInt(pickStart.split(':')[0], 10) * 60 + parseInt(pickStart.split(':')[1] || '0', 10);
+    const endM = parseInt(pickEnd.split(':')[0], 10) * 60 + parseInt(pickEnd.split(':')[1] || '0', 10);
+    if (endM <= startM) {
+      setError('End time must be after start time.');
+      return;
+    }
+    setError(null);
+    const daysSorted = [...selectedDays].sort((a, b) => a - b);
+    setWindows((prev) => [
+      ...prev,
+      ...daysSorted.map((day_of_week) => ({ day_of_week, start_time: pickStart, end_time: pickEnd })),
+    ]);
+    setSelectedDays([]);
   };
 
   const removeWindow = (index: number) => {
@@ -178,34 +196,56 @@ export function CoachProfileAvailabilitySection(props: CoachAvailSectionProps = 
             </ul>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+          <div className="space-y-4 pt-2">
             <div className="space-y-2">
-              <Label>Day</Label>
-              <select
-                className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                value={pickDay}
-                onChange={(e) => setPickDay(Number(e.target.value))}
-              >
-                {DAY_LABELS.map((label, d) => (
-                  <option key={label} value={d}>
-                    {label}
-                  </option>
-                ))}
-              </select>
+              <Label>Days</Label>
+              <p className="text-xs text-muted-foreground">
+                Select every day that shares this time window, then tap Add window once.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {DAY_LABELS.map((label, d) => {
+                  const on = selectedDays.includes(d);
+                  return (
+                    <Button
+                      key={label}
+                      type="button"
+                      variant={on ? 'default' : 'outline'}
+                      size="sm"
+                      className="min-h-[44px] min-w-[2.75rem] touch-manipulation"
+                      aria-pressed={on}
+                      onClick={() => {
+                        setSelectedDays((prev) =>
+                          prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d].sort((a, b) => a - b)
+                        );
+                      }}
+                    >
+                      {label}
+                    </Button>
+                  );
+                })}
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label>Start</Label>
-              <Input type="time" value={pickStart} onChange={(e) => setPickStart(e.target.value)} className="min-h-[44px]" />
-            </div>
-            <div className="space-y-2">
-              <Label>End</Label>
-              <Input type="time" value={pickEnd} onChange={(e) => setPickEnd(e.target.value)} className="min-h-[44px]" />
-            </div>
-            <div className="flex items-end">
-              <Button type="button" variant="outline" className="w-full min-h-[44px]" onClick={addWindow}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add window
-              </Button>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="space-y-2">
+                <Label>Start</Label>
+                <Input type="time" value={pickStart} onChange={(e) => setPickStart(e.target.value)} className="min-h-[44px]" />
+              </div>
+              <div className="space-y-2">
+                <Label>End</Label>
+                <Input type="time" value={pickEnd} onChange={(e) => setPickEnd(e.target.value)} className="min-h-[44px]" />
+              </div>
+              <div className="flex items-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="w-full min-h-[44px]"
+                  onClick={addWindow}
+                  disabled={selectedDays.length === 0}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add window
+                </Button>
+              </div>
             </div>
           </div>
 
