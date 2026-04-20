@@ -13,6 +13,8 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline' https://js.stripe.com https://api.mapbox.com",
               "worker-src 'self' blob:",
               "child-src blob:",
+              // Coach help: Loom + YouTube embeds on /coach-help
+              "frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com https://www.loom.com https://*.loom.com",
               "img-src 'self' data: blob: https://*.tiles.mapbox.com https://api.mapbox.com https://*.stripe.com https://*.supabase.co https://*.public.blob.vercel-storage.com",
               "connect-src 'self' https://api.mapbox.com https://events.mapbox.com https://*.supabase.co https://js.stripe.com https://api.stripe.com",
               "font-src 'self' data: https://fonts.mapbox.com",
