@@ -384,7 +384,7 @@ export default function ProfilePage() {
                   <Link href="/coach-help" className="text-accent font-medium underline">
                     Coach help
                   </Link>
-                  {' — '}start with the home-screen video, then availability and sessions.
+                  {' — '}start with The Guild home-screen video, then availability and sessions.
                 </p>
               </CardContent>
             </Card>

@@ -6,11 +6,16 @@ import { getTenantByDomain } from '@/config/tenants';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { BackLink } from '@/components/back-link';
 import { Button } from '@/components/ui/button';
-import { CalendarClock, ExternalLink, LayoutDashboard, Smartphone } from 'lucide-react';
+import { CalendarClock, ExternalLink, LayoutDashboard, Smartphone, Video } from 'lucide-react';
+import { CoachHelpResourcesAdmin } from '@/components/coach-help-resources-admin';
+import { CoachHelpVideoEngagement } from '@/components/coach-help-video-engagement';
+import { CoachHelpQuestions, type CoachHelpQuestionRow } from '@/components/coach-help-questions';
+import { COACH_HELP_FEATURED_HOME_SCREEN_KEY } from '@/lib/coach-help-video-keys';
 
 export const metadata = {
   title: 'Coach help | The Guild',
-  description: 'Mobile shortcut video and guides for availability, sessions, and payouts.',
+  description:
+    'Quick-start resources for coaches in The Guild: phone shortcut, availability, sessions, and payouts.',
 };
 
 /** Guild default: mobile shortcut tutorial (override with NEXT_PUBLIC_COACH_HELP_HOME_SCREEN_VIDEO_URL). */
@@ -73,9 +78,73 @@ export default async function CoachHelpPage() {
     .eq('id', user.id)
     .single();
 
+  const isAdmin = userData?.role === 'admin';
+
   if (userData?.role !== 'coach' && userData?.role !== 'admin') {
     if (userData?.role === 'parent') redirect('/browse');
     redirect('/login');
+  }
+
+  const { data: resourceRows, error: coachHelpResourcesError } = await supabase
+    .from('coach_help_resources')
+    .select('id, title, url, created_at')
+    .order('created_at', { ascending: false });
+
+  if (coachHelpResourcesError) {
+    console.error('coach_help_resources fetch:', coachHelpResourcesError.message);
+  }
+
+  const extraResources = (coachHelpResourcesError ? [] : resourceRows ?? []) as {
+    id: string;
+    title: string;
+    url: string;
+    created_at: string;
+  }[];
+
+  const fk = COACH_HELP_FEATURED_HOME_SCREEN_KEY;
+  let featuredSummary = {
+    myViewCount: 0,
+    upCount: 0,
+    downCount: 0,
+    myVote: null as number | null,
+  };
+  let featuredQuestions: CoachHelpQuestionRow[] = [];
+
+  const { count: featuredViewCount, error: featuredViewsErr } = await supabase
+    .from('coach_help_views')
+    .select('*', { count: 'exact', head: true })
+    .eq('video_key', fk)
+    .eq('user_id', user.id);
+  if (!featuredViewsErr) featuredSummary.myViewCount = featuredViewCount ?? 0;
+
+  const { data: featuredVoteRow, error: featuredVoteErr } = await supabase
+    .from('coach_help_votes')
+    .select('vote')
+    .eq('video_key', fk)
+    .eq('user_id', user.id)
+    .maybeSingle();
+  if (!featuredVoteErr && featuredVoteRow && (featuredVoteRow.vote === 1 || featuredVoteRow.vote === -1)) {
+    featuredSummary.myVote = featuredVoteRow.vote;
+  }
+
+  const { data: featuredVoteRpc, error: featuredVoteRpcErr } = await supabase.rpc('coach_help_vote_summary', {
+    p_video_key: fk,
+  });
+  if (!featuredVoteRpcErr && Array.isArray(featuredVoteRpc) && featuredVoteRpc[0]) {
+    const row = featuredVoteRpc[0] as { up_count?: unknown; down_count?: unknown };
+    featuredSummary.upCount = Number(row.up_count ?? 0);
+    featuredSummary.downCount = Number(row.down_count ?? 0);
+  }
+
+  const { data: featuredQuestionRows, error: featuredQuestionsErr } = await supabase
+    .from('coach_help_questions')
+    .select('id, user_id, video_key, body, created_at, answer_text, answered_at, answered_by')
+    .eq('video_key', fk)
+    .order('created_at', { ascending: false });
+  if (!featuredQuestionsErr && featuredQuestionRows) {
+    featuredQuestions = featuredQuestionRows as CoachHelpQuestionRow[];
+  } else if (featuredQuestionsErr) {
+    console.error('coach_help_questions fetch:', featuredQuestionsErr.message);
   }
 
   const homeScreenVideoUrl =
@@ -91,8 +160,9 @@ export default async function CoachHelpPage() {
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-foreground font-serif md:text-3xl">Coach help</h1>
         <p className="text-muted-foreground mt-2 text-sm md:text-base">
-          Start with the short video below to add LevelUp to your phone (home screen shortcut). Then use the guides for
-          availability and sessions.
+          This page is your fast path to getting productive in <strong className="text-foreground font-medium">The Guild</strong>{' '}
+          — booking flow, your schedule, and how parents find you. Start with the home-screen shortcut video, then skim
+          the guides below.
         </p>
       </div>
 
@@ -102,49 +172,60 @@ export default async function CoachHelpPage() {
             <p className="text-xs font-semibold uppercase tracking-wide text-[#D4AF37] mb-1">Start here</p>
             <div className="flex items-center gap-2">
               <Smartphone className="h-5 w-5 text-[#D4AF37]" aria-hidden />
-              <CardTitle className="text-lg">Add LevelUp to your phone</CardTitle>
+              <CardTitle className="text-lg">Add The Guild to your phone</CardTitle>
             </div>
             <CardDescription>
-              Put the Guild on your home screen so opening your schedule is one tap — same idea as installing an app.
+              Put The Guild on your home screen so opening your schedule is one tap — same idea as installing an app.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 text-sm text-muted-foreground">
-            <>
-              {embedSrc ? (
-                <div className="rounded-lg overflow-hidden border bg-black aspect-video">
-                  <iframe
-                    title="How to add LevelUp to your home screen"
-                    src={embedSrc}
-                    className="w-full h-full min-h-[200px]"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
-                    allowFullScreen
-                  />
-                </div>
-              ) : null}
-              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                <Button asChild className="min-h-[44px] bg-[#D4AF37] hover:bg-[#c9a432] text-black font-semibold w-full sm:w-auto">
-                  <a
-                    href={homeScreenVideoUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center justify-center gap-2"
-                  >
-                    {embedSrc ? 'Open in new tab' : 'Watch the video'}
-                    <ExternalLink className="h-4 w-4 shrink-0" aria-hidden />
-                  </a>
-                </Button>
-                {!embedSrc ? (
-                  <span className="text-xs sm:text-sm">
-                    Opens your video host in a new tab — use a YouTube or Loom watch/share link for an in-page player.
-                  </span>
-                ) : null}
-              </div>
-            </>
+            <CoachHelpVideoEngagement
+              videoKey={fk}
+              embedSrc={embedSrc}
+              watchUrl={homeScreenVideoUrl}
+              iframeTitle="How to add The Guild to your home screen"
+              initialSummary={featuredSummary}
+            />
+            <CoachHelpQuestions
+              videoKey={fk}
+              currentUserId={user.id}
+              isAdmin={isAdmin}
+              initialQuestions={featuredQuestions}
+            />
             <p className="text-xs border-t border-border/60 pt-3">
-              After you save the shortcut, open LevelUp once and sign in so the browser keeps you logged in.
+              After you save the shortcut, open The Guild once and sign in so the browser keeps you logged in.
             </p>
           </CardContent>
         </Card>
+
+        {extraResources.length > 0 ? (
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Video className="h-5 w-5 text-[#D4AF37]" aria-hidden />
+                <CardTitle className="text-lg">More how-tos</CardTitle>
+              </div>
+              <CardDescription>Additional Loom or YouTube walkthroughs — open in a new tab if you prefer.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2 text-sm">
+              <ul className="space-y-2">
+                {extraResources.map((r) => (
+                  <li key={r.id}>
+                    <a
+                      href={r.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 font-medium text-foreground underline-offset-4 hover:underline"
+                    >
+                      {r.title}
+                      <ExternalLink className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
+        ) : null}
 
         <Card>
           <CardHeader>
@@ -213,6 +294,8 @@ export default async function CoachHelpPage() {
             </Button>
           </CardContent>
         </Card>
+
+        {isAdmin ? <CoachHelpResourcesAdmin initialResources={extraResources} /> : null}
       </div>
     </div>
   );
