@@ -38,13 +38,13 @@ export default async function AvailabilityPage() {
         <CardHeader>
           <CardTitle>Your coaching calendar</CardTitle>
           <CardDescription>
-            Set your <strong>weekly template</strong> once, tap <strong>Quick fill</strong> to roll it into the next two
-            weeks, then fine-tune single days below. Parents only see times you add here.
+            Add your open hours on the calendar below (Eastern). That&apos;s the only place parents see when they can
+            request you. Optionally block whole days off at the bottom.
           </CardDescription>
         </CardHeader>
       </Card>
-      <CoachProfileAvailabilitySection embedInAvailabilityHub />
       <AvailabilityManager />
+      <CoachProfileAvailabilitySection variant="calendar-hub" />
     </div>
   );
 }

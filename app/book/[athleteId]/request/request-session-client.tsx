@@ -290,7 +290,7 @@ export function RequestSessionClient({
             )}
             {!hasAvailability && (
               <p className="text-xs text-muted-foreground">
-                This coach has not published weekly hours yet. You can still send a message below with times that work
+                This coach has not added calendar openings yet. You can still send a message below with times that work
                 for you.
               </p>
             )}

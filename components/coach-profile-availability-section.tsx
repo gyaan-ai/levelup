@@ -6,48 +6,34 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, Plus, Trash2 } from 'lucide-react';
+import { Loader2, Trash2 } from 'lucide-react';
 
-type WindowRow = { day_of_week: number; start_time: string; end_time: string };
 type BlockRow = { id: string; blocked_date: string; reason: string | null };
 
-const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as const;
-
 type CoachAvailSectionProps = {
-  /** When true, copy references Quick fill on the same page. */
-  embedInAvailabilityHub?: boolean;
+  /** Where this card is shown — adjusts helper text only */
+  variant?: 'calendar-hub' | 'profile';
 };
 
 export function CoachProfileAvailabilitySection(props: CoachAvailSectionProps = {}) {
-  const { embedInAvailabilityHub = false } = props;
+  const { variant = 'profile' } = props;
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [windows, setWindows] = useState<WindowRow[]>([]);
   const [blocks, setBlocks] = useState<BlockRow[]>([]);
   const [newBlockDate, setNewBlockDate] = useState('');
   const [newBlockReason, setNewBlockReason] = useState('');
-  /** 0–6 (Sun–Sat); same start/end applied to each selected day when adding a window */
-  const [selectedDays, setSelectedDays] = useState<number[]>([]);
-  const [pickStart, setPickStart] = useState('15:00');
-  const [pickEnd, setPickEnd] = useState('19:00');
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      const [wRes, bRes] = await Promise.all([
-        fetch('/api/coach/availability/weekly'),
-        fetch('/api/coach/availability/blocks'),
-      ]);
-      const wData = await wRes.json();
+      const bRes = await fetch('/api/coach/availability/blocks');
       const bData = await bRes.json();
-      if (!wRes.ok) throw new Error(wData.error || 'Failed to load weekly availability');
-      if (bRes.ok && Array.isArray(bData.blocks)) {
+      if (!bRes.ok) throw new Error(bData.error || 'Failed to load blocked dates');
+      if (Array.isArray(bData.blocks)) {
         setBlocks(bData.blocks);
       }
-      const list = (wData.windows || []) as { day_of_week: number; start_time: string; end_time: string }[];
-      setWindows(list.map((r) => ({ day_of_week: r.day_of_week, start_time: r.start_time, end_time: r.end_time })));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load');
     } finally {
@@ -58,50 +44,6 @@ export function CoachProfileAvailabilitySection(props: CoachAvailSectionProps = 
   useEffect(() => {
     void load();
   }, [load]);
-
-  const saveWeekly = async () => {
-    setSaving(true);
-    setError(null);
-    try {
-      const res = await fetch('/api/coach/availability/weekly', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ windows }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Save failed');
-      await load();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Save failed');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const addWindow = () => {
-    if (selectedDays.length === 0) {
-      setError('Select at least one day for this window.');
-      return;
-    }
-    const startM =
-      parseInt(pickStart.split(':')[0], 10) * 60 + parseInt(pickStart.split(':')[1] || '0', 10);
-    const endM = parseInt(pickEnd.split(':')[0], 10) * 60 + parseInt(pickEnd.split(':')[1] || '0', 10);
-    if (endM <= startM) {
-      setError('End time must be after start time.');
-      return;
-    }
-    setError(null);
-    const daysSorted = [...selectedDays].sort((a, b) => a - b);
-    setWindows((prev) => [
-      ...prev,
-      ...daysSorted.map((day_of_week) => ({ day_of_week, start_time: pickStart, end_time: pickEnd })),
-    ]);
-    setSelectedDays([]);
-  };
-
-  const removeWindow = (index: number) => {
-    setWindows((prev) => prev.filter((_, i) => i !== index));
-  };
 
   const addBlock = async () => {
     if (!newBlockDate.trim()) return;
@@ -152,19 +94,18 @@ export function CoachProfileAvailabilitySection(props: CoachAvailSectionProps = 
   return (
     <Card className="mb-6">
       <CardHeader>
-        <CardTitle>Availability</CardTitle>
+        <CardTitle>Block full days off</CardTitle>
         <CardDescription>
-          {embedInAvailabilityHub ? (
+          {variant === 'calendar-hub' ? (
             <>
-              Weekly template (Eastern) for private and partner requests. Use <strong>Quick fill</strong> below to copy
-              these hours onto the next two weeks, then tweak individual days if needed.
+              Optional: mark whole days you&apos;re not taking private or partner requests. Your bookable hours are the
+              dated openings you add in the calendar above.
             </>
           ) : (
             <>
-              Weekly hours (Eastern) tell parents when they can request private or partner sessions. Date-specific
-              openings are on{' '}
+              Mark whole days parents can&apos;t request you. Add your open hours on the{' '}
               <Link href="/availability" className="text-accent font-medium underline">
-                the calendar page
+                availability calendar
               </Link>
               .
             </>
@@ -175,87 +116,6 @@ export function CoachProfileAvailabilitySection(props: CoachAvailSectionProps = 
         {error && <p className="text-sm text-destructive">{error}</p>}
 
         <div className="space-y-3">
-          <p className="text-sm font-medium">Weekly windows</p>
-          {windows.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No recurring windows yet. Add at least one (60+ minutes).</p>
-          ) : (
-            <ul className="space-y-2">
-              {windows.map((w, i) => (
-                <li
-                  key={`${w.day_of_week}-${i}-${w.start_time}`}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border px-3 py-2 text-sm"
-                >
-                  <span>
-                    {DAY_LABELS[w.day_of_week]} · {w.start_time} – {w.end_time}
-                  </span>
-                  <Button type="button" variant="ghost" size="sm" className="min-h-[40px]" onClick={() => removeWindow(i)}>
-                    <Trash2 className="h-4 w-4 text-destructive" />
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          <div className="space-y-4 pt-2">
-            <div className="space-y-2">
-              <Label>Days</Label>
-              <p className="text-xs text-muted-foreground">
-                Select every day that shares this time window, then tap Add window once.
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {DAY_LABELS.map((label, d) => {
-                  const on = selectedDays.includes(d);
-                  return (
-                    <Button
-                      key={label}
-                      type="button"
-                      variant={on ? 'default' : 'outline'}
-                      size="sm"
-                      className="min-h-[44px] min-w-[2.75rem] touch-manipulation"
-                      aria-pressed={on}
-                      onClick={() => {
-                        setSelectedDays((prev) =>
-                          prev.includes(d) ? prev.filter((x) => x !== d) : [...prev, d].sort((a, b) => a - b)
-                        );
-                      }}
-                    >
-                      {label}
-                    </Button>
-                  );
-                })}
-              </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div className="space-y-2">
-                <Label>Start</Label>
-                <Input type="time" value={pickStart} onChange={(e) => setPickStart(e.target.value)} className="min-h-[44px]" />
-              </div>
-              <div className="space-y-2">
-                <Label>End</Label>
-                <Input type="time" value={pickEnd} onChange={(e) => setPickEnd(e.target.value)} className="min-h-[44px]" />
-              </div>
-              <div className="flex items-end">
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full min-h-[44px]"
-                  onClick={addWindow}
-                  disabled={selectedDays.length === 0}
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add window
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          <Button type="button" className="min-h-[44px]" onClick={() => void saveWeekly()} disabled={saving}>
-            {saving ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Save weekly hours'}
-          </Button>
-        </div>
-
-        <div className="space-y-3 border-t border-border pt-6">
-          <p className="text-sm font-medium">Block specific dates</p>
           <p className="text-xs text-muted-foreground">Parents won&apos;t be able to request sessions on these days.</p>
           {blocks.length > 0 && (
             <ul className="space-y-2">

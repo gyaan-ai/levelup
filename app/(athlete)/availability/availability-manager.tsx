@@ -14,7 +14,6 @@ import { Calendar } from '@/components/ui/calendar';
 import { startOfDay } from 'date-fns';
 import { formatEST } from '@/lib/format-date';
 import { formatSlotDisplay } from '@/lib/availability';
-import { Sparkles } from 'lucide-react';
 
 const SLOTS_24H = [
   '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00',
@@ -26,17 +25,11 @@ type Slot = { id: string; slot_date: string; start_time: string; end_time: strin
 export function AvailabilityManager() {
   const [list, setList] = useState<Slot[]>([]);
   const [loading, setLoading] = useState(true);
-  const [weeklyWindowCount, setWeeklyWindowCount] = useState(0);
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
   const [start, setStart] = useState<string>('09:00');
   const [end, setEnd] = useState<string>('17:00');
   const [adding, setAdding] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
-  const [applyLoading, setApplyLoading] = useState(false);
-  const [applyBanner, setApplyBanner] = useState<{
-    tone: 'success' | 'error' | 'neutral';
-    msg: string;
-  } | null>(null);
 
   const refreshSlots = useCallback(async () => {
     const r = await fetch('/api/availability/me');
@@ -46,20 +39,12 @@ export function AvailabilityManager() {
     }
   }, []);
 
-  const refreshWeekly = useCallback(async () => {
-    const r = await fetch('/api/coach/availability/weekly');
-    const data = await r.json();
-    if (r.ok && Array.isArray(data.windows)) {
-      setWeeklyWindowCount(data.windows.length);
-    }
-  }, []);
-
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
       try {
-        await Promise.all([refreshSlots(), refreshWeekly()]);
+        await refreshSlots();
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -67,46 +52,7 @@ export function AvailabilityManager() {
     return () => {
       cancelled = true;
     };
-  }, [refreshSlots, refreshWeekly]);
-
-  useEffect(() => {
-    const onSaved = () => void refreshWeekly();
-    window.addEventListener('coach-weekly-availability-saved', onSaved);
-    return () => window.removeEventListener('coach-weekly-availability-saved', onSaved);
-  }, [refreshWeekly]);
-
-  const handleApplyWeekly = async () => {
-    setApplyBanner(null);
-    setApplyLoading(true);
-    try {
-      const r = await fetch('/api/coach/availability/apply-weekly-slots', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ days: 14 }),
-      });
-      const data = await r.json();
-      if (!r.ok) throw new Error(data.error || 'Could not apply weekly hours');
-      await refreshSlots();
-      setApplyBanner(
-        data.added > 0
-          ? {
-              tone: 'success',
-              msg: `Added ${data.added} opening${data.added === 1 ? '' : 's'} for the next two weeks (skips blocked days and times you already added).`,
-            }
-          : {
-              tone: 'neutral',
-              msg: String(data.message || 'No new openings — you may already be covered for those days.'),
-            }
-      );
-    } catch (e) {
-      setApplyBanner({
-        tone: 'error',
-        msg: e instanceof Error ? e.message : 'Something went wrong',
-      });
-    } finally {
-      setApplyLoading(false);
-    }
-  };
+  }, [refreshSlots]);
 
   const handleAdd = async () => {
     if (selectedDates.length === 0) {
@@ -184,54 +130,12 @@ export function AvailabilityManager() {
 
   return (
     <div className="space-y-6">
-      <Card className="border-[#D4AF37]/25 bg-[#D4AF37]/5">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-            <Sparkles className="h-5 w-5 text-[#D4AF37] shrink-0" aria-hidden />
-            Quick fill (every week)
-          </CardTitle>
-          <CardDescription>
-            One tap copies your <strong>weekly template</strong> above onto the <strong>next 14 days</strong>. Blocked
-            days are skipped; existing times are not duplicated. Adjust with the calendar below anytime.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {applyBanner ? (
-            <p
-              className={`text-sm rounded-md px-3 py-2 ${
-                applyBanner.tone === 'success'
-                  ? 'bg-emerald-500/10 text-emerald-800 dark:text-emerald-200'
-                  : applyBanner.tone === 'error'
-                    ? 'bg-destructive/10 text-destructive'
-                    : 'bg-muted text-muted-foreground'
-              }`}
-            >
-              {applyBanner.msg}
-            </p>
-          ) : null}
-          <Button
-            type="button"
-            className="min-h-[48px] w-full sm:w-auto bg-[#D4AF37] text-black hover:bg-[#c9a432] font-semibold touch-manipulation"
-            onClick={() => void handleApplyWeekly()}
-            disabled={applyLoading || weeklyWindowCount === 0}
-          >
-            {applyLoading ? 'Working…' : 'Fill next 2 weeks from weekly hours'}
-          </Button>
-          {weeklyWindowCount === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Save at least one weekly window in the section above, then come back here.
-            </p>
-          ) : null}
-        </CardContent>
-      </Card>
-
       <Card>
         <CardHeader>
-          <CardTitle>Add a time slot</CardTitle>
+          <CardTitle>Your calendar</CardTitle>
           <CardDescription>
-            Select one or more dates on the calendar (tap again to deselect), choose start and end time, then tap Add
-            to apply the same window to every selected day. Parents see these when they book private or partner
-            sessions.
+            Select one or more dates, choose when you&apos;re open, then add. Parents use these times for private and
+            partner requests. Repeat for other time windows or weeks as needed.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -284,7 +188,7 @@ export function AvailabilityManager() {
               </Select>
             </div>
             <Button onClick={() => void handleAdd()} disabled={adding || selectedDates.length === 0}>
-              {adding ? 'Adding…' : selectedDates.length > 1 ? `Add slot (${selectedDates.length} days)` : 'Add slot'}
+              {adding ? 'Adding…' : selectedDates.length > 1 ? `Add opening (${selectedDates.length} days)` : 'Add opening'}
             </Button>
           </div>
         </CardContent>
@@ -292,10 +196,10 @@ export function AvailabilityManager() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Your dated openings</CardTitle>
+          <CardTitle>Upcoming openings</CardTitle>
           <CardDescription>
             {list.length === 0
-              ? 'No slots yet — use Quick fill or add one above.'
+              ? 'No slots yet — add your hours with the calendar above.'
               : 'These are the times parents can book against.'}
           </CardDescription>
         </CardHeader>
