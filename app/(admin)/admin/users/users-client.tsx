@@ -42,6 +42,8 @@ export type AdminUserRow = {
   kids_names?: string[] | null;
   /** For parents: number of coach reviews submitted (from public.reviews). */
   review_count?: number;
+  phone?: string | null;
+  zip_code?: string | null;
 };
 
 type SortOption = 'email_asc' | 'email_desc' | 'role' | 'created_desc' | 'created_asc' | 'login_desc' | 'login_asc';
@@ -62,6 +64,8 @@ export function AdminUsersClient({ initialUsers }: { initialUsers: AdminUserRow[
   const [search, setSearch] = useState('');
   const [editUser, setEditUser] = useState<AdminUserRow | null>(null);
   const [editRole, setEditRole] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editZip, setEditZip] = useState('');
   const [deleteUser, setDeleteUser] = useState<AdminUserRow | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -162,24 +166,45 @@ export function AdminUsersClient({ initialUsers }: { initialUsers: AdminUserRow[
   };
 
   const handleSaveEdit = async () => {
-    if (!editUser || editRole === '' || editRole === editUser.role) {
+    if (!editUser || editRole === '') return;
+    const roleDirty = editRole !== editUser.role;
+    const phoneDirty = (editPhone.trim() || '') !== (editUser.phone ?? '').trim();
+    const zipDirty = (editZip.trim() || '') !== (editUser.zip_code ?? '').trim();
+    if (!roleDirty && !phoneDirty && !zipDirty) {
       setEditUser(null);
       return;
     }
     setLoading(true);
     setError(null);
     try {
+      const payload: Record<string, unknown> = {};
+      if (roleDirty) payload.role = editRole;
+      if (phoneDirty) payload.phone = editPhone.trim() === '' ? null : editPhone.trim();
+      if (zipDirty) payload.zipCode = editZip.trim() === '' ? null : editZip.trim();
       const res = await fetch(`/api/admin/users/${editUser.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role: editRole }),
+        body: JSON.stringify(payload),
       });
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const data = await res.json();
-        setError(data.error || 'Failed to update');
+        setError(typeof data?.error === 'string' ? data.error : 'Failed to update');
         return;
       }
-      setUsers((prev) => prev.map((x) => (x.id === editUser.id ? { ...x, role: editRole } : x)));
+      setUsers((prev) =>
+        prev.map((x) =>
+          x.id === editUser.id
+            ? {
+                ...x,
+                role: typeof data.role === 'string' ? data.role : editRole,
+                phone: data.phone ?? (phoneDirty ? (editPhone.trim() === '' ? null : editPhone.trim()) : x.phone),
+                zip_code:
+                  data.zip_code ??
+                  (zipDirty ? (editZip.trim() === '' ? null : editZip.trim()) : x.zip_code),
+              }
+            : x
+        )
+      );
       setEditUser(null);
     } catch {
       setError('Something went wrong');
@@ -497,11 +522,13 @@ export function AdminUsersClient({ initialUsers }: { initialUsers: AdminUserRow[
                             onClick={() => {
                               setEditUser(u);
                               setEditRole(u.role);
+                              setEditPhone(u.phone ?? '');
+                              setEditZip(u.zip_code ?? '');
                               setError(null);
                             }}
                           >
                             <Pencil className="h-4 w-4 mr-1" />
-                            Edit role
+                            Edit user
                           </Button>
                           {u.archived_at ? (
                             <Button
@@ -575,6 +602,33 @@ export function AdminUsersClient({ initialUsers }: { initialUsers: AdminUserRow[
                 </SelectContent>
               </Select>
             </div>
+            <div>
+              <label className="text-sm font-medium mb-2 block" htmlFor="admin-user-phone">
+                Cell phone
+              </label>
+              <Input
+                id="admin-user-phone"
+                type="tel"
+                autoComplete="tel"
+                placeholder="10+ digits"
+                value={editPhone}
+                onChange={(e) => setEditPhone(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground mt-1">Leave blank to clear. Used for SMS and alerts.</p>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-2 block" htmlFor="admin-user-zip">
+                Home ZIP
+              </label>
+              <Input
+                id="admin-user-zip"
+                autoComplete="postal-code"
+                placeholder="e.g. 27607 or 27607-1234"
+                value={editZip}
+                onChange={(e) => setEditZip(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground mt-1">U.S. 5-digit or ZIP+4. Leave blank to clear.</p>
+            </div>
             {editUser?.archived_at && (
               <Button
                 variant="outline"
@@ -588,7 +642,16 @@ export function AdminUsersClient({ initialUsers }: { initialUsers: AdminUserRow[
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditUser(null)}>Cancel</Button>
-            <Button onClick={handleSaveEdit} disabled={loading || editRole === editUser?.role}>
+            <Button
+              onClick={() => void handleSaveEdit()}
+              disabled={
+                loading ||
+                (!!editUser &&
+                  editRole === editUser.role &&
+                  (editPhone.trim() || '') === (editUser.phone ?? '').trim() &&
+                  (editZip.trim() || '') === (editUser.zip_code ?? '').trim())
+              }
+            >
               Save
             </Button>
           </DialogFooter>

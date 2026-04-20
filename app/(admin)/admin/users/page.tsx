@@ -22,7 +22,7 @@ export default async function AdminUsersPage() {
   const admin = createAdminClient(tenant.slug);
   const { data: rows, error } = await admin
     .from('users')
-    .select('id, email, role, created_at, archived_at, last_login_at, first_name, last_name')
+    .select('id, email, role, created_at, archived_at, last_login_at, first_name, last_name, phone, zip_code')
     .order('created_at', { ascending: false });
 
   if (error) console.error('Admin users fetch error:', error);
@@ -37,6 +37,8 @@ export default async function AdminUsersPage() {
       last_login_at?: string | null;
       first_name?: string | null;
       last_name?: string | null;
+      phone?: string | null;
+      zip_code?: string | null;
     };
     return {
       id: row.id,
@@ -47,6 +49,8 @@ export default async function AdminUsersPage() {
       first_name: row.first_name ?? null,
       last_name: row.last_name ?? null,
       archived_at: row.archived_at ?? null,
+      phone: row.phone ?? null,
+      zip_code: row.zip_code ?? null,
     };
   });
 

@@ -763,6 +763,10 @@ export function AdminDashboardClient({
     photo_focus_y: number;
     venmo_handle: string | null;
     zelle_email: string | null;
+    /** Coach account cell (`users.phone`); same as /profile for coaches. */
+    phone: string;
+    /** Home ZIP on `users.zip_code`. */
+    zip_code: string;
     active: boolean;
   } | null>(null);
   const [facilities, setFacilities] = useState<{ id: string; name: string; school: string }[]>([]);
@@ -1408,6 +1412,8 @@ export function AdminDashboardClient({
         photo_focus_y: typeof a.photo_focus_y === 'number' ? a.photo_focus_y : 15,
         venmo_handle: a.venmo_handle ?? null,
         zelle_email: a.zelle_email ?? null,
+        phone: typeof a.phone === 'string' ? a.phone : '',
+        zip_code: typeof a.zip_code === 'string' ? a.zip_code : '',
         active: a.active ?? true,
       });
       setFacilities(facilitiesData.facilities ?? []);
@@ -1438,11 +1444,14 @@ export function AdminDashboardClient({
           photo_focus_y: athleteEditForm.photo_focus_y,
           venmo_handle: athleteEditForm.venmo_handle || null,
           zelle_email: athleteEditForm.zelle_email || null,
+          phone: athleteEditForm.phone.trim() === '' ? null : athleteEditForm.phone.trim(),
+          zip_code: athleteEditForm.zip_code.trim() === '' ? null : athleteEditForm.zip_code.trim(),
           active: athleteEditForm.active,
         }),
       });
       if (!res.ok) {
-        setAthleteEditSaving(false);
+        const errData = await res.json().catch(() => ({}));
+        window.alert(typeof errData?.error === 'string' ? errData.error : 'Could not save coach.');
         return;
       }
       setEditingAthleteId(null);
@@ -5201,6 +5210,34 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
                   onChange={(e) => setAthleteEditForm({ ...athleteEditForm, bio: e.target.value || null })}
                 />
                 <p className="text-xs text-muted-foreground">{(athleteEditForm.bio || '').length}/500</p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="coach_cell_phone">Cell phone</Label>
+                <Input
+                  id="coach_cell_phone"
+                  type="tel"
+                  autoComplete="tel"
+                  placeholder="e.g. (919) 555-0100"
+                  value={athleteEditForm.phone}
+                  onChange={(e) => setAthleteEditForm({ ...athleteEditForm, phone: e.target.value })}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Same field the coach can edit under Profile. Used for SMS and booking alerts; not shown on their public
+                  coach page.
+                </p>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="coach_home_zip">Home ZIP</Label>
+                <Input
+                  id="coach_home_zip"
+                  autoComplete="postal-code"
+                  placeholder="e.g. 27607 or 27607-1234"
+                  value={athleteEditForm.zip_code}
+                  onChange={(e) => setAthleteEditForm({ ...athleteEditForm, zip_code: e.target.value })}
+                />
+                <p className="text-xs text-muted-foreground">
+                  Stored on their account for maps and location features; not shown on the public coach page.
+                </p>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">

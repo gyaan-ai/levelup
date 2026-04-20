@@ -3,6 +3,8 @@ import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
+import { hasMinPhoneDigits } from '@/lib/phone';
+import { normalizeUsZipCode } from '@/lib/us-zip';
 
 export async function PATCH(
   req: NextRequest,
@@ -22,17 +24,49 @@ export async function PATCH(
     const { data: me } = await supabase.from('users').select('role').eq('id', user.id).single();
     if (me?.role !== 'admin') return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-    const body = await req.json().catch(() => ({})) as { role?: string; archived_at?: string | null };
-    const updates: { role?: string; archived_at?: string | null; updated_at?: string } = {};
+    const body = await req.json().catch(() => ({})) as {
+      role?: string;
+      archived_at?: string | null;
+      phone?: string | null;
+      zip_code?: string | null;
+      zipCode?: string | null;
+    };
+    const updates: { role?: string; archived_at?: string | null; phone?: string | null; zip_code?: string | null; updated_at?: string } =
+      {};
     if (typeof body.role === 'string' && ['parent', 'coach', 'admin', 'youth_wrestler'].includes(body.role)) {
       updates.role = body.role;
     }
     if (body.archived_at !== undefined) {
       updates.archived_at = body.archived_at === null || body.archived_at === '' ? null : body.archived_at;
     }
+    if (body.phone !== undefined) {
+      const trimmed = body.phone === null || body.phone === '' ? '' : String(body.phone).trim();
+      if (trimmed === '') updates.phone = null;
+      else if (!hasMinPhoneDigits(trimmed)) {
+        return NextResponse.json(
+          { error: 'Cell phone must include at least 10 digits' },
+          { status: 400 }
+        );
+      } else updates.phone = trimmed;
+    }
+    const zipRaw = body.zip_code !== undefined ? body.zip_code : body.zipCode;
+    if (zipRaw !== undefined) {
+      if (zipRaw === null || String(zipRaw).trim() === '') updates.zip_code = null;
+      else {
+        const z = normalizeUsZipCode(String(zipRaw));
+        if (!z) {
+          return NextResponse.json({ error: 'Enter a valid U.S. ZIP (5 digits or ZIP+4).' }, { status: 400 });
+        }
+        updates.zip_code = z;
+      }
+    }
     updates.updated_at = new Date().toISOString();
 
-    const hasChange = 'role' in updates || 'archived_at' in updates;
+    const hasChange =
+      'role' in updates ||
+      'archived_at' in updates ||
+      'phone' in updates ||
+      'zip_code' in updates;
     if (!hasChange) return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
 
     const admin = createAdminClient(tenant.slug);
@@ -41,7 +75,7 @@ export async function PATCH(
       .from('users')
       .update(updates)
       .eq('id', id)
-      .select('id, email, role')
+      .select('id, email, role, phone, zip_code')
       .single();
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });

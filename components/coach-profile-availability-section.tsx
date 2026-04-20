@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, Trash2 } from 'lucide-react';
+import { COACH_AVAILABILITY_BLOCKS_CHANGED_EVENT } from '@/lib/availability';
 
 type BlockRow = { id: string; blocked_date: string; reason: string | null };
 
@@ -54,6 +55,9 @@ export function CoachProfileAvailabilitySection() {
       setNewBlockDate('');
       setNewBlockReason('');
       await load();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event(COACH_AVAILABILITY_BLOCKS_CHANGED_EVENT));
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed');
     } finally {
@@ -68,6 +72,9 @@ export function CoachProfileAvailabilitySection() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed');
       await load();
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event(COACH_AVAILABILITY_BLOCKS_CHANGED_EVENT));
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed');
     } finally {

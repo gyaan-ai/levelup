@@ -31,6 +31,7 @@ import { Check, Copy, DollarSign, Globe, Lock, Share2 } from 'lucide-react';
 import { BackLink } from '@/components/back-link';
 import Link from 'next/link';
 import { IN_APP_MESSAGING_ENABLED } from '@/lib/in-app-messaging';
+import { isValidUsZipCode } from '@/lib/us-zip';
 
 const profileSchema = z.object({
   weightClass: z.string().optional(),
@@ -38,6 +39,10 @@ const profileSchema = z.object({
   facilityId: z.string().optional(),
   secondaryFacilityId: z.string().optional(),
   phone: z.string().optional().refine((v) => !v || v.trim() === '' || v.replace(/\D/g, '').length >= 10, 'Enter a valid 10-digit cell number'),
+  zipCode: z
+    .string()
+    .optional()
+    .refine((v) => !v || v.trim() === '' || isValidUsZipCode(v.trim()), 'Enter a valid U.S. ZIP (5 digits or ZIP+4)'),
   venmoHandle: z.string().max(30).optional(),
   zelleEmail: z.string().optional().refine((v) => !v || v.trim() === '' || (v.includes('@') ? /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v.trim()) : v.replace(/\D/g, '').length >= 7), 'Use a valid email or phone (7+ digits) for Zelle'),
   photo: z.instanceof(File).optional(),
@@ -71,6 +76,7 @@ export default function ProfilePage() {
       facilityId: '',
       secondaryFacilityId: '',
       phone: '',
+      zipCode: '',
       venmoHandle: '',
       zelleEmail: '',
     },
@@ -111,6 +117,7 @@ export default function ProfilePage() {
             facilityId: data.athlete.facility_id || '',
             secondaryFacilityId: data.athlete.secondary_facility_id || '',
             phone: data.athlete.phone || '',
+            zipCode: data.athlete.zip_code || '',
             venmoHandle: data.athlete.venmo_handle || '',
             zelleEmail: data.athlete.zelle_email || '',
           });
@@ -219,7 +226,8 @@ export default function ProfilePage() {
           photoFocusY: photoFocusY,
           facilityId: values.facilityId,
           secondaryFacilityId: values.secondaryFacilityId || undefined,
-          phone: values.phone?.trim() || undefined,
+          phone: (values.phone ?? '').trim() === '' ? null : (values.phone ?? '').trim(),
+          zipCode: (values.zipCode ?? '').trim() === '' ? null : (values.zipCode ?? '').trim(),
           venmoHandle: values.venmoHandle?.trim() || undefined,
           zelleEmail: values.zelleEmail?.trim() || undefined,
           active: makePublic,
@@ -627,6 +635,22 @@ export default function ProfilePage() {
                         <Input placeholder="5551234567" inputMode="tel" autoComplete="tel" {...field} />
                       </FormControl>
                       <FormDescription>We text you when someone signs up for your session.</FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="zipCode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Home ZIP</FormLabel>
+                      <FormControl>
+                        <Input placeholder="e.g. 27607" autoComplete="postal-code" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        Used for maps and distance features (same as parent accounts). Not shown on your public profile.
+                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}

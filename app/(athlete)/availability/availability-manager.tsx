@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import {
@@ -13,7 +13,7 @@ import {
 import { Calendar } from '@/components/ui/calendar';
 import { startOfDay } from 'date-fns';
 import { formatEST } from '@/lib/format-date';
-import { formatSlotDisplay } from '@/lib/availability';
+import { COACH_AVAILABILITY_BLOCKS_CHANGED_EVENT, formatSlotDisplay } from '@/lib/availability';
 
 const SLOTS_24H = [
   '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00',
@@ -30,6 +30,7 @@ function slotAlreadyInList(list: Slot[], slotDate: string, start: string, end: s
 
 export function AvailabilityManager() {
   const [list, setList] = useState<Slot[]>([]);
+  const [blockedYmd, setBlockedYmd] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
   const [start, setStart] = useState<string>('09:00');
@@ -45,12 +46,26 @@ export function AvailabilityManager() {
     }
   }, []);
 
+  const refreshBlockedDates = useCallback(async () => {
+    const r = await fetch('/api/coach/availability/blocks');
+    const data = await r.json();
+    if (r.ok && Array.isArray(data.blocks)) {
+      setBlockedYmd(
+        new Set(
+          (data.blocks as { blocked_date?: string }[])
+            .map((b) => b.blocked_date)
+            .filter((d): d is string => typeof d === 'string' && d.length >= 10)
+        )
+      );
+    }
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
       setLoading(true);
       try {
-        await refreshSlots();
+        await Promise.all([refreshSlots(), refreshBlockedDates()]);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -58,7 +73,38 @@ export function AvailabilityManager() {
     return () => {
       cancelled = true;
     };
-  }, [refreshSlots]);
+  }, [refreshSlots, refreshBlockedDates]);
+
+  useEffect(() => {
+    const onBlocksChanged = () => {
+      void refreshBlockedDates();
+    };
+    window.addEventListener(COACH_AVAILABILITY_BLOCKS_CHANGED_EVENT, onBlocksChanged);
+    return () => window.removeEventListener(COACH_AVAILABILITY_BLOCKS_CHANGED_EVENT, onBlocksChanged);
+  }, [refreshBlockedDates]);
+
+  const slotYmdSet = useMemo(() => new Set(list.map((s) => s.slot_date)), [list]);
+
+  const calendarModifiers = useMemo(
+    () => ({
+      hasOpening: (d: Date) => {
+        const ymd = formatEST(d, 'yyyy-MM-dd');
+        return slotYmdSet.has(ymd) && !blockedYmd.has(ymd);
+      },
+      dayBlocked: (d: Date) => blockedYmd.has(formatEST(d, 'yyyy-MM-dd')),
+    }),
+    [slotYmdSet, blockedYmd]
+  );
+
+  const calendarModifierClassNames = useMemo(
+    () => ({
+      hasOpening:
+        "relative after:pointer-events-none after:absolute after:bottom-1 after:left-1/2 after:h-[3px] after:w-5 after:-translate-x-1/2 after:rounded-full after:bg-emerald-500 after:content-['']",
+      dayBlocked:
+        "relative after:pointer-events-none after:absolute after:bottom-1 after:left-1/2 after:h-[3px] after:w-5 after:-translate-x-1/2 after:rounded-full after:bg-red-500 after:content-['']",
+    }),
+    []
+  );
 
   const handleAdd = async () => {
     if (selectedDates.length === 0) {
@@ -183,9 +229,21 @@ export function AvailabilityManager() {
                 selected={selectedDates}
                 onSelect={(dates) => setSelectedDates(dates ?? [])}
                 disabled={(date) => date < startOfDay(new Date())}
+                modifiers={calendarModifiers}
+                modifiersClassNames={calendarModifierClassNames}
                 className="rounded-md border"
               />
             </div>
+            <p className="text-xs text-muted-foreground text-center mt-2 flex flex-wrap justify-center gap-x-4 gap-y-1">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="inline-block h-[3px] w-5 shrink-0 rounded-full bg-emerald-500" aria-hidden />
+                Opening that day
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="inline-block h-[3px] w-5 shrink-0 rounded-full bg-red-500" aria-hidden />
+                Blocked day
+              </span>
+            </p>
             {selectedDates.length > 0 ? (
               <p className="text-xs text-muted-foreground text-center mt-2">
                 {selectedDates.length} day{selectedDates.length === 1 ? '' : 's'} selected

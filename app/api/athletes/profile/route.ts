@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import { normalizeZelleInput } from '@/lib/zelle';
+import { normalizeUsZipCode } from '@/lib/us-zip';
 
 async function resolveProfileAthleteId(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -90,12 +91,18 @@ export async function GET(req: NextRequest) {
     // Cell phone lives on users.phone (not athletes)
     const { data: userRow } = await readClient
       .from('users')
-      .select('phone')
+      .select('phone, zip_code')
       .eq('id', resolved.athleteUserId)
       .maybeSingle();
 
     return NextResponse.json({
-      athlete: athlete ? { ...athlete, phone: userRow?.phone ?? null } : null,
+      athlete: athlete
+        ? {
+            ...athlete,
+            phone: userRow?.phone ?? null,
+            zip_code: userRow?.zip_code ?? null,
+          }
+        : null,
       facilities: facilitiesForAnyCase || [],
     });
   } catch (error) {
@@ -125,7 +132,22 @@ export async function PUT(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { weightClass, bio, credentials, photoUrl, facilityId, secondaryFacilityId, active, phone, venmoHandle, zelleEmail, photoFocusX, photoFocusY } = body;
+    const {
+      weightClass,
+      bio,
+      credentials,
+      photoUrl,
+      facilityId,
+      secondaryFacilityId,
+      active,
+      phone,
+      zipCode,
+      zip_code: zipCodeSnake,
+      venmoHandle,
+      zelleEmail,
+      photoFocusX,
+      photoFocusY,
+    } = body;
 
     const clamp = (n: number) => Math.min(100, Math.max(0, Math.round(n)));
     const focusX = photoFocusX != null ? clamp(Number(photoFocusX)) : undefined;
@@ -137,12 +159,31 @@ export async function PUT(req: NextRequest) {
     }
     const targetAthleteId = resolved.athleteUserId;
 
-    // Cell phone is stored on users.phone (athletes.phone was removed)
+    // Cell + ZIP live on users (not athletes)
     let phoneForUser: string | null | undefined = undefined;
     if (phone !== undefined) {
-      const trimmed = String(phone).trim();
-      if (trimmed === '') phoneForUser = null;
-      else if (trimmed.replace(/\D/g, '').length >= 10) phoneForUser = trimmed;
+      if (phone === null) phoneForUser = null;
+      else {
+        const trimmed = String(phone).trim();
+        if (trimmed === '') phoneForUser = null;
+        else if (trimmed.replace(/\D/g, '').length >= 10) phoneForUser = trimmed;
+        else {
+          return NextResponse.json({ error: 'Enter a valid 10-digit cell number.' }, { status: 400 });
+        }
+      }
+    }
+
+    let zipForUser: string | null | undefined = undefined;
+    if (zipCode !== undefined || zipCodeSnake !== undefined) {
+      const raw = zipCode ?? zipCodeSnake;
+      if (raw === null || String(raw).trim() === '') zipForUser = null;
+      else {
+        const n = normalizeUsZipCode(String(raw));
+        if (!n) {
+          return NextResponse.json({ error: 'Enter a valid U.S. ZIP (5 digits or ZIP+4).' }, { status: 400 });
+        }
+        zipForUser = n;
+      }
     }
 
     // Use admin client to bypass RLS completely
@@ -157,18 +198,15 @@ export async function PUT(req: NextRequest) {
       }, { status: 500 });
     }
 
-    const applyUserPhone = async (): Promise<NextResponse | null> => {
-      if (phoneForUser === undefined) return null;
-      const { error: phoneErr } = await supabaseAdmin
-        .from('users')
-        .update({ phone: phoneForUser })
-        .eq('id', targetAthleteId);
-      if (phoneErr) {
-        console.error('users.phone update error:', phoneErr);
-        return NextResponse.json(
-          { error: `Update failed: ${phoneErr.message}` },
-          { status: 500 }
-        );
+    const applyUserContact = async (): Promise<NextResponse | null> => {
+      const patch: Record<string, unknown> = {};
+      if (phoneForUser !== undefined) patch.phone = phoneForUser;
+      if (zipForUser !== undefined) patch.zip_code = zipForUser;
+      if (Object.keys(patch).length === 0) return null;
+      const { error: userErr } = await supabaseAdmin.from('users').update(patch).eq('id', targetAthleteId);
+      if (userErr) {
+        console.error('users contact update error:', userErr);
+        return NextResponse.json({ error: `Update failed: ${userErr.message}` }, { status: 500 });
       }
       return null;
     };
@@ -216,8 +254,8 @@ export async function PUT(req: NextRequest) {
     if (updateResult && updateResult.length > 0) {
       console.log('Profile updated successfully for user:', targetAthleteId);
 
-      const phoneFail = await applyUserPhone();
-      if (phoneFail) return phoneFail;
+      const contactFail = await applyUserContact();
+      if (contactFail) return contactFail;
 
       // Verify the update by fetching the record
       const { data: verified } = await supabaseAdmin
@@ -287,8 +325,8 @@ export async function PUT(req: NextRequest) {
             error: `Failed to save profile: ${retryUpdateError.message}` 
           }, { status: 500 });
         }
-        const phoneFailRetry = await applyUserPhone();
-        if (phoneFailRetry) return phoneFailRetry;
+        const contactFailRetry = await applyUserContact();
+        if (contactFailRetry) return contactFailRetry;
         return NextResponse.json({ success: true });
       } else {
         console.error('Insert error:', insertError);
@@ -299,8 +337,8 @@ export async function PUT(req: NextRequest) {
     }
 
     // INSERT succeeded
-    const phoneFailInsert = await applyUserPhone();
-    if (phoneFailInsert) return phoneFailInsert;
+    const contactFailInsert = await applyUserContact();
+    if (contactFailInsert) return contactFailInsert;
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error updating athlete profile:', error);

@@ -3,6 +3,8 @@ import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
+import { hasMinPhoneDigits } from '@/lib/phone';
+import { normalizeUsZipCode } from '@/lib/us-zip';
 
 async function requireAdmin(tenantSlug: string) {
   const supabase = await createClient(tenantSlug);
@@ -35,7 +37,15 @@ export async function GET(
       .single();
 
     if (error || !athlete) return NextResponse.json({ error: 'Athlete not found' }, { status: 404 });
-    return NextResponse.json({ athlete });
+
+    const { data: userRow } = await admin.from('users').select('phone, zip_code').eq('id', id).maybeSingle();
+    return NextResponse.json({
+      athlete: {
+        ...athlete,
+        phone: userRow?.phone ?? null,
+        zip_code: userRow?.zip_code ?? null,
+      },
+    });
   } catch (e) {
     console.error('Admin GET athlete error:', e);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -72,6 +82,11 @@ export async function PATCH(
       photo_focus_y?: number;
       venmo_handle?: string | null;
       zelle_email?: string | null;
+      /** Coach account cell; stored on `users.phone`. */
+      phone?: string | null;
+      /** Home ZIP; stored on `users.zip_code`. */
+      zip_code?: string | null;
+      zipCode?: string | null;
     };
     const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
     if (typeof body.active === 'boolean') updates.active = body.active;
@@ -91,6 +106,34 @@ export async function PATCH(
     if (body.zelle_email !== undefined) updates.zelle_email = body.zelle_email === null || body.zelle_email === '' ? null : body.zelle_email;
 
     const admin = createAdminClient(tenant.slug);
+
+    const userContact: Record<string, string | null> = {};
+    if (body.phone !== undefined) {
+      const trimmed = body.phone === null || body.phone === '' ? '' : String(body.phone).trim();
+      if (trimmed === '') userContact.phone = null;
+      else if (!hasMinPhoneDigits(trimmed)) {
+        return NextResponse.json(
+          { error: 'Cell phone must include at least 10 digits' },
+          { status: 400 }
+        );
+      } else userContact.phone = trimmed;
+    }
+    const zipRaw = body.zip_code !== undefined ? body.zip_code : body.zipCode;
+    if (zipRaw !== undefined) {
+      if (zipRaw === null || String(zipRaw).trim() === '') userContact.zip_code = null;
+      else {
+        const z = normalizeUsZipCode(String(zipRaw));
+        if (!z) {
+          return NextResponse.json({ error: 'Enter a valid U.S. ZIP (5 digits or ZIP+4).' }, { status: 400 });
+        }
+        userContact.zip_code = z;
+      }
+    }
+    if (Object.keys(userContact).length > 0) {
+      const { error: userErr } = await admin.from('users').update(userContact).eq('id', id);
+      if (userErr) return NextResponse.json({ error: userErr.message }, { status: 500 });
+    }
+
     const { data: athlete, error } = await admin
       .from('athletes')
       .update(updates)
@@ -100,7 +143,15 @@ export async function PATCH(
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
     if (!athlete) return NextResponse.json({ error: 'Athlete not found' }, { status: 404 });
-    return NextResponse.json({ athlete });
+
+    const { data: userAfter } = await admin.from('users').select('phone, zip_code').eq('id', id).maybeSingle();
+    return NextResponse.json({
+      athlete: {
+        ...athlete,
+        phone: userAfter?.phone ?? null,
+        zip_code: userAfter?.zip_code ?? null,
+      },
+    });
   } catch (e) {
     console.error('Admin PATCH athlete error:', e);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

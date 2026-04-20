@@ -3,6 +3,9 @@
  * Slots are 1-hour increments; times in 24h "HH:mm" format.
  */
 
+/** Fired after coach blocked dates are added/removed so the availability calendar can refresh day markers. */
+export const COACH_AVAILABILITY_BLOCKS_CHANGED_EVENT = 'coach-availability-blocks-changed';
+
 export interface AvailabilitySlot {
   day_of_week: number;
   start_time: string;
