@@ -28,6 +28,7 @@ import {
 import { OnboardingWizard } from '@/components/onboarding-wizard';
 import { Camera, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
+import { isValidUsZipCode } from '@/lib/us-zip';
 
 const youthWrestlerSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
@@ -44,6 +45,10 @@ const youthWrestlerSchema = z.object({
     .string()
     .min(1, 'Cell phone is required')
     .refine((v) => v.replace(/\D/g, '').length >= 10, 'Enter a valid 10-digit cell number'),
+  zipCode: z
+    .string()
+    .min(1, 'Home ZIP code is required')
+    .refine(isValidUsZipCode, 'Enter a valid U.S. ZIP code (5 digits or ZIP+4)'),
 });
 
 type YouthWrestlerFormValues = z.infer<typeof youthWrestlerSchema>;
@@ -74,6 +79,7 @@ export default function AddYouthWrestlerPage() {
       goals: '',
       medicalNotes: '',
       phone: '',
+      zipCode: '',
     },
   });
 
@@ -101,13 +107,14 @@ export default function AddYouthWrestlerPage() {
       if (step === 2) {
         const ok = await form.trigger([
           'phone',
+          'zipCode',
           'dateOfBirth',
           'graduationYear',
           'weightClass',
           'skillLevel',
         ]);
         if (!ok) {
-          setError('Cell phone is required (10 digits) for coach communications.');
+          setError('Cell phone and home ZIP are required (phone for texts, ZIP for maps and nearby coaches).');
           return;
         }
       }
@@ -382,7 +389,7 @@ export default function AddYouthWrestlerPage() {
             <Card className="border-0 shadow-none">
               <CardContent className="p-0 space-y-4">
                 <p className="text-muted-foreground mb-4">
-                  Athlete cell, age, weight, and skill level.
+                  Athlete cell, home ZIP, age, weight, and skill level.
                 </p>
                 <FormField
                   control={form.control}
@@ -401,6 +408,27 @@ export default function AddYouthWrestlerPage() {
                       </FormControl>
                       <FormDescription>
                         Required so coaches can reach {form.watch('firstName') || 'your athlete'} for session updates (texts).
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="zipCode"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Home ZIP code *</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="e.g. 27514"
+                          autoComplete="postal-code"
+                          inputMode="numeric"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription>
+                        Household ZIP for this athlete — required for maps and showing training options near you.
                       </FormDescription>
                       <FormMessage />
                     </FormItem>

@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import { validateRequiredYouthPhone } from '@/lib/phone';
+import { normalizeUsZipCode } from '@/lib/us-zip';
 
 // GET - Get single youth wrestler (parent, linked parent, or admin)
 export async function GET(
@@ -114,11 +115,20 @@ export async function PUT(
       photoFocusX,
       photoFocusY,
       phone,
+      zipCode,
     } = body;
 
     const phoneCheck = validateRequiredYouthPhone(phone);
     if (!phoneCheck.ok) {
       return NextResponse.json({ error: phoneCheck.message }, { status: 400 });
+    }
+
+    const zipNorm = normalizeUsZipCode(typeof zipCode === 'string' ? zipCode : '');
+    if (!zipNorm) {
+      return NextResponse.json(
+        { error: 'A valid U.S. home ZIP code is required (5 digits or ZIP+4).' },
+        { status: 400 }
+      );
     }
 
     const clamp = (n: number) => Math.min(100, Math.max(0, Math.round(n)));
@@ -151,6 +161,7 @@ export async function PUT(
       medical_notes: medicalNotes || null,
       photo_url: photoUrl || null,
       phone: phoneCheck.phone,
+      zip_code: zipNorm,
     };
     if (focusX !== undefined) updatePayload.photo_focus_x = focusX;
     if (focusY !== undefined) updatePayload.photo_focus_y = focusY;

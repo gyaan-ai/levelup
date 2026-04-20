@@ -20,10 +20,15 @@ import {
   FormDescription,
 } from '@/components/ui/form';
 import Link from 'next/link';
+import { isValidUsZipCode } from '@/lib/us-zip';
 
 const signupSchema = z.object({
   firstName: z.string().min(1, 'First name is required').max(80),
   lastName: z.string().min(1, 'Last name is required').max(80),
+  zipCode: z
+    .string()
+    .min(1, 'Home ZIP code is required')
+    .refine(isValidUsZipCode, 'Enter a valid U.S. ZIP code (5 digits or ZIP+4)'),
   email: z.string().email('Invalid email address'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
   confirmPassword: z.string(),
@@ -85,6 +90,7 @@ export default function SignupPage() {
         body: JSON.stringify({
           firstName: values.firstName.trim(),
           lastName: values.lastName.trim(),
+          zipCode: values.zipCode.trim(),
           email: values.email,
           password: values.password,
           role: 'parent',
@@ -183,6 +189,27 @@ export default function SignupPage() {
                   )}
                 />
               </div>
+              <FormField
+                control={form.control}
+                name="zipCode"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Home ZIP code</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="e.g. 27514"
+                        autoComplete="postal-code"
+                        inputMode="numeric"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      {`Used to show coaches and programs near your family (maps and discovery).`}
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <FormField
                 control={form.control}
                 name="email"

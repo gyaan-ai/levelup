@@ -28,6 +28,7 @@ import {
 import Link from 'next/link';
 import { BackLink } from '@/components/back-link';
 import { useAuth } from '@/lib/auth/use-auth';
+import { isValidUsZipCode } from '@/lib/us-zip';
 
 const youthWrestlerSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
@@ -44,6 +45,10 @@ const youthWrestlerSchema = z.object({
     .string()
     .min(1, 'Cell phone is required')
     .refine((v) => v.replace(/\D/g, '').length >= 10, 'Enter a valid 10-digit cell number'),
+  zipCode: z
+    .string()
+    .min(1, 'Home ZIP code is required')
+    .refine(isValidUsZipCode, 'Enter a valid U.S. ZIP code (5 digits or ZIP+4)'),
 });
 
 type YouthWrestlerFormValues = z.infer<typeof youthWrestlerSchema>;
@@ -78,6 +83,7 @@ export default function EditYouthWrestlerPage() {
       goals: '',
       medicalNotes: '',
       phone: '',
+      zipCode: '',
     },
   });
 
@@ -108,6 +114,7 @@ export default function EditYouthWrestlerPage() {
           goals: youthWrestler.goals || '',
           medicalNotes: youthWrestler.medical_notes || '',
           phone: youthWrestler.phone || '',
+          zipCode: youthWrestler.zip_code || '',
         });
 
         if (youthWrestler.photo_url) {
@@ -317,6 +324,28 @@ export default function EditYouthWrestlerPage() {
                     </FormControl>
                     <FormDescription>
                       Required for coaches to text session updates to this athlete.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="zipCode"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Home ZIP code *</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="e.g. 27514"
+                        autoComplete="postal-code"
+                        inputMode="numeric"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Required for maps and nearby training options (household ZIP for this athlete).
                     </FormDescription>
                     <FormMessage />
                   </FormItem>

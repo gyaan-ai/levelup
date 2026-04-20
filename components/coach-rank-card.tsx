@@ -1,17 +1,28 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Trophy, Star, Flame, Medal } from 'lucide-react';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Trophy, Star, Flame, Medal, DollarSign } from 'lucide-react';
+
+export type LeaderboardSortMode = 'sessions' | 'earnings' | 'rating';
 
 type CoachStats = {
   id: string;
   name: string;
   sessionCount: number;
+  totalEarningsUsd: number;
   averageRating: number | null;
   reviewCount: number;
   thisMonthSessions: number;
   sessionRank: number;
+  earningsRank: number;
   ratingRank: number | null;
   isOnFire: boolean;
 };
@@ -30,6 +41,7 @@ type Props = {
 export function CoachRankCard({ coachId, topSessionsListSize }: Props) {
   const [data, setData] = useState<LeaderboardData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sortMode, setSortMode] = useState<LeaderboardSortMode>('sessions');
 
   useEffect(() => {
     fetch('/api/coach/leaderboard')
@@ -40,6 +52,26 @@ export function CoachRankCard({ coachId, topSessionsListSize }: Props) {
       })
       .catch(() => setLoading(false));
   }, []);
+
+  const topList = useMemo(() => {
+    if (!data || !topSessionsListSize) return [];
+    const list = [...data.leaderboard];
+    if (sortMode === 'sessions') {
+      return list.sort((a, b) => b.sessionCount - a.sessionCount).slice(0, topSessionsListSize);
+    }
+    if (sortMode === 'earnings') {
+      return list.sort((a, b) => b.totalEarningsUsd - a.totalEarningsUsd).slice(0, topSessionsListSize);
+    }
+    return list
+      .filter((c) => c.reviewCount > 0 && c.averageRating != null)
+      .sort((a, b) => {
+        const br = b.averageRating ?? 0;
+        const ar = a.averageRating ?? 0;
+        if (br !== ar) return br - ar;
+        return b.reviewCount - a.reviewCount;
+      })
+      .slice(0, topSessionsListSize);
+  }, [data, topSessionsListSize, sortMode]);
 
   if (loading) {
     return (
@@ -54,34 +86,54 @@ export function CoachRankCard({ coachId, topSessionsListSize }: Props) {
   const myStats = data.leaderboard.find(c => c.id === coachId);
   const totalCoaches = data.totalCoaches;
 
-  const topBySessions = topSessionsListSize
-    ? [...data.leaderboard].sort((a, b) => b.sessionCount - a.sessionCount).slice(0, topSessionsListSize)
-    : [];
-
   if (!myStats && !topSessionsListSize) return null;
 
   const sessionRank = myStats?.sessionRank ?? null;
+  const earningsRank = myStats?.earningsRank ?? null;
   const ratingRank = myStats?.ratingRank ?? null;
   const sessionCount = myStats?.sessionCount ?? 0;
+  const totalEarningsUsd = myStats?.totalEarningsUsd ?? 0;
   const isOnFire = myStats?.isOnFire ?? false;
   const averageRating = myStats?.averageRating ?? null;
   const reviewCount = myStats?.reviewCount ?? 0;
 
-  // Determine badges
+  const displayedRank =
+    sortMode === 'sessions'
+      ? sessionRank
+      : sortMode === 'earnings'
+        ? earningsRank
+        : ratingRank;
+
+  const rankLabel =
+    sortMode === 'sessions'
+      ? 'by completed bookings'
+      : sortMode === 'earnings'
+        ? 'by earnings'
+        : 'by rating';
+
+  // Determine badges (across all dimensions, not only active filter)
   const badges: { icon: React.ReactNode; label: string; color: string }[] = [];
   
   if (sessionRank === 1 && sessionCount > 0) {
     badges.push({ 
       icon: <Trophy className="h-4 w-4" />, 
-      label: 'Most Sessions', 
+      label: 'Most bookings', 
       color: 'bg-[#D4AF37]/20 text-[#D4AF37] border-[#D4AF37]/30' 
+    });
+  }
+
+  if (earningsRank === 1 && totalEarningsUsd > 0) {
+    badges.push({
+      icon: <DollarSign className="h-4 w-4" />,
+      label: 'Top earnings',
+      color: 'bg-[#D4AF37]/20 text-[#D4AF37] border-[#D4AF37]/30',
     });
   }
   
   if (ratingRank === 1 && reviewCount > 0) {
     badges.push({ 
       icon: <Star className="h-4 w-4" />, 
-      label: 'Top Rated', 
+      label: 'Top rated', 
       color: 'bg-[#D4AF37]/20 text-[#D4AF37] border-[#D4AF37]/30' 
     });
   }
@@ -94,9 +146,32 @@ export function CoachRankCard({ coachId, topSessionsListSize }: Props) {
     });
   }
 
+  const topListCaption =
+    sortMode === 'sessions'
+      ? 'Top coaches · bookings (#)'
+      : sortMode === 'earnings'
+        ? 'Top coaches · earnings ($)'
+        : 'Top coaches · rating (stars)';
+
   return (
     <Card className="border-accent/30 bg-gradient-to-r from-primary to-primary/80">
-      <CardContent className="p-4">
+      <CardContent className="p-4 space-y-4">
+        <div className="space-y-2">
+          <label htmlFor="leaderboard-sort" className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Leaderboard view
+          </label>
+          <Select value={sortMode} onValueChange={(v) => setSortMode(v as LeaderboardSortMode)}>
+            <SelectTrigger id="leaderboard-sort" className="w-full min-h-[44px] touch-manipulation bg-background/80">
+              <SelectValue placeholder="Sort by" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="sessions">Top bookings (# completed)</SelectItem>
+              <SelectItem value="earnings">Top earnings ($)</SelectItem>
+              <SelectItem value="rating">Top rated (stars)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
         {myStats ? (
           <>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -105,12 +180,27 @@ export function CoachRankCard({ coachId, topSessionsListSize }: Props) {
                   <Medal className="h-6 w-6 text-[#D4AF37]" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Your rank</p>
+                  <p className="text-sm text-muted-foreground">{`Your rank ${rankLabel}`}</p>
                   <p className="text-2xl font-bold text-foreground">
-                    #{myStats.sessionRank}{' '}
-                    <span className="text-sm font-normal text-muted-foreground">of {totalCoaches}</span>
+                    {sortMode === 'rating' && displayedRank === null ? (
+                      <span className="text-lg font-semibold">Not ranked yet</span>
+                    ) : (
+                      <>
+                        #{displayedRank}{' '}
+                        <span className="text-sm font-normal text-muted-foreground">
+                          {sortMode === 'rating' ? `of ${data.leaderboard.filter((c) => c.reviewCount > 0).length}` : `of ${totalCoaches}`}
+                        </span>
+                      </>
+                    )}
                   </p>
-                  <p className="text-xs text-muted-foreground">{sessionCount} sessions completed</p>
+                  <p className="text-xs text-muted-foreground">
+                    {sessionCount} completed booking{sessionCount !== 1 ? 's' : ''}
+                    {' · '}
+                    {`$${totalEarningsUsd.toFixed(0)} earned`}
+                    {reviewCount > 0 && averageRating != null
+                      ? ` · ${averageRating.toFixed(1)}★ (${reviewCount} review${reviewCount !== 1 ? 's' : ''})`
+                      : ''}
+                  </p>
                 </div>
               </div>
 
@@ -129,16 +219,16 @@ export function CoachRankCard({ coachId, topSessionsListSize }: Props) {
               )}
             </div>
 
-            {averageRating && reviewCount > 0 && (
-              <div className="mt-3 pt-3 border-t border-accent/20 flex flex-wrap items-center gap-4 text-sm">
+            {averageRating != null && reviewCount > 0 && (
+              <div className="pt-3 border-t border-accent/20 flex flex-wrap items-center gap-4 text-sm">
                 <div className="flex items-center gap-1">
                   <Star className="h-4 w-4 text-[#D4AF37] fill-[#D4AF37]" />
                   <span className="font-medium">{averageRating.toFixed(1)}</span>
                   <span className="text-muted-foreground">({reviewCount} reviews)</span>
                 </div>
-                {ratingRank && (
+                {ratingRank != null && (
                   <span className="text-muted-foreground">
-                    #{ratingRank} in ratings
+                    {`#${ratingRank} by stars`}
                   </span>
                 )}
               </div>
@@ -146,18 +236,17 @@ export function CoachRankCard({ coachId, topSessionsListSize }: Props) {
           </>
         ) : (
           <p className="text-sm text-muted-foreground">
-            Your profile isn&apos;t on the public leaderboard yet (inactive or new). Top coaches by completed sessions are
-            below.
+            Your profile isn&apos;t on the public leaderboard yet (inactive or new). Top coaches are listed below.
           </p>
         )}
 
-        {topBySessions.length > 0 && (
-          <div className={myStats ? 'mt-4 pt-4 border-t border-accent/20' : ''}>
+        {topList.length > 0 && (
+          <div className={myStats ? 'pt-4 border-t border-accent/20' : ''}>
             <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
-              Top coaches · completed sessions
+              {topListCaption}
             </p>
             <ul className="space-y-2">
-              {topBySessions.map((c, idx) => (
+              {topList.map((c, idx) => (
                 <li
                   key={c.id}
                   className={`flex items-center justify-between gap-2 text-sm ${c.id === coachId ? 'font-semibold text-[#D4AF37]' : ''}`}
@@ -167,12 +256,26 @@ export function CoachRankCard({ coachId, topSessionsListSize }: Props) {
                     {c.name}
                     {c.id === coachId ? <span className="sr-only"> (you)</span> : null}
                   </span>
-                  <span className="tabular-nums shrink-0 text-muted-foreground">{c.sessionCount}</span>
+                  <span className="tabular-nums shrink-0 text-muted-foreground">
+                    {sortMode === 'sessions'
+                      ? c.sessionCount
+                      : sortMode === 'earnings'
+                        ? `$${c.totalEarningsUsd.toFixed(0)}`
+                        : c.averageRating != null
+                          ? `${c.averageRating.toFixed(1)}★`
+                          : '—'}
+                  </span>
                 </li>
               ))}
             </ul>
           </div>
         )}
+
+        {topSessionsListSize && topList.length === 0 && sortMode === 'rating' ? (
+          <p className="text-xs text-muted-foreground">
+            No coaches with reviews yet — ratings list will fill in as parents leave reviews.
+          </p>
+        ) : null}
       </CardContent>
     </Card>
   );

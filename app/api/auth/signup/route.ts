@@ -5,6 +5,7 @@ import { verifyInviteToken } from '@/lib/invite-parent-token';
 import { validateRequiredYouthPhone } from '@/lib/phone';
 import { resolveDiscountPercentOff } from '@/lib/discount-codes';
 import { family10CodeBlockedForEmail } from '@/lib/family-auto-discount';
+import { normalizeUsZipCode } from '@/lib/us-zip';
 
 export async function POST(req: NextRequest) {
   try {
@@ -53,6 +54,13 @@ export async function POST(req: NextRequest) {
           { status: 400 }
         );
       }
+      const zipNorm = normalizeUsZipCode(typeof body.zipCode === 'string' ? body.zipCode : '');
+      if (!zipNorm) {
+        return NextResponse.json(
+          { error: 'A valid U.S. home ZIP code is required (5 digits, or ZIP+4).' },
+          { status: 400 }
+        );
+      }
     }
 
     // For athletes (coaches), require additional fields and coach type
@@ -72,6 +80,7 @@ export async function POST(req: NextRequest) {
     }
 
     let youthAthletePhone: string | undefined;
+    let youthZipNorm: string | undefined;
     if (role === 'youth_wrestler') {
       if (!firstName || !lastName) {
         return NextResponse.json(
@@ -84,6 +93,14 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: ph.message }, { status: 400 });
       }
       youthAthletePhone = ph.phone;
+      const z = normalizeUsZipCode(typeof body.zipCode === 'string' ? body.zipCode : '');
+      if (!z) {
+        return NextResponse.json(
+          { error: 'A valid U.S. home ZIP code is required (5 digits or ZIP+4).' },
+          { status: 400 }
+        );
+      }
+      youthZipNorm = z;
     }
 
     const supabaseAdmin = createAdminClient(tenant.slug);
@@ -163,10 +180,12 @@ export async function POST(req: NextRequest) {
     if (role === 'parent') {
       usersInsert.first_name = String(firstName).trim();
       usersInsert.last_name = String(lastName).trim();
+      usersInsert.zip_code = normalizeUsZipCode(String(body.zipCode ?? ''))!;
     }
     if (role === 'youth_wrestler') {
       usersInsert.first_name = String(firstName).trim();
       usersInsert.last_name = String(lastName).trim();
+      usersInsert.zip_code = youthZipNorm!;
     }
 
     // Insert into users table (one user per email address; store normalized for consistency)
@@ -251,6 +270,7 @@ export async function POST(req: NextRequest) {
           first_name: firstName,
           last_name: lastName,
           phone: youthAthletePhone!,
+          zip_code: youthZipNorm!,
           active: true,
         });
 

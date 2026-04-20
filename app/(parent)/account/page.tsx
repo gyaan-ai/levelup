@@ -9,6 +9,7 @@ import { User, Wallet, Bell, ChevronRight, Users, DollarSign } from 'lucide-reac
 import { AccountSignOut } from '@/components/account-sign-out';
 import { RedeemCodeCard } from './redeem-code-card';
 import { AccountPhoneCard } from './account-phone-card';
+import { AccountZipCard } from './account-zip-card';
 import { getUserCreditBalance } from '@/lib/credits';
 
 export const dynamic = 'force-dynamic';
@@ -23,7 +24,7 @@ export default async function AccountPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect('/login');
 
-  const { data: userData } = await supabase.from('users').select('role, phone, email').eq('id', user.id).single();
+  const { data: userData } = await supabase.from('users').select('role, phone, email, zip_code').eq('id', user.id).single();
   if (userData?.role === 'coach') redirect('/athlete-dashboard');
   if (userData?.role !== 'parent' && userData?.role !== 'admin') redirect('/dashboard');
 
@@ -65,6 +66,7 @@ export default async function AccountPage() {
 
   const userEmail = user.email ?? '';
   const userPhone = (userData as { phone?: string | null })?.phone;
+  const userZip = (userData as { zip_code?: string | null })?.zip_code ?? null;
 
   return (
     <div className="min-h-screen pb-24">
@@ -134,6 +136,7 @@ export default async function AccountPage() {
         {/* Settings */}
         <MenuSection title="Settings">
           <AccountPhoneCard initialPhone={userPhone ?? null} compact />
+          <AccountZipCard initialZip={userZip} compact />
           <MenuItem href="/notifications" icon={Bell} label="Notifications" />
         </MenuSection>
 
