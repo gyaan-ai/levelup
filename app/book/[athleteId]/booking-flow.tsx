@@ -861,6 +861,7 @@ export function BookingFlow({
                       <Input
                         id="booking-promo"
                         className="max-w-xs uppercase"
+                        placeholder="Enter code"
                         value={bookingPromoCode}
                         onChange={(e) => {
                           setBookingPromoCode(e.target.value.toUpperCase());
@@ -917,7 +918,7 @@ export function BookingFlow({
                           setPromoCode(e.target.value.toUpperCase());
                           setPromoMessage(null);
                         }}
-                        placeholder="e.g. FAMILY10"
+                        placeholder="Enter code"
                         autoComplete="off"
                         className="uppercase"
                       />

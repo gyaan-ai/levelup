@@ -259,7 +259,7 @@ export default function SignupPage() {
                   <FormItem>
                     <FormLabel>Discount Code (optional)</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g. FAMILY10" {...field} />
+                      <Input placeholder="Enter code" {...field} />
                     </FormControl>
                     <FormDescription>
                       Have a referral or promo code? Enter it here.

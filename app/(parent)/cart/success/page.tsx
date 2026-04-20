@@ -122,7 +122,10 @@ export default async function CartSuccessPage({
                 body: `New signup for ${dateStr}. Check My sessions.`,
                 data: { session_id: sessionId },
               }).catch(() => {});
-              await notifyCoachAndAdminsNewBooking(admin, coachId, dateStr, sessionId).catch(() => {});
+              await notifyCoachAndAdminsNewBooking(admin, coachId, dateStr, sessionId, {
+                parentId,
+                youthWrestlerId: wrestlerId,
+              }).catch(() => {});
             }
           }
         }

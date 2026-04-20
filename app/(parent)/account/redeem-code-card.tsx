@@ -112,7 +112,7 @@ export function RedeemCodeCard({ hasEntitlements, compact }: Props) {
           Redeem discount code
         </CardTitle>
         <CardDescription>
-          Have a discount code? Enter it here (e.g. FAMILY10 for 10% off).
+          Have a code from your coach or organization? Enter it here to apply your discount.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -120,7 +120,7 @@ export function RedeemCodeCard({ hasEntitlements, compact }: Props) {
           <Input
             value={code}
             onChange={(e) => setCode(e.target.value)}
-            placeholder="e.g. FAMILY10"
+            placeholder="Enter code"
             className="font-mono max-w-xs"
             disabled={loading}
           />

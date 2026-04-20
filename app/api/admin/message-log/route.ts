@@ -38,7 +38,22 @@ export async function GET(req: Request) {
   const { data, error, count } = await query;
 
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    const msg = error.message ?? String(error);
+    const code = 'code' in error ? String((error as { code?: string }).code) : '';
+    const looksLikeMissingTable =
+      /message_log/i.test(msg) &&
+      (/does not exist|schema cache|Could not find/i.test(msg) || code === '42P01' || code === 'PGRST205');
+    if (looksLikeMissingTable) {
+      return NextResponse.json(
+        {
+          error:
+            'Database table message_log is missing. Apply the migration supabase/migrations/20260425120000_message_log.sql to this Supabase project, then retry.',
+          detail: msg,
+        },
+        { status: 503 }
+      );
+    }
+    return NextResponse.json({ error: msg, code: code || undefined }, { status: 500 });
   }
 
   return NextResponse.json({ messages: data ?? [], total: count ?? 0 });

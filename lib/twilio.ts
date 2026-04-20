@@ -160,46 +160,150 @@ function shortSessionRef(sessionId: string): string {
   return sessionId.replace(/-/g, '').slice(0, 10);
 }
 
+/** Optional parent context for booking confirmation SMS (separate from coach/ops alerts). */
+export type BookingSmsStakeholders = {
+  parentId?: string | null;
+  youthWrestlerId?: string | null;
+};
+
+async function resolveParentPhoneE164(
+  admin: SupabaseAdmin,
+  parentId: string,
+  youthWrestlerId: string | null | undefined
+): Promise<string | null> {
+  const { data: u } = await admin.from('users').select('phone').eq('id', parentId).maybeSingle();
+  const up = normalizePhone(u?.phone ?? undefined);
+  if (up) return up;
+  if (youthWrestlerId) {
+    const { data: yw } = await admin.from('youth_wrestlers').select('phone').eq('id', youthWrestlerId).maybeSingle();
+    const yp = normalizePhone(yw?.phone ?? undefined);
+    if (yp) return yp;
+  }
+  return null;
+}
+
+function bookingLinksBase(): string {
+  const raw = process.env.NEXT_PUBLIC_APP_URL?.trim();
+  if (!raw) return '';
+  try {
+    return new URL(raw).origin;
+  } catch {
+    return raw.replace(/\/$/, '');
+  }
+}
+
+async function logSmsSkipped(
+  admin: SupabaseAdmin,
+  opts: {
+    messageType: string;
+    recipientLabel: string;
+    recipientId?: string | null;
+    sessionId?: string;
+    coachId?: string;
+    detail: string;
+  }
+): Promise<void> {
+  await logMessage(admin, {
+    channel: 'sms',
+    recipientId: opts.recipientId ?? null,
+    recipientLabel: opts.recipientLabel,
+    messageType: opts.messageType,
+    body: null,
+    sessionId: opts.sessionId ?? null,
+    coachId: opts.coachId ?? null,
+    status: 'failed',
+    errorDetail: opts.detail,
+  });
+}
+
 /**
- * Coach SMS + optional ops SMS for every new booking/signup.
- * Ops numbers: `ADMIN_BOOKING_ALERT_PHONES` (comma-separated) plus all admin users with `users.phone`.
- * Skips texting the same number twice when coach and ops share a cell.
+ * Coach SMS + ops/admin SMS + optional parent confirmation for every new booking/signup.
+ *
+ * Ops: `ADMIN_BOOKING_ALERT_PHONES` and every `users.phone` where `role = admin`.
+ * Parent: `users.phone`, else wrestler `youth_wrestlers.phone` when `youthWrestlerId` is set.
+ * All attempts (including skips) are written to `message_log` when the table exists.
  */
 export async function notifyCoachAndAdminsNewBooking(
   admin: SupabaseAdmin,
   coachUserId: string,
   dateStr: string,
-  sessionId?: string
+  sessionId?: string,
+  stakeholders?: BookingSmsStakeholders
 ): Promise<void> {
+  const sid = sessionId ?? '';
+
   await sendCoachNewSignupSms(admin, coachUserId, dateStr, sessionId);
 
   const coachE164 = await resolveCoachSmsE164(admin, coachUserId);
   const opsTargets = await collectAdminBookingAlertPhonesE164(admin);
-  if (opsTargets.length === 0) return;
 
-  const { data: athlete } = await admin
-    .from('athletes')
-    .select('first_name, last_name')
-    .eq('id', coachUserId)
-    .maybeSingle();
-  const coachLabel = athlete
-    ? [athlete.first_name, athlete.last_name].filter(Boolean).join(' ').trim() || 'Coach'
-    : 'Coach';
-  const ref = sessionId ? shortSessionRef(sessionId) : '';
-  const body = ref
-    ? `LevelUp (ops): New booking ${dateStr} · ${coachLabel}. Ref ${ref}`
-    : `LevelUp (ops): New booking ${dateStr} · ${coachLabel}.`;
-
-  for (const to of opsTargets) {
-    if (coachE164 && to === coachE164) continue;
-    await sendSms(to, body, {
-      admin,
-      messageType: 'admin_booking_alert',
+  if (opsTargets.length === 0) {
+    await logSmsSkipped(admin, {
+      messageType: 'admin_booking_alert_skipped',
       recipientLabel: 'Admin ops',
-      sessionId,
+      sessionId: sid,
       coachId: coachUserId,
+      detail:
+        'No admin alert numbers configured. Set ADMIN_BOOKING_ALERT_PHONES (comma-separated) and/or add cell numbers to users.phone for admin accounts.',
     });
+  } else {
+    const { data: athlete } = await admin
+      .from('athletes')
+      .select('first_name, last_name')
+      .eq('id', coachUserId)
+      .maybeSingle();
+    const coachLabel = athlete
+      ? [athlete.first_name, athlete.last_name].filter(Boolean).join(' ').trim() || 'Coach'
+      : 'Coach';
+    const ref = sessionId ? shortSessionRef(sessionId) : '';
+    const body = ref
+      ? `LevelUp (ops): New booking ${dateStr} · ${coachLabel}. Ref ${ref}`
+      : `LevelUp (ops): New booking ${dateStr} · ${coachLabel}.`;
+
+    for (const to of opsTargets) {
+      if (coachE164 && to === coachE164) continue;
+      await sendSms(to, body, {
+        admin,
+        messageType: 'admin_booking_alert',
+        recipientLabel: 'Admin ops',
+        sessionId,
+        coachId: coachUserId,
+      });
+    }
   }
+
+  const parentId = stakeholders?.parentId?.trim();
+  if (!parentId) return;
+
+  const ywid = stakeholders?.youthWrestlerId ?? null;
+  const parentPhone = await resolveParentPhoneE164(admin, parentId, ywid);
+  const origin = bookingLinksBase();
+  const bookingsUrl = origin ? `${origin}/bookings` : '';
+  const parentBody = bookingsUrl
+    ? `The Guild: You're booked for ${dateStr}. Details: ${bookingsUrl}`
+    : `The Guild: You're booked for ${dateStr}. Open the app → My bookings for details.`;
+
+  if (!parentPhone) {
+    await logSmsSkipped(admin, {
+      messageType: 'parent_booking_confirm_skipped',
+      recipientLabel: 'Parent',
+      recipientId: parentId,
+      sessionId: sid,
+      coachId: coachUserId,
+      detail:
+        'No parent SMS number: add users.phone on the parent account, or a wrestler cell on the athlete profile.',
+    });
+    return;
+  }
+
+  await sendSms(parentPhone, parentBody, {
+    admin,
+    messageType: 'parent_booking_confirm',
+    recipientId: parentId,
+    recipientLabel: 'Parent',
+    sessionId: sid,
+    coachId: coachUserId,
+  });
 }
 
 /**
@@ -213,7 +317,18 @@ export async function sendCoachNewSignupSms(
   sessionId?: string
 ): Promise<void> {
   const phone = await resolveCoachSmsE164(admin, coachUserId);
-  if (!phone) return;
+  if (!phone) {
+    await logSmsSkipped(admin, {
+      messageType: 'coach_new_signup_skipped',
+      recipientLabel: 'Coach',
+      recipientId: coachUserId,
+      sessionId: sessionId ?? '',
+      coachId: coachUserId,
+      detail:
+        'No coach phone on file. Add cell to Account (users.phone) or a phone-style number in Zelle on the coach athlete profile.',
+    });
+    return;
+  }
   const body = `LevelUp: New booking for ${dateStr}. Check My sessions in the app.`;
   await sendSms(phone, body, {
     admin,

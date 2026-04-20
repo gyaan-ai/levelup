@@ -322,7 +322,10 @@ export async function POST(req: NextRequest) {
               body: `New booking for ${dateStr}. Check My sessions.`,
               data: { session_id: meta.session_id },
             }).catch((e) => console.warn('Cart credits: coach notification failed', e));
-            await notifyCoachAndAdminsNewBooking(admin, coachId, dateStr, meta.session_id).catch(() => {});
+            await notifyCoachAndAdminsNewBooking(admin, coachId, dateStr, meta.session_id, {
+              parentId: user.id,
+              youthWrestlerId: meta.wrestler_id,
+            }).catch(() => {});
           }
         }
       }

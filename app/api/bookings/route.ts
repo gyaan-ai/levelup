@@ -323,7 +323,10 @@ export async function POST(req: NextRequest) {
         .eq('session_id', session.id);
 
       const dateStr = formatEST(new Date(scheduledDatetime), 'EEE MMM d, h:mm a');
-      await notifyCoachAndAdminsNewBooking(admin, athleteIdNorm, dateStr, session.id).catch(() => {});
+      await notifyCoachAndAdminsNewBooking(admin, athleteIdNorm, dateStr, session.id, {
+        parentId: user.id,
+        youthWrestlerId: youthWrestlerIdsNorm[0] ?? null,
+      }).catch(() => {});
 
       return NextResponse.json({
         sessionId: session.id,

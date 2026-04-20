@@ -183,7 +183,10 @@ export async function POST(req: NextRequest) {
                   body: `New booking for ${dateStr}. Check My sessions.`,
                   data: { session_id: sid },
                 }).catch((e) => console.warn('Cart webhook: coach notification failed', e));
-                await notifyCoachAndAdminsNewBooking(supabase, coachId, dateStr, sid).catch(() => {});
+                await notifyCoachAndAdminsNewBooking(supabase, coachId, dateStr, sid, {
+                  parentId,
+                  youthWrestlerId: ywid,
+                }).catch(() => {});
               }
             }
           } else {
@@ -213,7 +216,10 @@ export async function POST(req: NextRequest) {
                   data: { session_id: sid, link: cartNotifyBaseUrl ? `${cartNotifyBaseUrl}/athlete-dashboard` : '/athlete-dashboard' },
                   coachId,
                 }).catch((e) => console.warn('Cart webhook: coach notification failed', e));
-                await notifyCoachAndAdminsNewBooking(supabase, coachId, dateStr, sid).catch(() => {});
+                await notifyCoachAndAdminsNewBooking(supabase, coachId, dateStr, sid, {
+                  parentId,
+                  youthWrestlerId: ywid,
+                }).catch(() => {});
               }
             }
           }
@@ -398,7 +404,10 @@ export async function POST(req: NextRequest) {
             body: `New booking for ${dateStr}. Check My sessions.`,
             data: { session_id: sessionId },
           }).catch((e) => console.warn('Webhook: coach notification failed', e));
-          await notifyCoachAndAdminsNewBooking(supabase, coachId, dateStr, sessionId).catch(() => {});
+          await notifyCoachAndAdminsNewBooking(supabase, coachId, dateStr, sessionId, {
+            parentId,
+            youthWrestlerId,
+          }).catch(() => {});
         }
         return NextResponse.json({ received: true });
       }
@@ -430,11 +439,20 @@ export async function POST(req: NextRequest) {
       // Notify coach when parent pays for a session (e.g. private booking)
       const { data: sessRow } = await supabase
         .from('sessions')
-        .select('athlete_id, scheduled_datetime')
+        .select('athlete_id, scheduled_datetime, parent_id')
         .eq('id', sessionId)
         .single();
       const coachId = (sessRow as { athlete_id?: string } | null)?.athlete_id;
       const dt = (sessRow as { scheduled_datetime?: string } | null)?.scheduled_datetime;
+      const bookingParentIdForSms = (sessRow as { parent_id?: string } | null)?.parent_id ?? null;
+      const { data: part0 } = await supabase
+        .from('session_participants')
+        .select('youth_wrestler_id')
+        .eq('session_id', sessionId)
+        .limit(1)
+        .maybeSingle();
+      const privateYouthId =
+        (part0 as { youth_wrestler_id?: string } | null)?.youth_wrestler_id ?? null;
       if (coachId) {
         const dateStr = dt ? formatEST(new Date(dt), 'EEE MMM d, h:mm a') : 'your session';
         await createNotification(supabase, {
@@ -444,7 +462,10 @@ export async function POST(req: NextRequest) {
           body: `Someone booked ${dateStr}. Check My sessions.`,
           data: { session_id: sessionId },
         }).catch((e) => console.warn('Webhook: coach notification failed', e));
-        await notifyCoachAndAdminsNewBooking(supabase, coachId, dateStr, sessionId).catch(() => {});
+        await notifyCoachAndAdminsNewBooking(supabase, coachId, dateStr, sessionId, {
+          parentId: bookingParentIdForSms ?? undefined,
+          youthWrestlerId: privateYouthId,
+        }).catch(() => {});
       }
 
       if (earlyAdopterEntitlementId) {
@@ -461,14 +482,8 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      const { data: sessParentRow } = await supabase
-        .from('sessions')
-        .select('parent_id')
-        .eq('id', sessionId)
-        .maybeSingle();
-      const bookingParentId = (sessParentRow as { parent_id?: string } | null)?.parent_id;
-      if (bookingParentId) {
-        await maybeBackfillUserNameFromCheckoutSession(supabase, bookingParentId, session);
+      if (bookingParentIdForSms) {
+        await maybeBackfillUserNameFromCheckoutSession(supabase, bookingParentIdForSms, session);
       }
     }
 

@@ -108,7 +108,10 @@ export async function finalizeRegisterFromCheckoutSession(
           body: `New booking for ${dateStr}. Check My sessions.`,
           data: { session_id: sessionId },
         }).catch((e) => console.warn('finalizeRegister: coach notification failed', e));
-        await notifyCoachAndAdminsNewBooking(supabase, coachId, dateStr, sessionId).catch(() => {});
+        await notifyCoachAndAdminsNewBooking(supabase, coachId, dateStr, sessionId, {
+          parentId,
+          youthWrestlerId,
+        }).catch(() => {});
       }
     } else {
       await supabase

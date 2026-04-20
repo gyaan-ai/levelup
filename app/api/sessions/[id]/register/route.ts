@@ -148,7 +148,10 @@ export async function POST(
           body: `New signup for ${dateStr}. Check My sessions.`,
           data: { session_id: sessionId },
         }).catch((e) => console.warn('Register: coach notification failed', e));
-        await notifyCoachAndAdminsNewBooking(admin, coachId, dateStr, sessionId).catch(() => {});
+        await notifyCoachAndAdminsNewBooking(admin, coachId, dateStr, sessionId, {
+          parentId: user.id,
+          youthWrestlerId,
+        }).catch(() => {});
       }
       return NextResponse.json({ added: true });
     }
