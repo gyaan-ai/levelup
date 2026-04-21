@@ -11,10 +11,21 @@ const fetcher = (url: string) => fetch(url).then(r => r.json());
 type Credit = {
   id: string;
   amount: number;
+  remaining?: number;
   reason: string;
   sourceType: string;
-  expiresAt: string;
+  expiresAt: string | null;
   createdAt: string;
+};
+
+type LedgerRow = {
+  id: string;
+  kind: 'grant' | 'debit' | 'reversal';
+  amount: number;
+  description: string;
+  createdAt: string;
+  rewardType: string | null;
+  sessionId: string | null;
 };
 
 type HistoryItem = {
@@ -28,11 +39,15 @@ type HistoryItem = {
 function getSourceIcon(sourceType: string) {
   switch (sourceType) {
     case 'cancellation':
+    case 'coach_cancellation':
       return <RefreshCcw className="h-4 w-4 text-accent" />;
     case 'refund':
       return <CreditCard className="h-4 w-4 text-blue-500" />;
     case 'promo':
+    case 'promotion':
       return <Gift className="h-4 w-4 text-green-500" />;
+    case 'reward':
+      return <Gift className="h-4 w-4 text-amber-500" />;
     default:
       return <Wallet className="h-4 w-4 text-muted-foreground" />;
   }
@@ -43,6 +58,8 @@ export default function WalletPage() {
     balance: number;
     credits: Credit[];
     history: HistoryItem[];
+    ledger?: LedgerRow[];
+    rewardsEnabled?: boolean;
   }>('/api/credits', fetcher);
 
   if (isLoading) {
@@ -65,7 +82,8 @@ export default function WalletPage() {
     );
   }
 
-  const { balance = 0, credits = [], history = [] } = data ?? {};
+  const { balance = 0, credits = [], history = [], ledger = [], rewardsEnabled = false } = data ?? {};
+  const timeline = rewardsEnabled && ledger.length > 0 ? ledger : null;
 
   return (
     <div className="container max-w-2xl py-8 px-4 space-y-6">
@@ -103,9 +121,11 @@ export default function WalletPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             {credits.map((credit) => {
-              const expiresDate = new Date(credit.expiresAt);
-              const daysUntilExpiry = Math.ceil((expiresDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-              const isExpiringSoon = daysUntilExpiry <= 30;
+              const expiresDate = credit.expiresAt ? new Date(credit.expiresAt) : null;
+              const daysUntilExpiry = expiresDate
+                ? Math.ceil((expiresDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+                : null;
+              const isExpiringSoon = daysUntilExpiry != null && daysUntilExpiry <= 30;
 
               return (
                 <div
@@ -120,19 +140,21 @@ export default function WalletPage() {
                         <Calendar className="h-3 w-3" />
                         <span>Added {formatEST(new Date(credit.createdAt), 'MMM d, yyyy')}</span>
                       </div>
-                      <div className={`flex items-center gap-2 text-xs ${isExpiringSoon ? 'text-orange-500' : 'text-muted-foreground'}`}>
-                        <Clock className="h-3 w-3" />
-                        <span>
-                          {isExpiringSoon
-                            ? `Expires in ${daysUntilExpiry} days`
-                            : `Expires ${formatEST(expiresDate, 'MMM d, yyyy')}`
-                          }
-                        </span>
-                      </div>
+                      {expiresDate && daysUntilExpiry != null && (
+                        <div className={`flex items-center gap-2 text-xs ${isExpiringSoon ? 'text-orange-500' : 'text-muted-foreground'}`}>
+                          <Clock className="h-3 w-3" />
+                          <span>
+                            {isExpiringSoon
+                              ? `Expires in ${daysUntilExpiry} days`
+                              : `Expires ${formatEST(expiresDate, 'MMM d, yyyy')}`
+                            }
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                   <span className="text-lg font-semibold text-accent">
-                    ${credit.amount.toFixed(2)}
+                    ${(credit.remaining ?? credit.amount).toFixed(2)}
                   </span>
                 </div>
               );
@@ -145,10 +167,40 @@ export default function WalletPage() {
       <Card>
         <CardHeader>
           <CardTitle className="text-lg">Transaction History</CardTitle>
-          <CardDescription>All credit activity</CardDescription>
+          <CardDescription>
+            {timeline ? 'Grants, checkout usage, and adjustments' : 'Recent credit usage'}
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          {history.length === 0 ? (
+          {timeline && timeline.length > 0 ? (
+            <div className="space-y-2">
+              {timeline.map((item) => {
+                const positive = item.amount > 0;
+                return (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between py-2 border-b border-border last:border-0"
+                  >
+                    <div className="space-y-0.5 min-w-0 pr-2">
+                      <p className="text-sm">{item.description}</p>
+                      {item.rewardType && (
+                        <p className="text-xs text-muted-foreground">{item.rewardType.replace(/_/g, ' ')}</p>
+                      )}
+                      <p className="text-xs text-muted-foreground">
+                        {formatEST(new Date(item.createdAt), 'MMM d, yyyy h:mm a')}
+                      </p>
+                    </div>
+                    <span
+                      className={`font-medium tabular-nums shrink-0 ${positive ? 'text-green-600' : 'text-destructive'}`}
+                    >
+                      {positive ? '+' : ''}
+                      ${item.amount.toFixed(2)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          ) : history.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-6">
               No transactions yet
             </p>

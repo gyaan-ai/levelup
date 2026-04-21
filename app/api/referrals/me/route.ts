@@ -1,0 +1,78 @@
+import { NextResponse } from 'next/server';
+import { headers } from 'next/headers';
+import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
+import { getTenantByDomain } from '@/config/tenants';
+import {
+  countCompletedPaidSessionsForParent,
+  ensureReferralCodeForParent,
+  getNextSessionMilestoneProgress,
+  isRewardsProgramEnabled,
+} from '@/lib/rewards';
+
+export async function GET() {
+  try {
+    const headersList = await headers();
+    const tenant = getTenantByDomain(headersList.get('host') || '');
+    if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
+
+    const supabase = await createClient(tenant.slug);
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
+    if (userData?.role !== 'parent' && userData?.role !== 'admin') {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
+    const enabled = isRewardsProgramEnabled();
+    if (!enabled) {
+      return NextResponse.json({
+        rewardsEnabled: false,
+        referralCode: null,
+        referralLink: null,
+        completedReferrals: 0,
+        pendingReferrals: 0,
+        completedSessions: 0,
+        nextMilestone: null,
+      });
+    }
+
+    const admin = createAdminClient(tenant.slug);
+    const referralCode = await ensureReferralCodeForParent(admin, user.id);
+
+    const host = headersList.get('host') || '';
+    const proto = host.startsWith('localhost') ? 'http' : 'https';
+    const baseUrl = (process.env.NEXT_PUBLIC_APP_URL || `${proto}://${host}`).replace(/\/$/, '');
+    const referralLink = referralCode
+      ? `${baseUrl}/signup?ref=${encodeURIComponent(referralCode)}`
+      : null;
+
+    const [{ count: completedRef }, { count: pendingRef }] = await Promise.all([
+      admin.from('referrals').select('id', { count: 'exact', head: true }).eq('referrer_id', user.id).eq('status', 'completed'),
+      admin
+        .from('referrals')
+        .select('id', { count: 'exact', head: true })
+        .eq('referrer_id', user.id)
+        .in('status', ['pending', 'awaiting_release']),
+    ]);
+
+    const completedSessions = await countCompletedPaidSessionsForParent(admin, user.id);
+    const nextMilestone = getNextSessionMilestoneProgress(completedSessions);
+
+    return NextResponse.json({
+      rewardsEnabled: true,
+      referralCode,
+      referralLink,
+      completedReferrals: completedRef ?? 0,
+      pendingReferrals: pendingRef ?? 0,
+      completedSessions,
+      nextMilestone,
+    });
+  } catch (e) {
+    console.error('referrals/me GET:', e);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}

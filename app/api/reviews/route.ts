@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import { sendCoachNewReviewSms } from '@/lib/twilio';
+import { checkReviewRewardForSession, isRewardsProgramEnabled } from '@/lib/rewards';
 
 const REVIEW_TAGS = ['Technique', 'Great with kids', 'Punctual', 'Communication', 'My kid loved it'] as const;
 
@@ -199,6 +200,14 @@ export async function POST(req: NextRequest) {
       void sendCoachNewReviewSms(admin, coachId, rating, profileUrl).catch((err) =>
         console.warn('Coach new review SMS failed:', err)
       );
+    }
+
+    if (isRewardsProgramEnabled() && isFirstReviewForSession) {
+      await checkReviewRewardForSession(admin, {
+        tenantSlug: tenant.slug,
+        parentId: user.id,
+        sessionId,
+      });
     }
 
     return NextResponse.json({ review });

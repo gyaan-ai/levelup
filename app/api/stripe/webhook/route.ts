@@ -9,6 +9,11 @@ import { formatEST } from '@/lib/format-date';
 import { headers } from 'next/headers';
 import { maybeBackfillRosterSnapshot } from '@/lib/session-roster-snapshot';
 import { maybeBackfillUserNameFromCheckoutSession } from '@/lib/stripe-backfill-user-name';
+import {
+  countPaidSessionSpotsForParent,
+  issueSessionEarnedForCheckoutLines,
+  isRewardsProgramEnabled,
+} from '@/lib/rewards';
 
 /**
  * Fetch the actual Stripe fee from a PaymentIntent's balance transaction.
@@ -80,6 +85,9 @@ export async function POST(req: NextRequest) {
         const rawMetaTenant = (session.metadata?.tenant_slug as string | undefined)?.trim().toLowerCase();
         const tenantSlug = rawMetaTenant && rawMetaTenant in tenants ? rawMetaTenant : 'guild';
         const supabase = createAdminClient(tenantSlug);
+        const paidSpotsBeforeCart = isRewardsProgramEnabled()
+          ? await countPaidSessionSpotsForParent(supabase, parentId)
+          : 0;
 
         const paymentIntentId =
           typeof session.payment_intent === 'string' ? session.payment_intent : session.payment_intent?.id;
@@ -270,6 +278,21 @@ export async function POST(req: NextRequest) {
           });
         }
 
+        const stripeCashCart = (session.amount_total ?? 0) / 100;
+        if (isRewardsProgramEnabled() && rows.length > 0) {
+          await issueSessionEarnedForCheckoutLines(supabase, {
+            tenantSlug,
+            parentId,
+            lines: rows.map((r) => ({
+              sessionId: r.sid,
+              youthWrestlerId: r.ywid,
+              catalogLineDollars: r.amountPaid,
+            })),
+            stripeCashTotalDollars: stripeCashCart,
+            paidSpotsBeforeCheckout: paidSpotsBeforeCart,
+          });
+        }
+
         await maybeBackfillUserNameFromCheckoutSession(supabase, parentId, session);
 
         console.log('Cart checkout webhook completed:', { rows: rows.length, parentId, creditsUsed });
@@ -309,6 +332,9 @@ export async function POST(req: NextRequest) {
             { status: 500 }
           );
         }
+        const paidSpotsBeforeRegister = isRewardsProgramEnabled()
+          ? await countPaidSessionSpotsForParent(supabase, parentId)
+          : 0;
         const amountPaid = amountTotal / 100;
         // Fetch actual Stripe fee
         const stripeFee = paymentIntentId ? await getStripeFee(stripe, paymentIntentId) : 0;
@@ -409,6 +435,21 @@ export async function POST(req: NextRequest) {
             youthWrestlerId,
           }).catch(() => {});
         }
+        if (isRewardsProgramEnabled()) {
+          await issueSessionEarnedForCheckoutLines(supabase, {
+            tenantSlug,
+            parentId,
+            lines: [
+              {
+                sessionId,
+                youthWrestlerId,
+                catalogLineDollars: amountPaid,
+              },
+            ],
+            stripeCashTotalDollars: amountTotal / 100,
+            paidSpotsBeforeCheckout: paidSpotsBeforeRegister,
+          });
+        }
         return NextResponse.json({ received: true });
       }
 
@@ -423,6 +464,10 @@ export async function POST(req: NextRequest) {
           console.error('Stripe webhook: booking_lines but missing parent_id', session.metadata);
           return NextResponse.json({ error: 'Missing parent_id for booking checkout' }, { status: 500 });
         }
+
+        const paidSpotsBeforeBooking = isRewardsProgramEnabled()
+          ? await countPaidSessionSpotsForParent(supabase, parentIdBooking)
+          : 0;
 
         const lineRows = (bookingLinesRaw as string)
           .split(';')
@@ -593,6 +638,21 @@ export async function POST(req: NextRequest) {
             sessionId,
             description: 'Book-a-coach checkout (credit + card)',
             tenantSlug,
+          });
+        }
+
+        const stripeCashBooking = (session.amount_total ?? 0) / 100;
+        if (isRewardsProgramEnabled() && lineRows.length > 0) {
+          await issueSessionEarnedForCheckoutLines(supabase, {
+            tenantSlug,
+            parentId: parentIdBooking,
+            lines: lineRows.map((r) => ({
+              sessionId,
+              youthWrestlerId: r.ywid,
+              catalogLineDollars: r.amountPaid,
+            })),
+            stripeCashTotalDollars: stripeCashBooking,
+            paidSpotsBeforeCheckout: paidSpotsBeforeBooking,
           });
         }
 

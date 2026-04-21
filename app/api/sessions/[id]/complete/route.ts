@@ -3,6 +3,7 @@ import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
+import { checkSessionMilestonesForParent, isRewardsProgramEnabled } from '@/lib/rewards';
 
 /**
  * POST - Mark a session as completed.
@@ -64,6 +65,24 @@ export async function POST(
     if (updateError) {
       console.error('Mark session complete error:', updateError);
       return NextResponse.json({ error: updateError.message }, { status: 500 });
+    }
+
+    if (isRewardsProgramEnabled()) {
+      const { data: partRows } = await admin
+        .from('session_participants')
+        .select('parent_id')
+        .eq('session_id', sessionId)
+        .eq('paid', true);
+      const parentIds = [
+        ...new Set(
+          (partRows ?? [])
+            .map((r: { parent_id?: string | null }) => r.parent_id)
+            .filter((id): id is string => Boolean(id))
+        ),
+      ];
+      for (const parentId of parentIds) {
+        await checkSessionMilestonesForParent(admin, { tenantSlug: tenant.slug, parentId });
+      }
     }
 
     return NextResponse.json({ success: true });

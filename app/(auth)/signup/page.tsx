@@ -44,6 +44,7 @@ export default function SignupPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const inviteToken = searchParams?.get('invite')?.trim() || undefined;
+  const refFromUrl = searchParams?.get('ref')?.trim() || undefined;
   const roleParam = searchParams?.get('role')?.toLowerCase();
   const redirectTo = searchParams?.get('redirect')?.trim();
   const safeRedirect: string | null =
@@ -57,6 +58,16 @@ export default function SignupPage() {
   const supabase = createClient(tenant.slug);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (refFromUrl && typeof window !== 'undefined') {
+      try {
+        window.localStorage.setItem('guild_referral_code', refFromUrl);
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [refFromUrl]);
 
   // If role=coach, redirect to coach application
   useEffect(() => {
@@ -96,6 +107,12 @@ export default function SignupPage() {
           role: 'parent',
           discountCode: values.discountCode?.trim() || undefined,
           inviteToken: inviteToken || undefined,
+          referralCode:
+            (typeof window !== 'undefined'
+              ? window.localStorage.getItem('guild_referral_code')?.trim()
+              : undefined) ||
+            refFromUrl ||
+            undefined,
         }),
       });
 

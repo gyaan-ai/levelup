@@ -6,6 +6,7 @@ import { validateRequiredYouthPhone } from '@/lib/phone';
 import { resolveDiscountPercentOff } from '@/lib/discount-codes';
 import { family10CodeBlockedForEmail } from '@/lib/family-auto-discount';
 import { normalizeUsZipCode } from '@/lib/us-zip';
+import { createReferralAttributionOnSignup, isRewardsProgramEnabled } from '@/lib/rewards';
 
 export async function POST(req: NextRequest) {
   try {
@@ -20,7 +21,19 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { email, password, role, coachType, firstName, lastName, school, discountCode, inviteToken, athletePhone } = body;
+    const {
+      email,
+      password,
+      role,
+      coachType,
+      firstName,
+      lastName,
+      school,
+      discountCode,
+      inviteToken,
+      athletePhone,
+      referralCode: referralCodeBody,
+    } = body;
 
     // Validate required fields
     if (!email || !password || !role) {
@@ -198,6 +211,23 @@ export async function POST(req: NextRequest) {
         { error: `Failed to create user profile: ${userError.message}` },
         { status: 500 }
       );
+    }
+
+    if (role === 'parent' && isRewardsProgramEnabled()) {
+      const referralCodeRaw =
+        typeof referralCodeBody === 'string' ? referralCodeBody.trim() : '';
+      if (referralCodeRaw) {
+        const refRes = await createReferralAttributionOnSignup(supabaseAdmin, {
+          referredUserId: userId,
+          referredEmailLower: emailNormalized,
+          referralCodeRaw,
+        });
+        if (!refRes.ok) {
+          await supabaseAdmin.from('users').delete().eq('id', userId);
+          await supabaseAdmin.auth.admin.deleteUser(userId);
+          return NextResponse.json({ error: refRes.error }, { status: 400 });
+        }
+      }
     }
 
     // If they signed up via invite link, link them to the youth wrestler

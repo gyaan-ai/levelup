@@ -6,6 +6,7 @@ import { getTenantByDomain } from '@/config/tenants';
 import { createNotification } from '@/lib/notifications';
 import { formatEST } from '@/lib/format-date';
 import { grantCredit } from '@/lib/credits';
+import { isRewardsProgramEnabled, reverseSessionEarnedForParticipant } from '@/lib/rewards';
 
 export async function POST(
   req: NextRequest,
@@ -75,6 +76,20 @@ export async function POST(
       .from('session_participants')
       .select('id, parent_id, youth_wrestler_id, amount_paid')
       .eq('session_id', sessionId);
+
+    if (isRewardsProgramEnabled()) {
+      for (const participant of participants ?? []) {
+        const pid = (participant as { id?: string; parent_id?: string }).id;
+        const parId = (participant as { parent_id?: string | null }).parent_id;
+        if (pid && parId) {
+          await reverseSessionEarnedForParticipant(admin, {
+            sessionParticipantId: pid,
+            parentId: parId,
+            sessionId,
+          });
+        }
+      }
+    }
 
     const scheduledTime = new Date(session.scheduled_datetime);
     const sessionDate = formatEST(scheduledTime, 'EEE, MMM d');
