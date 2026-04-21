@@ -1,17 +1,21 @@
 import { createAdminClient } from '@/lib/supabase/admin';
-import { isSessionOpenForParentBrowse } from '@/lib/sessions';
+import { getEffectiveFilledCount, isSessionOpenForParentBrowse } from '@/lib/sessions';
 import { formatEST } from '@/lib/format-date';
 
-export type PublicCoachOpenJoinRow = {
+/** One table row per bookable public join-in session (not collapsed per coach). */
+export type PublicOpenJoinSessionRow = {
+  sessionId: string;
   coachId: string;
   coachName: string;
-  /** Open public join-in sessions in the window (partner-open / small group / 2-athlete). */
-  openCount: number;
-  nextSessionId: string;
-  nextAt: string;
-  nextKind: string;
+  kind: 'Partner' | 'Small group';
+  scheduledAt: string;
   facilityName: string;
+  /** Capacity context: athletes already on roster vs room left. */
+  openingsLabel: string;
 };
+
+/** @deprecated Use PublicOpenJoinSessionRow; kept for any external imports. */
+export type PublicCoachOpenJoinRow = PublicOpenJoinSessionRow;
 
 function coachNameFromSession(s: {
   athletes?: { first_name?: string; last_name?: string } | { first_name?: string; last_name?: string }[] | null;
@@ -30,13 +34,6 @@ function facilityNameFromSession(s: {
   return fo?.name?.trim() || '—';
 }
 
-function labelKind(session_type: string | null, session_mode: string | null): string {
-  const sm = (session_mode ?? '').toLowerCase();
-  const st = (session_type ?? '').toLowerCase();
-  if (sm === 'partner-open' || st === '2-athlete' || st === 'partner') return 'Partner';
-  return 'Small group';
-}
-
 type SessionRow = {
   id: string;
   scheduled_datetime: string;
@@ -50,6 +47,27 @@ type SessionRow = {
   facilities?: { name?: string } | { name?: string }[] | null;
   session_participants?: unknown[] | null;
 };
+
+function labelKind(session_type: string | null, session_mode: string | null): 'Partner' | 'Small group' {
+  const sm = (session_mode ?? '').toLowerCase();
+  const st = (session_type ?? '').toLowerCase();
+  if (sm === 'partner-open' || st === '2-athlete' || st === 'partner') return 'Partner';
+  return 'Small group';
+}
+
+function openingsLabelFromSession(s: SessionRow): string {
+  const max = s.max_participants;
+  const filled = getEffectiveFilledCount(s);
+  if (max != null && max > 0) {
+    const open = max - filled;
+    if (open <= 0) return '';
+    return `${filled} booked · ${open} open`;
+  }
+  if (filled >= 1) {
+    return `${filled} athlete${filled === 1 ? '' : 's'} on roster · spots available`;
+  }
+  return 'Spots available';
+}
 
 const SESSION_SELECT = `
   id,
@@ -66,7 +84,7 @@ const SESSION_SELECT = `
 `;
 
 export type PublicOpenJoinSummariesResult = {
-  rows: PublicCoachOpenJoinRow[];
+  rows: PublicOpenJoinSessionRow[];
   /** Counts of individual open join-in sessions whose start time falls on the current Eastern calendar day. */
   openSessionCountTodayByFilter: {
     all: number;
@@ -78,10 +96,10 @@ export type PublicOpenJoinSummariesResult = {
 /** Public join-in sessions (open partner + small group) for marketing / home table. Service role on server only. */
 export async function fetchPublicOpenJoinSummaries(
   tenantSlug: string,
-  options?: { daysAhead?: number; maxCoaches?: number }
+  options?: { daysAhead?: number; /** Max table rows (sessions), not unique coaches. */ maxCoaches?: number }
 ): Promise<PublicOpenJoinSummariesResult> {
   const days = options?.daysAhead ?? 21;
-  const maxCoaches = options?.maxCoaches ?? 50;
+  const maxSessions = options?.maxCoaches ?? 50;
   const admin = createAdminClient(tenantSlug);
   const now = new Date();
   const until = new Date(now);
@@ -136,36 +154,27 @@ export async function fetchPublicOpenJoinSummaries(
     else todaySmallGroup += 1;
   }
 
-  const byCoach = new Map<string, { name: string; sessions: SessionRow[] }>();
-
+  const out: PublicOpenJoinSessionRow[] = [];
   for (const s of open) {
-    const aid = s.athlete_id;
-    if (!aid) continue;
-    const name = coachNameFromSession(s);
-    const cur = byCoach.get(aid) ?? { name, sessions: [] };
-    cur.sessions.push(s);
-    byCoach.set(aid, cur);
-  }
-
-  const out: PublicCoachOpenJoinRow[] = [];
-  for (const [coachId, { name, sessions: coachSessions }] of byCoach) {
-    coachSessions.sort((a, b) => a.scheduled_datetime.localeCompare(b.scheduled_datetime));
-    const next = coachSessions[0];
-    if (!next) continue;
+    const coachId = s.athlete_id;
+    if (!coachId) continue;
+    const kind = labelKind(s.session_type, s.session_mode);
+    const label = openingsLabelFromSession(s);
+    if (!label) continue;
     out.push({
+      sessionId: s.id,
       coachId,
-      coachName: name,
-      openCount: coachSessions.length,
-      nextSessionId: next.id,
-      nextAt: next.scheduled_datetime,
-      nextKind: labelKind(next.session_type, next.session_mode),
-      facilityName: facilityNameFromSession(next),
+      coachName: coachNameFromSession(s),
+      kind,
+      scheduledAt: s.scheduled_datetime,
+      facilityName: facilityNameFromSession(s),
+      openingsLabel: label,
     });
   }
 
-  out.sort((a, b) => a.nextAt.localeCompare(b.nextAt));
+  out.sort((a, b) => a.scheduledAt.localeCompare(b.scheduledAt));
   return {
-    rows: out.slice(0, maxCoaches),
+    rows: out.slice(0, maxSessions),
     openSessionCountTodayByFilter: {
       all: todayAll,
       partner: todayPartner,

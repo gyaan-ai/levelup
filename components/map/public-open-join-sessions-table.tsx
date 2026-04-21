@@ -15,14 +15,14 @@ export async function PublicOpenJoinSessionsTable({
 }) {
   const { rows: rowsAll, openSessionCountTodayByFilter } = await fetchPublicOpenJoinSummaries(tenantSlug, {
     daysAhead: 21,
-    maxCoaches: 40,
+    maxCoaches: 60,
   });
   const rows =
     rowKindFilter === 'all'
       ? rowsAll
       : rowKindFilter === 'partner'
-        ? rowsAll.filter((r) => r.nextKind === 'Partner')
-        : rowsAll.filter((r) => r.nextKind === 'Small group');
+        ? rowsAll.filter((r) => r.kind === 'Partner')
+        : rowsAll.filter((r) => r.kind === 'Small group');
 
   const todayCount =
     rowKindFilter === 'all'
@@ -42,8 +42,15 @@ export async function PublicOpenJoinSessionsTable({
         Open sessions — join now
       </h3>
       <div className="mt-2 max-w-2xl space-y-2 text-sm text-white/70">
-        <p>These are open spots you can join right now.</p>
-        <p>Don&apos;t see what you need? Any coach can take you privately — browse the map above.</p>
+        <p>
+          Each row is a <span className="text-white/85">specific posted session</span> that already has at least one
+          athlete on the roster and still has room—you are joining that existing signup, not opening a brand-new slot from
+          scratch.
+        </p>
+        <p>
+          For a fresh private or partner booking on your own schedule, start from a coach on the map above (or Training
+          after you sign in).
+        </p>
       </div>
 
       {rows.length === 0 ? (
@@ -73,19 +80,19 @@ export async function PublicOpenJoinSessionsTable({
                   <th className="px-3 py-2.5 font-medium">Coach</th>
                   <th className="px-3 py-2.5 font-medium">Type</th>
                   <th className="px-3 py-2.5 font-medium">Openings</th>
-                  <th className="px-3 py-2.5 font-medium">Next session</th>
+                  <th className="px-3 py-2.5 font-medium">Session time</th>
                   <th className="px-3 py-2.5 font-medium">Where</th>
                   <th className="px-3 py-2.5 font-medium"> </th>
                 </tr>
               </thead>
               <tbody>
                 {rows.map((r) => {
-                  const isPartner = r.nextKind === 'Partner';
-                  const registerPath = `/sessions/${r.nextSessionId}/register`;
+                  const isPartner = r.kind === 'Partner';
+                  const registerPath = `/sessions/${r.sessionId}/register`;
                   const actionHref = isLoggedIn ? registerPath : loginWithRedirect(registerPath);
                   const actionLabel = isLoggedIn ? 'Add to cart' : 'Reserve';
                   return (
-                    <tr key={r.coachId} className="border-b border-white/[0.06] last:border-0">
+                    <tr key={r.sessionId} className="border-b border-white/[0.06] last:border-0">
                       <td className="px-3 py-3">
                         <Link
                           href={`/athlete/${r.coachId}`}
@@ -106,10 +113,8 @@ export async function PublicOpenJoinSessionsTable({
                           {isPartner ? 'Partner' : 'Small group'}
                         </Badge>
                       </td>
-                      <td className="px-3 py-3 tabular-nums text-white/70">
-                        {r.openCount} session{r.openCount !== 1 ? 's' : ''}
-                      </td>
-                      <td className="px-3 py-3 text-white/80">{formatEST(r.nextAt, 'EEE MMM d · h:mm a')}</td>
+                      <td className="max-w-[11rem] px-3 py-3 text-white/70">{r.openingsLabel}</td>
+                      <td className="px-3 py-3 text-white/80">{formatEST(r.scheduledAt, 'EEE MMM d · h:mm a')}</td>
                       <td className="px-3 py-3 text-white/65">{r.facilityName}</td>
                       <td className="px-3 py-3 text-right align-middle">
                         <Button
