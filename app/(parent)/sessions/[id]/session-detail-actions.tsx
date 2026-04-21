@@ -3,11 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { differenceInHours } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { RotateCcw, Star } from 'lucide-react';
-
-const CANCELLATION_WINDOW_HOURS = 24;
 
 interface SessionDetailActionsProps {
   sessionId: string;
@@ -37,10 +34,6 @@ export function SessionDetailActions({
   const [leaving, setLeaving] = useState(false);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
-
-  const scheduledTime = new Date(scheduledDatetime);
-  const hoursUntilSession = differenceInHours(scheduledTime, new Date());
-  const willGetRefund = hoursUntilSession >= CANCELLATION_WINDOW_HOURS && status === 'scheduled';
 
   const handleLeave = async () => {
     setLeaving(true);
@@ -150,9 +143,8 @@ export function SessionDetailActions({
         <div className="p-3 border border-destructive/50 rounded-lg bg-destructive/5 text-left">
           <p className="text-sm font-medium mb-2">Cancel this session?</p>
           <p className="text-xs text-muted-foreground mb-3">
-            {willGetRefund
-              ? `A refund of $${Number(totalPrice).toFixed(2)} will be processed (24h+ notice).`
-              : `Less than ${CANCELLATION_WINDOW_HOURS} hours notice — no refund.`}
+            You will receive wallet credit for what you paid (around $
+            {Number(totalPrice).toFixed(2)} for this booking). Use it toward any coach.
           </p>
           <div className="flex gap-2">
             <Button size="sm" variant="outline" onClick={() => setShowCancelConfirm(false)} disabled={cancelling}>

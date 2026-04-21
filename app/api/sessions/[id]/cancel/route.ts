@@ -4,11 +4,8 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import { createNotification } from '@/lib/notifications';
-import { differenceInHours } from 'date-fns';
 import { formatEST } from '@/lib/format-date';
 import { grantCredit } from '@/lib/credits';
-
-const CANCELLATION_WINDOW_HOURS = 24;
 
 export async function POST(
   req: NextRequest,
@@ -74,61 +71,69 @@ export async function POST(
       return NextResponse.json({ error: 'Session cannot be cancelled' }, { status: 400 });
     }
 
-    // Get session participants to grant credits
     const { data: participants } = await admin
       .from('session_participants')
       .select('id, parent_id, youth_wrestler_id, amount_paid')
       .eq('session_id', sessionId);
 
     const scheduledTime = new Date(session.scheduled_datetime);
-    const hoursUntilSession = differenceInHours(scheduledTime, new Date());
-    const withinRefundWindow = hoursUntilSession >= CANCELLATION_WINDOW_HOURS;
-
     const sessionDate = formatEST(scheduledTime, 'EEE, MMM d');
     const coach = Array.isArray(session.athletes) ? session.athletes[0] : session.athletes;
     const coachName = coach ? [coach.first_name, coach.last_name].filter(Boolean).join(' ') : 'Coach';
 
     let creditsGranted = 0;
     let totalCreditsAmount = 0;
+    /** Sum of credits issued per parent (for accurate notifications). */
+    const creditByParent = new Map<string, number>();
 
-    // Grant credits to all participants (coach/admin cancel always grants credits)
-    if (isCoach || isAdmin) {
+    const cancellerMayIssueCredit = isCoach || isAdmin || isOwner;
+
+    const recordSuccessfulGrant = (parentId: string, amount: number) => {
+      creditsGranted++;
+      totalCreditsAmount += amount;
+      creditByParent.set(parentId, (creditByParent.get(parentId) ?? 0) + amount);
+    };
+
+    if (cancellerMayIssueCredit) {
       for (const participant of participants ?? []) {
         const amountPaid = Number(participant.amount_paid ?? 0);
         if (amountPaid > 0 && participant.parent_id) {
           const result = await grantCredit({
             userId: participant.parent_id,
             amount: amountPaid,
+            reason:
+              isCoach || isAdmin
+                ? `Cancelled: ${sessionDate} with ${coachName}. ${reason}`
+                : `Self-cancelled: ${sessionDate} with ${coachName}`,
+            sourceType: 'cancellation',
+            sourceId: sessionId,
+            tenantSlug: tenant.slug,
+          });
+          if (result.success) {
+            recordSuccessfulGrant(participant.parent_id, amountPaid);
+          }
+        }
+      }
+
+      // No paid roster rows yet (e.g. pending_payment before checkout) — credit the organizing parent for the session price.
+      if (totalCreditsAmount === 0) {
+        const organizerId = session.parent_id as string | null;
+        const fallbackAmount = Number(session.total_price ?? session.base_price ?? 0);
+        if (organizerId && fallbackAmount > 0) {
+          const result = await grantCredit({
+            userId: organizerId,
+            amount: fallbackAmount,
             reason: `Cancelled: ${sessionDate} with ${coachName}. ${reason}`,
             sourceType: 'cancellation',
             sourceId: sessionId,
             tenantSlug: tenant.slug,
           });
           if (result.success) {
-            creditsGranted++;
-            totalCreditsAmount += amountPaid;
+            recordSuccessfulGrant(organizerId, fallbackAmount);
           }
         }
       }
-    } else if (isOwner && withinRefundWindow) {
-      // Parent self-cancel with 24+ hours notice - grant credit
-      const amountPaid = Number(session.total_price || 0);
-      if (amountPaid > 0) {
-        const result = await grantCredit({
-          userId: user.id,
-          amount: amountPaid,
-          reason: `Self-cancelled: ${sessionDate} with ${coachName}`,
-          sourceType: 'cancellation',
-          sourceId: sessionId,
-          tenantSlug: tenant.slug,
-        });
-        if (result.success) {
-          creditsGranted = 1;
-          totalCreditsAmount = amountPaid;
-        }
-      }
     }
-    // Parent self-cancel with less than 24 hours - no credit (existing behavior)
 
     const { error: updateError } = await admin
       .from('sessions')
@@ -145,7 +150,6 @@ export async function POST(
       return NextResponse.json({ error: 'Failed to cancel session' }, { status: 500 });
     }
 
-    // Update participant statuses
     if (participants && participants.length > 0) {
       await admin
         .from('session_participants')
@@ -155,22 +159,27 @@ export async function POST(
 
     const when = formatEST(new Date(session.scheduled_datetime), 'MMM d, h:mm a');
     try {
-      // Notify participants
+      const parentIdsToNotify = new Set<string>();
       for (const participant of participants ?? []) {
-        if (participant.parent_id) {
-          const creditMsg = totalCreditsAmount > 0 
-            ? ` $${totalCreditsAmount.toFixed(2)} credit added to your account.`
-            : '';
-          await createNotification(admin, {
-            user_id: participant.parent_id,
-            type: 'session_cancelled',
-            title: 'Session cancelled',
-            body: `Session on ${when} with ${coachName} was cancelled.${creditMsg}`,
-            data: { link: '/bookings', session_id: sessionId },
-          });
-        }
+        if (participant.parent_id) parentIdsToNotify.add(participant.parent_id);
       }
-      // Notify coach if not the one cancelling
+      if (parentIdsToNotify.size === 0 && session.parent_id) {
+        parentIdsToNotify.add(session.parent_id as string);
+      }
+      for (const parentId of parentIdsToNotify) {
+        const amt = creditByParent.get(parentId);
+        const creditMsg =
+          amt != null && amt > 0
+            ? ` $${amt.toFixed(2)} was added to your wallet — usable on any coach.`
+            : '';
+        await createNotification(admin, {
+          user_id: parentId,
+          type: 'session_cancelled',
+          title: 'Session cancelled',
+          body: `Session on ${when} with ${coachName} was cancelled.${creditMsg}`,
+          data: { link: '/bookings', session_id: sessionId },
+        });
+      }
       if (session.athlete_id !== user.id) {
         await createNotification(admin, {
           user_id: session.athlete_id,
@@ -184,11 +193,10 @@ export async function POST(
       console.warn('Notify cancel failed:', notifErr);
     }
 
-    const message = totalCreditsAmount > 0
-      ? `Session cancelled. $${totalCreditsAmount.toFixed(2)} credit issued to ${creditsGranted} participant(s).`
-      : withinRefundWindow
-        ? 'Session cancelled.'
-        : 'Session cancelled. No credit (less than 24 hours notice).';
+    const message =
+      totalCreditsAmount > 0
+        ? `Session cancelled. $${totalCreditsAmount.toFixed(2)} wallet credit issued (${creditsGranted} grant(s)). Use it on any booking.`
+        : 'Session cancelled.';
 
     return NextResponse.json({
       success: true,

@@ -20,7 +20,6 @@ import {
   Loader2,
 } from 'lucide-react';
 import { SchoolLogo } from '@/components/school-logo';
-import { differenceInHours } from 'date-fns';
 import { formatEST } from '@/lib/format-date';
 import { SessionTypeBadge } from '@/components/session-type-badge';
 import { ProfileImage } from '@/components/profile-image';
@@ -51,8 +50,6 @@ export type CoachTransferSessionOption = {
   current_participants: number;
   max_participants: number;
 };
-
-const CANCELLATION_WINDOW_HOURS = 24;
 
 export type BookingSession = {
   id: string;
@@ -227,7 +224,6 @@ export function BookingCard({
   };
 
   const scheduledTime = new Date(session.scheduled_datetime);
-  const hoursUntilSession = differenceInHours(scheduledTime, new Date());
   const canCancel = 
     !isPast && 
     (session.status === 'scheduled' || session.status === 'pending_payment') &&
@@ -241,8 +237,6 @@ export function BookingCard({
     !isPast &&
     isSessionOpenForParentBrowse(session) &&
     (session.joinPolicy === 'public' || session.joinPolicy === 'invite_only');
-  const willGetRefund = hoursUntilSession >= CANCELLATION_WINDOW_HOURS && session.status === 'scheduled';
-
   const handleLeaveSession = async () => {
     setLeaving(true);
     try {
@@ -573,10 +567,8 @@ export function BookingCard({
                 <p className="text-sm font-medium mb-2">Cancel this session?</p>
                 <p className="text-xs text-muted-foreground mb-3">
                   {variant === 'coach'
-                    ? 'This cancels the session for all booked wrestlers. Parents are notified; refunds follow the same timing rules as parent cancellations.'
-                    : willGetRefund
-                      ? `A refund of $${Number(session.total_price).toFixed(2)} will be processed (24h+ notice).`
-                      : `Less than ${CANCELLATION_WINDOW_HOURS} hours notice — no refund.`}
+                    ? 'This cancels the session for all booked wrestlers. Parents get wallet credit for what they paid (usable on any coach).'
+                    : `Wallet credit for what you paid (around $${Number(session.total_price).toFixed(2)}) will be added — usable on any coach.`}
                 </p>
                 <div className="flex gap-2">
                   <Button 

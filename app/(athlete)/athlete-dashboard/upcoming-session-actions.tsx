@@ -5,10 +5,6 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { MessageCircle, CalendarClock, X } from 'lucide-react';
-import { differenceInHours } from 'date-fns';
-
-const CANCELLATION_WINDOW_HOURS = 24;
-
 type Props = {
   sessionId: string;
   scheduledDatetime: string;
@@ -19,9 +15,6 @@ export function UpcomingSessionActions({ sessionId, scheduledDatetime, totalPric
   const router = useRouter();
   const [cancelling, setCancelling] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
-
-  const hoursUntil = differenceInHours(new Date(scheduledDatetime), new Date());
-  const willRefund = hoursUntil >= CANCELLATION_WINDOW_HOURS;
 
   const handleCancel = async () => {
     setCancelling(true);
@@ -74,9 +67,8 @@ export function UpcomingSessionActions({ sessionId, scheduledDatetime, totalPric
       ) : (
         <div className="flex flex-col gap-2 rounded-lg border p-3 bg-muted/50 w-full sm:w-auto">
           <p className="text-xs text-muted-foreground">
-            {willRefund
-              ? `Parent will receive a $${Number(totalPrice).toFixed(2)} refund (24h+ notice).`
-              : 'Less than 24 hours — no refund to parent.'}
+            Parents receive wallet credit for what they paid (about $
+            {Number(totalPrice).toFixed(2)} for the booking parent). Credit works on any coach.
           </p>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={() => setShowConfirm(false)} disabled={cancelling}>
