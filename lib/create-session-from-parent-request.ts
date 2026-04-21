@@ -5,7 +5,6 @@ import type { SessionMode } from '@/types';
 import type { JoinPolicy } from '@/types';
 import { COACH_REVENUE_FRACTION } from '@/lib/pricing';
 import { hasMinPhoneDigits } from '@/lib/phone';
-import { maybeBackfillRosterSnapshot } from '@/lib/session-roster-snapshot';
 import { isPennyTestPricingEnabled } from '@/lib/penny-test-pricing';
 import { COACH_SESSION_OVERLAP_ERROR, findCoachSessionTimeOverlap } from '@/lib/coach-session-overlap';
 
@@ -101,8 +100,9 @@ async function resolvePricing(
 }
 
 /**
- * Creates a pending_payment session + participant + cart line after a coach (or parent accepting a counter)
- * approves a parent_session_requests row. Uses service-role client.
+ * Creates a pending_payment session + cart line after a coach (or parent accepting a counter)
+ * approves a parent_session_requests row. Roster rows are added when checkout completes (webhook).
+ * Uses service-role client.
  */
 export async function createSessionFromParentRequest(
   admin: SupabaseClient,
@@ -192,7 +192,7 @@ export async function createSessionFromParentRequest(
       join_policy,
       partner_invite_code: partner_invite_code ?? undefined,
       max_participants: maxParticipants,
-      current_participants: 1,
+      current_participants: 0,
       base_price: basePrice,
       price_per_participant: testModePenny ? 0.50 : pricing.pricePerParticipant,
       scheduled_datetime: scheduledDatetimeIso,
@@ -214,26 +214,6 @@ export async function createSessionFromParentRequest(
   }
 
   const sessionId = session.id as string;
-
-  const partAmount = testModePenny ? 0.50 : pricing.pricePerParticipant;
-  const { error: partError } = await admin.from('session_participants').insert({
-    session_id: sessionId,
-    youth_wrestler_id: youthWrestlerId,
-    parent_id: parentId,
-    paid: false,
-    amount_paid: partAmount,
-  });
-  if (partError) {
-    await admin.from('sessions').delete().eq('id', sessionId);
-    console.error('[createSessionFromParentRequest] participant', partError);
-    return { ok: false, error: 'Failed to add participant', status: 500 };
-  }
-
-  await maybeBackfillRosterSnapshot(
-    admin,
-    { session_id: sessionId, youth_wrestler_id: youthWrestlerId },
-    ywRow ?? {}
-  );
 
   const lineId = crypto.randomUUID();
   const { error: cartErr } = await admin.from('cart_items').insert({

@@ -602,6 +602,7 @@ export function AdminDashboardClient({
     id: string;
     wrestlerName: string;
     amountPaid: number;
+    paid: boolean;
     hasStripePayment?: boolean;
   } | null>(null);
   const [transferTargetSessionId, setTransferTargetSessionId] = useState<string>('');
@@ -662,7 +663,11 @@ export function AdminDashboardClient({
         alert(data.error || 'Transfer failed');
         return;
       }
-      alert(`Successfully transferred ${transferringParticipant.wrestlerName} with $${transferringParticipant.amountPaid} payment preserved`);
+      alert(
+        transferringParticipant.paid
+          ? `Successfully transferred ${transferringParticipant.wrestlerName} with $${Number(transferringParticipant.amountPaid).toFixed(2)} payment preserved`
+          : `Successfully transferred ${transferringParticipant.wrestlerName} (payment was still pending — parent may need to complete checkout on the new session)`
+      );
       setTransferringParticipant(null);
       setTransferTargetSessionId('');
       setTransferTargetSearch('');
@@ -5629,6 +5634,7 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
                               id: p.id,
                               wrestlerName: p.wrestlerName,
                               amountPaid: p.amountPaid,
+                              paid: p.paid,
                               hasStripePayment: p.hasStripePayment,
                             });
                           }}
@@ -5646,7 +5652,9 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
             {transferringParticipant && (
               <div className="mt-4 p-4 rounded-lg border border-blue-600/50 bg-blue-600/10">
                 <div className="font-medium text-blue-400 mb-2">
-                  Transfer {transferringParticipant.wrestlerName} (${transferringParticipant.amountPaid} paid)
+                  Transfer {transferringParticipant.wrestlerName} ($
+                  {Number(transferringParticipant.amountPaid || 0).toFixed(2)}{' '}
+                  {transferringParticipant.paid ? 'paid' : 'due — payment not completed yet'})
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="transferTargetSearch">Find session (coach, facility, date)</Label>

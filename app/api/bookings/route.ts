@@ -203,6 +203,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Could not verify schedule availability' }, { status: 500 });
     }
 
+    const useStripeCheckout =
+      process.env.STRIPE_CHECKOUT_ENABLED === 'true' && stripeChargeAmount >= 0.5;
+
     const { data: session, error: sessionError } = await supabase
       .from('sessions')
       .insert({
@@ -216,7 +219,8 @@ export async function POST(req: NextRequest) {
         join_policy,
         partner_invite_code: partner_invite_code ?? undefined,
         max_participants: maxParticipants,
-        current_participants: numParticipants,
+        /** Roster + capacity apply only after payment; Stripe path fills rows in webhook */
+        current_participants: useStripeCheckout ? 0 : numParticipants,
         base_price: basePrice,
         price_per_participant: testModePenny ? 0.50 : (pricePerParticipant ?? undefined),
         scheduled_datetime: scheduledDatetime,
@@ -241,32 +245,34 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Failed to create session' }, { status: 500 });
     }
 
-    try {
-      await createNotification(admin, {
-        user_id: athleteIdNorm,
-        type: 'new_session',
-        title: 'New session booked',
-        body: `Session on ${formatEST(new Date(scheduledDatetime), 'MMM d, yyyy')} at ${formatEST(new Date(scheduledDatetime), 'h:mm a')}. View your dashboard.`,
-        data: { link: '/athlete-dashboard', session_id: session.id },
-      });
-    } catch (notifErr) {
-      console.warn('Notify coach of new session failed:', notifErr);
-    }
-
-    for (const ywId of youthWrestlerIdsNorm) {
-      const ywRow = ywPhoneRows?.find((r) => r.id === ywId);
-      const { error: partError } = await supabase.from('session_participants').insert({
-        session_id: session.id,
-        youth_wrestler_id: ywId,
-        parent_id: user.id,
-        paid: false,
-        amount_paid: testModePenny ? (0.50 / numParticipants) : (pricePerParticipant ?? totalPrice / numParticipants),
-      });
-      if (partError) {
-        await supabase.from('sessions').delete().eq('id', session.id);
-        return NextResponse.json({ error: 'Failed to add participants' }, { status: 500 });
+    if (!useStripeCheckout) {
+      try {
+        await createNotification(admin, {
+          user_id: athleteIdNorm,
+          type: 'new_session',
+          title: 'New session booked',
+          body: `Session on ${formatEST(new Date(scheduledDatetime), 'MMM d, yyyy')} at ${formatEST(new Date(scheduledDatetime), 'h:mm a')}. View your dashboard.`,
+          data: { link: '/athlete-dashboard', session_id: session.id },
+        });
+      } catch (notifErr) {
+        console.warn('Notify coach of new session failed:', notifErr);
       }
-      await maybeBackfillRosterSnapshot(admin, { session_id: session.id, youth_wrestler_id: ywId }, ywRow ?? {});
+
+      for (const ywId of youthWrestlerIdsNorm) {
+        const ywRow = ywPhoneRows?.find((r) => r.id === ywId);
+        const { error: partError } = await supabase.from('session_participants').insert({
+          session_id: session.id,
+          youth_wrestler_id: ywId,
+          parent_id: user.id,
+          paid: false,
+          amount_paid: testModePenny ? 0.5 / numParticipants : pricePerParticipant ?? totalPrice / numParticipants,
+        });
+        if (partError) {
+          await supabase.from('sessions').delete().eq('id', session.id);
+          return NextResponse.json({ error: 'Failed to add participants' }, { status: 500 });
+        }
+        await maybeBackfillRosterSnapshot(admin, { session_id: session.id, youth_wrestler_id: ywId }, ywRow ?? {});
+      }
     }
 
     // Stripe Checkout: enable by setting STRIPE_CHECKOUT_ENABLED=true (and keys + webhook).
@@ -275,8 +281,8 @@ export async function POST(req: NextRequest) {
     console.log('[Bookings API] STRIPE_CHECKOUT_ENABLED:', process.env.STRIPE_CHECKOUT_ENABLED);
     console.log('[Bookings API] Charge amount:', stripeChargeAmount);
     console.log('[Bookings API] Tenant slug:', tenant.slug);
-    
-    if (process.env.STRIPE_CHECKOUT_ENABLED === 'true' && stripeChargeAmount >= 0.50) {
+
+    if (useStripeCheckout) {
       try {
         console.log('[Bookings API] Attempting to create Stripe checkout session...');
         const stripe = getStripeInstance(tenant.slug);
@@ -286,6 +292,12 @@ export async function POST(req: NextRequest) {
         if (session.session_mode) successParams.set('mode', session.session_mode);
         
         const amountCents = Math.round(stripeChargeAmount * 100);
+        const perWrestlerAmount = testModePenny
+          ? 0.5 / numParticipants
+          : pricePerParticipant ?? totalPrice / numParticipants;
+        const bookingLines = youthWrestlerIdsNorm
+          .map((ywId) => `${ywId}|${perWrestlerAmount}`)
+          .join(';');
         const metadata: Record<string, string> = {
           business: 'guild',
           channel: 'bookings',
@@ -295,7 +307,10 @@ export async function POST(req: NextRequest) {
           platform_fee_pct: '20',
           session_id: session.id,
           app: 'the-guild',
+          tenant_slug: tenant.slug,
           test_mode: testModePenny ? 'true' : 'false',
+          parent_id: user.id,
+          booking_lines: bookingLines,
         };
 
         const stripeSession = await stripe.checkout.sessions.create({

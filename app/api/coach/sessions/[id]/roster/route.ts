@@ -60,7 +60,7 @@ export async function GET(
 
     const { data: sessionData, error } = await admin
       .from('sessions')
-      .select('id, session_participants(id, amount_paid, youth_wrestler_id)')
+      .select('id, session_participants(id, amount_paid, paid, youth_wrestler_id)')
       .eq('id', sessionId)
       .maybeSingle();
 
@@ -107,7 +107,8 @@ export async function GET(
         wrestlerName: name,
         photoUrl: wrestler?.photo_url || null,
         parentEmail: null,
-        paid: Number(p.amount_paid ?? 0) > 0,
+        /** List price / expected amount may be set before Stripe settles; only `paid` means money collected. */
+        paid: p.paid === true,
         amountPaid: Number(p.amount_paid ?? 0),
         isDropIn: youthId === null,
         createdAt: '',

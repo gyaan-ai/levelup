@@ -142,6 +142,7 @@ export function BookingCard({
     id: string;
     wrestlerName: string;
     amountPaid: number;
+    paid: boolean;
   } | null>(null);
   const [transferTargetSessionId, setTransferTargetSessionId] = useState('');
   const [transferLoading, setTransferLoading] = useState(false);
@@ -702,6 +703,7 @@ export function BookingCard({
                                 id: p.id,
                                 wrestlerName: p.wrestlerName,
                                 amountPaid: p.amountPaid,
+                                paid: p.paid,
                               })
                             }
                           >
@@ -716,7 +718,9 @@ export function BookingCard({
                 {transferringParticipant && (
                   <div className="mt-4 p-4 rounded-lg border border-border bg-muted/30">
                     <div className="font-medium mb-2">
-                      Transfer {transferringParticipant.wrestlerName} (${transferringParticipant.amountPaid} paid)
+                      Transfer {transferringParticipant.wrestlerName} ($
+                      {Number(transferringParticipant.amountPaid || 0).toFixed(2)}{' '}
+                      {transferringParticipant.paid ? 'paid' : 'due — payment not completed yet'})
                     </div>
                     <div className="space-y-2">
                       <Label htmlFor="coach-transfer-target">Move to session</Label>

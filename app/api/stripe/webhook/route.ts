@@ -412,7 +412,183 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ received: true });
       }
 
-      /* --- Private / booking checkout (metadata.register is NOT set) --- */
+      /* --- Private booking checkout: roster rows only after payment (booking_lines metadata) --- */
+      const bookingLinesRaw = session.metadata?.booking_lines?.trim();
+      const isDeferredPrivateBooking =
+        session.metadata?.channel === 'bookings' && Boolean(bookingLinesRaw);
+
+      if (isDeferredPrivateBooking) {
+        const parentIdBooking = session.metadata?.parent_id;
+        if (!parentIdBooking) {
+          console.error('Stripe webhook: booking_lines but missing parent_id', session.metadata);
+          return NextResponse.json({ error: 'Missing parent_id for booking checkout' }, { status: 500 });
+        }
+
+        const lineRows = (bookingLinesRaw as string)
+          .split(';')
+          .filter(Boolean)
+          .map((seg) => {
+            const [ywid, priceStr] = seg.split('|');
+            return {
+              ywid: ywid?.trim() ?? '',
+              amountPaid: parseFloat(priceStr || '0'),
+            };
+          })
+          .filter((r) => r.ywid);
+
+        if (lineRows.length === 0) {
+          console.error('Stripe webhook: empty booking_lines', session.metadata);
+          return NextResponse.json({ error: 'Invalid booking_lines' }, { status: 500 });
+        }
+
+        const stripeFeeTotal = paymentIntentId ? await getStripeFee(stripe, paymentIntentId) : 0;
+        const totalLineAmount = lineRows.reduce((s, r) => s + r.amountPaid, 0);
+
+        const { data: sessBefore } = await supabase
+          .from('sessions')
+          .select('current_participants, athlete_id, scheduled_datetime')
+          .eq('id', sessionId)
+          .single();
+        let currentCount =
+          (sessBefore as { current_participants?: number } | null)?.current_participants ?? 0;
+
+        for (const { ywid, amountPaid } of lineRows) {
+          const lineFee = totalLineAmount > 0 ? (amountPaid / totalLineAmount) * stripeFeeTotal : 0;
+          const { data: existing } = await supabase
+            .from('session_participants')
+            .select('id, paid')
+            .eq('session_id', sessionId)
+            .eq('youth_wrestler_id', ywid)
+            .maybeSingle();
+
+          if (!existing) {
+            const { data: ywSnap } = await supabase
+              .from('youth_wrestlers')
+              .select('first_name, last_name, photo_url')
+              .eq('id', ywid)
+              .maybeSingle();
+            const { error: insertErr } = await supabase.from('session_participants').insert({
+              session_id: sessionId,
+              youth_wrestler_id: ywid,
+              parent_id: parentIdBooking,
+              paid: true,
+              amount_paid: amountPaid,
+              stripe_payment_intent_id: paymentIntentId,
+              stripe_fee: lineFee,
+            });
+            if (insertErr) {
+              if (insertErr.code === '23505') {
+                await supabase
+                  .from('session_participants')
+                  .update({
+                    paid: true,
+                    amount_paid: amountPaid,
+                    stripe_payment_intent_id: paymentIntentId,
+                    stripe_fee: lineFee,
+                  })
+                  .eq('session_id', sessionId)
+                  .eq('youth_wrestler_id', ywid);
+              } else {
+                console.error('Webhook: booking_lines insert failed', insertErr, { sessionId, ywid });
+                return NextResponse.json(
+                  { error: 'Failed to add booking participants', message: insertErr.message },
+                  { status: 500 }
+                );
+              }
+            } else {
+              currentCount += 1;
+              await supabase
+                .from('sessions')
+                .update({ current_participants: currentCount, updated_at: new Date().toISOString() })
+                .eq('id', sessionId);
+              await maybeBackfillRosterSnapshot(
+                supabase,
+                { session_id: sessionId, youth_wrestler_id: ywid },
+                ywSnap ?? {}
+              );
+              const coachId = (sessBefore as { athlete_id?: string } | null)?.athlete_id;
+              const dt = (sessBefore as { scheduled_datetime?: string } | null)?.scheduled_datetime;
+              if (coachId) {
+                const dateStr = dt ? formatEST(new Date(dt), 'EEE MMM d, h:mm a') : 'your session';
+                await createNotification(supabase, {
+                  user_id: coachId,
+                  type: 'session_booked',
+                  title: 'New booking',
+                  body: `Someone booked ${dateStr}. Check My sessions.`,
+                  data: { session_id: sessionId },
+                }).catch((e) => console.warn('Webhook: coach notification failed', e));
+                await notifyCoachAndAdminsNewBooking(supabase, coachId, dateStr, sessionId, {
+                  parentId: parentIdBooking,
+                  youthWrestlerId: ywid,
+                }).catch(() => {});
+              }
+            }
+          } else {
+            const wasPaid = (existing as { paid?: boolean }).paid === true;
+            await supabase
+              .from('session_participants')
+              .update({
+                paid: true,
+                amount_paid: amountPaid,
+                stripe_payment_intent_id: paymentIntentId,
+                stripe_fee: lineFee,
+              })
+              .eq('session_id', sessionId)
+              .eq('youth_wrestler_id', ywid);
+            const { data: ywExisting } = await supabase
+              .from('youth_wrestlers')
+              .select('first_name, last_name, photo_url')
+              .eq('id', ywid)
+              .maybeSingle();
+            await maybeBackfillRosterSnapshot(
+              supabase,
+              { session_id: sessionId, youth_wrestler_id: ywid },
+              ywExisting ?? {}
+            );
+            if (!wasPaid) {
+              const coachId = (sessBefore as { athlete_id?: string } | null)?.athlete_id;
+              const dt = (sessBefore as { scheduled_datetime?: string } | null)?.scheduled_datetime;
+              if (coachId) {
+                const dateStr = dt ? formatEST(new Date(dt), 'EEE MMM d, h:mm a') : 'your session';
+                await createNotification(supabase, {
+                  user_id: coachId,
+                  type: 'session_booked',
+                  title: 'New booking',
+                  body: `Someone booked ${dateStr}. Check My sessions.`,
+                  data: { session_id: sessionId },
+                }).catch((e) => console.warn('Webhook: coach notification failed', e));
+                await notifyCoachAndAdminsNewBooking(supabase, coachId, dateStr, sessionId, {
+                  parentId: parentIdBooking,
+                  youthWrestlerId: ywid,
+                }).catch(() => {});
+              }
+            }
+          }
+        }
+
+        const { error: sessionFinalizeError } = await supabase
+          .from('sessions')
+          .update({
+            status: 'scheduled',
+            athlete_paid: !isFreeOrder,
+            ...(paymentIntentId && { stripe_payment_intent_id: paymentIntentId }),
+          })
+          .eq('id', sessionId);
+
+        if (sessionFinalizeError) {
+          console.error(
+            'Webhook: failed to finalize deferred booking session',
+            sessionId,
+            sessionFinalizeError
+          );
+          return NextResponse.json({ error: 'Failed to update session' }, { status: 500 });
+        }
+
+        await maybeBackfillUserNameFromCheckoutSession(supabase, parentIdBooking, session);
+        return NextResponse.json({ received: true });
+      }
+
+      /* --- Legacy private checkout (participants pre-created before payment) --- */
       const { error: updateError } = await supabase
         .from('sessions')
         .update({

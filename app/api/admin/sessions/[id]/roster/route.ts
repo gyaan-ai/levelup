@@ -25,7 +25,7 @@ export async function GET(
     const res1 = await admin
       .from('sessions')
       .select(
-        'id, session_participants(id, amount_paid, youth_wrestler_id, stripe_payment_intent_id)'
+        'id, session_participants(id, amount_paid, paid, youth_wrestler_id, stripe_payment_intent_id)'
       )
       .eq('id', sessionId)
       .maybeSingle();
@@ -35,7 +35,7 @@ export async function GET(
     if (error && (error.message ?? '').includes('stripe_payment_intent_id')) {
       const res2 = await admin
         .from('sessions')
-        .select('id, session_participants(id, amount_paid, youth_wrestler_id)')
+        .select('id, session_participants(id, amount_paid, paid, youth_wrestler_id)')
         .eq('id', sessionId)
         .maybeSingle();
       sessionData = res2.data as Record<string, unknown> | null;
@@ -89,7 +89,7 @@ export async function GET(
         wrestlerName: name,
         photoUrl: wrestler?.photo_url || null,
         parentEmail: null,
-        paid: Number(p.amount_paid ?? 0) > 0,
+        paid: p.paid === true,
         amountPaid: Number(p.amount_paid ?? 0),
         isDropIn: youthId === null,
         canDelete,
