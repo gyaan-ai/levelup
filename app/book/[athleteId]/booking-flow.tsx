@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import useSWR from 'swr';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Calendar } from '@/components/ui/calendar';
 import Link from 'next/link';
-import { User, Clock, CheckCircle, Link2, Users, UserCircle } from 'lucide-react';
+import { User, Clock, CheckCircle, Link2, Users, UserCircle, Wallet, Sparkles } from 'lucide-react';
 import { BackLink } from '@/components/back-link';
 import { SchoolLogo } from '@/components/school-logo';
 import { CoachSessionBadge } from '@/components/coach-session-badge';
@@ -22,6 +23,9 @@ import type { SessionMode } from '@/types';
 import { getSessionPrice } from '@/lib/sessions';
 import { COACH_REVENUE_FRACTION } from '@/lib/pricing';
 import { formatSlotDisplay, getDayOfWeek } from '@/lib/availability';
+import { Switch } from '@/components/ui/switch';
+
+const creditsFetcher = (url: string) => fetch(url).then((r) => r.json());
 
 /** 8am–9pm fallback when coach has no availability */
 const TIME_SLOTS_24H = [
@@ -127,18 +131,17 @@ export function BookingFlow({
   const [availabilityDates, setAvailabilityDates] = useState<Set<string>>(new Set());
   const [slots, setSlots] = useState<string[]>([]);
   const [promoCode, setPromoCode] = useState('');
-  const [applyingPromo, setApplyingPromo] = useState(false);
-  const [promoMessage, setPromoMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [promoApplying, setPromoApplying] = useState(false);
+  const [promoFeedback, setPromoFeedback] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [percentOff, setPercentOff] = useState<number | null>(null);
-  const [bookingPromoCode, setBookingPromoCode] = useState('');
+  /** Session-only checkout: validated code + percent (sent on POST /api/bookings). */
   const [bookingPromoApplied, setBookingPromoApplied] = useState(false);
   const [bookingPromoPercent, setBookingPromoPercent] = useState<number | null>(null);
-  const [bookingPromoLoading, setBookingPromoLoading] = useState(false);
-  const [bookingPromoError, setBookingPromoError] = useState<string | null>(null);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [freeEntitlements, setFreeEntitlements] = useState({ free1on1: 0, free2Athlete: 0 });
   const [initialSlotSeeded, setInitialSlotSeeded] = useState(false);
+  const [useCredits, setUseCredits] = useState(true);
 
   const sessionMode: SessionMode | null =
     sessionChoice === '1-on-1' ? 'private'
@@ -219,6 +222,12 @@ export function BookingFlow({
   const willUseFreeSession =
     (sessionChoice === '1-on-1' && freeEntitlements.free1on1 > 0) ||
     ((sessionChoice === 'partner' || sessionChoice === 'sibling') && freeEntitlements.free2Athlete > 0);
+
+  const { data: creditsData } = useSWR('/api/credits', creditsFetcher);
+  const creditBalance = typeof creditsData?.balance === 'number' ? creditsData.balance : 0;
+  const creditsToApplyBooking =
+    useCredits && !willUseFreeSession ? Math.min(creditBalance, displayPrice) : 0;
+  const amountAfterCredits = Math.max(0, displayPrice - creditsToApplyBooking);
 
   useEffect(() => {
     if (youthWrestlers.length === 1) {
@@ -362,31 +371,6 @@ export function BookingFlow({
     (currentStep === 2 && sessionChoice && (!isPartner || partnerOption)) ||
     (currentStep === 3 && !!selectedDate && !!selectedTime);
 
-  const handleBookingApplyPromo = async () => {
-    const t = bookingPromoCode.trim();
-    if (!t) return;
-    setBookingPromoLoading(true);
-    setBookingPromoError(null);
-    try {
-      const res = await fetch('/api/checkout/validate-promo-code', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: t.toUpperCase() }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        setBookingPromoError(data.error || 'Invalid code');
-        return;
-      }
-      setBookingPromoPercent(data.percent_off);
-      setBookingPromoApplied(true);
-    } catch {
-      setBookingPromoError('Could not validate code');
-    } finally {
-      setBookingPromoLoading(false);
-    }
-  };
-
   const refreshPercentDiscount = async () => {
     const pctRes = await fetch('/api/account/percentage-discount');
     if (!pctRes.ok) return;
@@ -395,29 +379,49 @@ export function BookingFlow({
     setPercentOff(n != null && n >= 1 && n <= 100 ? n : null);
   };
 
+  /** One field: redeem to account (saved %) or validate for this booking only, depending on tenant flag. */
   const handleApplyPromo = async () => {
     const trimmed = promoCode.trim();
     if (!trimmed) return;
-    setApplyingPromo(true);
-    setPromoMessage(null);
+    setPromoApplying(true);
+    setPromoFeedback(null);
     try {
-      const res = await fetch('/api/redeem-discount-code', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: trimmed }),
-      });
-      const data = await res.json();
-      if (!res.ok && !data.alreadyUsed) {
-        setPromoMessage({ type: 'error', text: data.error || 'Could not apply code' });
-        return;
+      if (checkoutUsesSavedAccountDiscount) {
+        const res = await fetch('/api/redeem-discount-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: trimmed }),
+        });
+        const data = await res.json();
+        if (!res.ok && !data.alreadyUsed) {
+          setPromoFeedback({ type: 'error', text: data.error || 'Could not apply code' });
+          return;
+        }
+        await refreshPercentDiscount();
+        setPromoFeedback({ type: 'success', text: data.message || 'Code applied to your account.' });
+        setPromoCode('');
+      } else {
+        const res = await fetch('/api/checkout/validate-promo-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: trimmed.toUpperCase() }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          setPromoFeedback({ type: 'error', text: data.error || 'Invalid code' });
+          return;
+        }
+        setBookingPromoPercent(data.percent_off);
+        setBookingPromoApplied(true);
+        setPromoFeedback({
+          type: 'success',
+          text: `${data.percent_off}% off applied for this booking.`,
+        });
       }
-      await refreshPercentDiscount();
-      setPromoMessage({ type: 'success', text: data.message || 'Code applied.' });
-      setPromoCode('');
     } catch {
-      setPromoMessage({ type: 'error', text: 'Could not apply code. Try again.' });
+      setPromoFeedback({ type: 'error', text: 'Could not apply code. Try again.' });
     } finally {
-      setApplyingPromo(false);
+      setPromoApplying(false);
     }
   };
 
@@ -429,7 +433,7 @@ export function BookingFlow({
     if (
       !checkoutUsesSavedAccountDiscount &&
       !willUseFreeSession &&
-      bookingPromoCode.trim() &&
+      promoCode.trim() &&
       !bookingPromoApplied
     ) {
       alert('Click Apply to confirm your promo code before paying, or clear the promo field.');
@@ -454,9 +458,10 @@ export function BookingFlow({
           pricePerParticipant: pricePerParticipant ?? undefined,
           productId: selectedProduct?.id ?? undefined,
           promoCode:
-            !checkoutUsesSavedAccountDiscount && bookingPromoApplied && bookingPromoCode.trim()
-              ? bookingPromoCode.trim().toUpperCase()
+            !checkoutUsesSavedAccountDiscount && bookingPromoApplied && promoCode.trim()
+              ? promoCode.trim().toUpperCase()
               : undefined,
+          useCredits,
         }),
       });
       const data = await res.json();
@@ -863,44 +868,103 @@ export function BookingFlow({
                     {facility.address && <p className="text-sm text-muted-foreground">{facility.address}</p>}
                   </div>
                 )}
-                {!checkoutUsesSavedAccountDiscount && !willUseFreeSession && (
-                  <div className="space-y-2 pt-2">
-                    <Label htmlFor="booking-promo">Promo code (discount only if you Apply a valid code)</Label>
-                    <div className="flex gap-2 flex-wrap">
-                      <Input
-                        id="booking-promo"
-                        className="max-w-xs uppercase"
-                        placeholder="Enter code"
-                        value={bookingPromoCode}
-                        onChange={(e) => {
-                          setBookingPromoCode(e.target.value.toUpperCase());
-                          setBookingPromoApplied(false);
-                          setBookingPromoPercent(null);
-                          setBookingPromoError(null);
-                        }}
-                        autoComplete="off"
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={handleBookingApplyPromo}
-                        disabled={bookingPromoLoading || !bookingPromoCode.trim()}
-                      >
-                        {bookingPromoLoading ? '…' : 'Apply'}
-                      </Button>
+                {!willUseFreeSession &&
+                  (!checkoutUsesSavedAccountDiscount || !hasPercentDiscount) && (
+                    <div className="space-y-2 rounded-lg border p-4">
+                      <Label htmlFor="booking-promo">Promo code</Label>
+                      <p className="text-sm text-muted-foreground">
+                        {checkoutUsesSavedAccountDiscount
+                          ? 'Redeem a valid code to save a discount on your account. Apply before you pay — Stripe checkout does not include a promo field.'
+                          : 'Apply a valid code before you pay. Stripe checkout does not include a promo field.'}
+                      </p>
+                      <div className="flex gap-2 flex-wrap">
+                        <Input
+                          id="booking-promo"
+                          className="max-w-xs uppercase"
+                          placeholder="Enter code"
+                          value={promoCode}
+                          onChange={(e) => {
+                            const v = e.target.value.toUpperCase();
+                            setPromoCode(v);
+                            setPromoFeedback(null);
+                            if (!checkoutUsesSavedAccountDiscount) {
+                              setBookingPromoApplied(false);
+                              setBookingPromoPercent(null);
+                            }
+                          }}
+                          autoComplete="off"
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => void handleApplyPromo()}
+                          disabled={promoApplying || !promoCode.trim()}
+                        >
+                          {promoApplying ? 'Applying…' : 'Apply'}
+                        </Button>
+                      </div>
+                      {promoFeedback && (
+                        <p
+                          className={
+                            promoFeedback.type === 'success'
+                              ? 'text-sm text-green-600 dark:text-green-400'
+                              : 'text-sm text-destructive'
+                          }
+                        >
+                          {promoFeedback.text}
+                        </p>
+                      )}
                     </div>
-                    {bookingPromoError && (
-                      <p className="text-sm text-destructive">{bookingPromoError}</p>
+                  )}
+                {!willUseFreeSession && creditBalance > 0 && (
+                  <div className="space-y-2 rounded-lg border border-[#D4AF37]/25 bg-[#D4AF37]/5 p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#D4AF37]/20">
+                          <Wallet className="h-5 w-5 text-[#D4AF37]" />
+                        </div>
+                        <div>
+                          <p className="font-medium text-foreground">Apply earned credits</p>
+                          <p className="text-sm text-muted-foreground">
+                            ${creditBalance.toFixed(2)} available — applies automatically up to this booking&apos;s total
+                            (same as cart checkout).
+                          </p>
+                        </div>
+                      </div>
+                      <Switch
+                        checked={useCredits}
+                        onCheckedChange={setUseCredits}
+                        className="data-[state=checked]:bg-[#D4AF37]"
+                      />
+                    </div>
+                    {useCredits && creditsToApplyBooking > 0 && (
+                      <div className="flex items-center gap-2 border-t border-[#D4AF37]/20 pt-3 text-[#D4AF37]">
+                        <Sparkles className="h-4 w-4" />
+                        <span className="text-sm font-medium">
+                          -${creditsToApplyBooking.toFixed(2)} from your wallet
+                        </span>
+                      </div>
                     )}
                   </div>
                 )}
                 <div className="pt-4 border-t flex justify-between items-center">
                   <span className="font-semibold">Price</span>
                   <span className="text-2xl font-bold">
-                    {willUseFreeSession ? <span className="text-accent">Free (early adopter)</span> : hasPercentDiscount ? (
-                      <span>{effectivePercentOff}% off: ${displayPrice.toFixed(2)}</span>
+                    {willUseFreeSession ? (
+                      <span className="text-accent">Free (early adopter)</span>
+                    ) : hasPercentDiscount ? (
+                      <span>
+                        {effectivePercentOff}% off · you pay ${amountAfterCredits.toFixed(2)}
+                      </span>
+                    ) : creditsToApplyBooking > 0 ? (
+                      <span>
+                        <span className="text-lg font-normal text-muted-foreground line-through mr-2">
+                          ${displayPrice.toFixed(2)}
+                        </span>
+                        ${amountAfterCredits.toFixed(2)}
+                      </span>
                     ) : (
-                      `$${totalPrice.toFixed(2)}`
+                      `$${displayPrice.toFixed(2)}`
                     )}
                   </span>
                 </div>
@@ -911,41 +975,11 @@ export function BookingFlow({
                 )}
                 {hasPercentDiscount && !willUseFreeSession && (
                   <p className="text-sm text-muted-foreground">
-                    {effectivePercentOff}% discount applied. You&apos;ll pay ${displayPrice.toFixed(2)}.
+                    {effectivePercentOff}% discount applied.
+                    {creditsToApplyBooking > 0
+                      ? ` Credits cover $${creditsToApplyBooking.toFixed(2)}; you pay $${amountAfterCredits.toFixed(2)}.`
+                      : ` You'll pay $${displayPrice.toFixed(2)}.`}
                   </p>
-                )}
-                {!willUseFreeSession && !hasPercentDiscount && (
-                  <div className="space-y-2 rounded-lg border p-4">
-                    <p className="text-sm font-medium">Promo code</p>
-                    <p className="text-sm text-muted-foreground">
-                      Apply your code here before checkout. Stripe won&apos;t show a promo code field.
-                    </p>
-                    <div className="flex gap-2">
-                      <Input
-                        value={promoCode}
-                        onChange={(e) => {
-                          setPromoCode(e.target.value.toUpperCase());
-                          setPromoMessage(null);
-                        }}
-                        placeholder="Enter code"
-                        autoComplete="off"
-                        className="uppercase"
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={handleApplyPromo}
-                        disabled={!promoCode.trim() || applyingPromo}
-                      >
-                        {applyingPromo ? 'Applying…' : 'Apply'}
-                      </Button>
-                    </div>
-                    {promoMessage && (
-                      <p className={promoMessage.type === 'success' ? 'text-sm text-green-600 dark:text-green-400' : 'text-sm text-destructive'}>
-                        {promoMessage.text}
-                      </p>
-                    )}
-                  </div>
                 )}
                 {(sessionMode === 'partner-invite' || sessionMode === 'partner-open') && !willUseFreeSession && (
                   <p className="text-sm text-muted-foreground">
@@ -955,7 +989,11 @@ export function BookingFlow({
                 <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mt-4">
                   <Button variant="outline" onClick={handleBack} className="flex-1 w-full sm:w-auto">Back</Button>
                   <Button onClick={handlePay} disabled={loading} className="flex-1 w-full sm:w-auto">
-                    {loading ? 'Booking…' : willUseFreeSession ? 'Confirm booking (free)' : hasPercentDiscount ? `Book Session ($${displayPrice.toFixed(2)})` : `Book Session ($${totalPrice.toFixed(2)})`}
+                    {loading
+                      ? 'Booking…'
+                      : willUseFreeSession
+                        ? 'Confirm booking (free)'
+                        : `Book Session ($${amountAfterCredits.toFixed(2)})`}
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground text-center">

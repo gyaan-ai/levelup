@@ -17,6 +17,7 @@ import { isPennyTestPricingEnabled } from '@/lib/penny-test-pricing';
 import { resolveCoachPayoutRate } from '@/lib/coach-session-payout';
 import { notifyCoachAndAdminsNewBooking } from '@/lib/twilio';
 import { COACH_SESSION_OVERLAP_ERROR, findCoachSessionTimeOverlap } from '@/lib/coach-session-overlap';
+import { applyCredits, getUserCreditBalance } from '@/lib/credits';
 
 export async function POST(req: NextRequest) {
   try {
@@ -55,6 +56,8 @@ export async function POST(req: NextRequest) {
       pricePerParticipant?: number;
       productId?: string;
       promoCode?: string;
+      /** When false, do not apply wallet credits. Default true. */
+      useCredits?: boolean;
     };
     const {
       athleteId,
@@ -68,6 +71,7 @@ export async function POST(req: NextRequest) {
       pricePerParticipant,
       productId,
       promoCode,
+      useCredits,
     } = body;
 
     if (!athleteId || !youthWrestlerIds?.length || !scheduledDate || !scheduledTime || totalPrice == null) {
@@ -150,7 +154,12 @@ export async function POST(req: NextRequest) {
       coach_payout_rate: coachCheck.coach.payout_rate ?? null,
     });
     const basePrice = testModePenny ? 0.50 : priceAfterPct;
-    const stripeChargeAmount = basePrice;
+    const applyWalletCredits = useCredits !== false;
+    const creditBalance = applyWalletCredits && basePrice > 0
+      ? await getUserCreditBalance(user.id, tenant.slug)
+      : 0;
+    const creditsToUse = applyWalletCredits ? Math.min(creditBalance, basePrice) : 0;
+    const amountToPay = Math.max(0, basePrice - creditsToUse);
     const orgFee = 0;
     const stripeFee = 0;
 
@@ -203,8 +212,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Could not verify schedule availability' }, { status: 500 });
     }
 
-    const useStripeCheckout =
-      process.env.STRIPE_CHECKOUT_ENABLED === 'true' && stripeChargeAmount >= 0.5;
+    const useDeferredStripe =
+      process.env.STRIPE_CHECKOUT_ENABLED === 'true' && amountToPay >= 0.5;
+    const paidWithCreditsOnly =
+      !useDeferredStripe && basePrice > 0 && amountToPay <= 0 && creditsToUse > 0;
 
     const { data: session, error: sessionError } = await supabase
       .from('sessions')
@@ -219,8 +230,8 @@ export async function POST(req: NextRequest) {
         join_policy,
         partner_invite_code: partner_invite_code ?? undefined,
         max_participants: maxParticipants,
-        /** Roster + capacity apply only after payment; Stripe path fills rows in webhook */
-        current_participants: useStripeCheckout ? 0 : numParticipants,
+        /** Roster + capacity apply only after payment; deferred Stripe / full-credit paths fill later */
+        current_participants: useDeferredStripe || paidWithCreditsOnly ? 0 : numParticipants,
         base_price: basePrice,
         price_per_participant: testModePenny ? 0.50 : (pricePerParticipant ?? undefined),
         scheduled_datetime: scheduledDatetime,
@@ -245,7 +256,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Failed to create session' }, { status: 500 });
     }
 
-    if (!useStripeCheckout) {
+    if (!useDeferredStripe && !paidWithCreditsOnly) {
       try {
         await createNotification(admin, {
           user_id: athleteIdNorm,
@@ -275,14 +286,65 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Paid entirely with wallet credit (no card)
+    if (paidWithCreditsOnly) {
+      await applyCredits({
+        userId: user.id,
+        amount: creditsToUse,
+        sessionId: session.id,
+        description: 'Book-a-coach session',
+        tenantSlug: tenant.slug,
+      });
+      const partAmt = testModePenny
+        ? 0.5 / numParticipants
+        : pricePerParticipant ?? totalPrice / numParticipants;
+      for (const ywId of youthWrestlerIdsNorm) {
+        const ywRow = ywPhoneRows?.find((r) => r.id === ywId);
+        const { error: insErr } = await admin.from('session_participants').insert({
+          session_id: session.id,
+          youth_wrestler_id: ywId,
+          parent_id: user.id,
+          paid: true,
+          amount_paid: partAmt,
+          payment_method: 'credit',
+          status: 'confirmed',
+        });
+        if (insErr) {
+          console.error('[bookings] full-credit participant insert', insErr);
+          await admin.from('sessions').delete().eq('id', session.id);
+          return NextResponse.json({ error: 'Failed to complete credit booking' }, { status: 500 });
+        }
+        await maybeBackfillRosterSnapshot(admin, { session_id: session.id, youth_wrestler_id: ywId }, ywRow ?? {});
+      }
+      await admin
+        .from('sessions')
+        .update({
+          status: 'scheduled',
+          athlete_paid: true,
+          current_participants: numParticipants,
+          paid_with_credit: true,
+        })
+        .eq('id', session.id);
+      const dateStrCredit = formatEST(new Date(scheduledDatetime), 'EEE MMM d, h:mm a');
+      await notifyCoachAndAdminsNewBooking(admin, athleteIdNorm, dateStrCredit, session.id, {
+        parentId: user.id,
+        youthWrestlerId: youthWrestlerIdsNorm[0] ?? null,
+      }).catch(() => {});
+
+      return NextResponse.json({
+        sessionId: session.id,
+        partnerInviteCode: session.partner_invite_code ?? undefined,
+        sessionMode: session.session_mode,
+      });
+    }
+
     // Stripe Checkout: enable by setting STRIPE_CHECKOUT_ENABLED=true (and keys + webhook).
-    // When disabled, booking creates session as pending_payment and we redirect to confirmed without payment.
     let checkoutUrl: string | undefined;
     console.log('[Bookings API] STRIPE_CHECKOUT_ENABLED:', process.env.STRIPE_CHECKOUT_ENABLED);
-    console.log('[Bookings API] Charge amount:', stripeChargeAmount);
+    console.log('[Bookings API] Amount due after credits:', amountToPay, 'credits:', creditsToUse);
     console.log('[Bookings API] Tenant slug:', tenant.slug);
 
-    if (useStripeCheckout) {
+    if (useDeferredStripe) {
       try {
         console.log('[Bookings API] Attempting to create Stripe checkout session...');
         const stripe = getStripeInstance(tenant.slug);
@@ -290,8 +352,8 @@ export async function POST(req: NextRequest) {
         const successParams = new URLSearchParams({ sessionId: session.id });
         if (session.partner_invite_code) successParams.set('code', session.partner_invite_code);
         if (session.session_mode) successParams.set('mode', session.session_mode);
-        
-        const amountCents = Math.round(stripeChargeAmount * 100);
+
+        const amountCents = Math.round(amountToPay * 100);
         const perWrestlerAmount = testModePenny
           ? 0.5 / numParticipants
           : pricePerParticipant ?? totalPrice / numParticipants;
@@ -311,6 +373,7 @@ export async function POST(req: NextRequest) {
           test_mode: testModePenny ? 'true' : 'false',
           parent_id: user.id,
           booking_lines: bookingLines,
+          ...(creditsToUse > 0 && { credits_to_use: creditsToUse.toFixed(2) }),
         };
 
         const stripeSession = await stripe.checkout.sessions.create({
@@ -341,11 +404,20 @@ export async function POST(req: NextRequest) {
         console.error('[Bookings API] Stripe Checkout ERROR:', stripeErr);
         console.error('[Bookings API] Error details:', JSON.stringify(stripeErr, null, 2));
       }
-    } else if (stripeChargeAmount < 0.50 && stripeChargeAmount > 0) {
-      // Amount below Stripe minimum; confirm session without payment
+    } else if (amountToPay < 0.5 && amountToPay > 0) {
+      // Below Stripe minimum; confirm without card (credits may cover part of basePrice)
+      if (creditsToUse > 0) {
+        await applyCredits({
+          userId: user.id,
+          amount: creditsToUse,
+          sessionId: session.id,
+          description: 'Book-a-coach session (sub-minimum card)',
+          tenantSlug: tenant.slug,
+        });
+      }
       await admin
         .from('sessions')
-        .update({ status: 'scheduled', athlete_paid: true })
+        .update({ status: 'scheduled', athlete_paid: true, paid_with_credit: creditsToUse > 0 })
         .eq('id', session.id);
       await admin
         .from('session_participants')

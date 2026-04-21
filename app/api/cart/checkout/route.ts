@@ -69,6 +69,8 @@ export async function POST(req: NextRequest) {
       sessionIds?: string[];
       wrestlerId?: string;
       promoCode?: string;
+      /** When false, do not apply wallet credits (card pays full discounted total). Default true. */
+      useCredits?: boolean;
     };
 
     let lines: CartLine[] = [];
@@ -269,8 +271,9 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const creditBalance = await getUserCreditBalance(user.id, tenant.slug);
-    const creditsToUse = Math.min(creditBalance, totalPrice);
+    const applyWalletCredits = body.useCredits !== false;
+    const creditBalance = applyWalletCredits ? await getUserCreditBalance(user.id, tenant.slug) : 0;
+    const creditsToUse = applyWalletCredits ? Math.min(creditBalance, totalPrice) : 0;
     const amountToPay = totalPrice - creditsToUse;
 
     const cartLinesMeta = sessionMetadata

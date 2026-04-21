@@ -1,13 +1,13 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import useSWR from 'swr';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { ShoppingCart, X, CreditCard, Loader2, Wallet, Tag, Check, AlertCircle } from 'lucide-react';
+import { ShoppingCart, X, CreditCard, Loader2, Wallet, Tag, Check, AlertCircle, Sparkles } from 'lucide-react';
 import { BackLink } from '@/components/back-link';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -15,6 +15,7 @@ import { useCart } from '@/lib/cart-context';
 import { formatEST } from '@/lib/format-date';
 import { getSessionTypeDisplay } from '@/lib/session-type-display';
 import { useAutoAssignSoloWrestler } from '@/lib/hooks/use-auto-assign-solo-wrestler';
+import { Switch } from '@/components/ui/switch';
 
 const fetcher = (url: string) => fetch(url).then(r => r.json());
 
@@ -53,8 +54,19 @@ export function CartCheckoutClient({
   const [promoError, setPromoError] = useState<string | null>(null);
   const [appliedDiscount, setAppliedDiscount] = useState<number>(existingDiscount ?? 0);
   const [promoApplied, setPromoApplied] = useState((existingDiscount ?? 0) > 0);
+  const [useCredits, setUseCredits] = useState(true);
 
   const allLinesHaveWrestler = items.length > 0 && items.every((i) => Boolean(i.athlete_id));
+
+  useEffect(() => {
+    try {
+      const v = sessionStorage.getItem('cart_use_credits');
+      if (v === '0') setUseCredits(false);
+      if (v === '1') setUseCredits(true);
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   // Fetch credit balance
   const { data: creditsData } = useSWR('/api/credits', fetcher);
@@ -63,7 +75,7 @@ export function CartCheckoutClient({
   // Calculate totals with discount
   const discountAmount = appliedDiscount > 0 ? total * (appliedDiscount / 100) : 0;
   const subtotalAfterDiscount = total - discountAmount;
-  const creditsToApply = Math.min(creditBalance, subtotalAfterDiscount);
+  const creditsToApply = useCredits ? Math.min(creditBalance, subtotalAfterDiscount) : 0;
   const amountToPay = subtotalAfterDiscount - creditsToApply;
   
   const handleApplyPromo = async () => {
@@ -141,7 +153,7 @@ export function CartCheckoutClient({
       const res = await fetch('/api/cart/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lines, promoCode: promoPayload }),
+        body: JSON.stringify({ lines, promoCode: promoPayload, useCredits }),
       });
 
       const data = await res.json();
@@ -374,12 +386,33 @@ export function CartCheckoutClient({
             )}
             
             {creditBalance > 0 && (
-              <div className="flex items-center justify-between text-accent">
-                <span className="flex items-center gap-1.5">
-                  <Wallet className="h-4 w-4" />
-                  Credit applied
-                </span>
-                <span>-${creditsToApply.toFixed(2)}</span>
+              <div className="space-y-2 rounded-lg border border-accent/20 bg-accent/5 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="flex items-center gap-1.5 text-sm font-medium">
+                    <Wallet className="h-4 w-4 text-accent" />
+                    Apply earned credits
+                  </span>
+                  <Switch
+                    checked={useCredits}
+                    onCheckedChange={(c) => {
+                      setUseCredits(c);
+                      try {
+                        sessionStorage.setItem('cart_use_credits', c ? '1' : '0');
+                      } catch {
+                        /* ignore */
+                      }
+                    }}
+                  />
+                </div>
+                {useCredits && creditsToApply > 0 && (
+                  <div className="flex items-center justify-between text-accent text-sm">
+                    <span className="flex items-center gap-1.5">
+                      <Sparkles className="h-4 w-4" />
+                      Credit applied
+                    </span>
+                    <span>-${creditsToApply.toFixed(2)}</span>
+                  </div>
+                )}
               </div>
             )}
 

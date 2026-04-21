@@ -244,7 +244,14 @@ export default function CartPage() {
               </div>
             </div>
             <Button 
-              onClick={() => router.push('/cart/checkout')}
+              onClick={() => {
+                try {
+                  sessionStorage.setItem('cart_use_credits', useCredits ? '1' : '0');
+                } catch {
+                  /* ignore */
+                }
+                router.push('/cart/checkout');
+              }}
               disabled={!canCheckout}
               className="bg-[#D4AF37] hover:bg-[#C4A030] text-black font-semibold px-8 h-12 text-base gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
             >

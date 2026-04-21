@@ -584,6 +584,18 @@ export async function POST(req: NextRequest) {
           return NextResponse.json({ error: 'Failed to update session' }, { status: 500 });
         }
 
+        const bookingCreditsUsed = parseFloat(String(session.metadata?.credits_to_use || '0'));
+        if (Number.isFinite(bookingCreditsUsed) && bookingCreditsUsed > 0) {
+          const { applyCredits } = await import('@/lib/credits');
+          await applyCredits({
+            userId: parentIdBooking,
+            amount: bookingCreditsUsed,
+            sessionId,
+            description: 'Book-a-coach checkout (credit + card)',
+            tenantSlug,
+          });
+        }
+
         await maybeBackfillUserNameFromCheckoutSession(supabase, parentIdBooking, session);
         return NextResponse.json({ received: true });
       }
