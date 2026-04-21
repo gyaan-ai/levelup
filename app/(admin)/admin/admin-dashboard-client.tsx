@@ -131,6 +131,8 @@ export type AdminSession = {
   focus_area_2?: string | null;
   partner_invite_code?: string | null;
   current_participants: number;
+  /** Roster slots that count toward capacity (excludes unpaid pending checkout rows). */
+  confirmed_booked_count?: number;
   max_participants: number;
   price_per_participant: number;
   parent_id: string;
@@ -158,11 +160,13 @@ export type AdminSession = {
 function sessionPayoutAmountUsd(s: AdminSession): number {
   const stored = Number(s.athlete_payment ?? 0);
   if (stored > 0) return Math.round(stored * 100) / 100;
+  const paidSum = s.participant_amount_paid_sum ?? 0;
+  if (s.status === 'pending_payment' && paidSum <= 0) return 0;
   return coachPayoutUsd({
     athlete_payment: s.athlete_payment,
     price_per_participant: s.price_per_participant,
     current_participants: s.current_participants,
-    participant_amount_paid_sum: s.participant_amount_paid_sum,
+    participant_amount_paid_sum: paidSum,
     session_payout_rate: s.session_payout_rate ?? null,
     coach_payout_rate: s.coach_payout_rate ?? null,
   });
@@ -905,7 +909,10 @@ export function AdminDashboardClient({
     let capacity = 0;
     let collected = 0;
     for (const s of filteredSessions) {
-      const cur = Number(s.current_participants) || 0;
+      const cur =
+        s.confirmed_booked_count != null
+          ? Number(s.confirmed_booked_count) || 0
+          : Number(s.current_participants) || 0;
       const max = Math.max(1, Number(s.max_participants) || 1);
       booked += cur;
       capacity += max;

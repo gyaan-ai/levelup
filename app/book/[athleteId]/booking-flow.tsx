@@ -699,7 +699,7 @@ export function BookingFlow({
                     <h4 className="font-semibold">How would you like to find a partner?</h4>
                     {[
                       { id: 'invite' as const, Icon: Link2, title: 'Invite only', desc: 'Share a link with someone you know. Only they can pay & register.', sub: "They'll pay when they use the link." },
-                      { id: 'open' as const, Icon: Users, title: 'Public', desc: 'Anyone can find this session and pay to register.', sub: 'Listed in Find training and Group & partner.' },
+                      { id: 'open' as const, Icon: Users, title: 'Public', desc: 'Anyone can find this session and pay to register.', sub: 'Shows in Find training and Group & partner as a join-in option.' },
                       { id: 'solo' as const, Icon: UserCircle, title: 'Private (train solo)', desc: 'No one else can join. Just you and the coach.', sub: "You'll only pay for your spot." },
                     ].map(({ id, Icon, title, desc, sub }) => (
                       <Card

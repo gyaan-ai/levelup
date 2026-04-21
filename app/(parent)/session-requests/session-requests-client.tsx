@@ -83,8 +83,8 @@ export function SessionRequestsClient({ initialRows }: { initialRows: SessionReq
           <p>No session requests yet.</p>
           <p>
             From a coach profile or booking page, use{' '}
-            <span className="text-foreground font-medium">Request a session</span> when you need a time
-            that isn&apos;t listed.
+            <span className="text-foreground font-medium">Request a session</span> when you need a custom time that
+            isn&apos;t on their calendar.
           </p>
           <Button asChild variant="outline" className="mt-2">
             <Link href="/training">Find training</Link>

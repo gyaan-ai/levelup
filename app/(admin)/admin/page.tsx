@@ -18,17 +18,27 @@ import {
   type YouthSessionSpendLine,
   type RecentSignupRow,
 } from './admin-dashboard-client';
-import { coachPayoutUsd } from '@/lib/coach-session-payout';
+import { coachPayoutUsd, type SessionCoachPayoutFields } from '@/lib/coach-session-payout';
 
-function sessionCoachShareUsd(s: AdminSession): number {
+type SessionWithPayoutStatus = SessionCoachPayoutFields & { status: string };
+
+function coachPayoutUsdUnlessUnpaidPending(
+  s: SessionWithPayoutStatus,
+  participantSum: number
+): number {
+  if (s.status === 'pending_payment' && participantSum <= 0) return 0;
   return coachPayoutUsd({
     athlete_payment: s.athlete_payment,
     price_per_participant: s.price_per_participant,
     current_participants: s.current_participants,
-    participant_amount_paid_sum: s.participant_amount_paid_sum,
+    participant_amount_paid_sum: participantSum,
     session_payout_rate: s.session_payout_rate ?? null,
     coach_payout_rate: s.coach_payout_rate ?? null,
   });
+}
+
+function sessionCoachShareUsd(s: AdminSession): number {
+  return coachPayoutUsdUnlessUnpaidPending(s, s.participant_amount_paid_sum ?? 0);
 }
 
 function roundRatingAvg(sum: number, count: number): number {
@@ -110,7 +120,7 @@ export default async function AdminPage() {
         session_payout_rate,
         athletes(id, first_name, last_name, school, venmo_handle, zelle_email, payout_rate),
         facilities(id, name),
-        session_participants(id, amount_paid, youth_wrestler_id, stripe_fee)
+        session_participants(id, amount_paid, paid, youth_wrestler_id, stripe_fee)
       `)
       .order('scheduled_datetime', { ascending: false })
       .limit(10000),
@@ -215,11 +225,13 @@ export default async function AdminPage() {
     session_participants?: Array<{
       id?: string;
       amount_paid?: number | null;
+      paid?: boolean | null;
       youth_wrestler_id?: string | null;
       stripe_fee?: number | null;
     }> | {
       id?: string;
       amount_paid?: number | null;
+      paid?: boolean | null;
       youth_wrestler_id?: string | null;
       stripe_fee?: number | null;
     };
@@ -227,17 +239,35 @@ export default async function AdminPage() {
 
   const emailByUserId = new Map(usersRows.map((u) => [u.id, u.email]));
 
-  type ParticipantRow = { 
+  type ParticipantRow = {
     id?: string;
-    amount_paid?: number | null; 
-    youth_wrestler_id?: string | null; 
+    amount_paid?: number | null;
+    paid?: boolean | null;
+    youth_wrestler_id?: string | null;
     stripe_fee?: number | null;
   };
-  
+
+  /** Money actually collected: exclude list-price placeholders on unpaid checkout rows (pending_payment). */
   function participantAmountPaidSum(s: (typeof sessionsRows)[0]): number {
     const raw = s.session_participants;
     const rows = Array.isArray(raw) ? raw : raw ? [raw] : [];
-    return rows.reduce((sum, p) => sum + Number((p as ParticipantRow).amount_paid ?? 0), 0);
+    return rows.reduce((sum, p) => {
+      const pr = p as ParticipantRow;
+      const amt = Number(pr.amount_paid ?? 0);
+      if (s.status === 'pending_payment' && pr.paid !== true) return sum;
+      if (pr.paid === false) return sum;
+      return sum + amt;
+    }, 0);
+  }
+
+  /** Spots that count toward capacity (unpaid pending checkout rows do not hold a slot). */
+  function confirmedBookedCount(s: (typeof sessionsRows)[0]): number {
+    const raw = s.session_participants;
+    const rows = Array.isArray(raw) ? raw : raw ? [raw] : [];
+    if (s.status === 'pending_payment') {
+      return rows.filter((p) => (p as ParticipantRow).paid === true).length;
+    }
+    return rows.filter((p) => (p as ParticipantRow).paid !== false).length;
   }
   
   // Calculate drop-in amount (participants with null youth_wrestler_id)
@@ -283,6 +313,8 @@ export default async function AdminPage() {
       const pr = p as ParticipantRow;
       const yid = pr.youth_wrestler_id;
       if (yid == null || yid === '') continue;
+      if (s.status === 'pending_payment' && pr.paid !== true) continue;
+      if (pr.paid === false) continue;
       const amt = Math.round(Number(pr.amount_paid ?? 0) * 100) / 100;
       youthSessionSpendLines.push({
         youth_wrestler_id: yid,
@@ -322,6 +354,7 @@ export default async function AdminPage() {
       focus_area_2: row.focus_area_2 ?? null,
       partner_invite_code: s.partner_invite_code ?? null,
       current_participants: actualParticipantCount(s),
+      confirmed_booked_count: confirmedBookedCount(s),
       max_participants: s.max_participants ?? 1,
       price_per_participant: row.price_per_participant ?? 30,
       parent_id: s.parent_id,
@@ -355,20 +388,39 @@ export default async function AdminPage() {
   }));
 
   const billing: BillingSummary = {
-    totalRevenue: sessions.reduce((sum, s) => sum + s.total_price, 0),
-    totalOrgFees: sessions.reduce((sum, s) => sum + s.org_fee, 0),
-    totalStripeFees: sessions.reduce((sum, s) => sum + s.stripe_fee, 0),
+    totalRevenue: sessions.reduce((sum, s) => {
+      if (s.status === 'pending_payment') return sum + (s.participant_amount_paid_sum ?? 0);
+      return sum + s.total_price;
+    }, 0),
+    totalOrgFees: sessions.reduce((sum, s) => {
+      if (s.status === 'pending_payment' && (s.participant_amount_paid_sum ?? 0) <= 0) return sum;
+      return sum + s.org_fee;
+    }, 0),
+    totalStripeFees: sessions.reduce((sum, s) => {
+      if (s.status === 'pending_payment' && (s.participant_amount_paid_sum ?? 0) <= 0) return sum;
+      return sum + s.stripe_fee;
+    }, 0),
     totalAthletePayments: sessions.reduce((sum, s) => sum + sessionCoachShareUsd(s), 0),
-    upcomingOpenRevenue: sessions.filter((s) => ['scheduled', 'pending_payment'].includes(s.status) && new Date(s.scheduled_datetime) >= new Date()).reduce((sum, s) => sum + s.total_price, 0),
-    upcomingOpenOrgFees: sessions.filter((s) => ['scheduled', 'pending_payment'].includes(s.status) && new Date(s.scheduled_datetime) >= new Date()).reduce((sum, s) => sum + s.org_fee, 0),
-    upcomingOpenStripeFees: sessions.filter((s) => ['scheduled', 'pending_payment'].includes(s.status) && new Date(s.scheduled_datetime) >= new Date()).reduce((sum, s) => sum + s.stripe_fee, 0),
+    upcomingOpenRevenue: sessions
+      .filter((s) => s.status === 'scheduled' && new Date(s.scheduled_datetime) >= new Date())
+      .reduce((sum, s) => sum + s.total_price, 0),
+    upcomingOpenOrgFees: sessions
+      .filter((s) => s.status === 'scheduled' && new Date(s.scheduled_datetime) >= new Date())
+      .reduce((sum, s) => sum + s.org_fee, 0),
+    upcomingOpenStripeFees: sessions
+      .filter((s) => s.status === 'scheduled' && new Date(s.scheduled_datetime) >= new Date())
+      .reduce((sum, s) => sum + s.stripe_fee, 0),
     upcomingOpenAthletePayments: sessions
-      .filter((s) => ['scheduled', 'pending_payment'].includes(s.status) && new Date(s.scheduled_datetime) >= new Date())
+      .filter((s) => s.status === 'scheduled' && new Date(s.scheduled_datetime) >= new Date())
       .reduce((sum, s) => sum + sessionCoachShareUsd(s), 0),
     sessionCount: sessions.length,
     completedCount: sessions.filter((s) => s.status === 'completed').length,
     pendingPaymentCount: sessions.filter((s) => s.status === 'pending_payment').length,
-    upcomingOpenCount: sessions.filter((s) => ['scheduled', 'pending_payment'].includes(s.status) && new Date(s.scheduled_datetime) >= new Date()).length,
+    upcomingOpenCount: sessions.filter(
+      (s) =>
+        (s.status === 'scheduled' || s.status === 'pending_payment') &&
+        new Date(s.scheduled_datetime) >= new Date()
+    ).length,
   };
 
   // Build coach list from all athletes so coaches with no sessions (e.g. Cam) still appear
@@ -418,17 +470,22 @@ export default async function AdminPage() {
     const r = athleteMap.get(o.id);
     if (r) {
       r.session_count += 1;
-      r.total_earnings += coachPayoutUsd({
-        athlete_payment: s.athlete_payment,
-        price_per_participant: s.price_per_participant,
-        current_participants: s.current_participants,
-        participant_amount_paid_sum: participantAmountPaidSum(s),
-        session_payout_rate: (s as { session_payout_rate?: number | null }).session_payout_rate ?? null,
-        coach_payout_rate:
-          o && (o as { payout_rate?: number | null }).payout_rate != null
-            ? Number((o as { payout_rate?: number | null }).payout_rate)
-            : null,
-      });
+      const paidSum = participantAmountPaidSum(s);
+      r.total_earnings += coachPayoutUsdUnlessUnpaidPending(
+        {
+          status: s.status,
+          athlete_payment: s.athlete_payment,
+          price_per_participant: s.price_per_participant ?? 30,
+          current_participants: s.current_participants ?? 0,
+          participant_amount_paid_sum: paidSum,
+          session_payout_rate: (s as { session_payout_rate?: number | null }).session_payout_rate ?? null,
+          coach_payout_rate:
+            o && (o as { payout_rate?: number | null }).payout_rate != null
+              ? Number((o as { payout_rate?: number | null }).payout_rate)
+              : null,
+        },
+        paidSum
+      );
       if (s.status === 'completed') r.completed_count += 1;
     }
   }

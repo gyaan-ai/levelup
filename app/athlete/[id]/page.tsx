@@ -475,7 +475,7 @@ export default async function AthleteProfilePage({
               Availability
             </CardTitle>
             <p className="text-sm text-muted-foreground">
-              Typical hours for private or partner session requests (Eastern). Open small-group sessions are listed
+              Typical hours for private or partner session requests (Eastern). Public small-group join-ins, if any, appear
               separately above.
             </p>
           </CardHeader>

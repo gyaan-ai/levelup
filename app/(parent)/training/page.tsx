@@ -449,6 +449,10 @@ export default async function TrainingPage({
     <div className="min-h-screen pb-24">
       <div className="px-4 pt-6 pb-4">
         <h1 className="text-2xl font-bold text-foreground">Training</h1>
+        <p className="text-sm text-muted-foreground mt-1 max-w-xl">
+          Start with a coach to book or request your own time, or use Join a session when a public slot fits your
+          schedule.
+        </p>
       </div>
       <div className="px-4">
       <TrainingClient

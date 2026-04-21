@@ -14,8 +14,9 @@ export async function CoachMapSection({ tenantSlug }: { tenantSlug: string }) {
         <h2 className="text-center font-serif text-2xl font-black uppercase tracking-wide text-accent md:text-3xl">
           Find Elite Coaching Near You
         </h2>
-        <p className="mx-auto mt-2 max-w-xl text-center text-sm text-white/60">
-          Guild coaches are training wrestlers across North Carolina
+        <p className="mx-auto mt-2 max-w-2xl text-center text-sm text-white/60">
+          Parents schedule training with Guild coaches—book or request a time first. Public group or partner join-ins on
+          the calendar are optional; explore the map to find a coach near you.
         </p>
 
         <div className="mt-8">

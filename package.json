@@ -10,7 +10,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "geocode:facilities": "npx tsx scripts/geocode-facilities-for-map.ts",
-    "geocode:facilities:dry-run": "npx tsx scripts/geocode-facilities-for-map.ts --dry-run"
+    "geocode:facilities:dry-run": "npx tsx scripts/geocode-facilities-for-map.ts --dry-run",
+    "coach:status": "npx tsx scripts/coach-application-status.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.3.4",

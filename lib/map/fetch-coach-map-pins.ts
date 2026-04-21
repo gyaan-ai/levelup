@@ -30,6 +30,8 @@ export type CoachMapPin = {
   nextSessionAt: string | null;
   sessionKinds: SessionKind[];
   hasOpenSession: boolean;
+  /** Weekly hours and/or future dated slots in the app — parents schedule from this, not only pre-built sessions. */
+  hasPublishedAvailability: boolean;
 };
 
 function normalizeSessionKind(sessionType: string | null | undefined): SessionKind | null {
@@ -135,6 +137,38 @@ export async function fetchCoachMapPins(
 
   const reviewStatsMap = await fetchCoachReviewStatsMap(admin, coachIds);
 
+  const coachIdsWithPublishedAvailability = new Set<string>();
+  if (coachIds.length > 0) {
+    const today = new Date().toISOString().slice(0, 10);
+    const [weeklyRes, slotsRes] = await Promise.all([
+      admin.from('athlete_availability').select('athlete_id').in('athlete_id', coachIds),
+      admin
+        .from('athlete_availability_slots')
+        .select('athlete_id')
+        .in('athlete_id', coachIds)
+        .gte('slot_date', today),
+    ]);
+    const skipTableErr = (err: { message?: string; code?: string } | null) =>
+      err &&
+      (err.message?.includes('does not exist') || err.code === '42P01');
+    if (weeklyRes.error && !skipTableErr(weeklyRes.error)) {
+      console.error('[fetchCoachMapPins] athlete_availability', weeklyRes.error);
+    } else {
+      for (const r of weeklyRes.data ?? []) {
+        const id = r.athlete_id as string;
+        if (id) coachIdsWithPublishedAvailability.add(id);
+      }
+    }
+    if (slotsRes.error && !skipTableErr(slotsRes.error)) {
+      console.error('[fetchCoachMapPins] athlete_availability_slots', slotsRes.error);
+    } else {
+      for (const r of slotsRes.data ?? []) {
+        const id = r.athlete_id as string;
+        if (id) coachIdsWithPublishedAvailability.add(id);
+      }
+    }
+  }
+
   if (coachIds.length > 0) {
     const { data: sessions, error: sessErr } = await admin
       .from('sessions')
@@ -188,6 +222,7 @@ export async function fetchCoachMapPins(
     }
     const sessionKinds = Array.from(kindsSet);
     const hasOpenSession = coachHasOpenUpcomingSession(sessions);
+    const hasPublishedAvailability = coachIdsWithPublishedAvailability.has(c.id as string);
 
     const addPin = (fid: string) => {
       const f = facById.get(fid);
@@ -218,6 +253,7 @@ export async function fetchCoachMapPins(
         nextSessionAt: nextAt,
         sessionKinds,
         hasOpenSession,
+        hasPublishedAvailability,
       });
     };
 

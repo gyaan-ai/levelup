@@ -253,10 +253,10 @@ export function RequestSessionClient({
         {coachHasPublishedAvailability ? (
           <Card className="border-accent/30 bg-accent/5">
             <CardHeader>
-              <CardTitle className="text-base">Book a listed time first</CardTitle>
+              <CardTitle className="text-base">Book an open calendar time first</CardTitle>
               <p className="text-sm text-muted-foreground">
                 Times on {athlete.first_name}&apos;s calendar can be booked right away (checkout). Use this form only for
-                times outside those openings or special situations — the coach will review before you pay.
+                times outside those openings or special situations—the coach will review before you pay.
               </p>
             </CardHeader>
             <CardContent>

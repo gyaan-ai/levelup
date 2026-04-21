@@ -10,7 +10,8 @@ import { fetchCoachReviewStatsMap, patchSessionsWithCoachReviewStats } from '@/l
 
 export const metadata = {
   title: 'Find training',
-  description: 'Search open sessions by date, time, and location.',
+  description:
+    'Browse public sessions you can join, or find a coach to book and schedule your own time.',
 };
 
 export const dynamic = 'force-dynamic';
@@ -178,8 +179,10 @@ export default async function FindTrainingPage({
     <div className="container mx-auto px-4 py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-serif font-bold text-foreground">Find training</h1>
-        <p className="text-muted-foreground mt-1">
-          Search by date and time to see all open sessions. Filter by facility and coach.
+        <p className="text-muted-foreground mt-1 max-w-2xl">
+          Most families book or request a session with a coach first. Use the filters below to browse{' '}
+          <span className="text-foreground/90">public sessions you can join</span> when a coach has posted one—those
+          are optional, not the only way to train.
         </p>
       </div>
       <FindTrainingClient

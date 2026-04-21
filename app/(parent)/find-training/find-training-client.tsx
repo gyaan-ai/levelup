@@ -993,7 +993,7 @@ export function FindTrainingClient({
       {/* Results Header */}
       <div className="flex items-center justify-between">
         <p className="text-sm text-zinc-400">
-          {openSessions.length} session{openSessions.length !== 1 ? 's' : ''} available
+          {openSessions.length} public session{openSessions.length !== 1 ? 's' : ''} you can join
           {defaultRangeLabel && !date && <span className="text-zinc-500"> · {defaultRangeLabel}</span>}
         </p>
       </div>
@@ -1008,9 +1008,15 @@ export function FindTrainingClient({
       ) : (
         <div className="py-16 text-center">
           <Calendar className="h-12 w-12 mx-auto mb-4 text-zinc-700" />
-          <p className="text-zinc-400 mb-2">No sessions available</p>
+          <p className="text-zinc-400 mb-2">No public sessions match</p>
           <p className="text-sm text-zinc-500">
-            {hasActiveFilters ? 'Try adjusting your filters' : 'Check back later for new sessions'}
+            {hasActiveFilters ? 'Try adjusting your filters.' : 'Try another day or time, or book directly with a coach.'}
+          </p>
+          <p className="text-sm text-zinc-500 mt-4 max-w-md mx-auto">
+            <Link href="/browse" className="text-[#D4AF37] hover:underline">
+              Browse coaches
+            </Link>{' '}
+            to schedule or request a session—what you see here are only join-in sessions coaches have posted.
           </p>
         </div>
       )}
@@ -1021,7 +1027,7 @@ export function FindTrainingClient({
             Need a different time?
           </h3>
           <p className="text-sm text-zinc-400 mb-4">
-            These coaches take private or partner requests when they don&apos;t have an open group spot listed.
+            These coaches take private or partner requests—a public join-in session above is never required.
           </p>
           <div className="space-y-3">
             {filteredRequestCoaches.map((c) => {

@@ -116,7 +116,8 @@ export function CoachLocatorMap({
   const [loadError, setLoadError] = useState<string | null>(null);
   const [sessionType, setSessionType] = useState('all');
   const [weightClass, setWeightClass] = useState('all');
-  const [availableOnly, setAvailableOnly] = useState(false);
+  /** Narrow to coaches with a bookable path: open seat on a public join-in session and/or published calendar availability. */
+  const [takingBookingsOnly, setTakingBookingsOnly] = useState(false);
   const [search, setSearch] = useState('');
   const [userPos, setUserPos] = useState<{ lat: number; lng: number } | null>(null);
   const [geoDenied, setGeoDenied] = useState(false);
@@ -166,7 +167,13 @@ export function CoachLocatorMap({
     let list = pins.filter((p) => {
       if (!sessionTypeMatches(p.sessionKinds, sessionType)) return false;
       if (!weightMatches(p.weightClass, weightClass)) return false;
-      if (availableOnly && !p.hasOpenSession) return false;
+      if (
+        takingBookingsOnly &&
+        !p.hasOpenSession &&
+        !p.hasPublishedAvailability
+      ) {
+        return false;
+      }
       if (!searchMatches(p, search)) return false;
       return true;
     });
@@ -178,7 +185,7 @@ export function CoachLocatorMap({
       );
     }
     return list;
-  }, [pins, sessionType, weightClass, availableOnly, search, userPos]);
+  }, [pins, sessionType, weightClass, takingBookingsOnly, search, userPos]);
 
   pinsRef.current = filteredPins;
 
@@ -415,12 +422,12 @@ export function CoachLocatorMap({
       )}
     >
       <select
-        aria-label="Session type"
+        aria-label="Session format on public join-in sessions (optional filter)"
         value={sessionType}
         onChange={(e) => setSessionType(e.target.value)}
         className="shrink-0 rounded-full border border-white/15 bg-black/80 px-3 py-2 text-xs text-white"
       >
-        <option value="all">All types</option>
+        <option value="all">All formats (public calendar)</option>
         <option value="private">Private</option>
         <option value="partner">Partner</option>
         <option value="small_group">Small group</option>
@@ -437,14 +444,17 @@ export function CoachLocatorMap({
           </option>
         ))}
       </select>
-      <label className="inline-flex shrink-0 cursor-pointer items-center gap-2 rounded-full border border-white/15 bg-black/80 px-3 py-2 text-xs text-white">
+      <label
+        className="inline-flex shrink-0 cursor-pointer items-center gap-2 rounded-full border border-white/15 bg-black/80 px-3 py-2 text-xs text-white"
+        title="Coaches with an open seat on a public join-in session and/or published calendar availability. Leave off to see the full network."
+      >
         <input
           type="checkbox"
-          checked={availableOnly}
-          onChange={(e) => setAvailableOnly(e.target.checked)}
+          checked={takingBookingsOnly}
+          onChange={(e) => setTakingBookingsOnly(e.target.checked)}
           className="rounded border-white/30"
         />
-        Open spots
+        Taking bookings
       </label>
       <input
         type="search"
@@ -493,6 +503,10 @@ export function CoachLocatorMap({
       {pins.length === 0 && stats && !loadError && <CoachMapEmptyHint stats={stats} />}
 
       <p className="mt-3 text-center text-xs text-white/50">
+        Training is scheduled with Guild coaches when you book or request a time—public join-in sessions on the
+        calendar are optional, not the only way to train.
+      </p>
+      <p className="mt-1.5 text-center text-xs text-white/45">
         {coachCount} coach{coachCount === 1 ? '' : 'es'} across{' '}
         {cityCount > 0 ? cityCount : pins.length === 0 ? '0' : 'several'} cities in North Carolina
         {geoDenied && !userPos && ' · Location off — distances hidden'}
@@ -666,7 +680,7 @@ function CoachCardContent({
 
       <div className="flex flex-wrap gap-1.5">
         {pin.sessionKinds.length === 0 ? (
-          <span className="text-xs text-white/40">Session types — see schedule</span>
+          <span className="text-xs text-white/40">Formats vary — schedule when you book</span>
         ) : (
           pin.sessionKinds.map((k) => (
             <SessionTypeBadge
@@ -677,9 +691,15 @@ function CoachCardContent({
         )}
       </div>
 
+      {pin.hasPublishedAvailability && (
+        <p className="text-xs text-emerald-400/90">
+          Publishes availability — pick a time when you book or request.
+        </p>
+      )}
+
       {pin.nextSessionAt && (
         <p className="text-xs text-white/70">
-          Next session: {formatEST(pin.nextSessionAt, 'MMM d · h:mm a')}
+          Next public join-in: {formatEST(pin.nextSessionAt, 'MMM d · h:mm a')}
         </p>
       )}
 
@@ -700,12 +720,15 @@ function CoachCardContent({
       <div className="flex flex-col gap-2">
         <div className="flex flex-col gap-2 sm:flex-row">
           <Button asChild variant="premium" size="sm" className="w-full">
-            <Link href={`/book/${pin.coachId}`}>Book a session</Link>
+            <Link href={`/book/${pin.coachId}`}>Schedule a session</Link>
           </Button>
           <Button asChild variant="outline" size="sm" className="w-full border-accent/40 text-accent">
-            <Link href={findTrainingHref}>See open sessions</Link>
+            <Link href={findTrainingHref}>Join a public session</Link>
           </Button>
         </div>
+        <p className="text-center text-[11px] leading-snug text-white/45">
+          Join a public session only if a posted group or partner slot works for you—most families use Schedule first.
+        </p>
         <p className="text-center">
           <Link
             href={`/athlete/${pin.coachId}`}

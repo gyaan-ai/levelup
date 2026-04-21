@@ -68,7 +68,8 @@ export default async function CoachesMapPage() {
           Find Wrestling Coaches Near You
         </h1>
         <p className="mt-2 max-w-2xl text-sm text-white/60 md:text-base">
-          Browse The Guild&apos;s coach network across North Carolina. Tap a pin for profile and sessions.
+          Browse The Guild&apos;s coach network across North Carolina. Most families book or request a time with the
+          coach; joining a public session on the calendar is optional. Tap a pin for profile and scheduling.
         </p>
 
         <div className="mt-8">
