@@ -2,6 +2,7 @@ import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 import Script from 'next/script';
 import { getTenantByDomain } from '@/config/tenants';
+import { createClient } from '@/lib/supabase/server';
 import { fetchCoachMapPins } from '@/lib/map/fetch-coach-map-pins';
 import { CoachMapShell } from '@/components/map/coach-map-shell';
 import { PublicOpenJoinSessionsTable } from '@/components/map/public-open-join-sessions-table';
@@ -26,6 +27,11 @@ export default async function CoachesMapPage() {
   const cities = result.ok ? result.cities : [];
   const initialStats = result.ok ? result.stats : null;
   const accessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN ?? '';
+
+  const supabase = await createClient(tenant.slug);
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -91,7 +97,7 @@ export default async function CoachesMapPage() {
           />
         </div>
 
-        <PublicOpenJoinSessionsTable tenantSlug={tenant.slug} />
+        <PublicOpenJoinSessionsTable tenantSlug={tenant.slug} isLoggedIn={Boolean(user)} />
 
         {!accessToken && (
           <p className="mt-4 text-center text-xs text-white/40">

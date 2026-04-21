@@ -4,7 +4,16 @@ import { useState, useEffect } from 'react';
 import { FindTrainingClient } from '@/app/(parent)/find-training/find-training-client';
 import { TrainingCoachesGrid } from '@/app/(parent)/training/training-coaches-grid';
 import type { Athlete } from '@/types';
-import type { CoachDateFilterData } from '@/lib/training-coach-date-filter';
+import type { CoachDateFilterData, CoachSessionTypeFilter } from '@/lib/training-coach-date-filter';
+
+function mapUrlTypeToCoachFilter(t: string): CoachSessionTypeFilter {
+  const x = (t || 'all').toLowerCase();
+  if (x === 'group' || x === 'small_group') return 'small_group';
+  if (x === 'private') return 'private';
+  if (x === 'partner') return 'partner';
+  if (x === 'partner_private') return 'partner_private';
+  return 'all';
+}
 
 type TabId = 'sessions' | 'coaches';
 
@@ -148,6 +157,7 @@ export function TrainingClient({
           coachIdsByFacilityId={coachIdsByFacilityId}
           coachDateFilterData={coachDateFilterData}
           coachDateFilterBounds={coachDateFilterBounds}
+          initialSessionType={mapUrlTypeToCoachFilter(availabilitySessionType)}
         />
       )}
     </>

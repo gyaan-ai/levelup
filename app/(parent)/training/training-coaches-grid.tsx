@@ -19,11 +19,12 @@ import { cn } from '@/lib/utils';
 import {
   coachIdsMatchingDateFilter,
   type CoachDateFilterData,
+  type CoachSessionTypeFilter,
 } from '@/lib/training-coach-date-filter';
 import type { Athlete } from '@/types';
 import { useAuth } from '@/lib/auth/use-auth';
 
-type SessionTypeFilter = 'all' | 'small_group' | 'partner_private';
+export type { CoachSessionTypeFilter as SessionTypeFilter };
 
 export interface AthleteWithNext extends Athlete {
   nextAvailable?: { slot_date: string; start_time: string } | null;
@@ -38,6 +39,7 @@ type Props = {
   coachIdsByFacilityId: Record<string, string[]>;
   coachDateFilterData: CoachDateFilterData;
   coachDateFilterBounds: { minYmd: string; maxYmd: string };
+  initialSessionType?: CoachSessionTypeFilter;
 };
 
 function formatCoachNextLine(slot_date: string, _start_time: string): string {
@@ -54,14 +56,19 @@ export function TrainingCoachesGrid({
   coachIdsByFacilityId,
   coachDateFilterData,
   coachDateFilterBounds,
+  initialSessionType = 'all',
 }: Props) {
   const { user, userRole } = useAuth();
   const [dateOpen, setDateOpen] = useState(false);
   const [followedCoachIds, setFollowedCoachIds] = useState<Set<string>>(new Set());
   const [facilityId, setFacilityId] = useState<string>('all');
-  const [sessionType, setSessionType] = useState<SessionTypeFilter>('all');
+  const [sessionType, setSessionType] = useState<CoachSessionTypeFilter>(initialSessionType);
   const [availableOnly, setAvailableOnly] = useState(false);
   const [filterDate, setFilterDate] = useState<string>('');
+
+  useEffect(() => {
+    setSessionType(initialSessionType);
+  }, [initialSessionType]);
 
   useEffect(() => {
     if (!user || (userRole !== 'parent' && userRole !== 'admin')) return;
@@ -100,8 +107,12 @@ export function TrainingCoachesGrid({
         const types = serviceTypesByCoach[a.id] ?? [];
         if (sessionType === 'small_group') {
           if (!types.includes('small_group')) return false;
-        } else if (!types.includes('partner') && !types.includes('private')) {
-          return false;
+        } else if (sessionType === 'private') {
+          if (!types.includes('private')) return false;
+        } else if (sessionType === 'partner') {
+          if (!types.includes('partner')) return false;
+        } else if (sessionType === 'partner_private') {
+          if (!types.includes('partner') && !types.includes('private')) return false;
         }
       }
       if (availableOnly && !coachIdsWithOpen.includes(a.id)) return false;
@@ -250,11 +261,13 @@ export function TrainingCoachesGrid({
         <select
           id="training-coach-session-type"
           value={sessionType}
-          onChange={(e) => setSessionType(e.target.value as SessionTypeFilter)}
+          onChange={(e) => setSessionType(e.target.value as CoachSessionTypeFilter)}
           className="min-h-[44px] w-full min-w-[10rem] max-w-[min(100%,20rem)] shrink-0 rounded-full border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/50 sm:w-auto"
         >
           <option value="all">All types</option>
           <option value="small_group">Small group</option>
+          <option value="private">Private</option>
+          <option value="partner">Partner</option>
           <option value="partner_private">Partner / Private</option>
         </select>
 

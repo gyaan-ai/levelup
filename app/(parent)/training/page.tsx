@@ -456,7 +456,7 @@ export default async function TrainingPage({
       </div>
       <div className="px-4">
       <TrainingClient
-        key={`training-${tab}-${sp.coach ?? 'all'}`}
+        key={`training-${tab}-${sp.coach ?? 'all'}-${sp.type ?? 'all'}`}
         initialTab={tab}
         athletesWithNext={athletesWithNext}
         facilities={facilities ?? []}
