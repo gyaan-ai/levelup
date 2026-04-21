@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import { easternWallDateTimeToUtcIso } from '@/lib/format-date';
 import { notifySessionScheduledFollowers } from '@/lib/notify-session-scheduled-followers';
+import { COACH_SESSION_OVERLAP_ERROR, findCoachSessionTimeOverlap } from '@/lib/coach-session-overlap';
 
 /**
  * PATCH - Admin updates a session (focus_area, join_policy, max_participants, price_per_participant).
@@ -51,7 +52,7 @@ export async function PATCH(
 
     const { data: session, error: fetchErr } = await admin
       .from('sessions')
-      .select('id, status, session_type, athlete_id, scheduled_datetime, partner_invite_code')
+      .select('id, status, session_type, athlete_id, scheduled_datetime, partner_invite_code, duration_minutes')
       .eq('id', sessionId)
       .single();
     
@@ -117,7 +118,22 @@ export async function PATCH(
       updates.price_per_participant = price;
     }
     if (body.scheduledDate && body.scheduledTime) {
-      updates.scheduled_datetime = easternWallDateTimeToUtcIso(body.scheduledDate, body.scheduledTime);
+      const newIso = easternWallDateTimeToUtcIso(body.scheduledDate, body.scheduledTime);
+      try {
+        const conflict = await findCoachSessionTimeOverlap(admin, {
+          coachAthleteId: session.athlete_id,
+          scheduledStartIso: newIso,
+          durationMinutes: session.duration_minutes,
+          excludeSessionId: sessionId,
+        });
+        if (conflict) {
+          return NextResponse.json({ error: COACH_SESSION_OVERLAP_ERROR }, { status: 409 });
+        }
+      } catch (overlapErr) {
+        console.error('[admin session PATCH] coach overlap check', overlapErr);
+        return NextResponse.json({ error: 'Could not verify schedule availability' }, { status: 500 });
+      }
+      updates.scheduled_datetime = newIso;
     }
     
     // published column doesn't exist in DB - skip this logic

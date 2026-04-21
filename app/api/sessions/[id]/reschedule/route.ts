@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import { easternWallDateTimeToUtcIso } from '@/lib/format-date';
+import { COACH_SESSION_OVERLAP_ERROR, findCoachSessionTimeOverlap } from '@/lib/coach-session-overlap';
 
 export async function PATCH(
   req: NextRequest,
@@ -52,7 +53,7 @@ export async function PATCH(
     const admin = createAdminClient(tenant.slug);
     const { data: session, error: fetchError } = await admin
       .from('sessions')
-      .select('id, parent_id, athlete_id, status')
+      .select('id, parent_id, athlete_id, status, duration_minutes')
       .eq('id', sessionId)
       .single();
 
@@ -81,6 +82,21 @@ export async function PATCH(
         { error: 'Only scheduled or pending sessions can be rescheduled' },
         { status: 400 }
       );
+    }
+
+    try {
+      const conflict = await findCoachSessionTimeOverlap(admin, {
+        coachAthleteId: session.athlete_id,
+        scheduledStartIso: scheduledDatetime,
+        durationMinutes: session.duration_minutes,
+        excludeSessionId: sessionId,
+      });
+      if (conflict) {
+        return NextResponse.json({ error: COACH_SESSION_OVERLAP_ERROR }, { status: 409 });
+      }
+    } catch (overlapErr) {
+      console.error('[reschedule] coach overlap check', overlapErr);
+      return NextResponse.json({ error: 'Could not verify schedule availability' }, { status: 500 });
     }
 
     const { error: updateError } = await admin

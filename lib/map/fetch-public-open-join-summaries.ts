@@ -10,7 +10,7 @@ export type PublicOpenJoinSessionRow = {
   kind: 'Partner' | 'Small group';
   scheduledAt: string;
   facilityName: string;
-  /** Capacity context: athletes already on roster vs room left. */
+  /** Capacity context: athletes already booked vs room left. */
   openingsLabel: string;
 };
 
@@ -64,7 +64,7 @@ function openingsLabelFromSession(s: SessionRow): string {
     return `${filled} booked · ${open} open`;
   }
   if (filled >= 1) {
-    return `${filled} athlete${filled === 1 ? '' : 's'} on roster · spots available`;
+    return `${filled} athlete${filled === 1 ? '' : 's'} booked · spots available`;
   }
   return 'Spots available';
 }

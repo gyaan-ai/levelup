@@ -16,6 +16,7 @@ import { normalizeCoachOrWrestlerId, verifyCoachForParentBooking } from '@/lib/s
 import { isPennyTestPricingEnabled } from '@/lib/penny-test-pricing';
 import { resolveCoachPayoutRate } from '@/lib/coach-session-payout';
 import { notifyCoachAndAdminsNewBooking } from '@/lib/twilio';
+import { COACH_SESSION_OVERLAP_ERROR, findCoachSessionTimeOverlap } from '@/lib/coach-session-overlap';
 
 export async function POST(req: NextRequest) {
   try {
@@ -186,6 +187,20 @@ export async function POST(req: NextRequest) {
         sessionServiceId = productId;
         durationMinutes = service.duration_minutes ?? 60;
       }
+    }
+
+    try {
+      const conflict = await findCoachSessionTimeOverlap(admin, {
+        coachAthleteId: athleteIdNorm,
+        scheduledStartIso: scheduledDatetime,
+        durationMinutes,
+      });
+      if (conflict) {
+        return NextResponse.json({ error: COACH_SESSION_OVERLAP_ERROR }, { status: 409 });
+      }
+    } catch (overlapErr) {
+      console.error('[bookings] coach overlap check', overlapErr);
+      return NextResponse.json({ error: 'Could not verify schedule availability' }, { status: 500 });
     }
 
     const { data: session, error: sessionError } = await supabase

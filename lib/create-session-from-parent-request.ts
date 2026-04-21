@@ -7,6 +7,7 @@ import { COACH_REVENUE_FRACTION } from '@/lib/pricing';
 import { hasMinPhoneDigits } from '@/lib/phone';
 import { maybeBackfillRosterSnapshot } from '@/lib/session-roster-snapshot';
 import { isPennyTestPricingEnabled } from '@/lib/penny-test-pricing';
+import { COACH_SESSION_OVERLAP_ERROR, findCoachSessionTimeOverlap } from '@/lib/coach-session-overlap';
 
 export type RequestSessionKind = 'private' | 'partner';
 
@@ -144,6 +145,20 @@ export async function createSessionFromParentRequest(
   }
 
   const pricing = await resolvePricing(admin, coachId, sessionKind, requestedDuration, tenantPricing);
+
+  try {
+    const conflict = await findCoachSessionTimeOverlap(admin, {
+      coachAthleteId: coachId,
+      scheduledStartIso: scheduledDatetimeIso,
+      durationMinutes: pricing.durationMinutes,
+    });
+    if (conflict) {
+      return { ok: false, error: COACH_SESSION_OVERLAP_ERROR, status: 409 };
+    }
+  } catch (overlapErr) {
+    console.error('[createSessionFromParentRequest] coach overlap check', overlapErr);
+    return { ok: false, error: 'Could not verify schedule availability', status: 500 };
+  }
 
   const sessionMode: SessionMode = sessionKind === 'private' ? 'private' : 'partner-invite';
   const sessionType = sessionKind === 'private' ? '1-on-1' : '2-athlete';

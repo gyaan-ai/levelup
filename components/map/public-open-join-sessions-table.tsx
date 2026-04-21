@@ -43,9 +43,8 @@ export async function PublicOpenJoinSessionsTable({
       </h3>
       <div className="mt-2 max-w-2xl space-y-2 text-sm text-white/70">
         <p>
-          Each row is a <span className="text-white/85">specific posted session</span> that already has at least one
-          athlete on the roster and still has room—you are joining that existing signup, not opening a brand-new slot from
-          scratch.
+          Each row is a specific posted session that already has at least one athlete booked and still has room—you are
+          joining that existing signup, not opening a brand-new slot from scratch.
         </p>
         <p>
           For a fresh private or partner booking on your own schedule, start from a coach on the map above (or Training

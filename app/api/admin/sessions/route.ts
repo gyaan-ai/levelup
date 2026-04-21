@@ -12,6 +12,7 @@ import {
 } from '@/lib/coach-session-pricing';
 import { normalizeUuidParam } from '@/lib/normalize-uuid-param';
 import { COACH_REVENUE_FRACTION } from '@/lib/pricing';
+import { COACH_SESSION_OVERLAP_ERROR, findCoachSessionTimeOverlap } from '@/lib/coach-session-overlap';
 
 /**
  * POST - Admin creates a small-group session: assign coach, set time/facility, get shareable link.
@@ -161,6 +162,20 @@ export async function POST(req: NextRequest) {
     // Assign session to the selected coach (parent_id = athlete_id) so they own it and see it on their schedule
     // published is not stored on sessions in all DBs — use body flag only for follower notifications
     const notifyAsPublished = body.published !== false;
+
+    try {
+      const conflict = await findCoachSessionTimeOverlap(admin, {
+        coachAthleteId: athleteId,
+        scheduledStartIso: scheduledDatetime,
+        durationMinutes: duration,
+      });
+      if (conflict) {
+        return NextResponse.json({ error: COACH_SESSION_OVERLAP_ERROR }, { status: 409 });
+      }
+    } catch (overlapErr) {
+      console.error('[admin/sessions POST] coach overlap check', overlapErr);
+      return NextResponse.json({ error: 'Could not verify schedule availability' }, { status: 500 });
+    }
 
     const { data: session, error: sessionError } = await admin
       .from('sessions')
