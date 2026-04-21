@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { fetchPublicOpenJoinSummaries } from '@/lib/map/fetch-public-open-join-summaries';
 import { formatEST } from '@/lib/format-date';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 
 export async function PublicOpenJoinSessionsTable({
   tenantSlug,
@@ -12,13 +13,23 @@ export async function PublicOpenJoinSessionsTable({
   rowKindFilter?: 'all' | 'partner' | 'small_group';
   isLoggedIn: boolean;
 }) {
-  const rowsAll = await fetchPublicOpenJoinSummaries(tenantSlug, { daysAhead: 21, maxCoaches: 40 });
+  const { rows: rowsAll, openSessionCountTodayByFilter } = await fetchPublicOpenJoinSummaries(tenantSlug, {
+    daysAhead: 21,
+    maxCoaches: 40,
+  });
   const rows =
     rowKindFilter === 'all'
       ? rowsAll
       : rowKindFilter === 'partner'
         ? rowsAll.filter((r) => r.nextKind === 'Partner')
         : rowsAll.filter((r) => r.nextKind === 'Small group');
+
+  const todayCount =
+    rowKindFilter === 'all'
+      ? openSessionCountTodayByFilter.all
+      : rowKindFilter === 'partner'
+        ? openSessionCountTodayByFilter.partner
+        : openSessionCountTodayByFilter.small_group;
 
   const loginWithRedirect = (path: string) => `/login?redirect=${encodeURIComponent(path)}`;
 
@@ -30,10 +41,10 @@ export async function PublicOpenJoinSessionsTable({
       <h3 className="font-serif text-lg font-bold uppercase tracking-wide text-accent md:text-xl">
         Open sessions — join now
       </h3>
-      <p className="mt-2 max-w-2xl text-sm text-white/60">
-        Coach-posted join-ins: partner sessions (two athletes with the coach) and small groups. For your own time, book
-        private or partner with a coach from the map.
-      </p>
+      <div className="mt-2 max-w-2xl space-y-2 text-sm text-white/70">
+        <p>These are open spots you can join right now.</p>
+        <p>Don&apos;t see what you need? Any coach can take you privately — browse the map above.</p>
+      </div>
 
       {rows.length === 0 ? (
         <p className="mt-6 text-sm text-white/50">
@@ -48,62 +59,75 @@ export async function PublicOpenJoinSessionsTable({
           to start a booking with any coach.
         </p>
       ) : (
-        <div className="mt-6 overflow-x-auto rounded-lg border border-white/10">
-          <table className="w-full min-w-[720px] text-left text-sm text-white/85">
-            <thead>
-              <tr className="border-b border-white/10 bg-white/[0.04] text-xs uppercase tracking-wide text-white/45">
-                <th className="px-3 py-2.5 font-medium">Coach</th>
-                <th className="px-3 py-2.5 font-medium">Type</th>
-                <th className="px-3 py-2.5 font-medium">Openings</th>
-                <th className="px-3 py-2.5 font-medium">Next session</th>
-                <th className="px-3 py-2.5 font-medium">Where</th>
-                <th className="px-3 py-2.5 font-medium"> </th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r) => {
-                const isPartner = r.nextKind === 'Partner';
-                const registerPath = `/sessions/${r.nextSessionId}/register`;
-                const actionHref = isLoggedIn ? registerPath : loginWithRedirect(registerPath);
-                const actionLabel = isLoggedIn ? 'Add to cart' : 'Reserve';
-                return (
-                  <tr key={r.coachId} className="border-b border-white/[0.06] last:border-0">
-                    <td className="px-3 py-3">
-                      <Link
-                        href={`/athlete/${r.coachId}`}
-                        className="font-medium text-accent hover:underline"
-                      >
-                        {r.coachName}
-                      </Link>
-                    </td>
-                    <td className="px-3 py-3">
-                      <Badge
-                        variant="outline"
-                        className={
-                          isPartner
-                            ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-200'
-                            : 'border-violet-500/50 bg-violet-500/10 text-violet-200'
-                        }
-                      >
-                        {isPartner ? 'Partner' : 'Small group'}
-                      </Badge>
-                    </td>
-                    <td className="px-3 py-3 tabular-nums text-white/70">
-                      {r.openCount} session{r.openCount !== 1 ? 's' : ''}
-                    </td>
-                    <td className="px-3 py-3 text-white/80">{formatEST(r.nextAt, 'EEE MMM d · h:mm a')}</td>
-                    <td className="px-3 py-3 text-white/65">{r.facilityName}</td>
-                    <td className="px-3 py-3 text-right">
-                      <Link href={actionHref} className="text-xs font-medium text-accent hover:underline">
-                        {actionLabel}
-                      </Link>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+        <>
+          <div className="mt-5 space-y-1">
+            <p className="text-sm font-semibold text-white/90">
+              {todayCount === 1 ? '1 open session available today' : `${todayCount} open sessions available today`}
+            </p>
+            <p className="text-xs text-white/45">Updates as coaches add spots.</p>
+          </div>
+          <div className="mt-4 overflow-x-auto rounded-lg border border-white/10">
+            <table className="w-full min-w-[720px] text-left text-sm text-white/85">
+              <thead>
+                <tr className="border-b border-white/10 bg-white/[0.04] text-xs uppercase tracking-wide text-white/45">
+                  <th className="px-3 py-2.5 font-medium">Coach</th>
+                  <th className="px-3 py-2.5 font-medium">Type</th>
+                  <th className="px-3 py-2.5 font-medium">Openings</th>
+                  <th className="px-3 py-2.5 font-medium">Next session</th>
+                  <th className="px-3 py-2.5 font-medium">Where</th>
+                  <th className="px-3 py-2.5 font-medium"> </th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((r) => {
+                  const isPartner = r.nextKind === 'Partner';
+                  const registerPath = `/sessions/${r.nextSessionId}/register`;
+                  const actionHref = isLoggedIn ? registerPath : loginWithRedirect(registerPath);
+                  const actionLabel = isLoggedIn ? 'Add to cart' : 'Reserve';
+                  return (
+                    <tr key={r.coachId} className="border-b border-white/[0.06] last:border-0">
+                      <td className="px-3 py-3">
+                        <Link
+                          href={`/athlete/${r.coachId}`}
+                          className="font-medium text-accent hover:underline"
+                        >
+                          {r.coachName}
+                        </Link>
+                      </td>
+                      <td className="px-3 py-3">
+                        <Badge
+                          variant="outline"
+                          className={
+                            isPartner
+                              ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-200'
+                              : 'border-violet-500/50 bg-violet-500/10 text-violet-200'
+                          }
+                        >
+                          {isPartner ? 'Partner' : 'Small group'}
+                        </Badge>
+                      </td>
+                      <td className="px-3 py-3 tabular-nums text-white/70">
+                        {r.openCount} session{r.openCount !== 1 ? 's' : ''}
+                      </td>
+                      <td className="px-3 py-3 text-white/80">{formatEST(r.nextAt, 'EEE MMM d · h:mm a')}</td>
+                      <td className="px-3 py-3 text-white/65">{r.facilityName}</td>
+                      <td className="px-3 py-3 text-right align-middle">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="whitespace-nowrap px-3 text-xs font-semibold"
+                          asChild
+                        >
+                          <Link href={actionHref}>{actionLabel}</Link>
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
 
       <p className="mt-6 text-center text-xs text-white/45">

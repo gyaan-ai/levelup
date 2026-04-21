@@ -1,5 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { isSessionOpenForParentBrowse } from '@/lib/sessions';
+import { formatEST } from '@/lib/format-date';
 
 export type PublicCoachOpenJoinRow = {
   coachId: string;
@@ -64,11 +65,21 @@ const SESSION_SELECT = `
   session_participants(id, youth_wrestler_id)
 `;
 
+export type PublicOpenJoinSummariesResult = {
+  rows: PublicCoachOpenJoinRow[];
+  /** Counts of individual open join-in sessions whose start time falls on the current Eastern calendar day. */
+  openSessionCountTodayByFilter: {
+    all: number;
+    partner: number;
+    small_group: number;
+  };
+};
+
 /** Public join-in sessions (open partner + small group) for marketing / home table. Service role on server only. */
 export async function fetchPublicOpenJoinSummaries(
   tenantSlug: string,
   options?: { daysAhead?: number; maxCoaches?: number }
-): Promise<PublicCoachOpenJoinRow[]> {
+): Promise<PublicOpenJoinSummariesResult> {
   const days = options?.daysAhead ?? 21;
   const maxCoaches = options?.maxCoaches ?? 50;
   const admin = createAdminClient(tenantSlug);
@@ -112,6 +123,19 @@ export async function fetchPublicOpenJoinSummaries(
   }
 
   const open = merged.filter((s) => isSessionOpenForParentBrowse(s));
+
+  const todayYmd = formatEST(new Date(), 'yyyy-MM-dd');
+  const sessionYmd = (s: SessionRow) => formatEST(s.scheduled_datetime, 'yyyy-MM-dd');
+  let todayAll = 0;
+  let todayPartner = 0;
+  let todaySmallGroup = 0;
+  for (const s of open) {
+    if (sessionYmd(s) !== todayYmd) continue;
+    todayAll += 1;
+    if (labelKind(s.session_type, s.session_mode) === 'Partner') todayPartner += 1;
+    else todaySmallGroup += 1;
+  }
+
   const byCoach = new Map<string, { name: string; sessions: SessionRow[] }>();
 
   for (const s of open) {
@@ -140,5 +164,12 @@ export async function fetchPublicOpenJoinSummaries(
   }
 
   out.sort((a, b) => a.nextAt.localeCompare(b.nextAt));
-  return out.slice(0, maxCoaches);
+  return {
+    rows: out.slice(0, maxCoaches),
+    openSessionCountTodayByFilter: {
+      all: todayAll,
+      partner: todayPartner,
+      small_group: todaySmallGroup,
+    },
+  };
 }
