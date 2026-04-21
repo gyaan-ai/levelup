@@ -4,6 +4,7 @@ import Script from 'next/script';
 import { getTenantByDomain } from '@/config/tenants';
 import { fetchCoachMapPins } from '@/lib/map/fetch-coach-map-pins';
 import { CoachMapShell } from '@/components/map/coach-map-shell';
+import { PublicOpenJoinSessionsTable } from '@/components/map/public-open-join-sessions-table';
 import Link from 'next/link';
 
 export const metadata = {
@@ -67,10 +68,18 @@ export default async function CoachesMapPage() {
         <h1 className="font-serif text-3xl font-black uppercase tracking-wide text-accent md:text-4xl">
           Find Wrestling Coaches Near You
         </h1>
-        <p className="mt-2 max-w-2xl text-sm text-white/60 md:text-base">
-          Browse The Guild&apos;s coach network across North Carolina. Most families book or request a time with the
-          coach; joining a public session on the calendar is optional. Tap a pin for profile and scheduling.
-        </p>
+        <div className="mt-4 max-w-2xl space-y-3 text-sm text-white/65">
+          <p>
+            <span className="font-semibold text-accent/90">1.</span> Find a coach, then{' '}
+            <span className="text-white/85">book private or partner</span>
+            —invite your partner when you select partner.
+          </p>
+          <p>
+            <span className="font-semibold text-accent/90">2.</span>{' '}
+            <span className="text-white/85">Browse open partner sessions and small groups</span> in the table below.
+            Filters are above the map; use city or zip to judge distance.
+          </p>
+        </div>
 
         <div className="mt-8">
           <CoachMapShell
@@ -81,6 +90,8 @@ export default async function CoachesMapPage() {
             showFiltersBelowMap={false}
           />
         </div>
+
+        <PublicOpenJoinSessionsTable tenantSlug={tenant.slug} />
 
         {!accessToken && (
           <p className="mt-4 text-center text-xs text-white/40">

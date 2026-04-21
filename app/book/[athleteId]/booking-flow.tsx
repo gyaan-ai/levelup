@@ -616,9 +616,16 @@ export function BookingFlow({
               <CardHeader>
                 <CardTitle>Choose Session Type</CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  {oneWrestler
-                    ? 'Select 1-on-1 or a partner session.'
-                    : 'Sibling session for multiple wrestlers.'}
+                  {oneWrestler ? (
+                    <>
+                      <strong className="font-medium text-foreground">Private</strong> — one athlete with the coach for
+                      the whole session.{' '}
+                      <strong className="font-medium text-foreground">Partner</strong> — two athletes with the same
+                      coach; you&apos;ll invite or find the second wrestler after you continue.
+                    </>
+                  ) : (
+                    'Sibling session for multiple wrestlers.'
+                  )}
                 </p>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -635,7 +642,7 @@ export function BookingFlow({
                     >
                       <CardContent className="p-5">
                         <h3 className="font-semibold text-lg">{firstPrivateProduct?.name ?? '1-on-1 Private Session'}</h3>
-                        <p className="text-muted-foreground text-sm mb-2">Focused individual attention</p>
+                        <p className="text-muted-foreground text-sm mb-2">Just your wrestler and the coach—no second athlete.</p>
                         <p className="text-2xl font-bold">
                           {freeEntitlements.free1on1 > 0 ? (
                             <span className="text-accent">Free session included</span>
@@ -657,7 +664,9 @@ export function BookingFlow({
                       {firstPartnerProduct && !firstPrivateProduct && <Badge className="absolute top-4 right-4 bg-accent text-black text-xs">BEST VALUE</Badge>}
                       <CardContent className="p-5 pr-24">
                         <h3 className="font-semibold text-lg">{firstPartnerProduct?.name ?? 'Partner Session'}</h3>
-                        <p className="text-muted-foreground text-sm mb-2">Share the session with another wrestler</p>
+                        <p className="text-muted-foreground text-sm mb-2">
+                          Two athletes, one coach—you line up the second wrestler (invite someone or post an open spot).
+                        </p>
                         <p className="text-2xl font-bold">
                           {freeEntitlements.free2Athlete > 0 ? (
                             <span className="text-accent">Free session included</span>

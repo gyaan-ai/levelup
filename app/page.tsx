@@ -141,8 +141,11 @@ export default async function HomePage() {
               <span className="text-accent font-bold text-sm">1</span>
             </div>
             <div>
-              <h3 className="text-white font-semibold mb-1">Find Training</h3>
-              <p className="text-white/60 text-sm">Browse private and small group sessions with elite coaches near you.</p>
+              <h3 className="text-white font-semibold mb-1">Pick a coach &amp; book</h3>
+              <p className="text-white/60 text-sm">
+                Private or partner session—invite your partner when you choose partner. Use the map to find someone who
+                fits your area and style.
+              </p>
             </div>
           </div>
           <div className="flex items-start gap-4">
@@ -150,8 +153,11 @@ export default async function HomePage() {
               <span className="text-accent font-bold text-sm">2</span>
             </div>
             <div>
-              <h3 className="text-white font-semibold mb-1">Book & Pay</h3>
-              <p className="text-white/60 text-sm">Reserve your spot. Secure checkout.</p>
+              <h3 className="text-white font-semibold mb-1">Or join a posted session</h3>
+              <p className="text-white/60 text-sm">
+                Browse open partner slots and small groups on the coach map when a coach has posted one—optional if you
+                prefer your own time from step 1.
+              </p>
             </div>
           </div>
           <div className="flex items-start gap-4">
@@ -159,8 +165,8 @@ export default async function HomePage() {
               <span className="text-accent font-bold text-sm">3</span>
             </div>
             <div>
-              <h3 className="text-white font-semibold mb-1">Train & Improve</h3>
-              <p className="text-white/60 text-sm">Elite instruction at top facilities. Real results.</p>
+              <h3 className="text-white font-semibold mb-1">Train &amp; improve</h3>
+              <p className="text-white/60 text-sm">Elite instruction at top facilities. Secure checkout when you book.</p>
             </div>
           </div>
         </div>

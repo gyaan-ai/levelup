@@ -348,6 +348,10 @@ export function RequestSessionClient({
 
             <div className="space-y-2">
               <Label htmlFor="stype">Session type</Label>
+              <p className="text-xs text-muted-foreground">
+                Private: one athlete with the coach. Partner: two athletes with the same coach—you&apos;ll invite the
+                other family or match an open partner slot.
+              </p>
               <Select value={sessionType} onValueChange={setSessionType}>
                 <SelectTrigger id="stype" className="min-h-[44px]">
                   <SelectValue />

@@ -695,6 +695,11 @@ export function FindTrainingClient({
 
   return (
     <div className="space-y-4">
+      <p className="text-xs text-zinc-500 leading-relaxed -mx-4 px-4">
+        <span className="font-medium text-zinc-400">Session types:</span> Private — one athlete with the coach. Partner
+        — two athletes with the same coach (you need a second wrestler). Small group — coach with several athletes;
+        spots are limited per session.
+      </p>
       {/* Filter Bar */}
       <div className="flex items-center gap-2 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
         {/* Date Picker */}

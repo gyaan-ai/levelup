@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import Link from 'next/link';
@@ -12,7 +12,7 @@ import { SessionTypeBadge } from '@/components/session-type-badge';
 import { formatEST } from '@/lib/format-date';
 import { NC_BOUNDS_LNG_LAT, NC_MAX_BOUNDS_LNG_LAT, GUILD_GOLD } from '@/lib/map/nc-bounds';
 import { cn } from '@/lib/utils';
-import { MapPin, Navigation, X } from 'lucide-react';
+import { MapPin, X } from 'lucide-react';
 import type { CoachMapPin, CoachMapStats, SessionKind } from '@/lib/map/fetch-coach-map-pins';
 
 export type { CoachMapPin };
@@ -34,41 +34,6 @@ function CoachMapEmptyHint({ stats }: { stats: CoachMapStats }) {
       <p className="mt-1 text-white/65">{body}</p>
     </div>
   );
-}
-
-const WEIGHT_OPTIONS = [
-  'all',
-  '125',
-  '133',
-  '141',
-  '149',
-  '157',
-  '165',
-  '174',
-  '184',
-  '197',
-  '285',
-] as const;
-
-function haversineMiles(lat1: number, lon1: number, lat2: number, lon2: number): number {
-  const R = 3958.8;
-  const dLat = ((lat2 - lat1) * Math.PI) / 180;
-  const dLon = ((lon2 - lon1) * Math.PI) / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos((lat1 * Math.PI) / 180) *
-      Math.cos((lat2 * Math.PI) / 180) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c;
-}
-
-function weightMatches(coachWeight: string | null, filterLb: string): boolean {
-  if (filterLb === 'all') return true;
-  if (!coachWeight) return false;
-  const digits = coachWeight.match(/\d+/)?.[0];
-  return digits === filterLb || coachWeight.includes(filterLb);
 }
 
 function sessionTypeMatches(kinds: SessionKind[], filter: string): boolean {
@@ -107,7 +72,6 @@ export function CoachLocatorMap({
 }) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<mapboxgl.Map | null>(null);
-  const userMarkerRef = useRef<mapboxgl.Marker | null>(null);
   const pinsRef = useRef<CoachMapPin[]>([]);
 
   const [pins, setPins] = useState<CoachMapPin[]>(initialPins ?? []);
@@ -115,12 +79,9 @@ export function CoachLocatorMap({
   const [stats, setStats] = useState<CoachMapStats | null>(initialStats ?? null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [sessionType, setSessionType] = useState('all');
-  const [weightClass, setWeightClass] = useState('all');
   /** Narrow to coaches with a bookable path: open seat on a public join-in session and/or published calendar availability. */
   const [takingBookingsOnly, setTakingBookingsOnly] = useState(false);
   const [search, setSearch] = useState('');
-  const [userPos, setUserPos] = useState<{ lat: number; lng: number } | null>(null);
-  const [geoDenied, setGeoDenied] = useState(false);
   /** One or more pins (cluster at same spot opens many). */
   const [selectedPins, setSelectedPins] = useState<CoachMapPin[] | null>(null);
   const [visible, setVisible] = useState(false);
@@ -164,9 +125,8 @@ export function CoachLocatorMap({
   }, [initialPins]);
 
   const filteredPins = useMemo(() => {
-    let list = pins.filter((p) => {
+    return pins.filter((p) => {
       if (!sessionTypeMatches(p.sessionKinds, sessionType)) return false;
-      if (!weightMatches(p.weightClass, weightClass)) return false;
       if (
         takingBookingsOnly &&
         !p.hasOpenSession &&
@@ -177,15 +137,7 @@ export function CoachLocatorMap({
       if (!searchMatches(p, search)) return false;
       return true;
     });
-    if (userPos) {
-      list = [...list].sort(
-        (a, b) =>
-          haversineMiles(userPos.lat, userPos.lng, a.latitude, a.longitude) -
-          haversineMiles(userPos.lat, userPos.lng, b.latitude, b.longitude)
-      );
-    }
-    return list;
-  }, [pins, sessionType, weightClass, takingBookingsOnly, search, userPos]);
+  }, [pins, sessionType, takingBookingsOnly, search]);
 
   pinsRef.current = filteredPins;
 
@@ -208,25 +160,6 @@ export function CoachLocatorMap({
       })),
     };
   }, [filteredPins]);
-
-  const requestLocation = useCallback(() => {
-    if (!navigator.geolocation) {
-      setGeoDenied(true);
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setUserPos({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-        setGeoDenied(false);
-      },
-      () => setGeoDenied(true),
-      { enableHighAccuracy: true, timeout: 12_000 }
-    );
-  }, []);
-
-  useEffect(() => {
-    requestLocation();
-  }, [requestLocation]);
 
   useEffect(() => {
     if (!containerRef.current || !accessToken || !visible) return;
@@ -379,8 +312,6 @@ export function CoachLocatorMap({
 
     return () => {
       setMapReady(false);
-      userMarkerRef.current?.remove();
-      userMarkerRef.current = null;
       map.remove();
       mapRef.current = null;
     };
@@ -394,33 +325,18 @@ export function CoachLocatorMap({
     src.setData(geoJson);
   }, [geoJson, mapReady]);
 
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !userPos) return;
-    userMarkerRef.current?.remove();
-    const el = document.createElement('div');
-    el.className =
-      'h-4 w-4 rounded-full border-2 border-white bg-sky-500 shadow-md ring-2 ring-sky-400/50';
-    userMarkerRef.current = new mapboxgl.Marker({ element: el })
-      .setLngLat([userPos.lng, userPos.lat])
-      .addTo(map);
-  }, [userPos]);
-
-  const distanceMiles = useCallback(
-    (pin: CoachMapPin) => {
-      if (!userPos) return null;
-      return haversineMiles(userPos.lat, userPos.lng, pin.latitude, pin.longitude);
-    },
-    [userPos]
-  );
-
   const filterBar = (
-    <div
-      className={cn(
-        'flex flex-nowrap gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] md:pb-0 [&::-webkit-scrollbar]:hidden',
-        showFiltersBelowMap ? 'mt-4' : 'mb-4'
-      )}
-    >
+    <div className={cn('space-y-2', showFiltersBelowMap ? 'mt-4' : 'mb-4')}>
+      <p className="max-w-3xl text-[11px] leading-relaxed text-white/40">
+        Posted sessions: <span className="text-white/55">Private</span> = one athlete + coach.{' '}
+        <span className="text-white/55">Partner</span> = two athletes + same coach.{' '}
+        <span className="text-white/55">Small group</span> = coach + several athletes (capped per session).
+      </p>
+      <div
+        className={cn(
+          'flex flex-nowrap gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] md:pb-0 [&::-webkit-scrollbar]:hidden'
+        )}
+      >
       <select
         aria-label="Session format on public join-in sessions (optional filter)"
         value={sessionType}
@@ -431,18 +347,6 @@ export function CoachLocatorMap({
         <option value="private">Private</option>
         <option value="partner">Partner</option>
         <option value="small_group">Small group</option>
-      </select>
-      <select
-        aria-label="Weight class"
-        value={weightClass}
-        onChange={(e) => setWeightClass(e.target.value)}
-        className="shrink-0 rounded-full border border-white/15 bg-black/80 px-3 py-2 text-xs text-white"
-      >
-        {WEIGHT_OPTIONS.map((w) => (
-          <option key={w} value={w}>
-            {w === 'all' ? 'All weights' : `${w} lbs`}
-          </option>
-        ))}
       </select>
       <label
         className="inline-flex shrink-0 cursor-pointer items-center gap-2 rounded-full border border-white/15 bg-black/80 px-3 py-2 text-xs text-white"
@@ -463,16 +367,7 @@ export function CoachLocatorMap({
         onChange={(e) => setSearch(e.target.value)}
         className="min-w-[140px] shrink-0 rounded-full border border-white/15 bg-black/80 px-3 py-2 text-xs text-white placeholder:text-white/40"
       />
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        className="shrink-0 rounded-full border-accent/50 text-accent"
-        onClick={requestLocation}
-      >
-        <Navigation className="mr-1 h-3.5 w-3.5" />
-        Near me
-      </Button>
+      </div>
     </div>
   );
 
@@ -502,14 +397,10 @@ export function CoachLocatorMap({
 
       {pins.length === 0 && stats && !loadError && <CoachMapEmptyHint stats={stats} />}
 
-      <p className="mt-3 text-center text-xs text-white/50">
-        Training is scheduled with Guild coaches when you book or request a time—public join-in sessions on the
-        calendar are optional, not the only way to train.
-      </p>
-      <p className="mt-1.5 text-center text-xs text-white/45">
+      <p className="mt-3 text-center text-xs text-white/45">
         {coachCount} coach{coachCount === 1 ? '' : 'es'} across{' '}
-        {cityCount > 0 ? cityCount : pins.length === 0 ? '0' : 'several'} cities in North Carolina
-        {geoDenied && !userPos && ' · Location off — distances hidden'}
+        {cityCount > 0 ? cityCount : pins.length === 0 ? '0' : 'several'} cities in North Carolina — zoom and search by
+        city or zip to judge distance yourself.
       </p>
 
       {selectedPins && selectedPins.length > 0 && (
@@ -552,7 +443,6 @@ export function CoachLocatorMap({
                         >
                           <CoachCardContent
                             pin={pin}
-                            distanceMiles={distanceMiles(pin)}
                             onClose={() => setSelectedPins(null)}
                             showFacilityLine={false}
                             showCloseButton={false}
@@ -566,7 +456,6 @@ export function CoachLocatorMap({
                 <div className="overflow-y-auto p-4">
                   <CoachCardContent
                     pin={selectedPins[0]}
-                    distanceMiles={distanceMiles(selectedPins[0])}
                     onClose={() => setSelectedPins(null)}
                   />
                 </div>
@@ -600,7 +489,6 @@ export function CoachLocatorMap({
                       >
                         <CoachCardContent
                           pin={pin}
-                          distanceMiles={distanceMiles(pin)}
                           onClose={() => setSelectedPins(null)}
                           showFacilityLine={false}
                           showCloseButton={false}
@@ -612,7 +500,6 @@ export function CoachLocatorMap({
               ) : (
                 <CoachCardContent
                   pin={selectedPins[0]}
-                  distanceMiles={distanceMiles(selectedPins[0])}
                   onClose={() => setSelectedPins(null)}
                 />
               )}
@@ -626,19 +513,17 @@ export function CoachLocatorMap({
 
 function CoachCardContent({
   pin,
-  distanceMiles,
   onClose,
   showFacilityLine = true,
   showCloseButton = true,
 }: {
   pin: CoachMapPin;
-  distanceMiles: number | null;
   onClose: () => void;
   /** When listing several coaches at one facility, hide repeated address rows. */
   showFacilityLine?: boolean;
   showCloseButton?: boolean;
 }) {
-  const findTrainingHref = `/find-training?coach=${encodeURIComponent(pin.coachId)}`;
+  const joinPublicHref = `/login?redirect=${encodeURIComponent(`/find-training?coach=${encodeURIComponent(pin.coachId)}`)}`;
 
   return (
     <div className="space-y-3">
@@ -713,21 +598,18 @@ function CoachCardContent({
         </p>
       )}
 
-      {distanceMiles != null && (
-        <p className="text-xs text-accent">{Math.round(distanceMiles * 10) / 10} miles away</p>
-      )}
-
       <div className="flex flex-col gap-2">
         <div className="flex flex-col gap-2 sm:flex-row">
           <Button asChild variant="premium" size="sm" className="w-full">
-            <Link href={`/book/${pin.coachId}`}>Schedule a session</Link>
+            <Link href={`/book/${pin.coachId}`}>Book private or partner</Link>
           </Button>
           <Button asChild variant="outline" size="sm" className="w-full border-accent/40 text-accent">
-            <Link href={findTrainingHref}>Join a public session</Link>
+            <Link href={joinPublicHref}>Open partner &amp; small groups</Link>
           </Button>
         </div>
         <p className="text-center text-[11px] leading-snug text-white/45">
-          Join a public session only if a posted group or partner slot works for you—most families use Schedule first.
+          Partner: you&apos;ll invite your partner after checkout. Public sessions are optional join-ins—book with the
+          coach for a time that fits you.
         </p>
         <p className="text-center">
           <Link
