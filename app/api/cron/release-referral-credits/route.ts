@@ -11,7 +11,8 @@ export async function GET(req: NextRequest) {
   const secret = process.env.CRON_SECRET?.trim();
   const auth = req.headers.get('authorization');
   const querySecret = req.nextUrl.searchParams.get('secret');
-  if (process.env.NODE_ENV === 'production') {
+  const requireCronAuth = process.env.NODE_ENV === 'production' || Boolean(secret);
+  if (requireCronAuth) {
     const ok = secret && (auth === `Bearer ${secret}` || querySecret === secret);
     if (!ok) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
