@@ -67,6 +67,9 @@ export default async function HomePage({
         <h1 className="mb-2 text-center font-serif text-3xl font-black uppercase tracking-wide text-accent sm:text-4xl md:text-5xl">
           Find elite coaching near you
         </h1>
+        <p className="mb-3 max-w-2xl text-center text-sm text-white/70 sm:text-base md:text-lg">
+          Train with NCAA wrestlers—technique, training, and mentorship—where you live.
+        </p>
         <p className="mb-8 text-center text-base text-white/75 sm:text-lg">How do you want to train?</p>
 
         <TrainingPathCards />

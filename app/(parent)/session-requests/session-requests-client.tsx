@@ -80,14 +80,13 @@ export function SessionRequestsClient({ initialRows }: { initialRows: SessionReq
     return (
       <Card>
         <CardContent className="py-10 text-center text-muted-foreground text-sm space-y-3">
-          <p>No session requests yet.</p>
+          <p>No session requests here.</p>
           <p>
-            From a coach profile or booking page, use{' '}
-            <span className="text-foreground font-medium">Request a session</span> when you need a custom time that
-            isn&apos;t on their calendar.
+            Book from each coach&apos;s published openings on their profile or the booking flow—outside times aren&apos;t
+            requested through the app anymore.
           </p>
           <Button asChild variant="outline" className="mt-2">
-            <Link href="/training">Find training</Link>
+            <Link href="/training">Training</Link>
           </Button>
         </CardContent>
       </Card>

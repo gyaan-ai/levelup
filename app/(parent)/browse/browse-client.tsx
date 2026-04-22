@@ -297,7 +297,6 @@ export function BrowseAthletesClient({ initialAthletes, isAdmin, initialYouthWre
             const schoolColors = getSchoolBadgeColors(athlete.school);
             const isFollowed = followedCoachIds.has(athlete.id);
             const bookHref = `/book/${athlete.id}${initialYouthWrestlerId ? `?youthWrestlerId=${encodeURIComponent(initialYouthWrestlerId)}` : ''}`;
-            const requestHref = `/book/${athlete.id}/request${initialYouthWrestlerId ? `?youthWrestlerId=${encodeURIComponent(initialYouthWrestlerId)}` : ''}`;
             const profileHref = initialYouthWrestlerId
               ? `/athlete/${athlete.id}?youthWrestlerId=${encodeURIComponent(initialYouthWrestlerId)}`
               : `/athlete/${athlete.id}`;
@@ -379,12 +378,6 @@ export function BrowseAthletesClient({ initialAthletes, isAdmin, initialYouthWre
                           See availability
                         </Link>
                       </Button>
-                      <Link
-                        href={requestHref}
-                        className="text-sm text-center text-accent font-medium underline underline-offset-2 hover:no-underline min-h-[44px] flex items-center justify-center"
-                      >
-                        Need a custom time? Ask the coach
-                      </Link>
                       <a
                         href={`/training?tab=sessions&coach=${encodeURIComponent(athlete.id)}${initialYouthWrestlerId ? `&wrestler=${encodeURIComponent(initialYouthWrestlerId)}` : ''}`}
                         className="text-xs text-muted-foreground hover:text-foreground underline text-center block"

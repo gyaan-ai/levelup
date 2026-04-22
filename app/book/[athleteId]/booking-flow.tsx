@@ -515,16 +515,6 @@ export function BookingFlow({
               <SchoolLogo school={athlete.school} size="sm" />
               {athlete.school}
             </p>
-            <p className="text-sm text-muted-foreground mt-3 max-w-xl">
-              Need a time outside these openings?{' '}
-              <Link
-                href={`/book/${athlete.id}/request`}
-                className="text-accent font-medium underline underline-offset-2 hover:no-underline"
-              >
-                Ask for a custom time
-              </Link>{' '}
-              (coach reviews before you pay).
-            </p>
           </div>
         </div>
       </div>

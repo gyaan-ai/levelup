@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
 
 /**
- * GET — pending join requests (coach sessions) + slot requests for this coach.
+ * GET — pending join requests (invite-only sessions) for this coach.
  * Used for Schedule tab badge on mobile bottom nav.
  */
 export async function GET() {
@@ -30,21 +30,13 @@ export async function GET() {
     const viewAsCoachId = role === 'admin' ? cookieStore.get('levelup_view_as_coach_id')?.value : null;
     const coachId = viewAsCoachId || user.id;
 
-    const [{ count: joinCount }, { count: slotCount }] = await Promise.all([
-      supabase
-        .from('session_join_requests')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'pending'),
-      supabase
-        .from('parent_session_requests')
-        .select('*', { count: 'exact', head: true })
-        .eq('coach_id', coachId)
-        .eq('status', 'pending'),
-    ]);
+    const { count: joinCount } = await supabase
+      .from('session_join_requests')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'pending');
 
     const join = joinCount ?? 0;
-    const slot = slotCount ?? 0;
-    return NextResponse.json({ join, slot, total: join + slot });
+    return NextResponse.json({ join, slot: 0, total: join });
   } catch (e) {
     console.error('pending-requests-count GET error:', e);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

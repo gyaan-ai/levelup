@@ -34,6 +34,7 @@ export default async function SessionRequestJoinPage({
       id,
       parent_id,
       athlete_id,
+      join_policy,
       session_mode,
       session_type,
       scheduled_datetime,
@@ -52,6 +53,7 @@ export default async function SessionRequestJoinPage({
   const s = session as {
     parent_id?: string;
     athlete_id?: string;
+    join_policy?: string;
     session_mode?: string;
     session_type?: string;
     scheduled_datetime?: string;
@@ -63,6 +65,10 @@ export default async function SessionRequestJoinPage({
   };
 
   if (s.parent_id === user.id) redirect('/dashboard');
+
+  if ((s.join_policy ?? 'private') === 'public') {
+    redirect(`/sessions/${sessionId}/register`);
+  }
 
   const current = s.current_participants ?? 1;
   const max = s.max_participants ?? 2;

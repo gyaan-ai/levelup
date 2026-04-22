@@ -1021,25 +1021,26 @@ export function FindTrainingClient({
             <Link href="/browse" className="text-[#D4AF37] hover:underline">
               Browse coaches
             </Link>{' '}
-            to schedule or request a session—what you see here are only join-in sessions coaches have posted.
+            to book from their availability—what you see here are only join-in sessions coaches have posted.
           </p>
         </div>
       )}
 
       {filteredRequestCoaches.length > 0 && (
-        <section className="mt-8 pt-6 border-t border-zinc-800" aria-label="Request a session">
+        <section className="mt-8 pt-6 border-t border-zinc-800" aria-label="Book private or partner">
           <h3 className="text-sm font-semibold uppercase tracking-wider text-zinc-500 mb-3">
-            Need a different time?
+            Book private or partner
           </h3>
           <p className="text-sm text-zinc-400 mb-4">
-            These coaches take private or partner requests—a public join-in session above is never required.
+            These coaches publish availability for one-on-one or partner work—a public join-in session above is never
+            required.
           </p>
           <div className="space-y-3">
             {filteredRequestCoaches.map((c) => {
               const name = [c.first_name, c.last_name].filter(Boolean).join(' ').trim() || 'Coach';
-              const reqHref = preselectedWrestlerId
-                ? `/book/${c.id}/request?youthWrestlerId=${encodeURIComponent(preselectedWrestlerId)}`
-                : `/book/${c.id}/request`;
+              const bookHref = preselectedWrestlerId
+                ? `/book/${c.id}?youthWrestlerId=${encodeURIComponent(preselectedWrestlerId)}`
+                : `/book/${c.id}`;
               return (
                 <div
                   key={c.id}
@@ -1068,7 +1069,7 @@ export function FindTrainingClient({
                     className="shrink-0 min-h-[44px] bg-[#D4AF37] hover:bg-[#c9a432] text-black font-semibold text-sm"
                     asChild
                   >
-                    <Link href={reqHref}>Custom time</Link>
+                    <Link href={bookHref}>See availability</Link>
                   </Button>
                 </div>
               );

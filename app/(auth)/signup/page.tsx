@@ -58,14 +58,20 @@ export default function SignupPage() {
   const supabase = createClient(tenant.slug);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** True when signup URL had ?ref= or browser already stored a referral code from a prior visit. */
+  const [referralLinkActive, setReferralLinkActive] = useState(false);
 
   useEffect(() => {
-    if (refFromUrl && typeof window !== 'undefined') {
-      try {
+    if (typeof window === 'undefined') return;
+    try {
+      if (refFromUrl) {
         window.localStorage.setItem('guild_referral_code', refFromUrl);
-      } catch {
-        /* ignore */
+        setReferralLinkActive(true);
+      } else if (window.localStorage.getItem('guild_referral_code')?.trim()) {
+        setReferralLinkActive(true);
       }
+    } catch {
+      /* ignore */
     }
   }, [refFromUrl]);
 
@@ -269,17 +275,24 @@ export default function SignupPage() {
                 )}
               />
 
+              {referralLinkActive && (
+                <p className="text-sm text-muted-foreground rounded-md border border-border bg-muted/40 px-3 py-2">
+                  You&apos;re signing up through a referral link — that&apos;s already applied. Leave the field
+                  below blank unless you also have a separate Guild promo or discount code.
+                </p>
+              )}
+
               <FormField
                 control={form.control}
                 name="discountCode"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Discount Code (optional)</FormLabel>
+                    <FormLabel>Promo or discount code (optional)</FormLabel>
                     <FormControl>
-                      <Input placeholder="Enter code" {...field} />
+                      <Input placeholder="e.g. FAMILY10" autoComplete="off" {...field} />
                     </FormControl>
                     <FormDescription>
-                      Have a referral or promo code? Enter it here.
+                      Only for codes issued by The Guild (percent-off promos). Not for friend referrals.
                     </FormDescription>
                     <FormMessage />
                   </FormItem>

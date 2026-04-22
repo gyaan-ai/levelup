@@ -37,6 +37,67 @@ export async function GET(req: Request) {
 
   const { data, error, count } = await query;
 
+  const enrichRecipientLabels = async (
+    rows: Record<string, unknown>[]
+  ): Promise<Record<string, unknown>[]> => {
+    const need = new Set<string>();
+    for (const r of rows) {
+      const labelEmpty = !String(r.recipient_label ?? '').trim();
+      if (
+        r.channel === 'notification' &&
+        r.recipient_id &&
+        labelEmpty &&
+        typeof r.recipient_id === 'string'
+      ) {
+        need.add(r.recipient_id);
+      }
+    }
+    if (need.size === 0) return rows;
+
+    const ids = [...need];
+    const { data: userRows } = await admin
+      .from('users')
+      .select('id, first_name, last_name, role, email')
+      .in('id', ids);
+
+    const labelById = new Map<string, string>();
+    for (const u of userRows ?? []) {
+      const row = u as {
+        id: string;
+        first_name: string | null;
+        last_name: string | null;
+        role: string | null;
+        email: string | null;
+      };
+      const name = [row.first_name, row.last_name].filter(Boolean).join(' ').trim();
+      const role =
+        row.role && row.role.length > 0
+          ? row.role.charAt(0).toUpperCase() + row.role.slice(1)
+          : 'User';
+      const label = name ? `${name} (${role})` : row.email || `${row.id.slice(0, 8)}…`;
+      labelById.set(row.id, label);
+    }
+
+    return rows.map((r) => {
+      if (
+        r.channel !== 'notification' ||
+        !r.recipient_id ||
+        String(r.recipient_label ?? '').trim() ||
+        typeof r.recipient_id !== 'string'
+      ) {
+        return r;
+      }
+      const resolved = labelById.get(r.recipient_id);
+      if (!resolved) {
+        return {
+          ...r,
+          recipient_label: `User ${(r.recipient_id as string).slice(0, 8)}…`,
+        };
+      }
+      return { ...r, recipient_label: resolved };
+    });
+  };
+
   if (error) {
     const msg = error.message ?? String(error);
     const code = 'code' in error ? String((error as { code?: string }).code) : '';
@@ -56,5 +117,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: msg, code: code || undefined }, { status: 500 });
   }
 
-  return NextResponse.json({ messages: data ?? [], total: count ?? 0 });
+  const messages = await enrichRecipientLabels((data ?? []) as Record<string, unknown>[]);
+
+  return NextResponse.json({ messages, total: count ?? 0 });
 }

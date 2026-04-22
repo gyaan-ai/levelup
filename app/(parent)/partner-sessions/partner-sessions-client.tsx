@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -23,6 +25,7 @@ type StatusFilter = 'all' | 'open' | 'filling' | 'full';
 interface SessionItem {
   id: string;
   scheduled_datetime: string;
+  join_policy?: string | null;
   current_participants?: number;
   max_participants?: number;
   price_per_participant?: number;
@@ -96,6 +99,7 @@ export function PartnerSessionsClient({
   initialSessions,
   youthWrestlers,
 }: PartnerSessionsClientProps) {
+  const router = useRouter();
   const [sessions, setSessions] = useState(initialSessions);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [requestingSessionId, setRequestingSessionId] = useState<string | null>(null);
@@ -129,8 +133,14 @@ export function PartnerSessionsClient({
           message: message || undefined,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Request failed');
+      const data = (await res.json()) as { error?: string; registerPath?: string };
+      if (!res.ok) {
+        if (typeof data.registerPath === 'string' && data.registerPath.startsWith('/')) {
+          router.push(data.registerPath);
+          return;
+        }
+        throw new Error(data.error || 'Request failed');
+      }
       setRequestingSessionId(null);
       setSelectedWrestlerId('');
       setMessage('');
@@ -281,9 +291,15 @@ export function PartnerSessionsClient({
                   </p>
                 )}
                 <p className="font-bold">${Number(price).toFixed(2)}</p>
-                <Button onClick={() => handleRequest(s.id)} className="w-full mt-2">
-                  Request to Join
-                </Button>
+                {(s.join_policy ?? 'private') === 'public' ? (
+                  <Button asChild className="w-full mt-2">
+                    <Link href={`/sessions/${s.id}/register`}>Register</Link>
+                  </Button>
+                ) : (
+                  <Button onClick={() => handleRequest(s.id)} className="w-full mt-2">
+                    Request to Join
+                  </Button>
+                )}
               </CardContent>
             </Card>
           );

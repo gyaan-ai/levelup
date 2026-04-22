@@ -151,9 +151,6 @@ export default async function AthleteProfilePage({
   const bookHref = youthWrestlerId
     ? `/book/${athlete.id}?youthWrestlerId=${encodeURIComponent(youthWrestlerId)}`
     : `/book/${athlete.id}`;
-  const requestHref = youthWrestlerId
-    ? `/book/${athlete.id}/request?youthWrestlerId=${encodeURIComponent(youthWrestlerId)}`
-    : `/book/${athlete.id}/request`;
   const athleteName = `${athlete.first_name} ${athlete.last_name}`.trim() || 'This coach';
 
   const { data: weeklyAvailRows } = await supabase
@@ -285,7 +282,7 @@ export default async function AthleteProfilePage({
                 )}
               </div>
 
-              {/* Parents/admins: book, custom-time request. Coaches: edit own profile only (no admin shortcut here). */}
+              {/* Parents/admins: book. Coaches: edit own profile only (no admin shortcut here). */}
               <div className="flex flex-col gap-3 max-w-xl">
                 <div className="flex flex-wrap items-center gap-3">
                   {canInteractAsParentOrAdmin && (
@@ -304,15 +301,6 @@ export default async function AthleteProfilePage({
                     </Link>
                   )}
                 </div>
-                {canInteractAsParentOrAdmin && (
-                  <div className="flex flex-col sm:flex-row flex-wrap gap-3">
-                    <Link href={requestHref}>
-                      <Button size="lg" variant="outline" className="w-full sm:w-auto border-[#D4AF37]/50 touch-manipulation">
-                        Ask for a custom time
-                      </Button>
-                    </Link>
-                  </div>
-                )}
                 {canInteractAsParentOrAdmin && (
                   <>
                     {coachPhoneForContact ? (
@@ -475,7 +463,7 @@ export default async function AthleteProfilePage({
               Availability
             </CardTitle>
             <p className="text-sm text-muted-foreground">
-              Typical hours for private or partner session requests (Eastern). Public small-group join-ins, if any, appear
+              Typical hours for private or partner sessions (Eastern). Public small-group join-ins, if any, appear
               separately above.
             </p>
           </CardHeader>

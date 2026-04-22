@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useMemo } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -60,6 +60,7 @@ import {
   Phone,
   Bell,
   History,
+  Gift,
 } from 'lucide-react';
 import Link from 'next/link';
 import { ProfileImage } from '@/components/profile-image';
@@ -325,6 +326,8 @@ type Props = {
   youthSessionSpendLines: YouthSessionSpendLine[];
   /** Newest signups (parents, coaches, wrestlers) for overview — names + emails. */
   recentSignups: RecentSignupRow[];
+  /** Guild rewards program: show /admin/rewards in Money nav when enabled. */
+  rewardsProgramEnabled?: boolean;
 };
 
 // Sidebar Navigation Item Component
@@ -441,8 +444,10 @@ export function AdminDashboardClient({
   usersError,
   youthSessionSpendLines = [],
   recentSignups = [],
+  rewardsProgramEnabled = false,
 }: Props) {
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
   const sectionParam = searchParams.get('section') as SectionId | null;
   const subParam = searchParams.get('sub') as SubSectionId | null;
@@ -4938,6 +4943,20 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
   active={section === 'money' && subSection === 'credits'}
   onClick={() => handleNavChange('money', 'credits')}
   />
+              {rewardsProgramEnabled && (
+                <Link
+                  href="/admin/rewards"
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 text-sm font-medium rounded-lg transition-all ${
+                    pathname === '/admin/rewards'
+                      ? 'bg-[#B89D60]/15 text-[#B89D60]'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                  }`}
+                >
+                  <Gift className="h-4 w-4 shrink-0" />
+                  <span className="flex-1 text-left">Rewards</span>
+                  {pathname === '/admin/rewards' && <ChevronRight className="h-4 w-4 shrink-0 opacity-50" />}
+                </Link>
+              )}
               <NavItem
                 icon={MessageSquare}
                 label="Messages"

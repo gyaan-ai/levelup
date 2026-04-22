@@ -6,7 +6,6 @@ import { usePathname, useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Check, X, DollarSign, Smartphone, Trash2, Loader2, Share2, ExternalLink, CalendarPlus, Pencil, CalendarClock } from 'lucide-react';
-import { Textarea } from '@/components/ui/textarea';
 import { CoachTextGroupDialog } from '@/components/coach-text-group-dialog';
 import { CopySessionPhonesButton } from '@/components/copy-session-phones-button';
 import { formatEST } from '@/lib/format-date';
@@ -60,22 +59,6 @@ type RequestItem = {
   session?: { id: string; scheduled_datetime: string; session_type?: string; session_mode?: string; facilities?: { name?: string } | null };
 };
 
-export type SlotRequestItem = {
-  id: string;
-  requesting_parent_id: string;
-  youth_wrestler_id: string;
-  coach_id: string;
-  facility_id: string | null;
-  preferred_datetime: string | null;
-  session_type: string | null;
-  message: string | null;
-  flexibility_note: string | null;
-  status: string;
-  created_at: string;
-  youth_wrestlers?: { id: string; first_name?: string; last_name?: string; age?: number; weight_class?: string; skill_level?: string } | null;
-  facilities?: { id?: string; name?: string } | { id?: string; name?: string }[] | null;
-};
-
 export type CommunitySession = {
   id: string;
   scheduled_datetime: string;
@@ -121,8 +104,6 @@ type Props = {
   pendingRequests: RequestItem[];
   /** Other coaches’ public / invite-only upcoming sessions */
   communitySessions: CommunitySession[];
-  /** Parents asking for a time / format before a session exists */
-  pendingSlotRequests: SlotRequestItem[];
   payoutRate?: number;
 };
 
@@ -131,7 +112,6 @@ export function CoachSessionsClient({
   upcomingSessions,
   completedSessions,
   pendingRequests,
-  pendingSlotRequests,
   communitySessions,
   payoutRate = COACH_REVENUE_FRACTION,
 }: Props) {
@@ -154,8 +134,6 @@ export function CoachSessionsClient({
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [requests, setRequests] = useState<RequestItem[]>(pendingRequests);
-  const [slotRequests, setSlotRequests] = useState<SlotRequestItem[]>(pendingSlotRequests);
-  const [slotNoteById, setSlotNoteById] = useState<Record<string, string>>({});
   const [textGroupSession, setTextGroupSession] = useState<CoachSession | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -187,31 +165,6 @@ export function CoachSessionsClient({
       alert(e instanceof Error ? e.message : 'Failed to cancel session');
     } finally {
       setCancellingId(null);
-    }
-  };
-
-  const requestCount = requests.length + slotRequests.length;
-
-  const handleSlotRespond = async (requestId: string, action: 'approve' | 'decline') => {
-    setLoadingId(requestId);
-    try {
-      const res = await fetch(`/api/parent-session-requests/${requestId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: action === 'approve' ? 'approve' : 'decline',
-          coachResponse: slotNoteById[requestId]?.trim() || null,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Failed');
-      setSlotRequests((prev) => prev.filter((r) => r.id !== requestId));
-      router.refresh();
-      window.dispatchEvent(new Event('coach-pending-refresh'));
-    } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : 'Failed');
-    } finally {
-      setLoadingId(null);
     }
   };
 
@@ -497,95 +450,6 @@ export function CoachSessionsClient({
                 </Card>
               );
             })}
-              </div>
-            )}
-          </div>
-
-          <div className="space-y-2">
-            <h2 className="text-sm font-semibold text-foreground">Session requests</h2>
-            <p className="text-xs text-muted-foreground">
-              Parents asking you to offer a time or format. Approve to let them know you can work with it, or decline with a short note.
-            </p>
-            {slotRequests.length === 0 ? (
-              <Card>
-                <CardContent className="py-6 text-center text-muted-foreground text-sm">
-                  No pending session requests.
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-3">
-                {slotRequests.map((r) => {
-                  const ywRaw = r.youth_wrestlers;
-                  const yw = Array.isArray(ywRaw) ? ywRaw[0] : ywRaw;
-                  const name = yw ? [yw.first_name, yw.last_name].filter(Boolean).join(' ') : 'A wrestler';
-                  const fac = r.facilities;
-                  const facName = fac
-                    ? (Array.isArray(fac) ? (fac[0] as { name?: string })?.name : (fac as { name?: string })?.name) ?? '—'
-                    : '—';
-                  const when = r.preferred_datetime
-                    ? formatEST(new Date(r.preferred_datetime), 'EEE, MMM d · h:mm a')
-                    : '— (see message)';
-                  const typeLabel = r.session_type ? r.session_type.replace('_', ' ') : '—';
-                  return (
-                    <Card key={r.id}>
-                      <CardContent className="p-4 space-y-3">
-                        <div>
-                          <p className="font-medium">{name}</p>
-                          <p className="text-sm text-muted-foreground">
-                            {when} · {facName !== '—' ? facName : 'Facility not specified'}
-                          </p>
-                          <p className="text-sm text-muted-foreground">Type: {typeLabel}</p>
-                          {r.message && <p className="text-sm text-muted-foreground mt-1">&ldquo;{r.message}&rdquo;</p>}
-                          {r.flexibility_note && (
-                            <p className="text-sm text-muted-foreground mt-1">Flexible: {r.flexibility_note}</p>
-                          )}
-                        </div>
-                        <div className="space-y-2">
-                          <label htmlFor={`slot-note-${r.id}`} className="text-xs text-muted-foreground">
-                            Optional note to parent (included in their notification)
-                          </label>
-                          <Textarea
-                            id={`slot-note-${r.id}`}
-                            rows={2}
-                            className="resize-y min-h-[72px] text-sm"
-                            placeholder="e.g. I can do Tuesday 4pm — book from my profile, or I will add a slot."
-                            value={slotNoteById[r.id] ?? ''}
-                            onChange={(e) =>
-                              setSlotNoteById((prev) => ({ ...prev, [r.id]: e.target.value }))
-                            }
-                          />
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          <Button
-                            size="sm"
-                            className="min-h-[44px] touch-manipulation"
-                            onClick={() => handleSlotRespond(r.id, 'approve')}
-                            disabled={loadingId === r.id}
-                          >
-                            <Check className="h-4 w-4 mr-1" />
-                            Approve
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="min-h-[44px] touch-manipulation text-destructive border-destructive hover:bg-destructive hover:text-destructive-foreground"
-                            onClick={() => handleSlotRespond(r.id, 'decline')}
-                            disabled={loadingId === r.id}
-                          >
-                            <X className="h-4 w-4 mr-1" />
-                            Decline
-                          </Button>
-                          <Button variant="ghost" size="sm" className="min-h-[44px] touch-manipulation" asChild>
-                            <Link href="/coach-sessions/create">
-                              <CalendarPlus className="h-4 w-4 mr-1" />
-                              New session
-                            </Link>
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
               </div>
             )}
           </div>

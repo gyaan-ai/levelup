@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { normalizeCoachRevenueShareRate } from '@/lib/pricing';
-import { CoachScheduleClient, type JoinRequestItem, type SlotRequestScheduleItem } from './coach-schedule-client';
+import { CoachScheduleClient, type JoinRequestItem } from './coach-schedule-client';
 import type { CoachSession } from './coach-schedule-card';
 
 export const dynamic = 'force-dynamic';
@@ -119,30 +119,6 @@ export default async function CoachHomePage() {
     session: sessionMap.get(r.session_id),
   }));
 
-  const { data: slotRequestsRaw } = await supabase
-    .from('parent_session_requests')
-    .select(
-      `
-      id,
-      requesting_parent_id,
-      youth_wrestler_id,
-      coach_id,
-      facility_id,
-      preferred_datetime,
-      session_type,
-      duration_minutes,
-      message,
-      flexibility_note,
-      status,
-      created_at,
-      youth_wrestlers:youth_wrestler_id(id, first_name, last_name, age, weight_class),
-      facilities:facility_id(id, name)
-    `
-    )
-    .eq('coach_id', coachId)
-    .eq('status', 'pending')
-    .order('created_at', { ascending: false });
-
   const coachFirstName = athlete?.first_name ?? null;
   const coachDisplayName =
     [athlete?.first_name, athlete?.last_name].filter(Boolean).join(' ').trim() || 'Coach';
@@ -152,7 +128,6 @@ export default async function CoachHomePage() {
         upcomingSessions={(upcomingSessions ?? []) as CoachSession[]}
         upcomingSessionsCount={upcomingSessionsCount ?? 0}
         pendingJoinRequests={requestsWithSession as JoinRequestItem[]}
-        pendingSlotRequests={(slotRequestsRaw ?? []) as unknown as SlotRequestScheduleItem[]}
         coachFirstName={coachFirstName}
         coachDisplayName={coachDisplayName}
         payoutRate={normalizeCoachRevenueShareRate(

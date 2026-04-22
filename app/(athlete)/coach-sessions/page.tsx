@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import { purgeEmptyPastSessions } from '@/lib/purge-empty-past-sessions';
-import { CoachSessionsClient, type CommunitySession, type SlotRequestItem } from './coach-sessions-client';
+import { CoachSessionsClient, type CommunitySession } from './coach-sessions-client';
 import type { CoachSession } from '@/app/(athlete)/athlete-dashboard/coach-schedule-card';
 import { CopyCoachAllAthletePhonesButton } from '@/components/copy-coach-all-athlete-phones-button';
 import { normalizeCoachRevenueShareRate } from '@/lib/pricing';
@@ -108,29 +108,6 @@ export default async function CoachSessionsPage({
     session: sessionMap.get(r.session_id),
   }));
 
-  const { data: slotRequestsRaw } = await supabase
-    .from('parent_session_requests')
-    .select(
-      `
-      id,
-      requesting_parent_id,
-      youth_wrestler_id,
-      coach_id,
-      facility_id,
-      preferred_datetime,
-      session_type,
-      message,
-      flexibility_note,
-      status,
-      created_at,
-      youth_wrestlers:youth_wrestler_id(id, first_name, last_name, age, weight_class),
-      facilities:facility_id(id, name)
-    `
-    )
-    .eq('coach_id', coachId)
-    .eq('status', 'pending')
-    .order('created_at', { ascending: false });
-
   // Other coaches’ bookable sessions (same visibility as parent Training list — public / invite_only)
   const { data: communitySessions } = await supabase
     .from('sessions')
@@ -176,7 +153,6 @@ export default async function CoachSessionsPage({
           youth_wrestlers?: { id: string; first_name?: string; last_name?: string; age?: number; weight_class?: string; skill_level?: string } | null;
           session?: { id: string; scheduled_datetime: string; session_type?: string; session_mode?: string; facilities?: { name?: string } | null };
         }>}
-        pendingSlotRequests={(slotRequestsRaw ?? []) as unknown as SlotRequestItem[]}
         payoutRate={normalizeCoachRevenueShareRate(
           athlete?.payout_rate != null ? Number(athlete.payout_rate) : null
         )}

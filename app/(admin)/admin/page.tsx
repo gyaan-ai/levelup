@@ -19,6 +19,7 @@ import {
   type RecentSignupRow,
 } from './admin-dashboard-client';
 import { coachPayoutUsd, type SessionCoachPayoutFields } from '@/lib/coach-session-payout';
+import { isRewardsProgramEnabled } from '@/lib/rewards';
 
 type SessionWithPayoutStatus = SessionCoachPayoutFields & { status: string };
 
@@ -668,6 +669,7 @@ export default async function AdminPage() {
         usersError={usersRes.error?.message ?? null}
         youthSessionSpendLines={youthSessionSpendLines}
         recentSignups={recentSignups}
+        rewardsProgramEnabled={isRewardsProgramEnabled()}
       />
     </div>
   );

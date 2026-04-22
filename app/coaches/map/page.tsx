@@ -83,7 +83,7 @@ export default async function CoachesMapPage() {
           <p>
             <span className="font-semibold text-accent/90">2.</span>{' '}
             <span className="text-white/85">Browse open partner sessions and small groups</span> in the table below.
-            Filters are above the map; use city or zip to judge distance.
+            Filters are above the map; pan and zoom to judge distance.
           </p>
         </div>
 

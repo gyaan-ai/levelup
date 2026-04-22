@@ -50,14 +50,26 @@ export async function GET() {
       ? `${baseUrl}/signup?ref=${encodeURIComponent(referralCode)}`
       : null;
 
-    const [{ count: completedRef }, { count: pendingRef }] = await Promise.all([
+    const [{ count: completedRef }, { count: pendingSignup }, { count: awaitingRelease }] = await Promise.all([
       admin.from('referrals').select('id', { count: 'exact', head: true }).eq('referrer_id', user.id).eq('status', 'completed'),
-      admin
-        .from('referrals')
-        .select('id', { count: 'exact', head: true })
-        .eq('referrer_id', user.id)
-        .in('status', ['pending', 'awaiting_release']),
+      admin.from('referrals').select('id', { count: 'exact', head: true }).eq('referrer_id', user.id).eq('status', 'pending'),
+      admin.from('referrals').select('id', { count: 'exact', head: true }).eq('referrer_id', user.id).eq('status', 'awaiting_release'),
     ]);
+
+    const { data: nextHoldRow } = await admin
+      .from('pending_referral_credits')
+      .select('available_at, amount')
+      .eq('referrer_id', user.id)
+      .eq('released', false)
+      .order('available_at', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    const nextReferralCreditAvailableAt =
+      (nextHoldRow as { available_at?: string } | null)?.available_at ?? null;
+    const nextReferralCreditAmount = nextHoldRow
+      ? Number((nextHoldRow as { amount?: unknown }).amount ?? 25)
+      : null;
 
     const completedSessions = await countCompletedPaidSessionsForParent(admin, user.id);
     const nextMilestone = getNextSessionMilestoneProgress(completedSessions);
@@ -67,7 +79,12 @@ export async function GET() {
       referralCode,
       referralLink,
       completedReferrals: completedRef ?? 0,
-      pendingReferrals: pendingRef ?? 0,
+      /** @deprecated use referralAwaitingFirstBooking + referralCreditOnHold */
+      pendingReferrals: (pendingSignup ?? 0) + (awaitingRelease ?? 0),
+      referralAwaitingFirstBooking: pendingSignup ?? 0,
+      referralCreditOnHold: awaitingRelease ?? 0,
+      nextReferralCreditAvailableAt,
+      nextReferralCreditAmount,
       completedSessions,
       nextMilestone,
     });

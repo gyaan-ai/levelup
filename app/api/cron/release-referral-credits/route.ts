@@ -4,7 +4,7 @@ import { tenants } from '@/config/tenants';
 import { expireStaleReferrals, isRewardsProgramEnabled, releaseDueReferralCredits } from '@/lib/rewards';
 
 /**
- * Daily: expire stale referrals; release referral credits past 7-day hold.
+ * Daily: expire stale referrals; release referral credits past hold (3 days after scheduling).
  * Production: Authorization: Bearer CRON_SECRET (or ?secret=)
  */
 export async function GET(req: NextRequest) {

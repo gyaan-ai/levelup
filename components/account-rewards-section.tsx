@@ -4,6 +4,7 @@ import { useState } from 'react';
 import useSWR from 'swr';
 import { Button } from '@/components/ui/button';
 import { Gift, Link2, Share2, Copy, Check } from 'lucide-react';
+import { formatEST } from '@/lib/format-date';
 
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -13,6 +14,10 @@ type ReferralsMe = {
   referralLink: string | null;
   completedReferrals: number;
   pendingReferrals: number;
+  referralAwaitingFirstBooking?: number;
+  referralCreditOnHold?: number;
+  nextReferralCreditAvailableAt?: string | null;
+  nextReferralCreditAmount?: number | null;
   completedSessions: number;
   nextMilestone: {
     nextThreshold: number | null;
@@ -105,11 +110,30 @@ export function AccountRewardsSection() {
               ? `You've referred ${data.completedReferrals} ${data.completedReferrals === 1 ? 'family' : 'families'} — $${earnedReferralCredits.toFixed(0)} in referral credits earned.`
               : 'Earn $25 when a referred family completes their first paid booking (released after a short hold).'}
           </p>
-          {data.pendingReferrals > 0 && (
-            <p className="text-xs text-zinc-500 mt-1">
-              {data.pendingReferrals} referral{data.pendingReferrals === 1 ? '' : 's'} in progress.
+          {(data.referralCreditOnHold ?? 0) > 0 && data.nextReferralCreditAvailableAt && (
+            <p className="text-xs text-amber-200/90 mt-2 rounded-md border border-amber-900/50 bg-amber-950/30 px-2.5 py-2">
+              A referred family completed their first booking. Your $
+              {(data.nextReferralCreditAmount ?? 25).toFixed(0)} credit is on a short hold and will hit your
+              wallet around{' '}
+              <span className="font-medium">
+                {formatEST(new Date(data.nextReferralCreditAvailableAt), 'MMM d, yyyy h:mm a')}
+              </span>{' '}
+              (then it shows under Available credit). This is normal.
             </p>
           )}
+          {(data.referralAwaitingFirstBooking ?? 0) > 0 && (
+            <p className="text-xs text-zinc-500 mt-1">
+              {data.referralAwaitingFirstBooking} signed up with your link but hasn&apos;t completed a paid
+              booking yet.
+            </p>
+          )}
+          {(data.referralCreditOnHold ?? 0) === 0 &&
+            (data.referralAwaitingFirstBooking ?? 0) === 0 &&
+            data.pendingReferrals > 0 && (
+              <p className="text-xs text-zinc-500 mt-1">
+                {data.pendingReferrals} referral{data.pendingReferrals === 1 ? '' : 's'} in progress.
+              </p>
+            )}
         </div>
 
         {next?.nextThreshold != null && (
@@ -134,7 +158,8 @@ export function AccountRewardsSection() {
 
         <p className="text-xs text-zinc-600 flex items-start gap-1.5">
           <Link2 className="h-3.5 w-3.5 shrink-0 mt-0.5" />
-          5% back on cash paid at checkout. Credits apply automatically on future bookings.
+          Earn credit through session milestones and referrals. Wallet credit applies automatically at checkout when you
+          choose to use it.
         </p>
       </div>
     </div>

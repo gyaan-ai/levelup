@@ -16,7 +16,6 @@ import { formatEST } from '@/lib/format-date';
 import { getSessionTypeDisplay } from '@/lib/session-type-display';
 import { useAutoAssignSoloWrestler } from '@/lib/hooks/use-auto-assign-solo-wrestler';
 import { Switch } from '@/components/ui/switch';
-
 const fetcher = (url: string) => fetch(url).then(r => r.json());
 
 type Wrestler = {
@@ -77,7 +76,7 @@ export function CartCheckoutClient({
   const subtotalAfterDiscount = total - discountAmount;
   const creditsToApply = useCredits ? Math.min(creditBalance, subtotalAfterDiscount) : 0;
   const amountToPay = subtotalAfterDiscount - creditsToApply;
-  
+
   const handleApplyPromo = async () => {
     if (!promoCode.trim()) return;
 

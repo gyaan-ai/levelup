@@ -2,21 +2,25 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Gauge, Calendar, Users, CreditCard, User } from 'lucide-react';
+import { Home, Gauge, Calendar, Users, CreditCard, User, Gift } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-/** Admin mobile bottom nav. Account = settings + sign out (same pattern as parent nav). */
-const ITEMS = [
-  { href: '/dashboard', label: 'Dashboard', icon: Home },
-  { href: '/admin', label: 'Cockpit', icon: Gauge },
-  { href: '/admin?tab=sessions', label: 'Sessions', icon: Calendar },
-  { href: '/admin?tab=users', label: 'Users', icon: Users },
-  { href: '/admin?tab=billing', label: 'Billing', icon: CreditCard },
-  { href: '/account', label: 'Account', icon: User },
-] as const;
+type NavItem = { href: string; label: string; icon: typeof Home };
 
+/** Admin mobile bottom nav. Account = settings + sign out (same pattern as parent nav). */
 export function AdminBottomNav() {
   const pathname = usePathname();
+  const rewardsOn = process.env.NEXT_PUBLIC_REWARDS_PROGRAM_ENABLED === 'true';
+
+  const ITEMS: NavItem[] = [
+    { href: '/dashboard', label: 'Dashboard', icon: Home },
+    { href: '/admin', label: 'Cockpit', icon: Gauge },
+    { href: '/admin?tab=sessions', label: 'Sessions', icon: Calendar },
+    { href: '/admin?tab=users', label: 'Users', icon: Users },
+    { href: '/admin?tab=billing', label: 'Billing', icon: CreditCard },
+    ...(rewardsOn ? [{ href: '/admin/rewards', label: 'Rewards', icon: Gift }] : []),
+    { href: '/account', label: 'Account', icon: User },
+  ];
 
   return (
     <nav
@@ -28,7 +32,12 @@ export function AdminBottomNav() {
         const isActive =
           path === '/account'
             ? pathname === '/account' || pathname.startsWith('/account/')
-            : pathname === path || (path === '/admin' && pathname.startsWith('/admin'));
+            : path === '/admin/rewards'
+            ? pathname === '/admin/rewards'
+            : pathname === path ||
+              (path === '/admin' &&
+                pathname.startsWith('/admin') &&
+                pathname !== '/admin/rewards');
         return (
           <Link
             key={href}

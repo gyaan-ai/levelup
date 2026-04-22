@@ -29,7 +29,7 @@ export async function CoachMapSection({
           Explore the map
         </h2>
         <p className="mx-auto mt-3 max-w-2xl text-center text-sm text-white/60">
-          Narrow by city or zip, then tap a pin. Filters stay above the map so you can explore with context.
+          Use the filters above the map, then tap a pin. Pan and zoom to see who&apos;s near you.
         </p>
 
         <div className="mt-8">

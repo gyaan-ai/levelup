@@ -44,15 +44,6 @@ function sessionTypeMatches(kinds: SessionKind[], filter: string): boolean {
   return true;
 }
 
-function searchMatches(pin: CoachMapPin, q: string): boolean {
-  const s = q.trim().toLowerCase();
-  if (!s) return true;
-  const hay = [pin.facilityName, pin.facilityAddress ?? '', pin.facilityAddress?.split(',')[0] ?? '']
-    .join(' ')
-    .toLowerCase();
-  return hay.includes(s) || (/\d{5}/.test(s) && hay.includes(s));
-}
-
 export function CoachLocatorMap({
   accessToken,
   className,
@@ -81,7 +72,6 @@ export function CoachLocatorMap({
   const [sessionType, setSessionType] = useState('all');
   /** Narrow to coaches with a bookable path: open seat on a public join-in session and/or published calendar availability. */
   const [takingBookingsOnly, setTakingBookingsOnly] = useState(false);
-  const [search, setSearch] = useState('');
   /** One or more pins (cluster at same spot opens many). */
   const [selectedPins, setSelectedPins] = useState<CoachMapPin[] | null>(null);
   const [visible, setVisible] = useState(false);
@@ -134,10 +124,9 @@ export function CoachLocatorMap({
       ) {
         return false;
       }
-      if (!searchMatches(p, search)) return false;
       return true;
     });
-  }, [pins, sessionType, takingBookingsOnly, search]);
+  }, [pins, sessionType, takingBookingsOnly]);
 
   pinsRef.current = filteredPins;
 
@@ -360,13 +349,6 @@ export function CoachLocatorMap({
         />
         Taking bookings
       </label>
-      <input
-        type="search"
-        placeholder="City or zip"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="min-w-[140px] shrink-0 rounded-full border border-white/15 bg-black/80 px-3 py-2 text-xs text-white placeholder:text-white/40"
-      />
       </div>
     </div>
   );
@@ -399,8 +381,8 @@ export function CoachLocatorMap({
 
       <p className="mt-3 text-center text-xs text-white/45">
         {coachCount} coach{coachCount === 1 ? '' : 'es'} across{' '}
-        {cityCount > 0 ? cityCount : pins.length === 0 ? '0' : 'several'} cities in North Carolina — zoom and search by
-        city or zip to judge distance yourself.
+        {cityCount > 0 ? cityCount : pins.length === 0 ? '0' : 'several'} cities in North Carolina — pan and zoom the map
+        to explore.
       </p>
 
       {selectedPins && selectedPins.length > 0 && (

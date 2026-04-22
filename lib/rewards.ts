@@ -10,6 +10,8 @@ export function isRewardsProgramEnabled(): boolean {
 
 export const SESSION_CASHBACK_RATE = 0.05;
 export const REFERRAL_CREDIT_AMOUNT = 25;
+/** Days after referred family's first paid booking before referrer credit is released */
+export const REFERRAL_CREDIT_HOLD_DAYS = 3;
 
 export type WalletLedgerRow = {
   id: string;
@@ -202,7 +204,9 @@ export async function maybeCompleteReferralOnFirstPaidBooking(
   if (!ref || ref.status !== 'pending' || ref.first_session_id) return;
 
   const nowIso = new Date().toISOString();
-  const holdUntil = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+  const holdUntil = new Date(
+    Date.now() + REFERRAL_CREDIT_HOLD_DAYS * 24 * 60 * 60 * 1000
+  ).toISOString();
 
   await admin
     .from('referrals')
@@ -229,33 +233,17 @@ export async function maybeCompleteReferralOnFirstPaidBooking(
     user_id: ref.referrer_id,
     type: 'referral_progress',
     title: 'Referral booking confirmed',
-    body: `Your friend completed their first booking. $${REFERRAL_CREDIT_AMOUNT.toFixed(0)} credit will be added in about 7 days.`,
+    body: `Your friend completed their first booking. $${REFERRAL_CREDIT_AMOUNT.toFixed(0)} credit will be added in about ${REFERRAL_CREDIT_HOLD_DAYS} days.`,
     data: { link: '/wallet' },
   }).catch(() => {});
 }
 
-export async function fetchSessionParticipantId(
-  admin: SupabaseClient,
-  sessionId: string,
-  youthWrestlerId: string
-): Promise<string | null> {
-  const { data } = await admin
-    .from('session_participants')
-    .select('id')
-    .eq('session_id', sessionId)
-    .eq('youth_wrestler_id', youthWrestlerId)
-    .maybeSingle();
-  return (data as { id?: string } | null)?.id ?? null;
-}
-
-/** Allocate Stripe cash across cart lines by catalog subtotal shares */
-export function cashPerLine(
-  lineCatalogAmount: number,
-  sumCatalogAmounts: number,
-  stripeCashTotalDollars: number
+/** Per-booking cashback disabled — milestones + referrals only. Kept for typing; always 0. */
+export function previewCartSessionCashbackUsd(
+  _catalogLineDollars: number[],
+  _stripeCashTotalDollars: number
 ): number {
-  if (sumCatalogAmounts <= 0) return 0;
-  return Number(((lineCatalogAmount / sumCatalogAmounts) * stripeCashTotalDollars).toFixed(2));
+  return 0;
 }
 
 export async function issueSessionEarnedForCheckoutLines(
@@ -270,25 +258,7 @@ export async function issueSessionEarnedForCheckoutLines(
 ): Promise<void> {
   if (!isRewardsProgramEnabled() || opts.lines.length === 0) return;
 
-  const sumCatalog = opts.lines.reduce((s, l) => s + l.catalogLineDollars, 0);
-
-  for (const line of opts.lines) {
-    const participantId = await fetchSessionParticipantId(
-      admin,
-      line.sessionId,
-      line.youthWrestlerId
-    );
-    if (!participantId) continue;
-
-    const cash = cashPerLine(line.catalogLineDollars, sumCatalog, opts.stripeCashTotalDollars);
-    await issueSessionEarnedCredit(admin, {
-      tenantSlug: opts.tenantSlug,
-      sessionId: line.sessionId,
-      parentId: opts.parentId,
-      sessionParticipantId: participantId,
-      cashPaidDollars: cash,
-    });
-  }
+  /* No per-session session_earned grants — milestones + referrals only. */
 
   await maybeCompleteReferralOnFirstPaidBooking(admin, {
     tenantSlug: opts.tenantSlug,
@@ -622,9 +592,10 @@ export async function releaseDueReferralCredits(
   const nowIso = new Date().toISOString();
   const { data: pending } = await admin
     .from('pending_referral_credits')
-    .select('id, referral_id, referrer_id, amount')
+    .select('id, referral_id, referrer_id, amount, frozen')
     .eq('released', false)
     .lte('available_at', nowIso)
+    .or('frozen.is.null,frozen.eq.false')
     .limit(200);
 
   let released = 0;
@@ -678,4 +649,169 @@ export async function releaseDueReferralCredits(
   }
 
   return { released };
+}
+
+export async function adminRevokeCreditGrant(
+  admin: SupabaseClient,
+  opts: { creditId: string; parentId: string; amount: number; reason: string }
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const amt = Number(opts.amount);
+  if (amt < 0.01) return { ok: false, error: 'Amount too small' };
+
+  const { data: row, error: fErr } = await admin
+    .from('credits')
+    .select('id, parent_id, remaining')
+    .eq('id', opts.creditId)
+    .maybeSingle();
+  if (fErr || !row) return { ok: false, error: 'Credit not found' };
+  if ((row as { parent_id: string }).parent_id !== opts.parentId) {
+    return { ok: false, error: 'Credit does not belong to this parent' };
+  }
+
+  const remaining = Number((row as { remaining: unknown }).remaining ?? 0);
+  if (amt > remaining + 0.001) return { ok: false, error: 'Amount exceeds remaining on this grant' };
+
+  const nowIso = new Date().toISOString();
+  const { error: uErr } = await admin
+    .from('credits')
+    .update({ remaining: remaining - amt, updated_at: nowIso })
+    .eq('id', opts.creditId);
+  if (uErr) return { ok: false, error: uErr.message };
+
+  await admin.from('credit_reversals').insert({
+    credit_id: opts.creditId,
+    parent_id: opts.parentId,
+    amount: amt,
+    session_id: null,
+    reason: opts.reason,
+  });
+
+  return { ok: true };
+}
+
+export async function releaseReferralCreditEarly(
+  admin: SupabaseClient,
+  opts: { referralId: string; tenantSlug: string; reason: string }
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  void opts.reason;
+
+  const { data: ref } = await admin
+    .from('referrals')
+    .select('id, referrer_id, status, referrer_credit_id')
+    .eq('id', opts.referralId)
+    .maybeSingle();
+  if (!ref) return { ok: false, error: 'Referral not found' };
+
+  const st = (ref as { status: string }).status;
+  if (st === 'flagged') return { ok: false, error: 'Referral is flagged' };
+  if ((ref as { referrer_credit_id?: string | null }).referrer_credit_id) {
+    return { ok: false, error: 'Credit already issued for this referral' };
+  }
+  if (st !== 'awaiting_release') {
+    return { ok: false, error: 'Referral is not waiting on credit release' };
+  }
+
+  const { data: pend } = await admin
+    .from('pending_referral_credits')
+    .select('id, referrer_id, amount, released, frozen')
+    .eq('referral_id', opts.referralId)
+    .maybeSingle();
+  if (!pend || (pend as { released: boolean }).released) {
+    return { ok: false, error: 'No pending referral credit' };
+  }
+  if ((pend as { frozen?: boolean }).frozen === true) {
+    return { ok: false, error: 'Pending credit is frozen' };
+  }
+
+  const nowIso = new Date().toISOString();
+  const r = pend as { id: string; referrer_id: string; amount: unknown };
+  const amt = Number(r.amount ?? REFERRAL_CREDIT_AMOUNT);
+
+  const { creditId, error: gErr } = await grantRewardCredit(admin, {
+    parentId: r.referrer_id,
+    amount: amt,
+    rewardType: 'referral_sent',
+    description: 'Referral — friend completed first booking (released early)',
+  });
+  if (gErr) return { ok: false, error: gErr };
+
+  await admin
+    .from('pending_referral_credits')
+    .update({ released: true, released_at: nowIso, credit_id: creditId ?? null, frozen: false })
+    .eq('id', r.id);
+
+  await admin
+    .from('referrals')
+    .update({ status: 'completed', referrer_credit_id: creditId ?? null })
+    .eq('id', opts.referralId);
+
+  const balance = await getUserCreditBalance(r.referrer_id, opts.tenantSlug);
+  await createNotification(admin, {
+    user_id: r.referrer_id,
+    type: 'referral_completed',
+    title: 'Referral credit added',
+    body: `$${amt.toFixed(2)} was added to your wallet. Balance: $${balance.toFixed(2)}.`,
+    data: { link: '/wallet' },
+  }).catch(() => {});
+
+  return { ok: true };
+}
+
+export async function flagReferral(
+  admin: SupabaseClient,
+  opts: { referralId: string; note: string }
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { data: ref } = await admin
+    .from('referrals')
+    .select('id, status')
+    .eq('id', opts.referralId)
+    .maybeSingle();
+  if (!ref) return { ok: false, error: 'Referral not found' };
+  const cur = (ref as { status: string }).status;
+  if (cur === 'flagged') return { ok: false, error: 'Already flagged' };
+
+  const { error: uErr } = await admin
+    .from('referrals')
+    .update({
+      status: 'flagged',
+      status_before_flag: cur,
+      flagged_reason: opts.note,
+    })
+    .eq('id', opts.referralId);
+  if (uErr) return { ok: false, error: uErr.message };
+
+  await admin.from('pending_referral_credits').update({ frozen: true }).eq('referral_id', opts.referralId);
+
+  return { ok: true };
+}
+
+export async function unflagReferral(
+  admin: SupabaseClient,
+  opts: { referralId: string }
+): Promise<{ ok: true } | { ok: false; error: string }> {
+  const { data: ref } = await admin
+    .from('referrals')
+    .select('id, status, status_before_flag')
+    .eq('id', opts.referralId)
+    .maybeSingle();
+  if (!ref) return { ok: false, error: 'Referral not found' };
+  if ((ref as { status: string }).status !== 'flagged') {
+    return { ok: false, error: 'Not flagged' };
+  }
+
+  const prev = (ref as { status_before_flag: string | null }).status_before_flag || 'pending';
+
+  const { error: uErr } = await admin
+    .from('referrals')
+    .update({
+      status: prev,
+      status_before_flag: null,
+      flagged_reason: null,
+    })
+    .eq('id', opts.referralId);
+  if (uErr) return { ok: false, error: uErr.message };
+
+  await admin.from('pending_referral_credits').update({ frozen: false }).eq('referral_id', opts.referralId);
+
+  return { ok: true };
 }

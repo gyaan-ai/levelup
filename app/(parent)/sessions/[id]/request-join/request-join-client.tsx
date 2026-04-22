@@ -50,8 +50,14 @@ export function RequestJoinClient({ sessionId, youthWrestlers }: RequestJoinClie
           message: message.trim() || undefined,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Request failed');
+      const data = (await res.json()) as { error?: string; registerPath?: string };
+      if (!res.ok) {
+        if (typeof data.registerPath === 'string' && data.registerPath.startsWith('/')) {
+          router.push(data.registerPath);
+          return;
+        }
+        throw new Error(data.error || 'Request failed');
+      }
       router.push('/small-group-sessions?requested=1');
       router.refresh();
     } catch (err: unknown) {

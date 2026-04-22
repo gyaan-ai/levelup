@@ -29,6 +29,7 @@ export default async function PartnerSessionsPage() {
     .select(`
       id,
       scheduled_datetime,
+      join_policy,
       current_participants,
       max_participants,
       price_per_participant,
@@ -59,7 +60,8 @@ export default async function PartnerSessionsPage() {
         </div>
         <h1 className="text-3xl font-bold">Open Partner Sessions</h1>
         <p className="text-muted-foreground">
-          Sessions where someone else is looking for a workout partner. Request to join and train together.
+          Sessions where someone else is looking for a workout partner. Public sessions let you register right away;
+          private sessions use a join request so the host can be selective.
         </p>
       </div>
       <PartnerSessionsClient

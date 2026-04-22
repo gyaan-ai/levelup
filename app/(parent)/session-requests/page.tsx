@@ -3,8 +3,6 @@ import { headers } from 'next/headers';
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { SessionRequestsClient } from './session-requests-client';
 
 export const metadata = {
@@ -14,12 +12,7 @@ export const metadata = {
 
 export const dynamic = 'force-dynamic';
 
-export default async function ParentSessionRequestsPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ submitted?: string }>;
-}) {
-  const sp = await searchParams;
+export default async function ParentSessionRequestsPage() {
   const headersList = await headers();
   const host = headersList.get('host') || '';
   const tenant = getTenantByDomain(host);
@@ -71,18 +64,10 @@ export default async function ParentSessionRequestsPage({
         </Link>
         <h1 className="text-2xl font-bold text-foreground">Session requests</h1>
         <p className="text-muted-foreground text-sm mt-1">
-          Requests you sent when a coach did not have an open slot that matched what you needed.
+          Older requests you sent before booking moved to coach availability only. New requests can&apos;t be created
+          here.
         </p>
       </div>
-
-      {sp.submitted === '1' && (
-        <Card className="mb-6 border-accent/40 bg-accent/5">
-          <CardContent className="py-4 text-sm">
-            Request sent. The coach will see it on their Schedule under pending requests and can approve, counter, or
-            decline.
-          </CardContent>
-        </Card>
-      )}
 
       <SessionRequestsClient initialRows={(rows ?? []) as SessionRequestRow[]} />
     </div>

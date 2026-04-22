@@ -25,11 +25,28 @@ export async function POST(req: NextRequest) {
 
     const { data: session } = await supabase
       .from('sessions')
-      .select('id, parent_id, athlete_id, session_mode, session_type, current_participants, max_participants')
+      .select('id, parent_id, athlete_id, join_policy, session_mode, session_type, current_participants, max_participants')
       .eq('id', sessionId)
       .single();
     if (!session) return NextResponse.json({ error: 'Session not found' }, { status: 404 });
-    const s = session as { parent_id?: string; athlete_id?: string; session_mode?: string; session_type?: string; current_participants?: number; max_participants?: number };
+    const s = session as {
+      parent_id?: string;
+      athlete_id?: string;
+      join_policy?: string;
+      session_mode?: string;
+      session_type?: string;
+      current_participants?: number;
+      max_participants?: number;
+    };
+    if (s.join_policy === 'public') {
+      return NextResponse.json(
+        {
+          error: 'This session is open to the public. Register to join — no approval needed.',
+          registerPath: `/sessions/${sessionId}/register`,
+        },
+        { status: 400 }
+      );
+    }
     const current = s.current_participants ?? 1;
     const max = s.max_participants ?? 2;
     const isPartnerOpen = s.session_mode === 'partner-open';
