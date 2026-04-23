@@ -11,7 +11,7 @@ import { TrainingPathCards } from '@/components/home/training-path-cards';
 export const metadata = {
   title: 'The Wrestling Guild | Access Elite Master Technique',
   description:
-    'Train with NCAA wrestlers and elite coaches for private technique instruction. Access elite master technique that separates good from great.',
+    'Train with Division I wrestlers and elite coaches for private technique instruction. Access elite master technique that separates good from great.',
 };
 
 export default async function HomePage({
@@ -65,10 +65,10 @@ export default async function HomePage({
           The Wrestling Guild
         </p>
         <h1 className="mb-2 text-center font-serif text-3xl font-black uppercase tracking-wide text-accent sm:text-4xl md:text-5xl">
-          Find elite coaching near you
+          Find DI coaching near you
         </h1>
         <p className="mb-3 max-w-2xl text-center text-sm text-white/70 sm:text-base md:text-lg">
-          Train with NCAA wrestlers—technique, training, and mentorship—where you live.
+          Train with Division I wrestlers—technique, training, and mentorship—where you live.
         </p>
         <p className="mb-8 text-center text-base text-white/75 sm:text-lg">How do you want to train?</p>
 
@@ -181,7 +181,7 @@ export default async function HomePage({
 
       <section className="border-t border-accent/20 bg-black px-6 py-10">
         <div className="mx-auto max-w-sm space-y-3 text-center">
-          <p className="text-sm text-white/60">NCAA wrestler or elite coach?</p>
+          <p className="text-sm text-white/60">Division I wrestler or elite coach?</p>
           <Button size="lg" variant="outline" asChild className="w-full max-w-[280px] border-accent/60 text-accent hover:bg-accent/10">
             <Link href="/signup/coach">Apply to join The Guild</Link>
           </Button>

@@ -313,7 +313,7 @@ export default async function AthleteProfilePage({
                     ) : null}
                     <p className="text-sm text-muted-foreground">
                       <Link href={`/coach/${athlete.id}`} className="text-accent font-medium underline">
-                        Open public schedule
+                        Open existing partner and small group sessions
                       </Link>
                       <span className="hidden sm:inline"> — share that page if someone needs your link.</span>
                     </p>

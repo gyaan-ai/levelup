@@ -95,9 +95,14 @@ export const NOTIFICATION_TITLES: Record<NotificationType, string> = {
 const TERMINAL_SESSION_STATUSES = new Set(['completed', 'cancelled', 'no-show']);
 
 /**
- * Seats filled for capacity UI and gates. Uses the higher of `current_participants` and
- * actual roster rows (or `participantRowCountOverride` from a COUNT query) so we don't show
- * "2 spots left" when the counter drifted after a failed webhook, manual DB edits, or Stripe refunds.
+ * Seats filled for capacity UI and gates.
+ *
+ * When roster data is authoritative (exact COUNT from DB, or `session_participants` array from a
+ * query), use **row count only**. The denormalized `current_participants` column can sit **above**
+ * the real roster (e.g. bump without a row) and would wrongly block join/checkout as "full".
+ *
+ * When roster was not loaded, fall back to max(rows, column) so lists without embedded participants
+ * still behave.
  */
 function participantRowCount(session: {
   session_participants?: unknown[] | null;
@@ -116,10 +121,8 @@ export function getEffectiveFilledCount(
   },
   participantRowCountOverride?: number
 ): number {
-  // Get count from session_participants rows if available
   const rows = participantRowCount(session, participantRowCountOverride);
-  
-  // Get count from current_participants column
+
   const fromColRaw = session.current_participants;
   const fromCol =
     typeof fromColRaw === 'number' && Number.isFinite(fromColRaw)
@@ -128,14 +131,12 @@ export function getEffectiveFilledCount(
         ? parseInt(fromColRaw, 10)
         : 0;
   const fromColSafe = Number.isFinite(fromCol) ? fromCol : 0;
-  
-  // Use the HIGHER of the two values to avoid showing wrong availability
-  // This handles cases where:
-  // - session_participants wasn't fetched (rows = 0, use fromCol)
-  // - session_participants is empty array but current_participants has value (use fromCol)
-  // - current_participants is stale/lower than actual roster (use rows)
-  const effectiveCount = Math.max(rows, fromColSafe);
-  
+
+  const rosterIsAuthoritative =
+    typeof participantRowCountOverride === 'number' || Array.isArray(session.session_participants);
+
+  const effectiveCount = rosterIsAuthoritative ? rows : Math.max(rows, fromColSafe);
+
   const max = session.max_participants;
   if (max == null || max <= 0) return effectiveCount;
   return Math.min(effectiveCount, max);

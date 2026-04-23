@@ -12,6 +12,7 @@ import { ensureAutoFamilyDiscountForParent } from '@/lib/family-auto-discount';
 import { checkoutAllowSavedAccountPercent, resolveCheckoutPercentOff } from '@/lib/checkout-promo';
 import { createNotification } from '@/lib/notifications';
 import { notifyCoachAndAdminsNewBooking } from '@/lib/twilio';
+import { publicOriginForStripeRedirect } from '@/lib/stripe-redirect-origin';
 
 type CartLine = { sessionId: string; wrestlerId: string };
 
@@ -375,11 +376,10 @@ export async function POST(req: NextRequest) {
     }
 
     const stripe = getStripeInstance(tenant.slug);
-    const baseUrl =
-      process.env.NEXT_PUBLIC_APP_URL || (host.startsWith('localhost') ? `http://${host}` : `https://${host}`);
+    const stripeRedirectOrigin = publicOriginForStripeRedirect(host, req);
 
-    const successUrl = `${baseUrl}/cart/success?stripe_cs={CHECKOUT_SESSION_ID}`;
-    const cancelUrl = `${baseUrl}/cart/checkout`;
+    const successUrl = `${stripeRedirectOrigin}/cart/success?stripe_cs={CHECKOUT_SESSION_ID}`;
+    const cancelUrl = `${stripeRedirectOrigin}/cart/checkout`;
 
     const idemParts = lines.map((l) => `${l.sessionId}:${l.wrestlerId}`).sort();
     const idempotencyKey = `cart-checkout-${user.id}-${idemParts.join(',')}-${Date.now()}`.slice(0, 255);

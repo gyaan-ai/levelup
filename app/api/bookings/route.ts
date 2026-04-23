@@ -18,6 +18,7 @@ import { resolveCoachPayoutRate } from '@/lib/coach-session-payout';
 import { notifyCoachAndAdminsNewBooking } from '@/lib/twilio';
 import { COACH_SESSION_OVERLAP_ERROR, findCoachSessionTimeOverlap } from '@/lib/coach-session-overlap';
 import { applyCredits, getUserCreditBalance } from '@/lib/credits';
+import { publicOriginForStripeRedirect } from '@/lib/stripe-redirect-origin';
 
 export async function POST(req: NextRequest) {
   try {
@@ -348,7 +349,7 @@ export async function POST(req: NextRequest) {
       try {
         console.log('[Bookings API] Attempting to create Stripe checkout session...');
         const stripe = getStripeInstance(tenant.slug);
-        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (host.startsWith('localhost') ? `http://${host}` : `https://${host}`);
+        const stripeRedirectOrigin = publicOriginForStripeRedirect(host, req);
         const successParams = new URLSearchParams({ sessionId: session.id });
         if (session.partner_invite_code) successParams.set('code', session.partner_invite_code);
         if (session.session_mode) successParams.set('mode', session.session_mode);
@@ -376,28 +377,33 @@ export async function POST(req: NextRequest) {
           ...(creditsToUse > 0 && { credits_to_use: creditsToUse.toFixed(2) }),
         };
 
-        const stripeSession = await stripe.checkout.sessions.create({
-          mode: 'payment',
-          payment_method_types: ['card'],
-          line_items: [{
-            quantity: 1,
-            price_data: {
-              currency: 'usd',
-              unit_amount: amountCents,
-              product_data: {
-                name: 'The Guild – Wrestling Session',
-                description: testModePenny
-                  ? `TEST MODE: Session on ${scheduledDate} at ${scheduledTime} (actual price: $${totalPrice.toFixed(2)})`
-                  : `Session on ${scheduledDate} at ${scheduledTime}`,
-                metadata: { app: 'the-guild', test_mode: testModePenny ? 'true' : 'false' },
+        const stripeSession = await stripe.checkout.sessions.create(
+          {
+            mode: 'payment',
+            payment_method_types: ['card'],
+            line_items: [
+              {
+                quantity: 1,
+                price_data: {
+                  currency: 'usd',
+                  unit_amount: amountCents,
+                  product_data: {
+                    name: 'The Guild – Wrestling Session',
+                    description: testModePenny
+                      ? `TEST MODE: Session on ${scheduledDate} at ${scheduledTime} (actual price: $${totalPrice.toFixed(2)})`
+                      : `Session on ${scheduledDate} at ${scheduledTime}`,
+                    metadata: { app: 'the-guild', test_mode: testModePenny ? 'true' : 'false' },
+                  },
+                },
               },
-            },
-          }],
-          metadata,
-          success_url: `${baseUrl}/book/${athleteIdNorm}/confirmed?${successParams.toString()}`,
-          cancel_url: `${baseUrl}/book/${athleteIdNorm}`,
-          customer_email: user.email ?? undefined,
-        });
+            ],
+            metadata,
+            success_url: `${stripeRedirectOrigin}/book/${athleteIdNorm}/confirmed?${successParams.toString()}`,
+            cancel_url: `${stripeRedirectOrigin}/book/${athleteIdNorm}`,
+            customer_email: user.email ?? undefined,
+          },
+          { idempotencyKey: `book-${session.id}-${user.id}-${amountCents}`.slice(0, 255) }
+        );
         checkoutUrl = stripeSession.url ?? undefined;
         console.log('[Bookings API] Stripe checkout URL created:', checkoutUrl);
       } catch (stripeErr) {

@@ -48,25 +48,35 @@ export default async function AccountPage() {
   // Get credit balance
   const creditBalance = await getUserCreditBalance(user.id, tenant.slug);
 
-  // Get spending summary
+  // Spending summary: sum cash paid per roster row (not sessions.total_price — often wrong for
+  // multi-seat pricing, missing values, or multiple wrestlers on the same session).
   let totalSpent = 0;
   if (youthWrestlerIds.length > 0) {
     const { data: partRows } = await supabase
       .from('session_participants')
-      .select('session_id')
+      .select('session_id, amount_paid, paid')
       .in('youth_wrestler_id', youthWrestlerIds);
     const familySessionIds = [...new Set((partRows ?? []).map((r: { session_id: string }) => r.session_id))];
-    
+
     if (familySessionIds.length > 0) {
-      const { data: paidSessions } = await supabase
+      const { data: sessionsForSpend } = await supabase
         .from('sessions')
-        .select('total_price, refunded_at')
+        .select('id, refunded_at')
         .in('id', familySessionIds)
-        .in('status', ['scheduled', 'completed']);
-      
-      totalSpent = (paidSessions ?? [])
-        .filter((s: { refunded_at?: string | null }) => !s.refunded_at)
-        .reduce((sum: number, s: { total_price?: number }) => sum + Number(s.total_price ?? 0), 0);
+        .in('status', ['scheduled', 'completed', 'no-show', 'pending_payment']);
+
+      const spendEligibleSessionIds = new Set(
+        (sessionsForSpend ?? [])
+          .filter((s: { refunded_at?: string | null }) => !s.refunded_at)
+          .map((s: { id: string }) => s.id)
+      );
+
+      totalSpent = (partRows ?? []).reduce((sum: number, row: { session_id: string; amount_paid?: unknown; paid?: boolean }) => {
+        if (!spendEligibleSessionIds.has(row.session_id)) return sum;
+        const ap = Number(row.amount_paid ?? 0);
+        if (ap <= 0) return sum;
+        return sum + ap;
+      }, 0);
     }
   }
 
@@ -146,7 +156,7 @@ export default async function AccountPage() {
             <div className="bg-zinc-900/50 border border-zinc-800/50 rounded-xl p-4 text-center hover:border-zinc-700 transition-colors">
               <DollarSign className="h-5 w-5 mx-auto mb-2 text-[#D4AF37]" />
               <p className="text-2xl font-bold">${totalSpent.toFixed(0)}</p>
-              <p className="text-xs text-zinc-500">Spent</p>
+              <p className="text-xs text-zinc-500">Paid</p>
             </div>
           </Link>
         </div>

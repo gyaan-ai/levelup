@@ -14,29 +14,7 @@ import { finalizeRegisterFromCheckoutSession } from '@/lib/finalize-session-regi
 import { getEffectiveFilledCount } from '@/lib/sessions';
 import { ensureAutoFamilyDiscountForParent } from '@/lib/family-auto-discount';
 import { checkoutAllowSavedAccountPercent, resolveCheckoutPercentOff } from '@/lib/checkout-promo';
-
-/** Stripe success/cancel URLs must land on the same deployment (e.g. *.vercel.app), not only NEXT_PUBLIC_APP_URL. */
-function publicOriginForStripeRedirect(hostname: string, req: NextRequest): string {
-  const h = hostname.split(':')[0].toLowerCase();
-  if (h.endsWith('.vercel.app')) {
-    return `https://${h}`;
-  }
-  if (h === 'localhost' || h.startsWith('127.')) {
-    const raw = req.headers.get('host') || hostname;
-    return raw.startsWith('localhost') || raw.startsWith('127.') ? `http://${raw}` : `http://${h}:3000`;
-  }
-  const canonical = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, '');
-  if (canonical) {
-    try {
-      const ch = new URL(canonical).hostname.toLowerCase().replace(/^www\./, '');
-      const hh = h.replace(/^www\./, '');
-      if (ch === hh) return canonical;
-    } catch {
-      return canonical;
-    }
-  }
-  return `https://${h}`;
-}
+import { publicOriginForStripeRedirect } from '@/lib/stripe-redirect-origin';
 
 /**
  * POST - Pay & register a youth wrestler for a session (public or invite_only).
@@ -270,11 +248,11 @@ export async function POST(
     }
 
     const stripe = getStripeInstance(tenant.slug);
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || (host.startsWith('localhost') ? `http://${host}` : `https://${host}`);
+    const stripeRedirectOrigin = publicOriginForStripeRedirect(host, req);
     const confirmToken = createRegisterConfirmationToken(sessionId);
     // stripe_cs lets the confirmed page finalize the DB row if the webhook is slow (fixes missing Home/bookings).
-    const successUrl = `${baseUrl}/sessions/${sessionId}/register/confirmed?t=${encodeURIComponent(confirmToken)}&stripe_cs={CHECKOUT_SESSION_ID}`;
-    const cancelUrl = req.headers.get('referer') || `${baseUrl}/training`;
+    const successUrl = `${stripeRedirectOrigin}/sessions/${sessionId}/register/confirmed?t=${encodeURIComponent(confirmToken)}&stripe_cs={CHECKOUT_SESSION_ID}`;
+    const cancelUrl = req.headers.get('referer') || `${stripeRedirectOrigin}/training`;
 
     const dt = s.scheduled_datetime ? new Date(s.scheduled_datetime) : null;
     const desc = dt
@@ -340,7 +318,7 @@ export async function POST(
       await finalizeRegisterFromCheckoutSession(stripeSession.id, tenant.slug).catch((err) =>
         console.error('register: finalize after idempotent paid session', err)
       );
-      const confirmUrl = `${baseUrl}/sessions/${sessionId}/register/confirmed?t=${encodeURIComponent(confirmToken)}&stripe_cs=${stripeSession.id}`;
+      const confirmUrl = `${stripeRedirectOrigin}/sessions/${sessionId}/register/confirmed?t=${encodeURIComponent(confirmToken)}&stripe_cs=${stripeSession.id}`;
       return NextResponse.json({ url: confirmUrl });
     }
 
