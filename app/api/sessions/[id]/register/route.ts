@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getTenantByDomain } from '@/config/tenants';
+import { getTenantFromRequestHeaders, resolveHostnameFromHeaders } from '@/config/tenants';
 import { getStripeInstance } from '@/lib/stripe/webhooks';
 import { formatEST } from '@/lib/format-date';
 import { createRegisterConfirmationToken } from '@/lib/confirmation-token';
@@ -28,8 +28,8 @@ export async function POST(
   try {
     const { id: sessionId } = await params;
     const headersList = await headers();
-    const host = headersList.get('host') || '';
-    const tenant = getTenantByDomain(host);
+    const host = resolveHostnameFromHeaders(headersList);
+    const tenant = getTenantFromRequestHeaders(headersList);
     if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
 
     const supabase = await createClient(tenant.slug);
@@ -235,13 +235,18 @@ export async function POST(
       ? `Session on ${formatEST(dt, 'MMM d, yyyy')} at ${formatEST(dt, 'h:mm a')} – register one spot`
       : 'Register for session';
 
-    /** One checkout per parent+session+kid — retries / double-submit reuse the same Session (no extra charges). */
-    const idempotencyKey = `register-checkout-${sessionId}-${youthWrestlerId}-${user.id}`.slice(0, 255);
-
     const sessionRow = session as {
-      athlete_id: string;
+      athlete_id?: string | null;
       session_type?: string | null;
     };
+    const coachId = sessionRow.athlete_id ?? '';
+
+    /**
+     * Must include amount (and any discount) in the idempotency key. Stripe rejects reuse of the same key
+     * with different parameters — e.g. user applies a promo after a first attempt → 500 without this.
+     */
+    const idempotencyKey =
+      `reg-${sessionId}-${youthWrestlerId}-${user.id}-${amountCents}`.slice(0, 255);
 
     const stripeSession = await stripe.checkout.sessions.create(
       {
@@ -260,20 +265,20 @@ export async function POST(
             },
           },
         ],
-      metadata: {
-        business: 'guild',
-        channel: 'bookings',
-        category: 'booking',
-        session_type: sessionRow.session_type ?? '',
-        coach_id: sessionRow.athlete_id,
-        platform_fee_pct: '20',
-        app: 'the-guild',
-        tenant_slug: tenant.slug,
-        session_id: sessionId,
-        youth_wrestler_id: youthWrestlerId,
-        parent_id: user.id,
-        register: 'true',
-      },
+        metadata: {
+          business: 'guild',
+          channel: 'bookings',
+          category: 'booking',
+          session_type: String(sessionRow.session_type ?? ''),
+          coach_id: String(coachId),
+          platform_fee_pct: '20',
+          app: 'the-guild',
+          tenant_slug: String(tenant.slug),
+          session_id: String(sessionId),
+          youth_wrestler_id: String(youthWrestlerId),
+          parent_id: String(user.id),
+          register: 'true',
+        },
         success_url: successUrl,
         cancel_url: cancelUrl,
         customer_email: user.email ?? undefined,
@@ -299,7 +304,12 @@ export async function POST(
 
     return NextResponse.json({ url: stripeSession.url });
   } catch (e) {
-    console.error('Session register API error:', e);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    const err = e as Error & { type?: string; message?: string };
+    console.error('Session register API error:', err?.message ?? e, err);
+    const msg =
+      typeof err?.message === 'string' && err.message.length > 0 && err.message.length < 400
+        ? err.message
+        : 'Internal server error';
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
