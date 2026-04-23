@@ -15,10 +15,35 @@ import { getEffectiveFilledCount } from '@/lib/sessions';
 import { ensureAutoFamilyDiscountForParent } from '@/lib/family-auto-discount';
 import { checkoutAllowSavedAccountPercent, resolveCheckoutPercentOff } from '@/lib/checkout-promo';
 
+/** Stripe success/cancel URLs must land on the same deployment (e.g. *.vercel.app), not only NEXT_PUBLIC_APP_URL. */
+function publicOriginForStripeRedirect(hostname: string, req: NextRequest): string {
+  const h = hostname.split(':')[0].toLowerCase();
+  if (h.endsWith('.vercel.app')) {
+    return `https://${h}`;
+  }
+  if (h === 'localhost' || h.startsWith('127.')) {
+    const raw = req.headers.get('host') || hostname;
+    return raw.startsWith('localhost') || raw.startsWith('127.') ? `http://${raw}` : `http://${h}:3000`;
+  }
+  const canonical = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, '');
+  if (canonical) {
+    try {
+      const ch = new URL(canonical).hostname.toLowerCase().replace(/^www\./, '');
+      const hh = h.replace(/^www\./, '');
+      if (ch === hh) return canonical;
+    } catch {
+      return canonical;
+    }
+  }
+  return `https://${h}`;
+}
+
 /**
  * POST - Pay & register a youth wrestler for a session (public or invite_only).
  * - Session owner: add their own wrestler (no charge).
  * - Non-owner: always Stripe Checkout (percent discounts via parent_percentage_discounts); webhook adds participant.
+ * - Optional body.partnerInviteCode: when set and matches sessions.partner_invite_code, allows load + pay even if
+ *   join_policy is private (RLS often hides those rows from the joining parent until they pay).
  * Early-adopter free sessions are disabled — everyone pays except session owner adding kids.
  */
 export async function POST(
@@ -42,18 +67,36 @@ export async function POST(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const body = (await req.json()) as { youthWrestlerId: string; promoCode?: string };
-    const { youthWrestlerId, promoCode } = body;
+    const body = (await req.json()) as { youthWrestlerId: string; promoCode?: string; partnerInviteCode?: string };
+    const { youthWrestlerId, promoCode, partnerInviteCode } = body;
     if (!youthWrestlerId) return NextResponse.json({ error: 'Missing youthWrestlerId' }, { status: 400 });
     if (role === 'youth_wrestler' && youthWrestlerId !== user.id) {
       return NextResponse.json({ error: 'Youth wrestlers can only register themselves' }, { status: 403 });
     }
 
-    const { data: session, error: sessionErr } = await supabase
+    const partnerInviteCodeNorm = (partnerInviteCode ?? '').trim().toUpperCase();
+    const admin = createAdminClient(tenant.slug);
+
+    let { data: session, error: sessionErr } = await supabase
       .from('sessions')
       .select('id, parent_id, athlete_id, join_policy, session_mode, session_type, partner_invite_code, current_participants, max_participants, price_per_participant, scheduled_datetime, status')
       .eq('id', sessionId)
       .single();
+
+    if (sessionErr || !session) {
+      if (partnerInviteCodeNorm) {
+        const { data: sAdmin } = await admin
+          .from('sessions')
+          .select('id, parent_id, athlete_id, join_policy, session_mode, session_type, partner_invite_code, current_participants, max_participants, price_per_participant, scheduled_datetime, status')
+          .eq('id', sessionId)
+          .eq('partner_invite_code', partnerInviteCodeNorm)
+          .maybeSingle();
+        if (sAdmin) {
+          session = sAdmin;
+          sessionErr = null;
+        }
+      }
+    }
 
     if (sessionErr || !session) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
@@ -69,9 +112,9 @@ export async function POST(
       price_per_participant?: number;
       scheduled_datetime?: string;
       status?: string;
+      partner_invite_code?: string | null;
     };
 
-    const admin = createAdminClient(tenant.slug);
     if (role === 'parent' && checkoutAllowSavedAccountPercent()) {
       await ensureAutoFamilyDiscountForParent(admin, user.id, user.email);
     }
@@ -156,7 +199,10 @@ export async function POST(
       return NextResponse.json({ added: true });
     }
 
-    if (s.join_policy !== 'public' && s.join_policy !== 'invite_only') {
+    const pinv = (s.partner_invite_code ?? '').trim().toUpperCase();
+    const inviteVerified = Boolean(partnerInviteCodeNorm && pinv === partnerInviteCodeNorm);
+    const joinPol = s.join_policy ?? 'private';
+    if (joinPol !== 'public' && joinPol !== 'invite_only' && !inviteVerified) {
       return NextResponse.json({ error: 'This session is not open for registration' }, { status: 400 });
     }
     if (!['scheduled', 'pending_payment'].includes(s.status ?? '')) {
@@ -235,11 +281,11 @@ export async function POST(
       ? `Session on ${formatEST(dt, 'MMM d, yyyy')} at ${formatEST(dt, 'h:mm a')} – register one spot`
       : 'Register for session';
 
-    const sessionRow = session as {
+    const sessionForStripe = session as {
       athlete_id?: string | null;
       session_type?: string | null;
     };
-    const coachId = sessionRow.athlete_id ?? '';
+    const coachId = sessionForStripe.athlete_id ?? '';
 
     /**
      * Must include amount (and any discount) in the idempotency key. Stripe rejects reuse of the same key
@@ -269,7 +315,7 @@ export async function POST(
           business: 'guild',
           channel: 'bookings',
           category: 'booking',
-          session_type: String(sessionRow.session_type ?? ''),
+          session_type: String(sessionForStripe.session_type ?? ''),
           coach_id: String(coachId),
           platform_fee_pct: '20',
           app: 'the-guild',

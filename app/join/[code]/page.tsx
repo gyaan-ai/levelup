@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getTenantByDomain } from '@/config/tenants';
+import { getTenantFromRequestHeaders } from '@/config/tenants';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -32,8 +32,7 @@ export default async function JoinByCodePage({
 }) {
   const { code } = await params;
   const headersList = await headers();
-  const host = headersList.get('host') || '';
-  const tenant = getTenantByDomain(host);
+  const tenant = getTenantFromRequestHeaders(headersList);
   if (!tenant) notFound();
 
   const supabase = await createClient(tenant.slug);

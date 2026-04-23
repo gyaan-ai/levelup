@@ -144,6 +144,7 @@ export function JoinSessionClient({
         body: JSON.stringify({
           youthWrestlerId: selectedWrestlerId,
           promoCode: codeApplied ? codeTrimmed.toUpperCase() : undefined,
+          partnerInviteCode: code.trim().toUpperCase(),
         }),
       });
       const data = await res.json();

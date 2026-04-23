@@ -2,7 +2,7 @@ import { redirect, notFound } from 'next/navigation';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getTenantByDomain } from '@/config/tenants';
+import { getTenantFromRequestHeaders } from '@/config/tenants';
 import Link from 'next/link';
 import { BackLink } from '@/components/back-link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,30 +25,35 @@ export default async function SessionRegisterPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ wrestler?: string }>;
+  searchParams: Promise<{ wrestler?: string; code?: string; invite?: string }>;
 }) {
   const { id: sessionId } = await params;
   const sp = await searchParams;
   const preselectedWrestlerId = sp.wrestler?.trim() || '';
+  const partnerInviteFromUrl = (sp.code ?? sp.invite ?? '').trim().toUpperCase();
   const headersList = await headers();
-  const host = headersList.get('host') || '';
-  const tenant = getTenantByDomain(host);
+  const tenant = getTenantFromRequestHeaders(headersList);
   if (!tenant) redirect('/404');
 
   const supabase = await createClient(tenant.slug);
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect(`/login?redirect=/sessions/${sessionId}/register`);
+  if (!user) {
+    const registerPath =
+      partnerInviteFromUrl !== ''
+        ? `/sessions/${sessionId}/register?code=${encodeURIComponent(partnerInviteFromUrl)}`
+        : `/sessions/${sessionId}/register`;
+    redirect(`/login?redirect=${encodeURIComponent(registerPath)}`);
+  }
 
   const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
   const role = userData?.role;
   if (role !== 'parent' && role !== 'admin' && role !== 'coach' && role !== 'youth_wrestler') redirect('/dashboard');
 
-  const { data: session, error: sessionErr } = await supabase
-    .from('sessions')
-    .select(`
+  const sessionSelect = `
       id,
       parent_id,
       join_policy,
+      partner_invite_code,
       athlete_id,
       session_mode,
       session_type,
@@ -59,16 +64,39 @@ export default async function SessionRegisterPage({
       total_price,
       athletes(id, first_name, last_name, school, photo_url),
       facilities(id, name, address)
-    `)
+    `;
+
+  const admin = createAdminClient(tenant.slug);
+
+  let { data: session, error: sessionErr } = await supabase
+    .from('sessions')
+    .select(sessionSelect)
     .eq('id', sessionId)
     .in('status', ['scheduled', 'pending_payment'])
     .single();
+
+  if (sessionErr || !session) {
+    if (partnerInviteFromUrl) {
+      const { data: sAdmin } = await admin
+        .from('sessions')
+        .select(sessionSelect)
+        .eq('id', sessionId)
+        .eq('partner_invite_code', partnerInviteFromUrl)
+        .in('status', ['scheduled', 'pending_payment'])
+        .maybeSingle();
+      if (sAdmin) {
+        session = sAdmin;
+        sessionErr = null;
+      }
+    }
+  }
 
   if (sessionErr || !session) notFound();
 
   const s = session as {
     parent_id?: string;
     join_policy?: string;
+    partner_invite_code?: string | null;
     session_type?: string;
     scheduled_datetime?: string;
     current_participants?: number;
@@ -79,7 +107,9 @@ export default async function SessionRegisterPage({
   };
 
   const isOwner = s.parent_id === user.id;
-  if (!isOwner && s.join_policy !== 'public' && s.join_policy !== 'invite_only') notFound();
+  const pinv = (s.partner_invite_code ?? '').trim().toUpperCase();
+  const inviteVerified = Boolean(partnerInviteFromUrl && pinv === partnerInviteFromUrl);
+  if (!isOwner && s.join_policy !== 'public' && s.join_policy !== 'invite_only' && !inviteVerified) notFound();
 
   const current = s.current_participants ?? 1;
   const max = s.max_participants ?? 2;
@@ -126,7 +156,6 @@ export default async function SessionRegisterPage({
   const fac = Array.isArray(s.facilities) ? s.facilities[0] : s.facilities;
   const dt = s.scheduled_datetime ? new Date(s.scheduled_datetime) : null;
 
-  const admin = createAdminClient(tenant.slug);
   if (role === 'parent' && checkoutAllowSavedAccountPercent()) {
     await ensureAutoFamilyDiscountForParent(admin, user.id, user.email);
   }
@@ -245,6 +274,7 @@ export default async function SessionRegisterPage({
             youthWrestlers={youthWrestlers as Array<{ id: string; first_name?: string; last_name?: string; age?: number; weight_class?: string; skill_level?: string; hasValidCell: boolean }>}
             checkoutUsesSavedAccountDiscount={checkoutAllowSavedAccountPercent()}
             initialWrestlerId={preselectedWrestlerId && youthWrestlers.some((yw) => yw.id === preselectedWrestlerId) ? preselectedWrestlerId : ''}
+            partnerInviteCode={partnerInviteFromUrl || undefined}
           />
         </CardContent>
       </Card>

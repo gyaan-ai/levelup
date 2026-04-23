@@ -35,6 +35,8 @@ interface SessionRegisterClientProps {
   youthWrestlers: YouthWrestlerItem[];
   initialWrestlerId?: string;
   checkoutUsesSavedAccountDiscount?: boolean;
+  /** Partner / invite link code (e.g. ?code= on register URL) — required for some private invite sessions under RLS. */
+  partnerInviteCode?: string;
 }
 
 export function SessionRegisterClient({
@@ -47,6 +49,7 @@ export function SessionRegisterClient({
   youthWrestlers,
   initialWrestlerId = '',
   checkoutUsesSavedAccountDiscount = false,
+  partnerInviteCode = '',
 }: SessionRegisterClientProps) {
   const router = useRouter();
   const [selectedWrestlerId, setSelectedWrestlerId] = useState(initialWrestlerId);
@@ -148,6 +151,7 @@ export function SessionRegisterClient({
         body: JSON.stringify({
           youthWrestlerId: selectedWrestlerId,
           promoCode: !isOwner && codeApplied ? codeTrimmed.toUpperCase() : undefined,
+          partnerInviteCode: partnerInviteCode.trim() ? partnerInviteCode.trim().toUpperCase() : undefined,
         }),
       });
       const data = await res.json();
