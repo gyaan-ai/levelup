@@ -15,11 +15,12 @@ import { getEffectiveFilledCount } from '@/lib/sessions';
 import { ensureAutoFamilyDiscountForParent } from '@/lib/family-auto-discount';
 import { checkoutAllowSavedAccountPercent, resolveCheckoutPercentOff } from '@/lib/checkout-promo';
 import { publicOriginForStripeRedirect } from '@/lib/stripe-redirect-origin';
+import { applyCredits, getUserCreditBalance } from '@/lib/credits';
 
 /**
  * POST - Pay & register a youth wrestler for a session (public or invite_only).
  * - Session owner: add their own wrestler (no charge).
- * - Non-owner: always Stripe Checkout (percent discounts via parent_percentage_discounts); webhook adds participant.
+ * - Non-owner: Stripe Checkout (percent discounts); optional Guild wallet credits (same rules as cart). Webhook/finalize applies credits.
  * - Optional body.partnerInviteCode: when set and matches sessions.partner_invite_code, allows load + pay even if
  *   join_policy is private (RLS often hides those rows from the joining parent until they pay).
  * Early-adopter free sessions are disabled — everyone pays except session owner adding kids.
@@ -45,8 +46,14 @@ export async function POST(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const body = (await req.json()) as { youthWrestlerId: string; promoCode?: string; partnerInviteCode?: string };
-    const { youthWrestlerId, promoCode, partnerInviteCode } = body;
+    const body = (await req.json()) as {
+      youthWrestlerId: string;
+      promoCode?: string;
+      partnerInviteCode?: string;
+      /** When false, card pays full discounted total. Default true. */
+      useCredits?: boolean;
+    };
+    const { youthWrestlerId, promoCode, partnerInviteCode, useCredits: useCreditsBody } = body;
     if (!youthWrestlerId) return NextResponse.json({ error: 'Missing youthWrestlerId' }, { status: 400 });
     if (role === 'youth_wrestler' && youthWrestlerId !== user.id) {
       return NextResponse.json({ error: 'Youth wrestlers can only register themselves' }, { status: 403 });
@@ -222,11 +229,6 @@ export async function POST(
       return NextResponse.json({ error: 'This wrestler is already registered for this session' }, { status: 409 });
     }
 
-    const stripeEnabled = process.env.STRIPE_CHECKOUT_ENABLED === 'true';
-    if (!stripeEnabled) {
-      return NextResponse.json({ error: 'Online payment is not enabled' }, { status: 503 });
-    }
-
     // Family / percentage discount (e.g. 10% off)
     const { data: pctDiscount } = await admin
       .from('parent_percentage_discounts')
@@ -242,9 +244,97 @@ export async function POST(
       ? pricePer * (1 - percentOff / 100)
       : pricePer;
 
-    const amountCents = Math.round(priceAfterDiscount * 100);
+    const applyWalletCredits = useCreditsBody !== false;
+    const creditBalance = applyWalletCredits ? await getUserCreditBalance(user.id, tenant.slug) : 0;
+    let creditsToUse = applyWalletCredits ? Math.min(creditBalance, priceAfterDiscount) : 0;
+    let amountToPay = priceAfterDiscount - creditsToUse;
+
+    if (amountToPay > 1e-6 && amountToPay + 1e-6 < 0.5) {
+      const maxCreditTowardMinCard = Math.max(0, priceAfterDiscount - 0.5);
+      creditsToUse = applyWalletCredits ? Math.min(creditBalance, maxCreditTowardMinCard) : 0;
+      amountToPay = priceAfterDiscount - creditsToUse;
+    }
+
+    if (amountToPay > 1e-6 && amountToPay + 1e-6 < 0.5) {
+      return NextResponse.json({ error: 'Minimum card charge is $0.50' }, { status: 400 });
+    }
+
+    const catalogStr = priceAfterDiscount.toFixed(2);
+
+    if (amountToPay <= 1e-6) {
+      const { data: ywSnap } = await supabase
+        .from('youth_wrestlers')
+        .select('first_name, last_name, photo_url')
+        .eq('id', youthWrestlerId)
+        .maybeSingle();
+
+      await applyCredits({
+        userId: user.id,
+        amount: creditsToUse,
+        sessionId,
+        description: 'Session registration paid with Guild credits',
+        tenantSlug: tenant.slug,
+      });
+
+      const { error: insertErr } = await admin.from('session_participants').insert({
+        session_id: sessionId,
+        youth_wrestler_id: youthWrestlerId,
+        parent_id: user.id,
+        paid: true,
+        amount_paid: priceAfterDiscount,
+        payment_method: 'credit',
+        status: 'confirmed',
+      });
+      if (insertErr) {
+        console.error('Register credit-only insert failed', insertErr);
+        return NextResponse.json({ error: insertErr.message }, { status: 500 });
+      }
+
+      await maybeBackfillRosterSnapshot(
+        admin,
+        { session_id: sessionId, youth_wrestler_id: youthWrestlerId },
+        ywSnap ?? {}
+      );
+      await admin
+        .from('sessions')
+        .update({ current_participants: current + 1, updated_at: new Date().toISOString() })
+        .eq('id', sessionId);
+
+      const coachId = (session as { athlete_id?: string }).athlete_id;
+      const dtNotify = s.scheduled_datetime;
+      if (coachId && coachId !== user.id) {
+        const dateStr = dtNotify ? formatEST(new Date(dtNotify), 'EEE MMM d, h:mm a') : 'your session';
+        await createNotification(admin, {
+          user_id: coachId,
+          type: 'session_booked',
+          title: 'Someone signed up for your session',
+          body: `New signup for ${dateStr}. Check My sessions.`,
+          data: { session_id: sessionId },
+        }).catch((e) => console.warn('Register credit-only: coach notification failed', e));
+        await notifyCoachAndAdminsNewBooking(admin, coachId, dateStr, sessionId, {
+          parentId: user.id,
+          youthWrestlerId,
+        }).catch(() => {});
+      }
+
+      const stripeRedirectOrigin = publicOriginForStripeRedirect(host, req);
+      const confirmToken = createRegisterConfirmationToken(sessionId);
+      const confirmUrl = `${stripeRedirectOrigin}/sessions/${sessionId}/register/confirmed?t=${encodeURIComponent(confirmToken)}`;
+      return NextResponse.json({
+        url: confirmUrl,
+        paidWithCredits: true,
+        creditsUsed: creditsToUse,
+      });
+    }
+
+    const stripeEnabled = process.env.STRIPE_CHECKOUT_ENABLED === 'true';
+    if (!stripeEnabled) {
+      return NextResponse.json({ error: 'Online payment is not enabled' }, { status: 503 });
+    }
+
+    const amountCents = Math.round(amountToPay * 100);
     if (amountCents < 50) {
-      return NextResponse.json({ error: 'Minimum charge is $0.50' }, { status: 400 });
+      return NextResponse.json({ error: 'Minimum card charge is $0.50' }, { status: 400 });
     }
 
     const stripe = getStripeInstance(tenant.slug);
@@ -255,9 +345,12 @@ export async function POST(
     const cancelUrl = req.headers.get('referer') || `${stripeRedirectOrigin}/training`;
 
     const dt = s.scheduled_datetime ? new Date(s.scheduled_datetime) : null;
-    const desc = dt
+    let desc = dt
       ? `Session on ${formatEST(dt, 'MMM d, yyyy')} at ${formatEST(dt, 'h:mm a')} – register one spot`
       : 'Register for session';
+    if (creditsToUse > 0) {
+      desc = `${desc} (Credit applied: $${creditsToUse.toFixed(2)})`;
+    }
 
     const sessionForStripe = session as {
       athlete_id?: string | null;
@@ -270,7 +363,7 @@ export async function POST(
      * with different parameters — e.g. user applies a promo after a first attempt → 500 without this.
      */
     const idempotencyKey =
-      `reg-${sessionId}-${youthWrestlerId}-${user.id}-${amountCents}`.slice(0, 255);
+      `reg-${sessionId}-${youthWrestlerId}-${user.id}-${amountCents}-c${Math.round(creditsToUse * 100)}`.slice(0, 255);
 
     const stripeSession = await stripe.checkout.sessions.create(
       {
@@ -302,6 +395,8 @@ export async function POST(
           youth_wrestler_id: String(youthWrestlerId),
           parent_id: String(user.id),
           register: 'true',
+          credits_to_use: creditsToUse.toString(),
+          register_catalog_dollars: catalogStr,
         },
         success_url: successUrl,
         cancel_url: cancelUrl,

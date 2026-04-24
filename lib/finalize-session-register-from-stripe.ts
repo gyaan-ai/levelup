@@ -41,7 +41,16 @@ export async function finalizeRegisterFromCheckoutSession(
         : tenantSlugHint ?? 'guild';
 
     const amountTotal = session.amount_total ?? 0;
-    const amountPaid = amountTotal / 100;
+    const stripeCashDollars = amountTotal / 100;
+    const creditsUsed =
+      Number.parseFloat(String(session.metadata?.credits_to_use ?? '0').replace(/,/g, '')) || 0;
+    const catalogFromMeta = Number.parseFloat(
+      String(session.metadata?.register_catalog_dollars ?? '').replace(/,/g, '')
+    );
+    const lineTotal =
+      Number.isFinite(catalogFromMeta) && catalogFromMeta > 0
+        ? catalogFromMeta
+        : stripeCashDollars + creditsUsed;
     const supabase = createAdminClient(tenantSlug);
 
     const { data: existing } = await supabase
@@ -70,16 +79,26 @@ export async function finalizeRegisterFromCheckoutSession(
         youth_wrestler_id: youthWrestlerId,
         parent_id: parentId,
         paid: true,
-        amount_paid: amountPaid,
+        amount_paid: lineTotal,
       });
       if (insertErr) {
         if (insertErr.code === '23505') {
           await supabase
             .from('session_participants')
-            .update({ paid: true, amount_paid: amountPaid })
+            .update({ paid: true, amount_paid: lineTotal })
             .eq('session_id', sessionId)
             .eq('youth_wrestler_id', youthWrestlerId);
           await maybeBackfillRosterSnapshot(supabase, { session_id: sessionId, youth_wrestler_id: youthWrestlerId }, ywSnap ?? {});
+          if (creditsUsed > 0) {
+            const { applyCredits } = await import('@/lib/credits');
+            await applyCredits({
+              userId: parentId,
+              amount: creditsUsed,
+              sessionId,
+              description: 'Session registration (Pay & register)',
+              tenantSlug,
+            });
+          }
           return { ok: true };
         }
         console.error('finalizeRegisterFromCheckoutSession: insert failed', insertErr);
@@ -113,10 +132,20 @@ export async function finalizeRegisterFromCheckoutSession(
           youthWrestlerId,
         }).catch(() => {});
       }
+      if (creditsUsed > 0) {
+        const { applyCredits } = await import('@/lib/credits');
+        await applyCredits({
+          userId: parentId,
+          amount: creditsUsed,
+          sessionId,
+          description: 'Session registration (Pay & register)',
+          tenantSlug,
+        });
+      }
     } else {
       await supabase
         .from('session_participants')
-        .update({ paid: true, amount_paid: amountPaid })
+        .update({ paid: true, amount_paid: lineTotal })
         .eq('session_id', sessionId)
         .eq('youth_wrestler_id', youthWrestlerId);
       const { data: ywExisting } = await supabase
@@ -125,6 +154,16 @@ export async function finalizeRegisterFromCheckoutSession(
         .eq('id', youthWrestlerId)
         .maybeSingle();
       await maybeBackfillRosterSnapshot(supabase, { session_id: sessionId, youth_wrestler_id: youthWrestlerId }, ywExisting ?? {});
+      if (creditsUsed > 0) {
+        const { applyCredits } = await import('@/lib/credits');
+        await applyCredits({
+          userId: parentId,
+          amount: creditsUsed,
+          sessionId,
+          description: 'Session registration (Pay & register)',
+          tenantSlug,
+        });
+      }
     }
 
     return { ok: true };

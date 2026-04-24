@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useRef } from 'react';
+import { useMemo, useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -56,6 +56,25 @@ export function JoinSessionClient({
   const [registered, setRegistered] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const payLock = useRef(false);
+  const [creditBalance, setCreditBalance] = useState<number | null>(null);
+  const [useCredits, setUseCredits] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/credits')
+      .then((r) => r.json())
+      .then((data: { balance?: unknown }) => {
+        if (cancelled) return;
+        const b = Number(data?.balance);
+        setCreditBalance(Number.isFinite(b) ? b : 0);
+      })
+      .catch(() => {
+        if (!cancelled) setCreditBalance(0);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const displayPrice = useMemo(() => {
     if (checkoutUsesSavedAccountDiscount) {
@@ -75,6 +94,13 @@ export function JoinSessionClient({
 
   const selectedWrestler = youthWrestlers.find((w) => w.id === selectedWrestlerId);
   const selectedHasCell = selectedWrestler?.hasValidCell !== false;
+
+  const creditsApplicable = useMemo(() => {
+    if (!useCredits || creditBalance == null || creditBalance <= 0) return 0;
+    return Math.min(creditBalance, displayPrice);
+  }, [useCredits, creditBalance, displayPrice]);
+
+  const cardPortion = useMemo(() => Math.max(0, displayPrice - creditsApplicable), [displayPrice, creditsApplicable]);
 
   const handleApplyCode = async () => {
     const codeTrimmed = promoCode.trim();
@@ -145,6 +171,7 @@ export function JoinSessionClient({
           youthWrestlerId: selectedWrestlerId,
           promoCode: codeApplied ? codeTrimmed.toUpperCase() : undefined,
           partnerInviteCode: code.trim().toUpperCase(),
+          useCredits,
         }),
       });
       const data = await res.json();
@@ -283,6 +310,27 @@ export function JoinSessionClient({
             {`Code applied. You get ${localPromoPercent}% off — pay & register below.`}
           </p>
         )}
+        {creditBalance !== null && creditBalance > 0 && (
+          <div className="rounded-md border border-border bg-muted/40 p-3 text-sm space-y-2">
+            <p className="text-foreground">
+              Guild wallet balance: <span className="font-semibold">${creditBalance.toFixed(2)}</span>
+              {useCredits && creditsApplicable > 0 ? (
+                <span className="text-muted-foreground">
+                  {` · ${creditsApplicable.toFixed(2)} will apply to this spot`}
+                </span>
+              ) : null}
+            </p>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={useCredits}
+                onChange={(e) => setUseCredits(e.target.checked)}
+                className="rounded border-input"
+              />
+              <span>Use Guild credits for this registration</span>
+            </label>
+          </div>
+        )}
       </div>
       <Button
         onClick={handlePayAndRegister}
@@ -291,7 +339,9 @@ export function JoinSessionClient({
       >
         {joining
           ? 'Redirecting to payment…'
-          : `Pay $${displayPrice.toFixed(2)} & register`}
+          : cardPortion < 0.005
+            ? 'Complete registration'
+            : `Pay $${cardPortion.toFixed(2)} & register`}
       </Button>
     </div>
   );

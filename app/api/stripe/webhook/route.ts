@@ -335,10 +335,20 @@ export async function POST(req: NextRequest) {
         const paidSpotsBeforeRegister = isRewardsProgramEnabled()
           ? await countPaidSessionSpotsForParent(supabase, parentId)
           : 0;
-        const amountPaid = amountTotal / 100;
+        const stripeCashDollars = amountTotal / 100;
+        const creditsUsed =
+          Number.parseFloat(String(session.metadata?.credits_to_use ?? '0').replace(/,/g, '')) || 0;
+        const catalogFromMeta = Number.parseFloat(
+          String(session.metadata?.register_catalog_dollars ?? '').replace(/,/g, '')
+        );
+        const lineTotal =
+          Number.isFinite(catalogFromMeta) && catalogFromMeta > 0
+            ? catalogFromMeta
+            : stripeCashDollars + creditsUsed;
+        const amountPaid = lineTotal;
         // Fetch actual Stripe fee
         const stripeFee = paymentIntentId ? await getStripeFee(stripe, paymentIntentId) : 0;
-        
+
         const { data: existing } = await supabase
           .from('session_participants')
           .select('id')
@@ -435,6 +445,16 @@ export async function POST(req: NextRequest) {
             youthWrestlerId,
           }).catch(() => {});
         }
+        if (creditsUsed > 0) {
+          const { applyCredits } = await import('@/lib/credits');
+          await applyCredits({
+            userId: parentId,
+            amount: creditsUsed,
+            sessionId,
+            description: 'Session registration (Pay & register)',
+            tenantSlug,
+          });
+        }
         if (isRewardsProgramEnabled()) {
           await issueSessionEarnedForCheckoutLines(supabase, {
             tenantSlug,
@@ -443,10 +463,10 @@ export async function POST(req: NextRequest) {
               {
                 sessionId,
                 youthWrestlerId,
-                catalogLineDollars: amountPaid,
+                catalogLineDollars: lineTotal,
               },
             ],
-            stripeCashTotalDollars: amountTotal / 100,
+            stripeCashTotalDollars: stripeCashDollars,
             paidSpotsBeforeCheckout: paidSpotsBeforeRegister,
           });
         }
