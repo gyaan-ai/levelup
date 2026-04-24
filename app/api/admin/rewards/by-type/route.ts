@@ -43,16 +43,22 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const list = (rows ?? []) as Array<{ bucket: string; issued: unknown; redeemed: unknown }>;
+  const list = (rows ?? []) as Array<{
+    bucket: string;
+    issued: unknown;
+    redeemed: unknown;
+    outstanding?: unknown;
+  }>;
   const mapped = list.map((r) => {
     const issued = Number(r.issued ?? 0);
     const redeemed = Number(r.redeemed ?? 0);
+    const outstanding = Number(r.outstanding ?? 0);
     return {
       type: r.bucket,
       label: BUCKET_LABEL[r.bucket] ?? r.bucket,
       issued,
       redeemed,
-      outstanding: Number((issued - redeemed).toFixed(2)),
+      outstanding: Number(outstanding.toFixed(2)),
     };
   });
 
