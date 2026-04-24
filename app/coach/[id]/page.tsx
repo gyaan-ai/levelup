@@ -118,6 +118,20 @@ export default async function CoachPublicSchedulePage({ params }: { params: Prom
   const coachName = [athleteRow.first_name, athleteRow.last_name].filter(Boolean).join(' ').trim() || 'Coach';
   const nowIso = new Date().toISOString();
 
+  const { data: { user: authUser } } = await supabase.auth.getUser();
+  let bookingRole: string | null = null;
+  if (authUser) {
+    const { data: roleRow } = await supabase.from('users').select('role').eq('id', authUser.id).maybeSingle();
+    bookingRole = (roleRow as { role?: string } | null)?.role ?? null;
+  }
+  /** Same roles as `POST /api/sessions/[id]/register` — can open register / book without another login hop. */
+  const canBookOrRegister =
+    Boolean(authUser) &&
+    (bookingRole === 'parent' ||
+      bookingRole === 'admin' ||
+      bookingRole === 'coach' ||
+      bookingRole === 'youth_wrestler');
+
   const { data: sessionRows } = await admin
     .from('sessions')
     .select(
@@ -205,7 +219,9 @@ export default async function CoachPublicSchedulePage({ params }: { params: Prom
                 <Link href={`/athlete/${id}`}>Full coach profile</Link>
               </Button>
               <Button asChild variant="outline" size="sm">
-                <Link href={`/login?redirect=${encodeURIComponent(`/book/${id}`)}`}>Sign in to book</Link>
+                <Link href={canBookOrRegister ? `/book/${id}` : `/login?redirect=${encodeURIComponent(`/book/${id}`)}`}>
+                  {canBookOrRegister ? 'Book a session' : 'Sign in to book'}
+                </Link>
               </Button>
             </div>
           </div>
@@ -233,8 +249,11 @@ export default async function CoachPublicSchedulePage({ params }: { params: Prom
             <p>No upcoming sessions scheduled yet.</p>
             <p className="text-sm mt-2">
               Ask the coach for a session link, or{' '}
-              <Link href={`/login?redirect=${encodeURIComponent(`/book/${id}`)}`} className="text-accent underline">
-                sign in to request a time
+              <Link
+                href={canBookOrRegister ? `/book/${id}` : `/login?redirect=${encodeURIComponent(`/book/${id}`)}`}
+                className="text-accent underline"
+              >
+                {canBookOrRegister ? 'request a time' : 'sign in to request a time'}
               </Link>
               .
             </p>
@@ -267,15 +286,19 @@ export default async function CoachPublicSchedulePage({ params }: { params: Prom
             if (policy === 'invite_only' && code) {
               cta = { href: `/join/${code.toUpperCase()}`, label: 'Open invite link', external: false };
             } else if (policy === 'public') {
-              cta = {
-                href: `/login?redirect=${encodeURIComponent(`/sessions/${s.id}/register`)}`,
-                label: 'Sign in to register',
-              };
+              cta = canBookOrRegister
+                ? { href: `/sessions/${s.id}/register`, label: 'Register' }
+                : {
+                    href: `/login?redirect=${encodeURIComponent(`/sessions/${s.id}/register`)}`,
+                    label: 'Sign in to register',
+                  };
             } else {
-              cta = {
-                href: `/login?redirect=${encodeURIComponent(`/book/${id}`)}`,
-                label: 'Sign in to book',
-              };
+              cta = canBookOrRegister
+                ? { href: `/book/${id}`, label: 'Book' }
+                : {
+                    href: `/login?redirect=${encodeURIComponent(`/book/${id}`)}`,
+                    label: 'Sign in to book',
+                  };
             }
 
             return (
