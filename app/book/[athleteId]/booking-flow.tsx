@@ -509,8 +509,12 @@ export function BookingFlow({
           />
           <div className="min-w-0 flex-1 space-y-1">
             <h1 className="text-2xl font-bold">
-              Book a Session with {athlete.first_name} {athlete.last_name}
+              Book with {athlete.first_name} {athlete.last_name}
             </h1>
+            <p className="text-sm text-muted-foreground">
+              Schedule a new private or partner session in the steps below. When this coach has posted join-in sessions,
+              they show in the list above.
+            </p>
             <p className="text-muted-foreground flex items-center gap-2 flex-wrap">
               <SchoolLogo school={athlete.school} size="sm" />
               {athlete.school}
@@ -520,7 +524,7 @@ export function BookingFlow({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="order-2 lg:order-1 lg:col-span-2 space-y-6">
+        <div id="schedule-new-session" className="order-2 lg:order-1 lg:col-span-2 space-y-6 scroll-mt-24">
           <Card>
             <CardContent className="pt-6">
               <div className="flex justify-between mb-2">

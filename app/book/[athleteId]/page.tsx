@@ -7,6 +7,10 @@ import { checkoutAllowSavedAccountPercent } from '@/lib/checkout-promo';
 import { getRecommendedPricesForCoach } from '@/lib/coach-session-pricing';
 import { coachPayoutFromParentPrice } from '@/lib/pricing';
 import { BookingFlow } from './booking-flow';
+import {
+  CoachUpcomingSessionsSection,
+  type CoachSessionForBookList,
+} from './coach-upcoming-sessions-section';
 
 export default async function BookPage({
   params,
@@ -176,18 +180,77 @@ export default async function BookPage({
       });
   }
 
+  const nowISO = new Date().toISOString();
+  const { data: coachSessionRows } = await admin
+    .from('sessions')
+    .select(
+      `
+      id,
+      scheduled_datetime,
+      session_type,
+      session_mode,
+      join_policy,
+      focus_area,
+      current_participants,
+      max_participants,
+      price_per_participant,
+      partner_invite_code,
+      facilities:facility_id(name)
+    `
+    )
+    .eq('athlete_id', athleteId)
+    .in('status', ['scheduled', 'pending_payment'])
+    .gte('scheduled_datetime', nowISO)
+    .order('scheduled_datetime', { ascending: true })
+    .limit(200);
+
+  const sessionsBase = (coachSessionRows ?? []) as Omit<CoachSessionForBookList, 'session_participants'>[];
+  const coachSessionIds = sessionsBase.map((s) => s.id);
+  const participantsBySessionId = new Map<string, unknown[]>();
+  if (coachSessionIds.length > 0) {
+    const { data: partRows } = await admin
+      .from('session_participants')
+      .select(
+        `
+        session_id,
+        roster_first_name,
+        roster_last_name,
+        youth_wrestlers ( first_name, last_name )
+      `
+      )
+      .in('session_id', coachSessionIds);
+    for (const raw of partRows ?? []) {
+      const sid = (raw as { session_id?: string }).session_id;
+      if (!sid) continue;
+      const list = participantsBySessionId.get(sid) ?? [];
+      list.push(raw);
+      participantsBySessionId.set(sid, list);
+    }
+  }
+  const coachSessionsForBook: CoachSessionForBookList[] = sessionsBase.map((s) => ({
+    ...s,
+    session_participants: participantsBySessionId.get(s.id) ?? [],
+  }));
+
   return (
-    <BookingFlow
-      athlete={athlete}
-      facility={facility}
-      youthWrestlers={youthWrestlersList}
-      tenantPricing={tenant.pricing}
-      products={products}
-      preselectedYouthWrestlerId={preselectedYouthWrestlerId}
-      checkoutUsesSavedAccountDiscount={checkoutAllowSavedAccountPercent()}
-      initialBookingDate={initialBookingDate}
-      initialBookingTime={initialBookingTime}
-    />
+    <>
+      <CoachUpcomingSessionsSection
+        coachFirstName={athlete.first_name}
+        sessions={coachSessionsForBook}
+        preselectedYouthWrestlerId={preselectedYouthWrestlerId}
+      />
+      <BookingFlow
+        athlete={athlete}
+        facility={facility}
+        youthWrestlers={youthWrestlersList}
+        tenantPricing={tenant.pricing}
+        products={products}
+        preselectedYouthWrestlerId={preselectedYouthWrestlerId}
+        checkoutUsesSavedAccountDiscount={checkoutAllowSavedAccountPercent()}
+        initialBookingDate={initialBookingDate}
+        initialBookingTime={initialBookingTime}
+      />
+    </>
   );
 }
 

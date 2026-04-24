@@ -312,10 +312,12 @@ export default async function AthleteProfilePage({
                       </div>
                     ) : null}
                     <p className="text-sm text-muted-foreground">
+                      Book lists this coach&apos;s upcoming sessions and lets you schedule a new private or partner
+                      time.{' '}
                       <Link href={`/coach/${athlete.id}`} className="text-accent font-medium underline">
-                        Open existing partner and small group sessions
-                      </Link>
-                      <span className="hidden sm:inline"> — share that page if someone needs your link.</span>
+                        Shareable schedule
+                      </Link>{' '}
+                      for guests who aren&apos;t logged in yet.
                     </p>
                   </>
                 )}
