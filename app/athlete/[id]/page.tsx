@@ -151,6 +151,10 @@ export default async function AthleteProfilePage({
   const bookHref = youthWrestlerId
     ? `/book/${athlete.id}?youthWrestlerId=${encodeURIComponent(youthWrestlerId)}`
     : `/book/${athlete.id}`;
+  const registerHrefForSession = (sessionId: string) =>
+    youthWrestlerId
+      ? `/sessions/${sessionId}/register?wrestler=${encodeURIComponent(youthWrestlerId)}`
+      : `/sessions/${sessionId}/register`;
   const athleteName = `${athlete.first_name} ${athlete.last_name}`.trim() || 'This coach';
 
   const { data: weeklyAvailRows } = await supabase
@@ -336,7 +340,8 @@ export default async function AthleteProfilePage({
               Upcoming Sessions
             </CardTitle>
             <p className="text-sm text-muted-foreground">
-              Open sessions you can join
+              Tap a session to register, or use Book with {athlete.first_name} for the full list and private or partner
+              booking.
             </p>
           </CardHeader>
           <CardContent>
@@ -360,7 +365,7 @@ export default async function AthleteProfilePage({
                 const openSlots = Math.max(0, max - current);
                 const price = s.price_per_participant;
                 return (
-                  <Link key={s.id} href={`/coach/${athlete.id}`}>
+                  <Link key={s.id} href={registerHrefForSession(s.id)}>
                     <div className="flex items-center gap-4 p-4 rounded-xl bg-zinc-900/50 border border-zinc-800/50 hover:border-zinc-700 transition-all">
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
@@ -398,9 +403,9 @@ export default async function AthleteProfilePage({
                 );
               })}
             </div>
-            <Link href={`/coach/${athlete.id}`}>
+            <Link href={bookHref}>
               <Button variant="outline" className="w-full mt-4">
-                View all sessions (public link)
+                All sessions & schedule new
               </Button>
             </Link>
           </CardContent>
