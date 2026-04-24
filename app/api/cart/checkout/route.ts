@@ -7,7 +7,7 @@ import { getTenantByDomain } from '@/config/tenants';
 import { getStripeInstance } from '@/lib/stripe/webhooks';
 import { formatEST } from '@/lib/format-date';
 import { getEffectiveFilledCount } from '@/lib/sessions';
-import { getUserCreditBalance, applyCredits } from '@/lib/credits';
+import { getUserCreditBalance, applyCredits, getCreditUsageSumForParentSession } from '@/lib/credits';
 import { ensureAutoFamilyDiscountForParent } from '@/lib/family-auto-discount';
 import { checkoutAllowSavedAccountPercent, resolveCheckoutPercentOff } from '@/lib/checkout-promo';
 import { createNotification } from '@/lib/notifications';
@@ -289,17 +289,35 @@ export async function POST(req: NextRequest) {
           (s as { current_participants?: number }).current_participants ?? 0
         );
       }
+      const cartSessionIds = [...new Set(sessionMetadata.map((m) => m.session_id))];
+      const { data: priorParentRows } = await admin
+        .from('session_participants')
+        .select('session_id')
+        .eq('parent_id', user.id)
+        .in('session_id', cartSessionIds);
+      const priorParentSpotsBySession = new Map<string, number>();
+      for (const row of priorParentRows ?? []) {
+        const sid = (row as { session_id: string }).session_id;
+        priorParentSpotsBySession.set(sid, (priorParentSpotsBySession.get(sid) ?? 0) + 1);
+      }
+      const parentSpotsAddedThisCheckout = new Map<string, number>();
+
       const coachNotifySentForSession = new Set<string>();
       for (const meta of sessionMetadata) {
-        await applyCredits({
-          userId: user.id,
-          amount: meta.price,
-          sessionId: meta.session_id,
-          description: `Session booking paid with credits`,
-          tenantSlug: tenant.slug,
-        });
+        const prior = priorParentSpotsBySession.get(meta.session_id) ?? 0;
+        const inFlight = parentSpotsAddedThisCheckout.get(meta.session_id) ?? 0;
+        const parentSpotsBeforeLine = prior + inFlight;
+        let needApply = meta.price;
+        if (parentSpotsBeforeLine === 0) {
+          const usageSum = await getCreditUsageSumForParentSession(
+            user.id,
+            meta.session_id,
+            tenant.slug
+          );
+          needApply = Math.max(0, meta.price - usageSum);
+        }
 
-        await admin.from('session_participants').insert({
+        const { error: insertErr } = await admin.from('session_participants').insert({
           session_id: meta.session_id,
           youth_wrestler_id: meta.wrestler_id,
           parent_id: user.id,
@@ -307,6 +325,44 @@ export async function POST(req: NextRequest) {
           payment_method: 'credit',
           status: 'confirmed',
         });
+        if (insertErr) {
+          console.error('Cart credit-only: session_participants insert failed', insertErr);
+          return NextResponse.json({ error: insertErr.message }, { status: 500 });
+        }
+
+        if (needApply > 0.01) {
+          const applied = await applyCredits({
+            userId: user.id,
+            amount: needApply,
+            sessionId: meta.session_id,
+            description: `Session booking paid with credits`,
+            tenantSlug: tenant.slug,
+          });
+          if (applied.usedAmount + 0.02 < needApply) {
+            await admin
+              .from('session_participants')
+              .delete()
+              .eq('session_id', meta.session_id)
+              .eq('youth_wrestler_id', meta.wrestler_id)
+              .eq('parent_id', user.id);
+            console.error('Cart credit-only: applyCredits incomplete', {
+              needApply,
+              usedAmount: applied.usedAmount,
+            });
+            return NextResponse.json(
+              {
+                error:
+                  'Could not apply wallet credits for one or more sessions. No card was charged. Please try again.',
+              },
+              { status: 500 }
+            );
+          }
+        }
+
+        parentSpotsAddedThisCheckout.set(
+          meta.session_id,
+          (parentSpotsAddedThisCheckout.get(meta.session_id) ?? 0) + 1
+        );
 
         const next = (currentCountBySession.get(meta.session_id) ?? 0) + 1;
         currentCountBySession.set(meta.session_id, next);

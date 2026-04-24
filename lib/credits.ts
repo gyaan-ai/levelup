@@ -198,6 +198,31 @@ export async function applyCredits({
   };
 }
 
+/**
+ * Total dollars already applied from this parent’s wallet to a session (sum of `credit_usage.amount`
+ * for credits owned by `parentId` and this `sessionId`). Used to recover from “credits debited but
+ * roster insert failed” without double-charging on retry. Not sufficient when multiple children share
+ * one session via separate checkouts — callers must adjust `needApply` when the parent already has
+ * other kids on this session (see register / cart).
+ */
+export async function getCreditUsageSumForParentSession(
+  parentId: string,
+  sessionId: string,
+  tenantSlug = 'guild'
+): Promise<number> {
+  const admin = createAdminClient(tenantSlug);
+  const { data: creditRows, error: cErr } = await admin.from('credits').select('id').eq('parent_id', parentId);
+  if (cErr || !creditRows?.length) return 0;
+  const ids = creditRows.map((c: { id: string }) => c.id);
+  const { data: usage, error: uErr } = await admin
+    .from('credit_usage')
+    .select('amount')
+    .eq('session_id', sessionId)
+    .in('credit_id', ids);
+  if (uErr) return 0;
+  return (usage ?? []).reduce((s, row: { amount?: unknown }) => s + Number(row.amount ?? 0), 0);
+}
+
 /** Recent credit applications for wallet / API (from `credit_usage`). */
 export async function getCreditHistory(userId: string, tenantSlug = 'guild') {
   const admin = createAdminClient(tenantSlug);

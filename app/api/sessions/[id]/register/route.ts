@@ -15,7 +15,7 @@ import { getEffectiveFilledCount } from '@/lib/sessions';
 import { ensureAutoFamilyDiscountForParent } from '@/lib/family-auto-discount';
 import { checkoutAllowSavedAccountPercent, resolveCheckoutPercentOff } from '@/lib/checkout-promo';
 import { publicOriginForStripeRedirect } from '@/lib/stripe-redirect-origin';
-import { applyCredits, getUserCreditBalance } from '@/lib/credits';
+import { applyCredits, getCreditUsageSumForParentSession, getUserCreditBalance } from '@/lib/credits';
 
 /**
  * POST - Pay & register a youth wrestler for a session (public or invite_only).
@@ -268,13 +268,17 @@ export async function POST(
         .eq('id', youthWrestlerId)
         .maybeSingle();
 
-      await applyCredits({
-        userId: user.id,
-        amount: creditsToUse,
-        sessionId,
-        description: 'Session registration paid with Guild credits',
-        tenantSlug: tenant.slug,
-      });
+      const { count: parentSpotCount } = await admin
+        .from('session_participants')
+        .select('*', { count: 'exact', head: true })
+        .eq('session_id', sessionId)
+        .eq('parent_id', user.id);
+      const priorParentSpots = parentSpotCount ?? 0;
+      const usageSum = await getCreditUsageSumForParentSession(user.id, sessionId, tenant.slug);
+      let needApplyCredits = creditsToUse;
+      if (priorParentSpots === 0) {
+        needApplyCredits = Math.max(0, creditsToUse - usageSum);
+      }
 
       const { error: insertErr } = await admin.from('session_participants').insert({
         session_id: sessionId,
@@ -288,6 +292,31 @@ export async function POST(
       if (insertErr) {
         console.error('Register credit-only insert failed', insertErr);
         return NextResponse.json({ error: insertErr.message }, { status: 500 });
+      }
+
+      if (needApplyCredits > 0.01) {
+        const applied = await applyCredits({
+          userId: user.id,
+          amount: needApplyCredits,
+          sessionId,
+          description: 'Session registration paid with Guild credits',
+          tenantSlug: tenant.slug,
+        });
+        if (applied.usedAmount + 0.02 < needApplyCredits) {
+          await admin
+            .from('session_participants')
+            .delete()
+            .eq('session_id', sessionId)
+            .eq('youth_wrestler_id', youthWrestlerId);
+          console.error('Register credit-only: applyCredits incomplete', {
+            needApplyCredits,
+            usedAmount: applied.usedAmount,
+          });
+          return NextResponse.json(
+            { error: 'Could not apply wallet credits. Your card was not charged. Please try again.' },
+            { status: 500 }
+          );
+        }
       }
 
       await maybeBackfillRosterSnapshot(

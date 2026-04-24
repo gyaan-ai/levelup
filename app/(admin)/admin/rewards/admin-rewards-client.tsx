@@ -945,6 +945,48 @@ export function AdminRewardsClient() {
               <Button type="button" size="sm" variant="outline" className="min-h-[44px]" onClick={() => setRevokeOpen(true)}>
                 Revoke credit
               </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                className="min-h-[44px]"
+                disabled={actionLoading}
+                onClick={async () => {
+                  if (!panelParent) return;
+                  if (
+                    !confirm(
+                      'Restore credits for sessions where this parent has wallet debits but no roster row? (Failed registration fix.)'
+                    )
+                  )
+                    return;
+                  setActionLoading(true);
+                  try {
+                    const r = await fetch(
+                      `/api/admin/rewards/parents/${panelParent.id}/reverse-orphaned-booking-credits`,
+                      { method: 'POST' }
+                    );
+                    const j = await r.json().catch(() => ({}));
+                    if (r.ok) {
+                      alert(
+                        `Restored $${Number(j.restoredUsd ?? 0).toFixed(2)} (${Number(j.reversedUsageRowCount ?? 0)} usage rows). Balance: $${Number(j.balanceAfter ?? 0).toFixed(2)}.`
+                      );
+                      await openPanel(
+                        panelParent.id,
+                        panelParent.name,
+                        Number(j.balanceAfter ?? panelParent.balance)
+                      );
+                      void fetchParents();
+                      void fetchSummary();
+                    } else {
+                      alert(typeof j.error === 'string' ? j.error : 'Request failed');
+                    }
+                  } finally {
+                    setActionLoading(false);
+                  }
+                }}
+              >
+                Restore failed booking credits
+              </Button>
             </div>
             <div className="flex-1 overflow-y-auto p-3">
               {ledgerLoading && ledger.length === 0 ? (
