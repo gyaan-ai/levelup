@@ -145,7 +145,7 @@ export async function POST(req: NextRequest) {
       if (joinPolicy !== 'public' && joinPolicy !== 'invite_only') {
         return NextResponse.json({ error: 'Session is not open for registration' }, { status: 400 });
       }
-      if (!['scheduled', 'pending_payment'].includes(status ?? '')) {
+      if (status !== 'scheduled') {
         return NextResponse.json({ error: 'Session is not open for registration' }, { status: 400 });
       }
 

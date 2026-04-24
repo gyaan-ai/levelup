@@ -8,7 +8,7 @@ import { checkSessionMilestonesForParent, isRewardsProgramEnabled } from '@/lib/
 /**
  * POST - Mark a session as completed.
  * Allowed for admin or the session's coach (athlete_id).
- * Only allowed when status is scheduled or pending_payment.
+ * Only allowed when status is scheduled.
  */
 export async function POST(
   _req: NextRequest,
@@ -49,9 +49,9 @@ export async function POST(
       return NextResponse.json({ error: 'Not authorized to complete this session' }, { status: 403 });
     }
 
-    if (!['scheduled', 'pending_payment'].includes(session.status)) {
+    if (session.status !== 'scheduled') {
       return NextResponse.json(
-        { error: 'Session can only be marked complete when it is scheduled or pending payment' },
+        { error: 'Session can only be marked complete when it is open (scheduled)' },
         { status: 400 }
       );
     }

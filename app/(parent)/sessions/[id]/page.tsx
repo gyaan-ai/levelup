@@ -163,7 +163,7 @@ export default async function SessionDetailPage({
 
   const canCancel =
     !isPast &&
-    (s.status === 'scheduled' || s.status === 'pending_payment') &&
+    s.status === 'scheduled' &&
     scheduledTime != null &&
     scheduledTime > now &&
     isOwner;
@@ -228,7 +228,7 @@ export default async function SessionDetailPage({
   
   const canRegister =
     !isPast &&
-    (s.status === 'scheduled' || s.status === 'pending_payment') &&
+    s.status === 'scheduled' &&
     openings > 0 &&
     (isOwner || (!isParticipant && (joinPolicy === 'public' || (joinPolicy === 'invite_only' && hasInviteAccess))));
 
@@ -291,9 +291,8 @@ export default async function SessionDetailPage({
   const hasReviewed = (coachReviewRows ?? []).length > 0;
 
   const statusBadge = (status: string) => {
-    if (status === 'scheduled') return <Badge>Scheduled</Badge>;
-    if (status === 'pending_payment') return <Badge variant="secondary">Pending payment</Badge>;
-    if (status === 'completed') return <Badge variant="default">Completed</Badge>;
+    if (status === 'scheduled') return <Badge>Open</Badge>;
+    if (status === 'completed') return <Badge variant="default">Paid</Badge>;
     if (status === 'cancelled') return <Badge variant="secondary">Cancelled</Badge>;
     if (status === 'no-show') return <Badge variant="secondary">No-show</Badge>;
     return <Badge variant="outline">{status}</Badge>;

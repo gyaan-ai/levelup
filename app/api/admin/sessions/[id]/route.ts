@@ -9,7 +9,7 @@ import { COACH_SESSION_OVERLAP_ERROR, findCoachSessionTimeOverlap } from '@/lib/
 
 /**
  * PATCH - Admin updates a session (focus_area, join_policy, max_participants, price_per_participant).
- * Only allowed for scheduled or pending_payment sessions.
+ * Only allowed for scheduled sessions.
  */
 export async function PATCH(
   req: NextRequest,
@@ -210,7 +210,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    if (session.status !== 'scheduled' && session.status !== 'pending_payment') {
+    if (session.status !== 'scheduled') {
       return NextResponse.json(
         { error: 'Only scheduled or pending-payment sessions can be deleted' },
         { status: 400 }

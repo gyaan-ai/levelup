@@ -176,7 +176,7 @@ export async function fetchCoachMapPins(
         'athlete_id, session_type, scheduled_datetime, status, join_policy, current_participants, max_participants'
       )
       .in('athlete_id', coachIds)
-      .in('status', ['scheduled', 'pending_payment'])
+      .eq('status', 'scheduled')
       .gt('scheduled_datetime', new Date().toISOString());
 
     if (sessErr) {

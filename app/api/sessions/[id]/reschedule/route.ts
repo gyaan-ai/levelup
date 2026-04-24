@@ -77,7 +77,7 @@ export async function PATCH(
       }
     }
 
-    if (!['scheduled', 'pending_payment'].includes(session.status)) {
+    if (session.status !== 'scheduled') {
       return NextResponse.json(
         { error: 'Only scheduled or pending sessions can be rescheduled' },
         { status: 400 }

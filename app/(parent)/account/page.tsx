@@ -63,7 +63,7 @@ export default async function AccountPage() {
         .from('sessions')
         .select('id, refunded_at')
         .in('id', familySessionIds)
-        .in('status', ['scheduled', 'completed', 'no-show', 'pending_payment']);
+        .in('status', ['scheduled', 'completed', 'no-show']);
 
       const spendEligibleSessionIds = new Set(
         (sessionsForSpend ?? [])

@@ -21,8 +21,9 @@ import {
 import { coachPayoutUsd, type SessionCoachPayoutFields } from '@/lib/coach-session-payout';
 import { isRewardsProgramEnabled } from '@/lib/rewards';
 import { formatEST } from '@/lib/format-date';
+import { isBookingCheckoutShellSession } from '@/lib/session-checkout-shell';
 
-type SessionWithPayoutStatus = SessionCoachPayoutFields & { status: string };
+type SessionWithPayoutStatus = SessionCoachPayoutFields & { status: string; booking_checkout_shell?: boolean };
 
 /** Open-booking counts: session calendar day in Eastern is today or later (matches admin Sessions filter). */
 function isOpenSessionFromTodayForwardEastern(scheduledDatetime: string): boolean {
@@ -35,7 +36,7 @@ function coachPayoutUsdUnlessUnpaidPending(
   s: SessionWithPayoutStatus,
   participantSum: number
 ): number {
-  if (s.status === 'pending_payment' && participantSum <= 0) return 0;
+  if (s.booking_checkout_shell && participantSum <= 0) return 0;
   return coachPayoutUsd({
     athlete_payment: s.athlete_payment,
     price_per_participant: s.price_per_participant,
@@ -47,7 +48,10 @@ function coachPayoutUsdUnlessUnpaidPending(
 }
 
 function sessionCoachShareUsd(s: AdminSession): number {
-  return coachPayoutUsdUnlessUnpaidPending(s, s.participant_amount_paid_sum ?? 0);
+  return coachPayoutUsdUnlessUnpaidPending(
+    { ...s, booking_checkout_shell: s.booking_checkout_shell },
+    s.participant_amount_paid_sum ?? 0
+  );
 }
 
 function roundRatingAvg(sum: number, count: number): number {
@@ -256,24 +260,26 @@ export default async function AdminPage() {
     stripe_fee?: number | null;
   };
 
-  /** Money actually collected: exclude list-price placeholders on unpaid checkout rows (pending_payment). */
+  /** Money actually collected: exclude list-price placeholders on unpaid checkout rows. */
   function participantAmountPaidSum(s: (typeof sessionsRows)[0]): number {
+    const shell = isBookingCheckoutShellSession(s);
     const raw = s.session_participants;
     const rows = Array.isArray(raw) ? raw : raw ? [raw] : [];
     return rows.reduce((sum, p) => {
       const pr = p as ParticipantRow;
       const amt = Number(pr.amount_paid ?? 0);
-      if (s.status === 'pending_payment' && pr.paid !== true) return sum;
+      if (shell && pr.paid !== true) return sum;
       if (pr.paid === false) return sum;
       return sum + amt;
     }, 0);
   }
 
-  /** Spots that count toward capacity (unpaid pending checkout rows do not hold a slot). */
+  /** Spots that count toward capacity (unpaid checkout shell rows do not hold a slot). */
   function confirmedBookedCount(s: (typeof sessionsRows)[0]): number {
+    const shell = isBookingCheckoutShellSession(s);
     const raw = s.session_participants;
     const rows = Array.isArray(raw) ? raw : raw ? [raw] : [];
-    if (s.status === 'pending_payment') {
+    if (shell) {
       return rows.filter((p) => (p as ParticipantRow).paid === true).length;
     }
     return rows.filter((p) => (p as ParticipantRow).paid !== false).length;
@@ -322,7 +328,7 @@ export default async function AdminPage() {
       const pr = p as ParticipantRow;
       const yid = pr.youth_wrestler_id;
       if (yid == null || yid === '') continue;
-      if (s.status === 'pending_payment' && pr.paid !== true) continue;
+      if (isBookingCheckoutShellSession(s) && pr.paid !== true) continue;
       if (pr.paid === false) continue;
       const amt = Math.round(Number(pr.amount_paid ?? 0) * 100) / 100;
       youthSessionSpendLines.push({
@@ -344,6 +350,7 @@ export default async function AdminPage() {
     const o = Array.isArray(a) ? a[0] : a;
     const f = s.facilities;
     const fo = Array.isArray(f) ? f[0] : f;
+    const booking_checkout_shell = isBookingCheckoutShellSession(s);
     // Cast to access fields not in generated types
     const row = s as typeof s & { duration_minutes?: number; price_per_participant?: number; join_policy?: string; focus_area?: string; focus_area_2?: string };
     return {
@@ -383,6 +390,7 @@ export default async function AdminPage() {
         o && (o as { payout_rate?: number | null }).payout_rate != null
           ? Number((o as { payout_rate?: number | null }).payout_rate)
           : null,
+      booking_checkout_shell,
     };
   });
 
@@ -398,15 +406,15 @@ export default async function AdminPage() {
 
   const billing: BillingSummary = {
     totalRevenue: sessions.reduce((sum, s) => {
-      if (s.status === 'pending_payment') return sum + (s.participant_amount_paid_sum ?? 0);
+      if (s.booking_checkout_shell) return sum + (s.participant_amount_paid_sum ?? 0);
       return sum + s.total_price;
     }, 0),
     totalOrgFees: sessions.reduce((sum, s) => {
-      if (s.status === 'pending_payment' && (s.participant_amount_paid_sum ?? 0) <= 0) return sum;
+      if (s.booking_checkout_shell && (s.participant_amount_paid_sum ?? 0) <= 0) return sum;
       return sum + s.org_fee;
     }, 0),
     totalStripeFees: sessions.reduce((sum, s) => {
-      if (s.status === 'pending_payment' && (s.participant_amount_paid_sum ?? 0) <= 0) return sum;
+      if (s.booking_checkout_shell && (s.participant_amount_paid_sum ?? 0) <= 0) return sum;
       return sum + s.stripe_fee;
     }, 0),
     totalAthletePayments: sessions.reduce((sum, s) => sum + sessionCoachShareUsd(s), 0),
@@ -425,12 +433,10 @@ export default async function AdminPage() {
     sessionCount: sessions.length,
     completedCount: sessions.filter((s) => s.status === 'completed').length,
     pendingPaymentCount: sessions.filter(
-      (s) => s.status === 'pending_payment' && isOpenSessionFromTodayForwardEastern(s.scheduled_datetime)
+      (s) => s.booking_checkout_shell && isOpenSessionFromTodayForwardEastern(s.scheduled_datetime)
     ).length,
     upcomingOpenCount: sessions.filter(
-      (s) =>
-        (s.status === 'scheduled' || s.status === 'pending_payment') &&
-        isOpenSessionFromTodayForwardEastern(s.scheduled_datetime)
+      (s) => s.status === 'scheduled' && isOpenSessionFromTodayForwardEastern(s.scheduled_datetime)
     ).length,
   };
 

@@ -64,7 +64,7 @@ export default async function ReschedulePage({
     redirect('/dashboard');
   }
 
-  if (!['scheduled', 'pending_payment'].includes(session.status)) {
+  if (session.status !== 'scheduled') {
     redirect('/bookings');
   }
 

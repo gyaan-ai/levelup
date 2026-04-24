@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 /** Statuses that reserve the coach's calendar (must not overlap each other). */
-const COACH_CALENDAR_BLOCKING_STATUSES = ['scheduled', 'pending_payment'] as const;
+const COACH_CALENDAR_BLOCKING_STATUSES = ['scheduled'] as const;
 
 const DEFAULT_SESSION_DURATION_MIN = 60;
 

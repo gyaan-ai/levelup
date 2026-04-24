@@ -150,7 +150,7 @@ export default async function TrainingPage({
         )
         .in('athlete_id', athleteIds)
         .eq('join_policy', 'public')
-        .in('status', ['scheduled', 'pending_payment'])
+        .eq('status', 'scheduled')
         .gte('scheduled_datetime', nowIso)
         .lte('scheduled_datetime', horizonUtcEnd)
     : { data: [] };
@@ -247,7 +247,7 @@ export default async function TrainingPage({
         .from('sessions')
         .select('athlete_id, scheduled_datetime')
         .in('athlete_id', athleteIds)
-        .in('status', ['scheduled', 'pending_payment'])
+        .eq('status', 'scheduled')
         .gte('scheduled_datetime', nowIso)
         .order('scheduled_datetime', { ascending: true })
     : { data: [] };
@@ -319,9 +319,9 @@ export default async function TrainingPage({
     return q;
   };
 
-  // Query only UPCOMING sessions (scheduled or pending_payment)
+  // Query only UPCOMING scheduled sessions
   const { data: upcomingData, error: upcomingError } = await withOptFilters(sessionQuery(dayStart, dayEnd))
-    .in('status', ['scheduled', 'pending_payment'])
+    .eq('status', 'scheduled')
     .order('scheduled_datetime', { ascending: true });
   
   
@@ -367,7 +367,7 @@ export default async function TrainingPage({
         )
         .in('athlete_id', athleteIds)
         .eq('join_policy', 'public')
-        .in('status', ['scheduled', 'pending_payment'])
+        .eq('status', 'scheduled')
         .gte('scheduled_datetime', nowIso)
     : { data: [] };
   const coachHasBookablePublicSession = new Set<string>();

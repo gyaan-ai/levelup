@@ -106,7 +106,7 @@ export async function GET() {
       )
     `)
     .eq('athlete_id', coachId)
-    .in('status', ['scheduled', 'pending_payment'])
+    .eq('status', 'scheduled')
     .gte('scheduled_datetime', now.toISOString())
     .lte('scheduled_datetime', tomorrow.toISOString())
     .order('scheduled_datetime', { ascending: true });

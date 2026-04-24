@@ -52,7 +52,7 @@ async function fetchDiscoverySessions(
       .from('sessions')
       .select(DISCOVERY_SELECT)
       .eq('join_policy', 'public')
-      .in('status', ['scheduled', 'pending_payment'])
+      .eq('status', 'scheduled')
       .gte('scheduled_datetime', nowIso)
       .order('scheduled_datetime', { ascending: true })
       .limit(80);
@@ -151,7 +151,7 @@ export default async function HomePage() {
           session_participants(youth_wrestler_id, youth_wrestlers(first_name, last_name))
         `)
         .in('id', familySessionIds)
-        .in('status', ['scheduled', 'pending_payment'])
+        .eq('status', 'scheduled')
         .gte('scheduled_datetime', nowISO)
         .order('scheduled_datetime', { ascending: true })
         .limit(100)

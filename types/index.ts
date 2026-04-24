@@ -62,7 +62,7 @@ export interface Athlete {
 
 // Session types
 export type SessionType = '1-on-1' | '2-athlete' | 'group';
-export type SessionStatus = 'scheduled' | 'completed' | 'cancelled' | 'no-show' | 'pending_payment';
+export type SessionStatus = 'scheduled' | 'completed' | 'cancelled' | 'no-show';
 export type SessionMode = 'private' | 'sibling' | 'partner-invite' | 'partner-open';
 /**
  * Who can discover the session in Training / small-group browse:

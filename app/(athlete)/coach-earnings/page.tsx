@@ -21,7 +21,7 @@ function isEarningsEligible(
   if (st === 'completed') return true;
   const t = s.scheduled_datetime ? new Date(s.scheduled_datetime).getTime() : NaN;
   if (Number.isNaN(t)) return false;
-  return t < new Date(nowIso).getTime() && (st === 'scheduled' || st === 'pending_payment');
+  return t < new Date(nowIso).getTime() && st === 'scheduled';
 }
 
 export default async function CoachEarningsPage() {
@@ -121,7 +121,7 @@ export default async function CoachEarningsPage() {
     .from('sessions')
     .select('id, scheduled_datetime, total_price, session_type, current_participants, max_participants, session_payout_rate')
     .eq('athlete_id', coachId)
-    .in('status', ['scheduled', 'pending_payment'])
+    .eq('status', 'scheduled')
     .gte('scheduled_datetime', nowIso)
     .order('scheduled_datetime', { ascending: true })
     .limit(10);

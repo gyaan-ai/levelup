@@ -100,7 +100,8 @@ async function resolvePricing(
 }
 
 /**
- * Creates a pending_payment session + cart line after a coach (or parent accepting a counter)
+ * Creates a scheduled session + cart line after a coach (or parent accepting a counter)
+ * (checkout-in-progress is inferred from parent_id ≠ coach and no paid roster — see isBookingCheckoutShellSession.)
  * approves a parent_session_requests row. Roster rows are added when checkout completes (webhook).
  * Uses service-role client.
  */
@@ -202,7 +203,7 @@ export async function createSessionFromParentRequest(
       org_fee: 0,
       stripe_fee: 0,
       paid_with_credit: false,
-      status: 'pending_payment',
+      status: 'scheduled',
       athlete_paid: false,
     })
     .select('id')

@@ -224,10 +224,7 @@ export function BookingCard({
   };
 
   const scheduledTime = new Date(session.scheduled_datetime);
-  const canCancel = 
-    !isPast && 
-    (session.status === 'scheduled' || session.status === 'pending_payment') &&
-    scheduledTime > new Date();
+  const canCancel = !isPast && session.status === 'scheduled' && scheduledTime > new Date();
   
   const familyHasSpot = session.isFamilyParticipant !== false;
   const canLeave = canCancel && !session.isOwner && familyHasSpot;
@@ -284,9 +281,8 @@ export function BookingCard({
   };
 
   const statusBadge = (status: string) => {
-    if (status === 'scheduled') return <Badge>Scheduled</Badge>;
-    if (status === 'pending_payment') return <Badge variant="secondary">Pending payment</Badge>;
-    if (status === 'completed') return <Badge variant="default">Completed</Badge>;
+    if (status === 'scheduled') return <Badge>Open</Badge>;
+    if (status === 'completed') return <Badge variant="default">Paid</Badge>;
     if (status === 'cancelled') return <Badge variant="secondary">Cancelled</Badge>;
     if (status === 'no-show') return <Badge variant="secondary">No-show</Badge>;
     return <Badge variant="outline">{status}</Badge>;

@@ -215,12 +215,6 @@ export function CoachScheduleCard({
                               <span>{session.current_participants} {session.current_participants === 1 ? 'kid' : 'kids'}{wrestlerNames(session).length > 0 ? `: ${wrestlerNames(session).join(', ')}` : ''}</span>
                             </>
                           )}
-                          {session.status === 'pending_payment' && (
-                            <>
-                              <span> • </span>
-                              <Badge variant="secondary" className="text-xs">Pending payment</Badge>
-                            </>
-                          )}
                           {isTentative(session) && (
                             <>
                               <span> • </span>
@@ -273,7 +267,7 @@ export function CoachScheduleCard({
                           )}
                           {' • '}
                           <Badge variant={session.status === 'completed' ? 'default' : session.status === 'cancelled' ? 'secondary' : 'outline'}>
-                            {session.status === 'completed' ? 'Completed' : session.status === 'cancelled' ? 'Cancelled' : session.status === 'no-show' ? 'No-show' : session.status}
+                            {session.status === 'completed' ? 'Paid' : session.status === 'cancelled' ? 'Cancelled' : session.status === 'no-show' ? 'No-show' : session.status === 'scheduled' ? 'Open' : session.status}
                           </Badge>
                         </div>
                       </div>
@@ -281,7 +275,7 @@ export function CoachScheduleCard({
                         <p className="font-medium">You made ${coachPayoutEstimate(session).toFixed(2)}</p>
                         <p className="text-xs text-muted-foreground">{session.session_type || '—'}</p>
                         <div className="flex gap-1 flex-wrap justify-end">
-                          {['scheduled', 'pending_payment'].includes(session.status) && (
+                          {session.status === 'scheduled' && (
                             <Button
                               variant="outline"
                               size="sm"
@@ -334,7 +328,7 @@ export function CoachScheduleCard({
               </thead>
               <tbody>
                 {allSessions.map((session) => {
-                  const isUpcoming = ['scheduled', 'pending_payment'].includes(session.status) && new Date(session.scheduled_datetime) > new Date();
+                  const isUpcoming = session.status === 'scheduled' && new Date(session.scheduled_datetime) > new Date();
                   return (
                     <tr key={session.id} className="border-b last:border-0">
                       <td className="py-2 px-2">{formatEST(new Date(session.scheduled_datetime), 'MMM d, yyyy')}</td>
@@ -362,7 +356,7 @@ export function CoachScheduleCard({
                           />
                         ) : (
                           <div className="flex items-center justify-end gap-1 flex-wrap">
-                            {['scheduled', 'pending_payment'].includes(session.status) && (
+                            {session.status === 'scheduled' && (
                               <Button
                                 variant="outline"
                                 size="sm"
@@ -443,7 +437,7 @@ export function CoachScheduleCard({
                           {' • You make $'}{coachPayoutEstimate(session).toFixed(2)}
                         </p>
                       </div>
-                      {['scheduled', 'pending_payment'].includes(session.status) && new Date(session.scheduled_datetime) > new Date() ? (
+                      {session.status === 'scheduled' && new Date(session.scheduled_datetime) > new Date() ? (
                         <div className="flex gap-1">
                           <Link href={`/sessions/${session.id}/reschedule`}>
                             <Button variant="outline" size="sm">Reschedule</Button>
@@ -456,7 +450,7 @@ export function CoachScheduleCard({
                         </div>
                       ) : (
                         <div className="flex gap-1 flex-wrap">
-                          {['scheduled', 'pending_payment'].includes(session.status) && (
+                          {session.status === 'scheduled' && (
                             <Button
                               variant="outline"
                               size="sm"

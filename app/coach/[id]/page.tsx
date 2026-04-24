@@ -150,7 +150,7 @@ export default async function CoachPublicSchedulePage({ params }: { params: Prom
     `
     )
     .eq('athlete_id', id)
-    .in('status', ['scheduled', 'pending_payment'])
+    .eq('status', 'scheduled')
     .gte('scheduled_datetime', nowIso)
     .order('scheduled_datetime', { ascending: true })
     .limit(200);

@@ -55,7 +55,7 @@ export default async function YouthDashboardPage() {
           session_participants(youth_wrestler_id, youth_wrestlers(id, first_name, last_name))
         `)
         .in('id', sessionIds)
-        .in('status', ['scheduled', 'pending_payment'])
+        .eq('status', 'scheduled')
         .gte('scheduled_datetime', nowISO)
         .order('scheduled_datetime', { ascending: true })
         .limit(15)

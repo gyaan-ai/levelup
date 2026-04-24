@@ -109,7 +109,7 @@ export default async function MyBookingsPage() {
 
   const upcoming = all.filter(
     (s) =>
-      (s.status === 'scheduled' || s.status === 'pending_payment') &&
+      s.status === 'scheduled' &&
       s.scheduled_datetime >= nowISO
   );
   const thisWeek = upcoming.filter((s) => s.scheduled_datetime < weekEndISO);

@@ -68,7 +68,7 @@ export async function POST(
       return NextResponse.json({ error: 'Session already cancelled' }, { status: 400 });
     }
 
-    if (!['scheduled', 'pending_payment'].includes(session.status)) {
+    if (session.status !== 'scheduled') {
       return NextResponse.json({ error: 'Session cannot be cancelled' }, { status: 400 });
     }
 
@@ -114,7 +114,7 @@ export async function POST(
         const p = participant as { amount_paid?: unknown; paid?: boolean | null; parent_id?: string | null };
         const amountPaid = Number(p.amount_paid ?? 0);
         // Only refund as wallet credit what was actually collected (paid row). Never use list/total_price
-        // when checkout never completed — that created phantom liability on pending_payment cancels.
+        // when checkout never completed — phantom liability on parent booking shells before cancel.
         if (amountPaid > 0 && p.paid === true && p.parent_id) {
           const result = await grantCredit({
             userId: p.parent_id,

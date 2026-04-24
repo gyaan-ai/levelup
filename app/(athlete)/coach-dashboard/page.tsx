@@ -20,7 +20,7 @@ function isEarningsEligible(
   if (st === 'completed') return true;
   const t = s.scheduled_datetime ? new Date(s.scheduled_datetime).getTime() : NaN;
   if (Number.isNaN(t)) return false;
-  return t < new Date(nowIso).getTime() && (st === 'scheduled' || st === 'pending_payment');
+  return t < new Date(nowIso).getTime() && st === 'scheduled';
 }
 
 export default async function CoachDashboardPage() {

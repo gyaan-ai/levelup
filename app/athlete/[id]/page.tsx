@@ -180,7 +180,7 @@ export default async function AthleteProfilePage({
       facilities(name)
     `)
     .eq('athlete_id', id)
-    .in('status', ['scheduled', 'pending_payment'])
+    .eq('status', 'scheduled')
     .in('join_policy', ['public'])
     .gte('scheduled_datetime', nowISO)
     .order('scheduled_datetime', { ascending: true })

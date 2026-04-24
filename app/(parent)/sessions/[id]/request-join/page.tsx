@@ -45,7 +45,7 @@ export default async function SessionRequestJoinPage({
       facilities(id, name, address)
     `)
     .eq('id', sessionId)
-    .in('status', ['scheduled', 'pending_payment'])
+    .eq('status', 'scheduled')
     .single();
 
   if (sessionErr || !session) notFound();

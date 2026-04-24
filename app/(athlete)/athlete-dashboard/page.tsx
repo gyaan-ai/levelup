@@ -77,7 +77,7 @@ export default async function CoachHomePage() {
     .from('sessions')
     .select('*', { count: 'exact', head: true })
     .eq('athlete_id', coachId)
-    .in('status', ['scheduled', 'pending_payment'])
+    .eq('status', 'scheduled')
     .gte('scheduled_datetime', nowIso);
 
   const { data: upcomingSessions } = await supabase
@@ -86,7 +86,7 @@ export default async function CoachHomePage() {
       '*, facilities(id, name), session_participants(youth_wrestler_id, roster_first_name, roster_last_name, amount_paid, youth_wrestlers(id, first_name, last_name))'
     )
     .eq('athlete_id', coachId)
-    .in('status', ['scheduled', 'pending_payment'])
+    .eq('status', 'scheduled')
     .gte('scheduled_datetime', nowIso)
     .order('scheduled_datetime', { ascending: true })
     .limit(100);

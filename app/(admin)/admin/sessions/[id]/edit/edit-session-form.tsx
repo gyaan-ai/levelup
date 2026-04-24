@@ -402,7 +402,7 @@ export function EditSessionForm({
             <Button type="submit" disabled={loading}>
               {loading ? 'Saving…' : 'Save changes'}
             </Button>
-            {(sessionStatus === 'scheduled' || sessionStatus === 'pending_payment') && (
+            {sessionStatus === 'scheduled' && (
               <Button
                 type="button"
                 variant="outline"
@@ -558,7 +558,7 @@ export function EditSessionForm({
     </Card>
     )}
 
-    {(sessionStatus === 'scheduled' || sessionStatus === 'pending_payment') && (
+    {sessionStatus === 'scheduled' && (
       <Card>
         <CardHeader>
           <CardTitle>{formMode === 'coach' ? 'Mark session complete' : '1 · Mark session complete'}</CardTitle>

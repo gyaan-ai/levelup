@@ -111,7 +111,7 @@ export async function fetchPublicOpenJoinSummaries(
     admin
       .from('sessions')
       .select(SESSION_SELECT)
-      .in('status', ['scheduled', 'pending_payment'])
+      .eq('status', 'scheduled')
       .eq('join_policy', 'public')
       .gte('scheduled_datetime', from)
       .lte('scheduled_datetime', to)
@@ -120,7 +120,7 @@ export async function fetchPublicOpenJoinSummaries(
     admin
       .from('sessions')
       .select(SESSION_SELECT)
-      .in('status', ['scheduled', 'pending_payment'])
+      .eq('status', 'scheduled')
       .eq('join_policy', 'public')
       .gte('scheduled_datetime', from)
       .lte('scheduled_datetime', to)

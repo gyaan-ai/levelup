@@ -142,7 +142,7 @@ export async function fetchCoachRosterData(
     .from('sessions')
     .select('id, scheduled_datetime, partner_invite_code')
     .eq('athlete_id', coachId)
-    .in('status', ['scheduled', 'pending_payment'])
+    .eq('status', 'scheduled')
     .gte('scheduled_datetime', nowIso)
     .order('scheduled_datetime', { ascending: true })
     .limit(1)

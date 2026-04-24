@@ -60,7 +60,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       return NextResponse.json({ error: 'You can only text groups for your own sessions' }, { status: 403 });
     }
 
-    if (!['scheduled', 'pending_payment'].includes((session as { status?: string }).status ?? '')) {
+    if ((session as { status?: string }).status !== 'scheduled') {
       return NextResponse.json({ error: 'Session is not active' }, { status: 400 });
     }
 

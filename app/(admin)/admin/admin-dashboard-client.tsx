@@ -87,6 +87,7 @@ import {
   Tooltip,
 } from 'recharts';
 import { AdminMessageLogSection } from '@/components/admin-message-log-section';
+import { isOpenSessionStatus } from '@/lib/session-checkout-shell';
 
 /** Payout history presets use the date stored in athlete_payout_date (Eastern calendar day). */
 type PayoutHistoryPeriodPreset = 'week' | 'month' | 'last30' | 'ytd' | 'all' | 'custom';
@@ -156,6 +157,8 @@ export type AdminSession = {
   session_payout_rate?: number | null;
   /** From athletes.payout_rate when needed */
   coach_payout_rate?: number | null;
+  /** Parent-initiated booking with no paid roster yet (legacy DB status was `pending_payment`). */
+  booking_checkout_shell: boolean;
 };
 
 function sessionDateKeyInAppTz(iso: string): string {
@@ -172,7 +175,7 @@ function sessionPayoutAmountUsd(s: AdminSession): number {
   const stored = Number(s.athlete_payment ?? 0);
   if (stored > 0) return Math.round(stored * 100) / 100;
   const paidSum = s.participant_amount_paid_sum ?? 0;
-  if (s.status === 'pending_payment' && paidSum <= 0) return 0;
+  if (s.booking_checkout_shell && paidSum <= 0) return 0;
   return coachPayoutUsd({
     athlete_payment: s.athlete_payment,
     price_per_participant: s.price_per_participant,
@@ -484,7 +487,7 @@ export function AdminDashboardClient({
   const [sessionStatusFilter, setSessionStatusFilter] = useState<'all' | 'open' | 'completed' | 'cancelled_other'>('all');
   const [sessionTypeFilter, setSessionTypeFilter] = useState<string>('all');
   const [sessionCoachFilter, setSessionCoachFilter] = useState<string>('all');
-  /** When false (default), past scheduled/pending_payment sessions with zero bookings are hidden if no date range is set. */
+  /** When false (default), past open sessions with zero bookings are hidden if no date range is set. */
   const [showPastEmptyOpenSessions, setShowPastEmptyOpenSessions] = useState(false);
   const [copiedSessionId, setCopiedSessionId] = useState<string | null>(null);
   const [duplicatingSessionId, setDuplicatingSessionId] = useState<string | null>(null);
@@ -639,7 +642,7 @@ export function AdminDashboardClient({
     };
     return sessions
       .filter((s) => s.id !== rosterSessionId && isEligibleTransferTarget(s.scheduled_datetime))
-      .filter((s) => s.status === 'scheduled' || s.status === 'pending_payment')
+      .filter((s) => s.status === 'scheduled')
       .filter((s) => {
         if (!q) return true;
         const hay = `${s.athlete_name} ${s.athlete_school} ${s.facility_name} ${formatEST(
@@ -907,12 +910,12 @@ export function AdminDashboardClient({
       if (sessionDateTo && d > sessionDateTo) return false;
 
       if (sessionStatusFilter === 'open') {
-        if (s.status !== 'scheduled' && s.status !== 'pending_payment') return false;
+        if (s.status !== 'scheduled') return false;
         if (sessionDateKeyLocal(s.scheduled_datetime) < todayKey) return false;
       } else if (sessionStatusFilter === 'completed') {
         if (s.status !== 'completed') return false;
       } else if (sessionStatusFilter === 'cancelled_other') {
-        if (s.status === 'scheduled' || s.status === 'pending_payment' || s.status === 'completed') return false;
+        if (s.status === 'scheduled' || s.status === 'completed') return false;
       }
 
       if (sessionTypeFilter !== 'all' && (s.session_type ?? '') !== sessionTypeFilter) return false;
@@ -923,7 +926,7 @@ export function AdminDashboardClient({
         !dateRangeActive &&
         sessionStatusFilter === 'all' &&
         sessionDateKeyLocal(s.scheduled_datetime) < todayKey &&
-        (s.status === 'scheduled' || s.status === 'pending_payment') &&
+        isOpenSessionStatus(s.status) &&
         confirmedRosterCountForAdminList(s) === 0
       ) {
         return false;
@@ -963,9 +966,7 @@ export function AdminDashboardClient({
   /** Only these statuses can be removed via DELETE /api/admin/sessions/[id] (admin may include registrations). */
   const bulkDeletableFilteredIds = useMemo(
     () =>
-      filteredSessions
-        .filter((s) => s.status === 'scheduled' || s.status === 'pending_payment')
-        .map((s) => s.id),
+      filteredSessions.filter((s) => s.status === 'scheduled').map((s) => s.id),
     [filteredSessions]
   );
 
@@ -1052,8 +1053,8 @@ export function AdminDashboardClient({
       existing.total_earnings += sessionPayoutAmountUsd(s);
       
       if (s.status === 'completed') existing.completed_count += 1;
-      if (s.status === 'scheduled') existing.open_count += 1;
-      if (s.status === 'pending_payment') existing.pending_payment_count += 1;
+      if (s.status === 'scheduled' && !s.booking_checkout_shell) existing.open_count += 1;
+      if (s.booking_checkout_shell) existing.pending_payment_count += 1;
       
       coachMap.set(s.athlete_id, existing);
     }
@@ -1203,9 +1204,8 @@ export function AdminDashboardClient({
 
       prev.booking_count += 1;
       prev.total_spent = Math.round((prev.total_spent + line.amount_paid) * 100) / 100;
-      if (line.session_status === 'scheduled') prev.open_count += 1;
-      else if (line.session_status === 'pending_payment') prev.pending_payment_count += 1;
-      else if (line.session_status === 'completed') prev.completed_count += 1;
+      if (line.session_status === 'completed') prev.completed_count += 1;
+      else if (isOpenSessionStatus(line.session_status)) prev.open_count += 1;
 
       byYouth.set(id, { ...prev, name, school });
     }
@@ -1359,15 +1359,23 @@ export function AdminDashboardClient({
         completedRevenue += parentsPaid;
         coachPayoutsEarned += coachPaid;
         actualStripeFees += Number(s.stripe_fee_sum ?? 0);
-      } else if (s.status === 'scheduled' || s.status === 'pending_payment') {
+      } else if (s.status === 'scheduled') {
         // FUTURE = Deposits collected (liability), coach payout pending
         depositsCollected += parentsPaid;
         coachPayoutsPending += coachPaid;
       }
 
-      if (s.status === 'scheduled' && sessionDayKeyFinance(s.scheduled_datetime) >= todayKeyFinance) openBookings += 1;
+      if (
+        s.status === 'scheduled' &&
+        !s.booking_checkout_shell &&
+        sessionDayKeyFinance(s.scheduled_datetime) >= todayKeyFinance
+      )
+        openBookings += 1;
       if (s.status === 'completed') completedSessions += 1;
-      if (s.status === 'pending_payment' && sessionDayKeyFinance(s.scheduled_datetime) >= todayKeyFinance)
+      if (
+        s.booking_checkout_shell &&
+        sessionDayKeyFinance(s.scheduled_datetime) >= todayKeyFinance
+      )
         pendingPayment += 1;
       if (s.status === 'cancelled') cancelledSessions += 1;
 
@@ -1385,7 +1393,12 @@ export function AdminDashboardClient({
         existing.payout += coachPaid;
         existing.sessions += 1;
       }
-      if (s.status === 'scheduled' && sessionDayKeyFinance(s.scheduled_datetime) >= todayKeyFinance) existing.open += 1;
+      if (
+        s.status === 'scheduled' &&
+        !s.booking_checkout_shell &&
+        sessionDayKeyFinance(s.scheduled_datetime) >= todayKeyFinance
+      )
+        existing.open += 1;
       coachBreakdown.set(s.athlete_id, existing);
     }
 
@@ -1689,13 +1702,20 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
   };
 
   const statusBadge = (status: string) => {
-    const isOpen = status === 'scheduled' || status === 'pending_payment';
-    const isClosed = status === 'completed' || status === 'cancelled' || status === 'no-show';
-    const label = status === 'pending_payment' ? 'Scheduled' : status;
+    const isOpen = isOpenSessionStatus(status);
+    const isPaid = status === 'completed';
+    const isClosed = status === 'cancelled' || status === 'no-show';
+    const label = isOpen ? 'Open' : isPaid ? 'Paid' : status;
     return (
       <Badge
         variant={isClosed ? 'destructive' : 'outline'}
-        className={isOpen ? 'border-emerald-600 bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/20 hover:text-emerald-400' : undefined}
+        className={
+          isOpen
+            ? 'border-emerald-600 bg-emerald-600/20 text-emerald-400 hover:bg-emerald-600/20 hover:text-emerald-400'
+            : isPaid
+              ? 'border-[#B89D60] bg-[#B89D60]/20 text-[#B89D60] hover:bg-[#B89D60]/20 hover:text-[#B89D60]'
+              : undefined
+        }
       >
         {label}
       </Badge>
@@ -1731,11 +1751,11 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
   // Calculate metrics
   const todayKeyForMetrics = formatInTimeZone(new Date(), APP_TIMEZONE, 'yyyy-MM-dd');
   const openSessions = sessions.filter((s) => {
-    if (s.status !== 'scheduled' && s.status !== 'pending_payment') return false;
+    if (s.status !== 'scheduled' || s.booking_checkout_shell) return false;
     return sessionDateKeyInAppTz(s.scheduled_datetime) >= todayKeyForMetrics;
   }).length;
   const pendingPayments = sessions.filter((s) => {
-    if (s.status !== 'pending_payment') return false;
+    if (!s.booking_checkout_shell) return false;
     return sessionDateKeyInAppTz(s.scheduled_datetime) >= todayKeyForMetrics;
   }).length;
   const totalCoachPayoutsDue = coachPayouts.reduce((sum, p) => sum + p.amount, 0);
@@ -2654,8 +2674,7 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
                           // Ignore errors
                         }
                       };
-                      const canBulkDelete =
-                        s.status === 'scheduled' || s.status === 'pending_payment';
+                      const canBulkDelete = s.status === 'scheduled';
                       return (
                         <tr key={s.id} className="hover:bg-muted/30 transition-colors">
                           <td className="w-10 py-3 pl-3 pr-0 align-middle">

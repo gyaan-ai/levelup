@@ -48,7 +48,7 @@ export async function POST(
       );
     }
 
-    if (!['scheduled', 'pending_payment'].includes(s.status ?? '')) {
+    if (s.status !== 'scheduled') {
       return NextResponse.json({ error: 'Session can no longer be left' }, { status: 400 });
     }
 

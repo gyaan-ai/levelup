@@ -190,7 +190,7 @@ export async function POST(
     if (joinPol !== 'public' && joinPol !== 'invite_only' && !inviteVerified) {
       return NextResponse.json({ error: 'This session is not open for registration' }, { status: 400 });
     }
-    if (!['scheduled', 'pending_payment'].includes(s.status ?? '')) {
+    if (s.status !== 'scheduled') {
       return NextResponse.json({ error: 'Session is not open for registration' }, { status: 400 });
     }
 

@@ -82,7 +82,7 @@ export async function GET(req: NextRequest) {
       .from('sessions')
       .select('id, scheduled_datetime')
       .eq('athlete_id', athleteId)
-      .in('status', ['scheduled', 'pending_payment', 'completed'])
+      .in('status', ['scheduled', 'completed'])
       .gte('scheduled_datetime', dayStart)
       .lte('scheduled_datetime', dayEnd);
 

@@ -199,7 +199,7 @@ export default async function BookPage({
     `
     )
     .eq('athlete_id', athleteId)
-    .in('status', ['scheduled', 'pending_payment'])
+    .eq('status', 'scheduled')
     .gte('scheduled_datetime', nowISO)
     .order('scheduled_datetime', { ascending: true })
     .limit(200);

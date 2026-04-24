@@ -67,7 +67,7 @@ export default async function CoachSessionsPage({
     .from('sessions')
     .select('*, facilities(name), session_participants(youth_wrestler_id, youth_wrestlers(id, first_name, last_name))')
     .eq('athlete_id', coachId)
-    .in('status', ['scheduled', 'pending_payment'])
+    .eq('status', 'scheduled')
     .gte('scheduled_datetime', now)
     .order('scheduled_datetime', { ascending: true });
 
@@ -127,7 +127,7 @@ export default async function CoachSessionsPage({
       facilities:facility_id(id, name)
     `)
     .neq('athlete_id', coachId)
-    .in('status', ['scheduled', 'pending_payment'])
+    .eq('status', 'scheduled')
     .gte('scheduled_datetime', now)
     .in('join_policy', ['public', 'invite_only'])
     .order('scheduled_datetime', { ascending: true })

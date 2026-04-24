@@ -244,7 +244,7 @@ export async function POST(req: NextRequest) {
         org_fee: orgFee,
         stripe_fee: stripeFee,
         paid_with_credit: false,
-        status: 'pending_payment',
+        status: 'scheduled',
         athlete_paid: false,
       })
       .select('id, partner_invite_code, session_mode')

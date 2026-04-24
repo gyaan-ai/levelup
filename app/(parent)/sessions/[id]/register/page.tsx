@@ -72,7 +72,7 @@ export default async function SessionRegisterPage({
     .from('sessions')
     .select(sessionSelect)
     .eq('id', sessionId)
-    .in('status', ['scheduled', 'pending_payment'])
+    .eq('status', 'scheduled')
     .single();
 
   if (sessionErr || !session) {
@@ -82,7 +82,7 @@ export default async function SessionRegisterPage({
         .select(sessionSelect)
         .eq('id', sessionId)
         .eq('partner_invite_code', partnerInviteFromUrl)
-        .in('status', ['scheduled', 'pending_payment'])
+        .eq('status', 'scheduled')
         .maybeSingle();
       if (sAdmin) {
         session = sAdmin;

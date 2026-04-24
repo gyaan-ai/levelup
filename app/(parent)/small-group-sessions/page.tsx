@@ -55,7 +55,7 @@ export default async function SmallGroupSessionsPage({
       session_participants(youth_wrestlers(id, first_name, last_name, photo_url))
     `)
     .in('session_type', ['group', 'small_group'])
-    .in('status', ['scheduled', 'pending_payment'])
+    .eq('status', 'scheduled')
     .gte('scheduled_datetime', weekStart.toISOString())
     .lte('scheduled_datetime', nextWeekEnd.toISOString())
     .order('scheduled_datetime', { ascending: true });
@@ -81,7 +81,7 @@ export default async function SmallGroupSessionsPage({
       session_participants(youth_wrestlers(id, first_name, last_name, photo_url, age, weight_class, skill_level))
     `)
     .eq('session_mode', 'partner-open')
-    .in('status', ['scheduled', 'pending_payment'])
+    .eq('status', 'scheduled')
     .gte('scheduled_datetime', now.toISOString())
     .order('scheduled_datetime', { ascending: true });
 
