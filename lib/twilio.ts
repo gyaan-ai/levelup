@@ -192,6 +192,82 @@ function bookingLinksBase(): string {
   }
 }
 
+/**
+ * SMS each registered parent (and book-a-coach parent when there are no participant rows yet).
+ * Matches parent booking copy ("The Guild:"). Skips excludeUserId (e.g. parent who rescheduled in-app).
+ */
+export async function sendParentsSessionRescheduleSms(
+  admin: SupabaseAdmin,
+  opts: {
+    sessionId: string;
+    coachAthleteId: string;
+    coachName: string;
+    oldWhen: string;
+    newWhen: string;
+    excludeUserId?: string | null;
+    fallbackParentId?: string | null;
+  }
+): Promise<void> {
+  const { data: parts, error } = await admin
+    .from('session_participants')
+    .select('parent_id, youth_wrestler_id')
+    .eq('session_id', opts.sessionId);
+  if (error) {
+    console.warn('[parent reschedule sms] participants', error.message);
+    return;
+  }
+
+  const byParent = new Map<string, string | null>();
+  for (const row of parts ?? []) {
+    const pid = (row as { parent_id?: string | null }).parent_id;
+    if (!pid) continue;
+    if (!byParent.has(pid)) {
+      byParent.set(pid, (row as { youth_wrestler_id?: string | null }).youth_wrestler_id ?? null);
+    }
+  }
+  if (byParent.size === 0 && opts.fallbackParentId) {
+    byParent.set(opts.fallbackParentId, null);
+  }
+
+  const origin = bookingLinksBase();
+  const bookingsUrl = origin ? `${origin}/bookings` : '';
+  const suffix = bookingsUrl
+    ? `Details: ${bookingsUrl}`
+    : 'Open the app → My bookings for details.';
+  const body = `The Guild: Session with ${opts.coachName} moved from ${opts.oldWhen} to ${opts.newWhen}. ${suffix}`.slice(
+    0,
+    1600
+  );
+
+  const sentPhones = new Set<string>();
+  for (const [parentId, ywId] of byParent) {
+    if (parentId === opts.excludeUserId) continue;
+    const phone = await resolveParentPhoneE164(admin, parentId, ywId);
+    if (!phone) {
+      await logSmsSkipped(admin, {
+        messageType: 'parent_reschedule_skipped',
+        recipientLabel: 'Parent',
+        recipientId: parentId,
+        sessionId: opts.sessionId,
+        coachId: opts.coachAthleteId,
+        detail:
+          'No parent SMS number: add users.phone on the parent account, or a wrestler cell on the athlete profile.',
+      });
+      continue;
+    }
+    if (sentPhones.has(phone)) continue;
+    sentPhones.add(phone);
+    await sendSms(phone, body, {
+      admin,
+      messageType: 'session_rescheduled',
+      recipientId: parentId,
+      recipientLabel: 'Parent',
+      sessionId: opts.sessionId,
+      coachId: opts.coachAthleteId,
+    });
+  }
+}
+
 async function logSmsSkipped(
   admin: SupabaseAdmin,
   opts: {

@@ -3,12 +3,11 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Link2, Loader2, MessageCircle, Share2, Check } from 'lucide-react';
+import { Link2, Loader2, MessageCircle, Share2, Check, CalendarClock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { AddToCalendarButton } from '@/components/add-to-calendar-button';
 import { ContactInfoRow } from '@/components/contact-info-row';
 import { formatEST } from '@/lib/format-date';
-import { athletePaymentForCoachEstimate, coachPayoutUsd } from '@/lib/coach-session-payout';
 import { copyTextToClipboard } from '@/lib/copy-to-clipboard';
 import { fillTemplate, getTemplate } from '@/lib/playbook-templates';
 import { sessionParticipantDisplayNames } from '@/lib/session-participant-display-name';
@@ -23,47 +22,9 @@ function facilityLabel(s: CoachSession): string {
   return (arr[0] as { name?: string })?.name ?? '—';
 }
 
-function participantPaidSum(s: CoachSession): number {
-  const parts = s.session_participants;
-  if (!Array.isArray(parts)) return 0;
-  return parts.reduce((sum, p) => sum + Number(p.amount_paid ?? 0), 0);
-}
-
 function registeredCount(s: CoachSession): number {
   const rows = Array.isArray(s.session_participants) ? s.session_participants.length : 0;
   return Math.max(rows, s.current_participants ?? 0);
-}
-
-function payoutSummary(session: CoachSession, payoutRate: number): { projected: number; max: number } {
-  const parts = session.session_participants;
-  const rowCount = Array.isArray(parts) ? parts.length : 0;
-  const current = rowCount || session.current_participants || 0;
-  const max = session.max_participants ?? 1;
-  const paid = participantPaidSum(session);
-  const rate = session.session_payout_rate ?? payoutRate;
-  const projected = coachPayoutUsd(
-    {
-      athlete_payment: athletePaymentForCoachEstimate(session),
-      price_per_participant: session.price_per_participant,
-      current_participants: current,
-      participant_amount_paid_sum: paid > 0 ? paid : null,
-      session_payout_rate: session.session_payout_rate ?? null,
-      coach_payout_rate: payoutRate,
-    },
-    rate
-  );
-  const maxEarn = coachPayoutUsd(
-    {
-      athlete_payment: null,
-      price_per_participant: session.price_per_participant,
-      current_participants: max,
-      participant_amount_paid_sum: null,
-      session_payout_rate: session.session_payout_rate ?? null,
-      coach_payout_rate: payoutRate,
-    },
-    rate
-  );
-  return { projected: Math.round(projected * 100) / 100, max: Math.round(maxEarn * 100) / 100 };
 }
 
 type Contact = {
@@ -84,12 +45,11 @@ type Contact = {
 
 type Props = {
   session: CoachSession;
-  payoutRate: number;
   coachDisplayName: string;
   emphasis?: 'today' | 'default';
 };
 
-export function CoachScheduleSessionCard({ session, payoutRate, coachDisplayName, emphasis = 'default' }: Props) {
+export function CoachScheduleSessionCard({ session, coachDisplayName, emphasis = 'default' }: Props) {
   const router = useRouter();
   const [expanded, setExpanded] = useState(false);
   const [shareCopied, setShareCopied] = useState(false);
@@ -160,14 +120,6 @@ export function CoachScheduleSessionCard({ session, payoutRate, coachDisplayName
       .catch(() => setContacts([]))
       .finally(() => setContactsLoading(false));
   }, [expanded, contactsFetched, session.id]);
-
-  const { projected, max } = payoutSummary(session, payoutRate);
-  const earningsLine =
-    projected > 0
-      ? `Your share: $${projected.toFixed(0)}`
-      : max > 0
-        ? `Up to $${max.toFixed(0)} when booked`
-        : '—';
 
   const typeLabelUpper = getSessionTypeDisplay(session.session_type, session.session_mode).label.toUpperCase();
   const headerLine = `${typeLabelUpper} · ${formatEST(dt, 'EEE, MMM d')} · ${formatEST(dt, 'h:mm a')}`;
@@ -318,7 +270,6 @@ export function CoachScheduleSessionCard({ session, payoutRate, coachDisplayName
             )}
           </div>
         </div>
-        <p className="text-base font-semibold text-[#D4AF37] mt-3 tabular-nums">{earningsLine}</p>
       </button>
 
       <div className="px-4 pb-4 flex flex-col sm:flex-row gap-2" onClick={(e) => e.stopPropagation()}>
@@ -331,6 +282,12 @@ export function CoachScheduleSessionCard({ session, payoutRate, coachDisplayName
         >
           <MessageCircle className="h-4 w-4 mr-2 shrink-0" />
           Text parents
+        </Button>
+        <Button variant="outline" asChild className="min-h-[44px] touch-manipulation flex-1 border-[#D4AF37]/40">
+          <Link href={`/sessions/${session.id}/reschedule`}>
+            <CalendarClock className="h-4 w-4 mr-2 shrink-0" />
+            Reschedule
+          </Link>
         </Button>
         <Button
           type="button"
@@ -396,9 +353,6 @@ export function CoachScheduleSessionCard({ session, payoutRate, coachDisplayName
           )}
 
           <div className="flex flex-col gap-2 pt-2">
-            <Button variant="outline" asChild className="min-h-[44px] touch-manipulation w-full justify-center">
-              <Link href={`/sessions/${session.id}/reschedule`}>Reschedule</Link>
-            </Button>
             <Button
               type="button"
               variant="outline"

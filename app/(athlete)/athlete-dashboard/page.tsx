@@ -3,7 +3,6 @@ import { headers, cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { getTenantByDomain } from '@/config/tenants';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { normalizeCoachRevenueShareRate } from '@/lib/pricing';
 import { CoachScheduleClient, type JoinRequestItem } from './coach-schedule-client';
 import type { CoachSession } from './coach-schedule-card';
 
@@ -130,9 +129,6 @@ export default async function CoachHomePage() {
         pendingJoinRequests={requestsWithSession as JoinRequestItem[]}
         coachFirstName={coachFirstName}
         coachDisplayName={coachDisplayName}
-        payoutRate={normalizeCoachRevenueShareRate(
-          athlete?.payout_rate != null ? Number(athlete.payout_rate) : null
-        )}
       />
     </div>
   );

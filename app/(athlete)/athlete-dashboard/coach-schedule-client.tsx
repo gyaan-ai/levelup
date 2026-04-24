@@ -7,7 +7,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { CalendarClock, CalendarPlus, Check, CircleHelp, Loader2, X } from 'lucide-react';
 import { formatEST } from '@/lib/format-date';
-import { COACH_REVENUE_FRACTION } from '@/lib/pricing';
 import type { CoachSession } from './coach-schedule-card';
 import { splitCoachSessionsByToday } from '@/lib/coach-schedule-split';
 import { getSessionTypeDisplay } from '@/lib/session-type-display';
@@ -36,7 +35,6 @@ type Props = {
   pendingJoinRequests: JoinRequestItem[];
   coachFirstName?: string | null;
   coachDisplayName: string;
-  payoutRate?: number;
 };
 
 function sessionTypeLabel(sessionType?: string | null, sessionMode?: string | null): string {
@@ -49,7 +47,6 @@ export function CoachScheduleClient({
   pendingJoinRequests,
   coachFirstName,
   coachDisplayName,
-  payoutRate = COACH_REVENUE_FRACTION,
 }: Props) {
   const router = useRouter();
   const [loadingId, setLoadingId] = useState<string | null>(null);
@@ -131,7 +128,6 @@ export function CoachScheduleClient({
               <CoachScheduleSessionCard
                 key={session.id}
                 session={session}
-                payoutRate={payoutRate}
                 coachDisplayName={coachDisplayName}
                 emphasis="today"
               />
@@ -227,7 +223,6 @@ export function CoachScheduleClient({
               <CoachScheduleSessionCard
                 key={session.id}
                 session={session}
-                payoutRate={payoutRate}
                 coachDisplayName={coachDisplayName}
               />
             ))}

@@ -2,9 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getTenantByDomain } from '@/config/tenants';
-import { easternWallDateTimeToUtcIso } from '@/lib/format-date';
+import { getTenantFromRequestHeaders } from '@/config/tenants';
+import { easternWallDateTimeToUtcIso, formatEST } from '@/lib/format-date';
 import { COACH_SESSION_OVERLAP_ERROR, findCoachSessionTimeOverlap } from '@/lib/coach-session-overlap';
+import { createNotification } from '@/lib/notifications';
+import { sendParentsSessionRescheduleSms } from '@/lib/twilio';
 
 export async function PATCH(
   req: NextRequest,
@@ -13,8 +15,7 @@ export async function PATCH(
   try {
     const { id: sessionId } = await params;
     const headersList = await headers();
-    const host = headersList.get('host') || '';
-    const tenant = getTenantByDomain(host);
+    const tenant = getTenantFromRequestHeaders(headersList);
 
     if (!tenant) {
       return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
@@ -53,7 +54,17 @@ export async function PATCH(
     const admin = createAdminClient(tenant.slug);
     const { data: session, error: fetchError } = await admin
       .from('sessions')
-      .select('id, parent_id, athlete_id, status, duration_minutes')
+      .select(
+        `
+        id,
+        parent_id,
+        athlete_id,
+        status,
+        duration_minutes,
+        scheduled_datetime,
+        athletes ( first_name, last_name )
+      `
+      )
       .eq('id', sessionId)
       .single();
 
@@ -99,9 +110,10 @@ export async function PATCH(
       return NextResponse.json({ error: 'Could not verify schedule availability' }, { status: 500 });
     }
 
+    const previousIso = session.scheduled_datetime as string;
     const { error: updateError } = await admin
       .from('sessions')
-      .update({ scheduled_datetime: scheduledDatetime })
+      .update({ scheduled_datetime: scheduledDatetime, updated_at: new Date().toISOString() })
       .eq('id', sessionId);
 
     if (updateError) {
@@ -110,6 +122,62 @@ export async function PATCH(
         { error: 'Failed to reschedule session' },
         { status: 500 }
       );
+    }
+
+    if (previousIso !== scheduledDatetime) {
+      const oldWhen = formatEST(new Date(previousIso), 'EEE, MMM d, h:mm a');
+      const newWhen = formatEST(new Date(scheduledDatetime), 'EEE, MMM d, h:mm a');
+      const coachRow = session.athletes as
+        | { first_name?: string | null; last_name?: string | null }
+        | { first_name?: string | null; last_name?: string | null }[]
+        | null;
+      const coachOne = Array.isArray(coachRow) ? coachRow[0] : coachRow;
+      const coachName = coachOne
+        ? [coachOne.first_name, coachOne.last_name].filter(Boolean).join(' ').trim() || 'Coach'
+        : 'Coach';
+
+      const { data: participants } = await admin
+        .from('session_participants')
+        .select('parent_id')
+        .eq('session_id', sessionId);
+      const parentIdsToNotify = new Set<string>();
+      for (const row of participants ?? []) {
+        const pid = (row as { parent_id?: string | null }).parent_id;
+        if (pid) parentIdsToNotify.add(pid);
+      }
+      if (parentIdsToNotify.size === 0 && session.parent_id) {
+        parentIdsToNotify.add(session.parent_id as string);
+      }
+
+      try {
+        for (const parentId of parentIdsToNotify) {
+          if (parentId === user.id) continue;
+          await createNotification(admin, {
+            user_id: parentId,
+            type: 'session_rescheduled',
+            title: 'Session rescheduled',
+            body: `Your session with ${coachName} was moved from ${oldWhen} to ${newWhen}.`,
+            data: { link: '/bookings', session_id: sessionId },
+            sessionId,
+          });
+        }
+      } catch (notifErr) {
+        console.warn('[reschedule] in-app notify parents failed:', notifErr);
+      }
+
+      try {
+        await sendParentsSessionRescheduleSms(admin, {
+          sessionId,
+          coachAthleteId: session.athlete_id as string,
+          coachName,
+          oldWhen,
+          newWhen,
+          excludeUserId: user.id,
+          fallbackParentId: (session.parent_id as string | null) ?? null,
+        });
+      } catch (smsErr) {
+        console.warn('[reschedule] parent SMS failed:', smsErr);
+      }
     }
 
     return NextResponse.json({
