@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { getTenantByDomain } from '@/config/tenants';
+import { getTenantFromRequestHeaders } from '@/config/tenants';
 import { easternWallDateTimeToUtcIso } from '@/lib/format-date';
 import { notifySessionScheduledFollowers } from '@/lib/notify-session-scheduled-followers';
 import { COACH_SESSION_OVERLAP_ERROR, findCoachSessionTimeOverlap } from '@/lib/coach-session-overlap';
@@ -18,8 +18,7 @@ export async function PATCH(
   try {
     const { id: sessionId } = await params;
     const headersList = await headers();
-    const host = headersList.get('host') || '';
-    const tenant = getTenantByDomain(host);
+    const tenant = getTenantFromRequestHeaders(headersList);
     if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
 
     const supabase = await createClient(tenant.slug);
@@ -171,8 +170,8 @@ export async function PATCH(
 }
 
 /**
- * DELETE - Admin permanently deletes a session.
- * Only allowed for scheduled or pending_payment. Session participants are removed (CASCADE).
+ * DELETE - Permanently deletes a session (participants removed via CASCADE).
+ * Allowed statuses: scheduled, cancelled, no-show. Completed sessions stay undeletable here.
  */
 export async function DELETE(
   _req: NextRequest,
@@ -181,8 +180,7 @@ export async function DELETE(
   try {
     const { id: sessionId } = await params;
     const headersList = await headers();
-    const host = headersList.get('host') || '';
-    const tenant = getTenantByDomain(host);
+    const tenant = getTenantFromRequestHeaders(headersList);
     if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 });
 
     const supabase = await createClient(tenant.slug);
@@ -210,35 +208,32 @@ export async function DELETE(
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    if (session.status !== 'scheduled') {
+    const deletableStatuses = new Set(['scheduled', 'cancelled', 'no-show']);
+    if (!deletableStatuses.has(session.status)) {
       return NextResponse.json(
-        { error: 'Only scheduled or pending-payment sessions can be deleted' },
+        { error: 'Only scheduled, cancelled, or no-show sessions can be deleted' },
         { status: 400 }
       );
     }
 
     if (!isAdmin) {
-      if ((session.current_participants ?? 0) > 0) {
-        return NextResponse.json(
-          {
-            error:
-              'This session has registrations. Cancel it from your session list instead of deleting.',
-          },
-          { status: 400 }
-        );
-      }
-      const { count, error: cntErr } = await admin
+      const { data: participants, error: partErr } = await admin
         .from('session_participants')
-        .select('id', { count: 'exact', head: true })
+        .select('paid, stripe_payment_intent_id')
         .eq('session_id', sessionId);
-      if (cntErr) {
+      if (partErr) {
         return NextResponse.json({ error: 'Could not verify participants' }, { status: 500 });
       }
-      if ((count ?? 0) > 0) {
+      const hasCommittedPayment = (participants ?? []).some(
+        (p) =>
+          p.paid === true ||
+          (typeof p.stripe_payment_intent_id === 'string' && p.stripe_payment_intent_id.length > 0)
+      );
+      if (hasCommittedPayment) {
         return NextResponse.json(
           {
             error:
-              'This session has registrations. Cancel it from your session list instead of deleting.',
+              'This session has paid registrations. Cancel it from your session list instead of deleting.',
           },
           { status: 400 }
         );

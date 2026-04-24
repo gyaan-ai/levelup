@@ -963,10 +963,12 @@ export function AdminDashboardClient({
     return { booked, capacity, openings, collected };
   }, [filteredSessions]);
 
-  /** Only these statuses can be removed via DELETE /api/admin/sessions/[id] (admin may include registrations). */
+  /** Rows eligible for bulk delete (matches DELETE /api/admin/sessions/[id]). */
   const bulkDeletableFilteredIds = useMemo(
     () =>
-      filteredSessions.filter((s) => s.status === 'scheduled').map((s) => s.id),
+      filteredSessions
+        .filter((s) => s.status === 'scheduled' || s.status === 'cancelled' || s.status === 'no-show')
+        .map((s) => s.id),
     [filteredSessions]
   );
 
@@ -2439,7 +2441,10 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
         setBulkDeleteLoading(true);
         const failures: string[] = [];
         for (const id of ids) {
-          const res = await fetch(`/api/admin/sessions/${id}`, { method: 'DELETE' });
+          const res = await fetch(`/api/admin/sessions/${id}`, {
+            method: 'DELETE',
+            credentials: 'same-origin',
+          });
           const data = (await res.json().catch(() => ({}))) as { error?: string };
           if (!res.ok) failures.push(`${id.slice(0, 8)}…: ${data.error ?? res.statusText}`);
         }
@@ -2451,6 +2456,8 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
           window.alert(
             `Deleted ${ids.length - failures.length} of ${ids.length} session(s).\n\nFailed:\n${failures.join('\n')}`
           );
+        } else {
+          window.alert(`Deleted ${ids.length} session(s).`);
         }
       };
 
@@ -2674,7 +2681,8 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
                           // Ignore errors
                         }
                       };
-                      const canBulkDelete = s.status === 'scheduled';
+                      const canBulkDelete =
+                        s.status === 'scheduled' || s.status === 'cancelled' || s.status === 'no-show';
                       return (
                         <tr key={s.id} className="hover:bg-muted/30 transition-colors">
                           <td className="w-10 py-3 pl-3 pr-0 align-middle">
@@ -2780,8 +2788,8 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
             </div>
           </Card>
           <p className="text-xs text-muted-foreground px-1">
-            Use the checkboxes on scheduled sessions to delete many at once (any coach). Completed or cancelled rows have
-            no checkbox.
+            Use checkboxes to delete scheduled, cancelled, or no-show sessions in bulk. Completed sessions are not
+            deletable here. Coaches cannot delete sessions that already have paid registrations (cancel those first).
           </p>
         </div>
 
@@ -2790,8 +2798,9 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
             <DialogHeader>
               <DialogTitle>Delete {bulkDeleteSelection.length} session(s)?</DialogTitle>
               <DialogDescription>
-                This permanently removes the selected sessions and their participant rows. Only open scheduled sessions
-                can be deleted. This cannot be undone.
+                This permanently removes the selected sessions and their participant rows.                 Completed sessions cannot be
+                deleted here. Coaches can only delete sessions with no paid registrations (unpaid placeholders are
+                removed). This cannot be undone.
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
