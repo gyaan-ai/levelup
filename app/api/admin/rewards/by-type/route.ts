@@ -72,15 +72,22 @@ export async function GET(req: NextRequest) {
     { issued: 0, redeemed: 0, outstanding: 0 }
   );
 
-  return NextResponse.json({
-    year,
-    month,
-    startIso,
-    rows: mapped,
-    totals: {
-      issued: Number(totals.issued.toFixed(2)),
-      redeemed: Number(totals.redeemed.toFixed(2)),
-      outstanding: Number(totals.outstanding.toFixed(2)),
+  return NextResponse.json(
+    {
+      year,
+      month,
+      startIso,
+      rows: mapped,
+      totals: {
+        issued: Number(totals.issued.toFixed(2)),
+        redeemed: Number(totals.redeemed.toFixed(2)),
+        outstanding: Number(totals.outstanding.toFixed(2)),
+      },
     },
-  });
+    {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
+      },
+    }
+  );
 }
