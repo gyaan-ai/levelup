@@ -17,9 +17,16 @@ export async function POST(_req: NextRequest, ctx: { params: Promise<{ id: strin
   const { id: parentId } = await ctx.params;
   const admin = createAdminClient(auth.tenantSlug);
 
-  const { data: u } = await admin.from('users').select('id, role').eq('id', parentId).maybeSingle();
-  if (!u || (u as { role: string }).role !== 'parent') {
-    return NextResponse.json({ error: 'Parent not found' }, { status: 400 });
+  const { data: u } = await admin.from('users').select('id').eq('id', parentId).maybeSingle();
+  if (!u) {
+    return NextResponse.json({ error: 'User not found' }, { status: 400 });
+  }
+  const { count: creditRowCount } = await admin
+    .from('credits')
+    .select('*', { count: 'exact', head: true })
+    .eq('parent_id', parentId);
+  if ((creditRowCount ?? 0) === 0) {
+    return NextResponse.json({ error: 'No wallet (credits) for this user' }, { status: 400 });
   }
 
   try {
