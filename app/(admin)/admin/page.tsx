@@ -20,8 +20,16 @@ import {
 } from './admin-dashboard-client';
 import { coachPayoutUsd, type SessionCoachPayoutFields } from '@/lib/coach-session-payout';
 import { isRewardsProgramEnabled } from '@/lib/rewards';
+import { formatEST } from '@/lib/format-date';
 
 type SessionWithPayoutStatus = SessionCoachPayoutFields & { status: string };
+
+/** Open-booking counts: session calendar day in Eastern is today or later (matches admin Sessions filter). */
+function isOpenSessionFromTodayForwardEastern(scheduledDatetime: string): boolean {
+  const todayKey = formatEST(new Date(), 'yyyy-MM-dd');
+  const sessionKey = formatEST(scheduledDatetime, 'yyyy-MM-dd');
+  return sessionKey >= todayKey;
+}
 
 function coachPayoutUsdUnlessUnpaidPending(
   s: SessionWithPayoutStatus,
@@ -403,24 +411,26 @@ export default async function AdminPage() {
     }, 0),
     totalAthletePayments: sessions.reduce((sum, s) => sum + sessionCoachShareUsd(s), 0),
     upcomingOpenRevenue: sessions
-      .filter((s) => s.status === 'scheduled' && new Date(s.scheduled_datetime) >= new Date())
+      .filter((s) => s.status === 'scheduled' && isOpenSessionFromTodayForwardEastern(s.scheduled_datetime))
       .reduce((sum, s) => sum + s.total_price, 0),
     upcomingOpenOrgFees: sessions
-      .filter((s) => s.status === 'scheduled' && new Date(s.scheduled_datetime) >= new Date())
+      .filter((s) => s.status === 'scheduled' && isOpenSessionFromTodayForwardEastern(s.scheduled_datetime))
       .reduce((sum, s) => sum + s.org_fee, 0),
     upcomingOpenStripeFees: sessions
-      .filter((s) => s.status === 'scheduled' && new Date(s.scheduled_datetime) >= new Date())
+      .filter((s) => s.status === 'scheduled' && isOpenSessionFromTodayForwardEastern(s.scheduled_datetime))
       .reduce((sum, s) => sum + s.stripe_fee, 0),
     upcomingOpenAthletePayments: sessions
-      .filter((s) => s.status === 'scheduled' && new Date(s.scheduled_datetime) >= new Date())
+      .filter((s) => s.status === 'scheduled' && isOpenSessionFromTodayForwardEastern(s.scheduled_datetime))
       .reduce((sum, s) => sum + sessionCoachShareUsd(s), 0),
     sessionCount: sessions.length,
     completedCount: sessions.filter((s) => s.status === 'completed').length,
-    pendingPaymentCount: sessions.filter((s) => s.status === 'pending_payment').length,
+    pendingPaymentCount: sessions.filter(
+      (s) => s.status === 'pending_payment' && isOpenSessionFromTodayForwardEastern(s.scheduled_datetime)
+    ).length,
     upcomingOpenCount: sessions.filter(
       (s) =>
         (s.status === 'scheduled' || s.status === 'pending_payment') &&
-        new Date(s.scheduled_datetime) >= new Date()
+        isOpenSessionFromTodayForwardEastern(s.scheduled_datetime)
     ).length,
   };
 

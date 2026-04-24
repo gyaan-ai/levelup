@@ -158,6 +158,16 @@ export type AdminSession = {
   coach_payout_rate?: number | null;
 };
 
+function sessionDateKeyInAppTz(iso: string): string {
+  return formatInTimeZone(new Date(iso), APP_TIMEZONE, 'yyyy-MM-dd');
+}
+
+function confirmedRosterCountForAdminList(s: AdminSession): number {
+  return s.confirmed_booked_count != null
+    ? Number(s.confirmed_booked_count) || 0
+    : Number(s.current_participants) || 0;
+}
+
 function sessionPayoutAmountUsd(s: AdminSession): number {
   const stored = Number(s.athlete_payment ?? 0);
   if (stored > 0) return Math.round(stored * 100) / 100;
@@ -474,6 +484,8 @@ export function AdminDashboardClient({
   const [sessionStatusFilter, setSessionStatusFilter] = useState<'all' | 'open' | 'completed' | 'cancelled_other'>('all');
   const [sessionTypeFilter, setSessionTypeFilter] = useState<string>('all');
   const [sessionCoachFilter, setSessionCoachFilter] = useState<string>('all');
+  /** When false (default), past scheduled/pending_payment sessions with zero bookings are hidden if no date range is set. */
+  const [showPastEmptyOpenSessions, setShowPastEmptyOpenSessions] = useState(false);
   const [copiedSessionId, setCopiedSessionId] = useState<string | null>(null);
   const [duplicatingSessionId, setDuplicatingSessionId] = useState<string | null>(null);
   const [bulkDeleteSelection, setBulkDeleteSelection] = useState<string[]>([]);
@@ -886,6 +898,9 @@ export function AdminDashboardClient({
   const filteredSessions = useMemo(() => {
     const sessionDateKeyLocal = (iso: string) =>
       formatInTimeZone(new Date(iso), APP_TIMEZONE, 'yyyy-MM-dd');
+    const todayKey = formatInTimeZone(new Date(), APP_TIMEZONE, 'yyyy-MM-dd');
+    const dateRangeActive = Boolean(sessionDateFrom || sessionDateTo);
+
     return sessions.filter((s) => {
       const d = sessionDateKeyLocal(s.scheduled_datetime);
       if (sessionDateFrom && d < sessionDateFrom) return false;
@@ -893,6 +908,7 @@ export function AdminDashboardClient({
 
       if (sessionStatusFilter === 'open') {
         if (s.status !== 'scheduled' && s.status !== 'pending_payment') return false;
+        if (sessionDateKeyLocal(s.scheduled_datetime) < todayKey) return false;
       } else if (sessionStatusFilter === 'completed') {
         if (s.status !== 'completed') return false;
       } else if (sessionStatusFilter === 'cancelled_other') {
@@ -901,6 +917,17 @@ export function AdminDashboardClient({
 
       if (sessionTypeFilter !== 'all' && (s.session_type ?? '') !== sessionTypeFilter) return false;
       if (sessionCoachFilter !== 'all' && s.athlete_id !== sessionCoachFilter) return false;
+
+      if (
+        !showPastEmptyOpenSessions &&
+        !dateRangeActive &&
+        sessionStatusFilter === 'all' &&
+        sessionDateKeyLocal(s.scheduled_datetime) < todayKey &&
+        (s.status === 'scheduled' || s.status === 'pending_payment') &&
+        confirmedRosterCountForAdminList(s) === 0
+      ) {
+        return false;
+      }
 
       return true;
     });
@@ -911,6 +938,7 @@ export function AdminDashboardClient({
     sessionStatusFilter,
     sessionTypeFilter,
     sessionCoachFilter,
+    showPastEmptyOpenSessions,
   ]);
 
   /** Sum spots and collected $ for the current filter (matches table rows). */
@@ -950,7 +978,7 @@ export function AdminDashboardClient({
     sessionStatusFilter === 'all'
       ? 'All statuses'
       : sessionStatusFilter === 'open'
-        ? 'Open (scheduled & pending payment)'
+        ? 'Open (scheduled, from today forward)'
         : sessionStatusFilter === 'completed'
           ? 'Completed'
           : 'Cancelled / other';
@@ -1299,6 +1327,10 @@ export function AdminDashboardClient({
       return true;
     });
 
+    const todayKeyFinance = formatInTimeZone(new Date(), APP_TIMEZONE, 'yyyy-MM-dd');
+    const sessionDayKeyFinance = (iso: string) =>
+      formatInTimeZone(new Date(iso), APP_TIMEZONE, 'yyyy-MM-dd');
+
     // Calculate aggregates following GAAP accounting rules:
     // - Revenue = only from COMPLETED sessions (money EARNED)
     // - Deposits = collected for future sessions (liability until delivered)
@@ -1333,9 +1365,10 @@ export function AdminDashboardClient({
         coachPayoutsPending += coachPaid;
       }
 
-      if (s.status === 'scheduled') openBookings += 1;
+      if (s.status === 'scheduled' && sessionDayKeyFinance(s.scheduled_datetime) >= todayKeyFinance) openBookings += 1;
       if (s.status === 'completed') completedSessions += 1;
-      if (s.status === 'pending_payment') pendingPayment += 1;
+      if (s.status === 'pending_payment' && sessionDayKeyFinance(s.scheduled_datetime) >= todayKeyFinance)
+        pendingPayment += 1;
       if (s.status === 'cancelled') cancelledSessions += 1;
 
       // Coach breakdown - only count COMPLETED sessions for earned revenue/payouts
@@ -1352,7 +1385,7 @@ export function AdminDashboardClient({
         existing.payout += coachPaid;
         existing.sessions += 1;
       }
-      if (s.status === 'scheduled') existing.open += 1;
+      if (s.status === 'scheduled' && sessionDayKeyFinance(s.scheduled_datetime) >= todayKeyFinance) existing.open += 1;
       coachBreakdown.set(s.athlete_id, existing);
     }
 
@@ -1658,7 +1691,7 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
   const statusBadge = (status: string) => {
     const isOpen = status === 'scheduled' || status === 'pending_payment';
     const isClosed = status === 'completed' || status === 'cancelled' || status === 'no-show';
-    const label = status === 'pending_payment' ? 'Pending payment' : status;
+    const label = status === 'pending_payment' ? 'Scheduled' : status;
     return (
       <Badge
         variant={isClosed ? 'destructive' : 'outline'}
@@ -1696,8 +1729,15 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
   }, [section, subSection]);
 
   // Calculate metrics
-  const openSessions = sessions.filter(s => s.status === 'scheduled' || s.status === 'pending_payment').length;
-  const pendingPayments = sessions.filter(s => s.status === 'pending_payment').length;
+  const todayKeyForMetrics = formatInTimeZone(new Date(), APP_TIMEZONE, 'yyyy-MM-dd');
+  const openSessions = sessions.filter((s) => {
+    if (s.status !== 'scheduled' && s.status !== 'pending_payment') return false;
+    return sessionDateKeyInAppTz(s.scheduled_datetime) >= todayKeyForMetrics;
+  }).length;
+  const pendingPayments = sessions.filter((s) => {
+    if (s.status !== 'pending_payment') return false;
+    return sessionDateKeyInAppTz(s.scheduled_datetime) >= todayKeyForMetrics;
+  }).length;
   const totalCoachPayoutsDue = coachPayouts.reduce((sum, p) => sum + p.amount, 0);
   const pendingFacilityRequests = facilityRequests.filter(r => r.status === 'pending').length;
 
@@ -2080,7 +2120,7 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
               value={openSessions}
               icon={Calendar}
               trend={openSessions > 0 ? 'up' : 'neutral'}
-              change={`${pendingPayments} pending payment`}
+              change={`${pendingPayments} incomplete checkout`}
               chartData={bookingsChartData}
             />
           </div>
@@ -2138,7 +2178,7 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
                 <CardDescription>Upcoming/open sessions</CardDescription>
                 <CardTitle className="text-2xl">{billing.upcomingOpenCount} total</CardTitle>
                 <p className="text-sm text-muted-foreground pt-1">
-                  Scheduled or pending-payment sessions with a future date/time.
+                  Scheduled sessions from today&apos;s date forward (Eastern), including any incomplete checkouts.
                 </p>
               </CardHeader>
             </Card>
@@ -2462,6 +2502,18 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
                 </SelectContent>
               </Select>
 
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="show-past-empty-open-sessions"
+                  checked={showPastEmptyOpenSessions}
+                  onCheckedChange={(c) => setShowPastEmptyOpenSessions(c === true)}
+                  className="translate-y-0.5"
+                />
+                <label htmlFor="show-past-empty-open-sessions" className="text-xs text-muted-foreground cursor-pointer select-none max-w-[14rem] leading-snug">
+                  Show past scheduled sessions with no bookings (cleanup / noise)
+                </label>
+              </div>
+
               <div className="flex items-center gap-2 ml-auto">
                 <Button variant="outline" size="sm" onClick={setPresetThisWeek}>This week</Button>
                 <Button variant="outline" size="sm" onClick={setPresetNextWeek}>Next week</Button>
@@ -2511,12 +2563,12 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
                 {sessionStatusFilter === 'all' ? (
                   <>
                     {' '}
-                    · Including completed is useful for revenue and historical fill. Set Status to{' '}
-                    <span className="text-foreground font-medium">Open (upcoming)</span> for upcoming capacity only, or{' '}
-                    <span className="text-foreground font-medium">Completed (past)</span> for past sessions only.
+                    · Empty past sessions still marked <span className="text-foreground font-medium">scheduled</span> are hidden by default; check the filter above to surface them for deletion.{' '}
+                    Set Status to <span className="text-foreground font-medium">Open (upcoming)</span> for forward capacity, or{' '}
+                    <span className="text-foreground font-medium">Completed (past)</span> for history.
                   </>
                 ) : sessionStatusFilter === 'open' ? (
-                  <> · Upcoming / bookable sessions only (spots and openings are forward-looking).</>
+                  <> · Scheduled sessions from today&apos;s date forward (Eastern).</>
                 ) : sessionStatusFilter === 'completed' ? (
                   <> · Past sessions only (collected is historical).</>
                 ) : (
@@ -2709,8 +2761,8 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
             </div>
           </Card>
           <p className="text-xs text-muted-foreground px-1">
-            Use the checkboxes on scheduled or pending-payment sessions to delete many at once (any coach). Completed or
-            cancelled rows have no checkbox.
+            Use the checkboxes on scheduled sessions to delete many at once (any coach). Completed or cancelled rows have
+            no checkbox.
           </p>
         </div>
 
@@ -2719,8 +2771,8 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
             <DialogHeader>
               <DialogTitle>Delete {bulkDeleteSelection.length} session(s)?</DialogTitle>
               <DialogDescription>
-                This permanently removes the selected sessions and their participant rows. Only scheduled and
-                pending-payment sessions can be deleted. This cannot be undone.
+                This permanently removes the selected sessions and their participant rows. Only open scheduled sessions
+                can be deleted. This cannot be undone.
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
@@ -3404,7 +3456,7 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
               <p className="text-xl font-semibold mt-1">{financeData.completedSessions}</p>
             </Card>
             <Card className="p-4">
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Pending Payment</p>
+              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Incomplete checkout</p>
               <p className="text-xl font-semibold mt-1 text-amber-500">{financeData.pendingPayment}</p>
             </Card>
             <Card className="p-4">
@@ -3581,7 +3633,7 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
                 <p className="text-xl font-semibold mt-1">{totalOpenBookings}</p>
               </Card>
               <Card className="p-4">
-                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Pending Payment</p>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Incomplete checkout</p>
                 <p className="text-xl font-semibold mt-1 text-amber-500">{totalPendingPayment}</p>
               </Card>
               <Card className="p-4">
@@ -3683,7 +3735,7 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
                       <th className="text-center py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Rating</th>
                       <th className="text-center py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Open</th>
                       <th className="text-center py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Completed</th>
-                      <th className="text-center py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Pending $</th>
+                      <th className="text-center py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Draft</th>
                       <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Earnings</th>
                       <th className="text-right py-3 px-4 font-medium text-muted-foreground text-xs uppercase tracking-wider">Actions</th>
                     </tr>
@@ -3860,7 +3912,7 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
                     <p className="text-[11px] text-muted-foreground mt-0.5">Scheduled session spots</p>
                   </Card>
                   <Card className="p-4">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Pending payment</p>
+                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Incomplete checkout</p>
                     <p className="text-xl font-semibold mt-1 text-amber-500 tabular-nums">{youthLbTotalPending}</p>
                   </Card>
                   <Card className="p-4">
@@ -5701,7 +5753,7 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
                   </select>
                   {transferTargetOptions.length === 0 && (
                     <p className="text-xs text-muted-foreground">
-                      No matching open sessions (scheduled / pending payment, still upcoming). Search by coach name or date. Past sessions cannot be transfer targets here.
+                      No matching sessions from today forward. Search by coach name or date. Past sessions cannot be transfer targets here.
                     </p>
                   )}
                 </div>
