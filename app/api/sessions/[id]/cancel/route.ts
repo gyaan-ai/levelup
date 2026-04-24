@@ -74,7 +74,7 @@ export async function POST(
 
     const { data: participants } = await admin
       .from('session_participants')
-      .select('id, parent_id, youth_wrestler_id, amount_paid')
+      .select('id, parent_id, youth_wrestler_id, amount_paid, paid')
       .eq('session_id', sessionId);
 
     if (isRewardsProgramEnabled()) {
@@ -111,10 +111,13 @@ export async function POST(
 
     if (cancellerMayIssueCredit) {
       for (const participant of participants ?? []) {
-        const amountPaid = Number(participant.amount_paid ?? 0);
-        if (amountPaid > 0 && participant.parent_id) {
+        const p = participant as { amount_paid?: unknown; paid?: boolean | null; parent_id?: string | null };
+        const amountPaid = Number(p.amount_paid ?? 0);
+        // Only refund as wallet credit what was actually collected (paid row). Never use list/total_price
+        // when checkout never completed — that created phantom liability on pending_payment cancels.
+        if (amountPaid > 0 && p.paid === true && p.parent_id) {
           const result = await grantCredit({
-            userId: participant.parent_id,
+            userId: p.parent_id,
             amount: amountPaid,
             reason:
               isCoach || isAdmin
@@ -125,26 +128,7 @@ export async function POST(
             tenantSlug: tenant.slug,
           });
           if (result.success) {
-            recordSuccessfulGrant(participant.parent_id, amountPaid);
-          }
-        }
-      }
-
-      // No paid roster rows yet (e.g. pending_payment before checkout) — credit the organizing parent for the session price.
-      if (totalCreditsAmount === 0) {
-        const organizerId = session.parent_id as string | null;
-        const fallbackAmount = Number(session.total_price ?? session.base_price ?? 0);
-        if (organizerId && fallbackAmount > 0) {
-          const result = await grantCredit({
-            userId: organizerId,
-            amount: fallbackAmount,
-            reason: `Cancelled: ${sessionDate} with ${coachName}. ${reason}`,
-            sourceType: 'cancellation',
-            sourceId: sessionId,
-            tenantSlug: tenant.slug,
-          });
-          if (result.success) {
-            recordSuccessfulGrant(organizerId, fallbackAmount);
+            recordSuccessfulGrant(p.parent_id, amountPaid);
           }
         }
       }
