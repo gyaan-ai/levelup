@@ -163,10 +163,6 @@ export default async function AthleteProfilePage({
     const qs = q.toString();
     return qs ? `/book/${athlete.id}?${qs}` : `/book/${athlete.id}`;
   };
-  const registerHrefForSession = (sessionId: string) =>
-    youthWrestlerId
-      ? `/sessions/${sessionId}/register?wrestler=${encodeURIComponent(youthWrestlerId)}`
-      : `/sessions/${sessionId}/register`;
   const athleteName = `${athlete.first_name} ${athlete.last_name}`.trim() || 'This coach';
 
   const { data: weeklyAvailRows } = await supabase
@@ -459,7 +455,7 @@ export default async function AthleteProfilePage({
               coachName={athleteName}
               sessions={upcomingSessionsOpen}
               parentWrestlerIds={parentWrestlerIds}
-              registerHrefForSession={registerHrefForSession}
+              preselectedYouthWrestlerId={youthWrestlerId ?? null}
             />
             <Link href={bookHref()}>
               <Button variant="outline" className="w-full mt-4">

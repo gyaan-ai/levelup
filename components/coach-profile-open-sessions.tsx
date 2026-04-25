@@ -27,15 +27,23 @@ type Props = {
   coachName: string;
   sessions: CoachProfileOpenSessionRow[];
   parentWrestlerIds: string[];
-  registerHrefForSession: (sessionId: string) => string;
+  /** When set, register links include ?wrestler= for pre-select (must be serializable — no server functions). */
+  preselectedYouthWrestlerId?: string | null;
 };
+
+function registerHref(sessionId: string, youthWrestlerId?: string | null) {
+  if (youthWrestlerId) {
+    return `/sessions/${sessionId}/register?wrestler=${encodeURIComponent(youthWrestlerId)}`;
+  }
+  return `/sessions/${sessionId}/register`;
+}
 
 export function CoachProfileOpenSessions({
   coachId,
   coachName,
   sessions,
   parentWrestlerIds,
-  registerHrefForSession,
+  preselectedYouthWrestlerId = null,
 }: Props) {
   const { addItem, removeItem, items } = useCart();
 
@@ -175,7 +183,7 @@ export function CoachProfileOpenSessions({
                 </div>
               )}
               <Button variant="outline" size="sm" className="min-h-[40px] w-full text-xs" asChild>
-                <Link href={registerHrefForSession(s.id)}>Register</Link>
+                <Link href={registerHref(s.id, preselectedYouthWrestlerId)}>Register</Link>
               </Button>
             </div>
           </div>
