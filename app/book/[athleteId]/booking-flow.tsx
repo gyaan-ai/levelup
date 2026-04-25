@@ -101,6 +101,8 @@ interface BookingFlowProps {
   /** Deep-link from training / shared links: yyyy-MM-dd and HH:mm as returned by availability slots API. */
   initialBookingDate?: string | null;
   initialBookingTime?: string | null;
+  /** From coach profile: pre-select private vs partner (partner defaults to invite). */
+  initialBookIntent?: 'private' | 'partner' | null;
 }
 
 type AvailabilityByDay = { day_of_week: number; start_time: string; end_time: string }[];
@@ -115,6 +117,7 @@ export function BookingFlow({
   checkoutUsesSavedAccountDiscount = false,
   initialBookingDate = null,
   initialBookingTime = null,
+  initialBookIntent = null,
 }: BookingFlowProps) {
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(1);
@@ -238,6 +241,17 @@ export function BookingFlow({
       setCurrentStep(2);
     }
   }, [youthWrestlers]);
+
+  useEffect(() => {
+    if (!initialBookIntent) return;
+    if (initialBookIntent === 'private') {
+      setSessionChoice('1-on-1');
+      setPartnerOption(null);
+    } else {
+      setSessionChoice('partner');
+      setPartnerOption('invite');
+    }
+  }, [initialBookIntent]);
 
   useEffect(() => {
     (async () => {

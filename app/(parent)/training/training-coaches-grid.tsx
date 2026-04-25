@@ -26,6 +26,14 @@ import { useAuth } from '@/lib/auth/use-auth';
 
 export type { CoachSessionTypeFilter as SessionTypeFilter };
 
+const SESSION_TYPE_PILLS: { value: CoachSessionTypeFilter; label: string; labelShort?: string }[] = [
+  { value: 'all', label: 'All types' },
+  { value: 'small_group', label: 'Small group', labelShort: 'Group' },
+  { value: 'private', label: 'Private' },
+  { value: 'partner', label: 'Partner' },
+  { value: 'partner_private', label: 'Partner / Private', labelShort: 'P / P' },
+];
+
 export interface AthleteWithNext extends Athlete {
   nextAvailable?: { slot_date: string; start_time: string } | null;
 }
@@ -152,25 +160,60 @@ export function TrainingCoachesGrid({
 
   const showDateEmpty = Boolean(filterDate) && sorted.length === 0;
 
+  const filtersActive =
+    Boolean(filterDate) ||
+    facilityId !== 'all' ||
+    sessionType !== 'all' ||
+    availableOnly;
+
+  const clearAllFilters = () => {
+    setFilterDate('');
+    setDateOpen(false);
+    setFacilityId('all');
+    setSessionType('all');
+    setAvailableOnly(false);
+  };
+
   return (
     <div className="space-y-4">
-      <div
-        className="flex flex-wrap items-center gap-2 gap-y-3 pb-2"
-        role="toolbar"
-        aria-label="Coach filters"
-      >
+      <div className="-mx-1 sm:mx-0">
+        <div
+          className="flex snap-x snap-mandatory items-center gap-2 overflow-x-auto pb-2 [-ms-overflow-style:none] [scrollbar-width:none] sm:flex-wrap sm:overflow-visible [&::-webkit-scrollbar]:hidden"
+          role="toolbar"
+          aria-label="Coach filters"
+        >
         <div
           className={cn(
-            'flex min-h-[44px] shrink-0 items-stretch overflow-hidden rounded-full border bg-zinc-900',
+            'flex min-h-[44px] shrink-0 snap-start items-stretch overflow-hidden rounded-full border bg-zinc-900',
             filterDate ? 'border-[#D4AF37]/40' : 'border-zinc-800'
           )}
         >
+          <label className="sr-only" htmlFor="training-coach-date-native">
+            Filter by date
+          </label>
+          <div
+            className={cn(
+              'flex min-w-[7.5rem] items-center gap-1.5 px-2 sm:hidden',
+              filterDate ? 'text-[#D4AF37]' : 'text-zinc-300'
+            )}
+          >
+            <Calendar className="h-4 w-4 shrink-0 opacity-90" aria-hidden />
+            <input
+              id="training-coach-date-native"
+              type="date"
+              min={coachDateFilterBounds.minYmd}
+              max={coachDateFilterBounds.maxYmd}
+              value={filterDate}
+              onChange={(e) => setFilterDate(e.target.value)}
+              className="min-h-[40px] w-[min(11rem,calc(100vw-6rem))] flex-1 cursor-pointer bg-transparent text-sm font-medium text-inherit focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/50 rounded-md"
+            />
+          </div>
           <Popover open={dateOpen} onOpenChange={setDateOpen}>
             <PopoverTrigger asChild>
               <button
                 type="button"
                 className={cn(
-                  'flex min-w-[7.5rem] max-w-[12rem] items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/50 sm:min-w-[9rem]',
+                  'hidden min-h-[44px] sm:flex min-w-[9rem] max-w-[12rem] items-center justify-center gap-1.5 px-3 py-2 text-sm font-medium touch-manipulation focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/50',
                   filterDate ? 'text-[#D4AF37]' : 'text-zinc-300'
                 )}
                 aria-label={
@@ -245,7 +288,7 @@ export function TrainingCoachesGrid({
           id="training-coach-location"
           value={facilityId}
           onChange={(e) => setFacilityId(e.target.value)}
-          className="min-h-[44px] w-full min-w-[10rem] max-w-[min(100%,20rem)] shrink-0 rounded-full border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/50 sm:w-auto"
+          className="min-h-[44px] w-full min-w-[10rem] max-w-[min(100%,20rem)] shrink-0 snap-start rounded-full border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/50 sm:w-auto"
         >
           <option value="all">All locations</option>
           {locationFacilities.map((f) => (
@@ -255,28 +298,38 @@ export function TrainingCoachesGrid({
           ))}
         </select>
 
-        <label className="sr-only" htmlFor="training-coach-session-type">
-          Session type
-        </label>
-        <select
-          id="training-coach-session-type"
-          value={sessionType}
-          onChange={(e) => setSessionType(e.target.value as CoachSessionTypeFilter)}
-          className="min-h-[44px] w-full min-w-[10rem] max-w-[min(100%,20rem)] shrink-0 rounded-full border border-zinc-800 bg-zinc-900 px-3 py-2 text-sm font-medium text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#D4AF37]/50 sm:w-auto"
+        <div
+          className="flex shrink-0 snap-start items-center gap-1.5 overflow-x-auto rounded-full border border-zinc-800 bg-zinc-900 py-1 pl-1 pr-1 sm:max-w-none sm:flex-wrap sm:overflow-visible"
+          role="group"
+          aria-label="Session type"
         >
-          <option value="all">All types</option>
-          <option value="small_group">Small group</option>
-          <option value="private">Private</option>
-          <option value="partner">Partner</option>
-          <option value="partner_private">Partner / Private</option>
-        </select>
+          {SESSION_TYPE_PILLS.map((pill) => {
+            const selected = sessionType === pill.value;
+            return (
+              <button
+                key={pill.value}
+                type="button"
+                onClick={() => setSessionType(pill.value)}
+                className={cn(
+                  'shrink-0 rounded-full px-3 py-2 text-xs font-semibold transition-colors touch-manipulation sm:text-sm',
+                  selected
+                    ? 'bg-[#D4AF37]/25 text-[#D4AF37] ring-1 ring-[#D4AF37]/40'
+                    : 'text-zinc-400 hover:text-zinc-200'
+                )}
+              >
+                <span className="sm:hidden">{pill.labelShort ?? pill.label}</span>
+                <span className="hidden sm:inline">{pill.label}</span>
+              </button>
+            );
+          })}
+        </div>
 
         <button
           type="button"
           onClick={() => setAvailableOnly((v) => !v)}
           aria-pressed={availableOnly}
           title="Coaches with upcoming open sessions only"
-          className={`min-h-[44px] shrink-0 self-center whitespace-nowrap rounded-full border px-3 py-2 text-xs font-semibold transition-colors sm:px-4 sm:text-sm ${
+          className={`min-h-[44px] shrink-0 snap-start self-center whitespace-nowrap rounded-full border px-3 py-2 text-xs font-semibold transition-colors sm:px-4 sm:text-sm ${
             availableOnly
               ? 'bg-[#D4AF37]/20 text-[#D4AF37] border-[#D4AF37]/30'
               : 'bg-zinc-900 text-zinc-300 border-zinc-800'
@@ -284,6 +337,17 @@ export function TrainingCoachesGrid({
         >
           Available
         </button>
+
+        {filtersActive ? (
+          <button
+            type="button"
+            onClick={clearAllFilters}
+            className="min-h-[44px] shrink-0 snap-start whitespace-nowrap rounded-full border border-zinc-600 px-3 py-2 text-xs font-semibold text-zinc-300 hover:border-[#D4AF37]/40 hover:text-[#D4AF37] sm:text-sm"
+          >
+            Clear filters
+          </button>
+        ) : null}
+        </div>
       </div>
 
       {showDateEmpty ? (

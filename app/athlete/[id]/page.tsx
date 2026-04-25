@@ -9,10 +9,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import { Star, User, MapPin, Award, Shield, CheckCircle, DollarSign, Pencil, Calendar, Clock, Users, ChevronRight } from 'lucide-react';
+import { Star, MapPin, Award, Shield, CheckCircle, DollarSign, Pencil, Calendar, Clock } from 'lucide-react';
 import { BackLink } from '@/components/back-link';
 import { formatEST } from '@/lib/format-date';
-import { SessionTypeBadge } from '@/components/session-type-badge';
 import { SchoolLogo } from '@/components/school-logo';
 import { CoachSessionBadge } from '@/components/coach-session-badge';
 import { FollowCoachButton } from '@/components/follow-coach-button';
@@ -24,6 +23,11 @@ import { summarizeWeeklyAvailability, type WeeklyAvailabilityRow } from '@/lib/a
 import { COACH_PROFILE_PUBLIC_RATE_ROWS, getCoachDisplayedParentRates } from '@/lib/coach-session-pricing';
 import { ContactInfoRow } from '@/components/contact-info-row';
 import { hasMinPhoneDigits } from '@/lib/phone';
+import { getEffectiveFilledCount } from '@/lib/sessions';
+import {
+  CoachProfileOpenSessions,
+  type CoachProfileOpenSessionRow,
+} from '@/components/coach-profile-open-sessions';
 
 function CoachProfileUnavailable() {
   return (
@@ -36,14 +40,14 @@ function CoachProfileUnavailable() {
           </p>
         </CardHeader>
         <CardContent className="flex flex-col gap-3">
-          <Link href="/bookings">
+          <Link href="/dashboard">
             <Button variant="default" className="w-full sm:w-auto">
-              My bookings
+              Home
             </Button>
           </Link>
-          <Link href="/browse">
+          <Link href="/training">
             <Button variant="outline" className="w-full sm:w-auto">
-              Browse coaches
+              Training
             </Button>
           </Link>
         </CardContent>
@@ -148,9 +152,13 @@ export default async function AthleteProfilePage({
   const canDelete = isAdmin || isOwnProfile;
   /** Parents and admins viewing a coach — book / message / request (not your own profile). */
   const canInteractAsParentOrAdmin = (isParent || isAdmin) && !isOwnProfile;
-  const bookHref = youthWrestlerId
-    ? `/book/${athlete.id}?youthWrestlerId=${encodeURIComponent(youthWrestlerId)}`
-    : `/book/${athlete.id}`;
+  const bookHref = (intent?: 'private' | 'partner') => {
+    const q = new URLSearchParams();
+    if (youthWrestlerId) q.set('youthWrestlerId', youthWrestlerId);
+    if (intent) q.set('bookIntent', intent);
+    const qs = q.toString();
+    return qs ? `/book/${athlete.id}?${qs}` : `/book/${athlete.id}`;
+  };
   const registerHrefForSession = (sessionId: string) =>
     youthWrestlerId
       ? `/sessions/${sessionId}/register?wrestler=${encodeURIComponent(youthWrestlerId)}`
@@ -163,13 +171,32 @@ export default async function AthleteProfilePage({
     .eq('athlete_id', id);
   const availabilitySummaryLines = summarizeWeeklyAvailability((weeklyAvailRows ?? []) as WeeklyAvailabilityRow[]);
 
-  // Fetch upcoming public sessions for this coach
   const admin = createAdminClient(tenantSlug);
   const nowISO = new Date().toISOString();
-  const { data: upcomingSessions } = await admin
+
+  let parentWrestlerIds: string[] = [];
+  if (user && (isParent || isAdmin)) {
+    const { data: primaryRows } = await supabase
+      .from('youth_wrestlers')
+      .select('id')
+      .eq('parent_id', user.id)
+      .eq('active', true);
+    const { data: linkedRows } = await supabase
+      .from('youth_wrestler_parents')
+      .select('youth_wrestler_id')
+      .eq('parent_id', user.id);
+    const linkedIds = [...new Set((linkedRows ?? []).map((r: { youth_wrestler_id: string }) => r.youth_wrestler_id))];
+    const primaryIds = [...new Set((primaryRows ?? []).map((r: { id: string }) => r.id))];
+    parentWrestlerIds = [...new Set([...primaryIds, ...linkedIds])];
+  }
+
+  const { data: upcomingSessionsRaw } = await admin
     .from('sessions')
     .select(`
       id,
+      parent_id,
+      athlete_id,
+      athlete_paid,
       scheduled_datetime,
       session_type,
       session_mode,
@@ -177,14 +204,68 @@ export default async function AthleteProfilePage({
       current_participants,
       max_participants,
       price_per_participant,
+      join_policy,
+      duration_minutes,
       facilities(name)
     `)
     .eq('athlete_id', id)
     .eq('status', 'scheduled')
-    .in('join_policy', ['public'])
+    .in('join_policy', ['public', 'invite_only'])
     .gte('scheduled_datetime', nowISO)
     .order('scheduled_datetime', { ascending: true })
-    .limit(5);
+    .limit(40);
+
+  /** Hide parent-booking shells until paid (same as book-coach list). */
+  const sessionsBase = (upcomingSessionsRaw ?? []).filter((row) => {
+    const r = row as {
+      parent_id?: string | null;
+      athlete_id?: string | null;
+      athlete_paid?: boolean | null;
+      current_participants?: number | null;
+    };
+    const pid = r.parent_id ?? null;
+    const aid = r.athlete_id ?? null;
+    if (!pid || !aid || pid === aid) return true;
+    if (r.athlete_paid === true) return true;
+    if ((r.current_participants ?? 0) > 0) return true;
+    return false;
+  });
+  const sessionIds = sessionsBase.map((s) => (s as { id: string }).id);
+  const participantsBySessionId = new Map<string, unknown[]>();
+  if (sessionIds.length > 0) {
+    const { data: partRows } = await admin
+      .from('session_participants')
+      .select('session_id')
+      .in('session_id', sessionIds);
+    for (const raw of partRows ?? []) {
+      const sid = (raw as { session_id?: string }).session_id;
+      if (!sid) continue;
+      const list = participantsBySessionId.get(sid) ?? [];
+      list.push(raw);
+      participantsBySessionId.set(sid, list);
+    }
+  }
+
+  const upcomingSessionsOpen: CoachProfileOpenSessionRow[] = sessionsBase
+    .map((row) => {
+      const id = (row as { id: string }).id;
+      return {
+        ...(row as unknown as CoachProfileOpenSessionRow),
+        session_participants: participantsBySessionId.get(id) ?? [],
+      };
+    })
+    .filter((s) => {
+      const max = s.max_participants ?? 1;
+      const filled = getEffectiveFilledCount(s);
+      return filled < max;
+    })
+    .slice(0, 12);
+
+  const nextOpenSession = upcomingSessionsOpen[0] as { scheduled_datetime?: string } | undefined;
+  const nextOpenLine =
+    nextOpenSession?.scheduled_datetime != null
+      ? `Next: ${formatEST(new Date(nextOpenSession.scheduled_datetime), 'EEE, MMM d')} · ${formatEST(new Date(nextOpenSession.scheduled_datetime), 'h:mm a')}`
+      : null;
 
   let coachPhoneForContact: string | null = null;
   if (canInteractAsParentOrAdmin) {
@@ -198,7 +279,7 @@ export default async function AthleteProfilePage({
   return (
     <div className="container mx-auto px-4 py-8 max-w-5xl">
       <div className="mb-6">
-        <BackLink fallbackHref="/browse" label="Back to Browse" />
+        <BackLink fallbackHref="/training" label="Back to Training" />
       </div>
 
       {/* Hero Section */}
@@ -257,6 +338,9 @@ export default async function AthleteProfilePage({
                   </span>
                 )}
               </div>
+              {nextOpenLine && (
+                <p className="text-sm font-medium text-accent/90 mb-4">{nextOpenLine}</p>
+              )}
 
               {/* Certification Badges */}
               <div className="flex flex-wrap gap-2 mb-4">
@@ -290,11 +374,18 @@ export default async function AthleteProfilePage({
               <div className="flex flex-col gap-3 max-w-xl">
                 <div className="flex flex-wrap items-center gap-3">
                   {canInteractAsParentOrAdmin && (
-                    <Link href={bookHref}>
-                      <Button size="lg" variant="premium" className="w-full sm:w-auto touch-manipulation">
-                        Book with {athlete.first_name}
-                      </Button>
-                    </Link>
+                    <>
+                      <Link href={bookHref('private')}>
+                        <Button size="lg" variant="premium" className="w-full sm:w-auto touch-manipulation">
+                          Book private
+                        </Button>
+                      </Link>
+                      <Link href={bookHref('partner')}>
+                        <Button size="lg" variant="outline" className="w-full sm:w-auto touch-manipulation">
+                          Book partner
+                        </Button>
+                      </Link>
+                    </>
                   )}
                   {isOwnProfile && (
                     <Link href="/profile">
@@ -331,79 +422,31 @@ export default async function AthleteProfilePage({
         </CardContent>
       </Card>
 
-      {/* Upcoming Sessions Section */}
-      {(upcomingSessions ?? []).length > 0 && (
+      {/* Open upcoming sessions (public & invite-only with spots) */}
+      {upcomingSessionsOpen.length > 0 && (
         <Card className="mb-6">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Calendar className="h-5 w-5" />
-              Upcoming Sessions
+              Open sessions
             </CardTitle>
             <p className="text-sm text-muted-foreground">
-              Tap a session to register, or use Book with {athlete.first_name} for the full list and private or partner
-              booking.
+              Add a spot to your cart or register. Schedule a new private or partner time with{' '}
+              <Link href={bookHref()} className="text-accent font-medium underline">
+                Book
+              </Link>
+              .
             </p>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
-              {(upcomingSessions ?? []).map((session) => {
-                const s = session as {
-                  id: string;
-                  scheduled_datetime: string;
-                  session_type?: string | null;
-                  session_mode?: string | null;
-                  focus_area?: string | null;
-                  current_participants?: number | null;
-                  max_participants?: number | null;
-                  price_per_participant?: number | null;
-                  facilities?: { name?: string } | { name?: string }[] | null;
-                };
-                const dt = new Date(s.scheduled_datetime);
-                const fac = Array.isArray(s.facilities) ? s.facilities[0] : s.facilities;
-                const current = s.current_participants ?? 0;
-                const max = s.max_participants ?? 1;
-                const openSlots = Math.max(0, max - current);
-                const price = s.price_per_participant;
-                return (
-                  <Link key={s.id} href={registerHrefForSession(s.id)}>
-                    <div className="flex items-center gap-4 p-4 rounded-xl bg-zinc-900/50 border border-zinc-800/50 hover:border-zinc-700 transition-all">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <SessionTypeBadge sessionType={s.session_type ?? null} sessionMode={s.session_mode ?? null} />
-                          {s.focus_area && (
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400">
-                              {s.focus_area}
-                            </span>
-                          )}
-                        </div>
-                        <p className="font-semibold text-foreground">
-                          {formatEST(dt, 'EEE, MMM d')} · {formatEST(dt, 'h:mm a')}
-                        </p>
-                        <div className="flex items-center gap-3 mt-1 text-xs text-zinc-500">
-                          {fac?.name && (
-                            <span className="flex items-center gap-1">
-                              <MapPin className="h-3 w-3" />
-                              {fac.name}
-                            </span>
-                          )}
-                          <span className="flex items-center gap-1">
-                            <Users className="h-3 w-3" />
-                            {openSlots > 0 ? `${openSlots} spot${openSlots !== 1 ? 's' : ''} left` : 'Full'}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex flex-col items-end shrink-0">
-                        {price != null && price > 0 && (
-                          <span className="text-lg font-bold text-foreground">${price}</span>
-                        )}
-                        <ChevronRight className="h-5 w-5 text-zinc-500" />
-                      </div>
-                    </div>
-                  </Link>
-                );
-              })}
-            </div>
-            <Link href={bookHref}>
+            <CoachProfileOpenSessions
+              coachId={athlete.id}
+              coachName={athleteName}
+              sessions={upcomingSessionsOpen}
+              parentWrestlerIds={parentWrestlerIds}
+              registerHrefForSession={registerHrefForSession}
+            />
+            <Link href={bookHref()}>
               <Button variant="outline" className="w-full mt-4">
                 All sessions & schedule new
               </Button>

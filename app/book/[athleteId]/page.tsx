@@ -17,11 +17,14 @@ export default async function BookPage({
   searchParams,
 }: {
   params: Promise<{ athleteId: string }>;
-  searchParams: Promise<{ youthWrestlerId?: string; date?: string; time?: string }>;
+  searchParams: Promise<{ youthWrestlerId?: string; date?: string; time?: string; bookIntent?: string }>;
 }) {
   const { athleteId } = await params;
   const sp = await searchParams;
   const preselectedYouthWrestlerId = sp.youthWrestlerId ?? null;
+  const bookIntentRaw = sp.bookIntent?.trim().toLowerCase();
+  const initialBookIntent =
+    bookIntentRaw === 'private' || bookIntentRaw === 'partner' ? bookIntentRaw : null;
   const dateRaw = sp.date?.trim();
   const initialBookingDate =
     dateRaw && /^\d{4}-\d{2}-\d{2}$/.test(dateRaw) ? dateRaw : null;
@@ -283,6 +286,7 @@ export default async function BookPage({
         checkoutUsesSavedAccountDiscount={checkoutAllowSavedAccountPercent()}
         initialBookingDate={initialBookingDate}
         initialBookingTime={initialBookingTime}
+        initialBookIntent={initialBookIntent}
       />
     </>
   );
