@@ -8,6 +8,8 @@ export type CoachRosterEntry = {
   kidLastName: string;
   parentFirstName: string;
   parentLastName: string;
+  /** Login email for parent account (weekly blasts, BCC). */
+  parentEmail: string;
   /** E.164 from resolveParentSmsPhone, or null */
   parentPhone: string | null;
   kidPhone: string | null;
@@ -103,11 +105,20 @@ export async function fetchCoachRosterData(
   const parentIds = [...new Set([...byWrestler.values()].map((r) => r.parentId))];
   const { data: parentUsers } =
     parentIds.length > 0
-      ? await admin.from('users').select('id, first_name, last_name, phone').in('id', parentIds)
+      ? await admin.from('users').select('id, email, first_name, last_name, phone').in('id', parentIds)
       : { data: [] };
 
   const parentById = new Map(
-    (parentUsers ?? []).map((u) => [u.id as string, u as { id: string; first_name?: string | null; last_name?: string | null; phone?: string | null }])
+    (parentUsers ?? []).map((u) => [
+      u.id as string,
+      u as {
+        id: string;
+        email?: string | null;
+        first_name?: string | null;
+        last_name?: string | null;
+        phone?: string | null;
+      },
+    ])
   );
 
   const entries: CoachRosterEntry[] = [];
@@ -124,6 +135,7 @@ export async function fetchCoachRosterData(
       kidLastName: agg.kidLastName,
       parentFirstName: pu?.first_name ?? '',
       parentLastName: pu?.last_name ?? '',
+      parentEmail: (pu?.email && String(pu.email).trim()) || '',
       parentPhone: parentPhoneResolved,
       kidPhone: kidPhoneResolved,
       lastSessionAt: agg.lastSessionAt,

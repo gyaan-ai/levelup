@@ -47,7 +47,7 @@ export default async function CoachRosterPage() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-foreground md:text-3xl">Family roster</h1>
         <p className="text-muted-foreground text-sm mt-1">
-          Kid numbers first for texting — parents too. Everyone who has trained with you.
+          Parents, emails, and phones for everyone who has ever been on your sessions — copy for weekly blasts or texts.
         </p>
       </div>
       <CoachRosterClient entries={entries} nextSession={nextSession} />

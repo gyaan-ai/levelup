@@ -94,6 +94,12 @@ export function CoachScheduleClient({
               <CircleHelp className="h-4 w-4 shrink-0" aria-hidden />
               Coach help
             </Link>
+            <Link
+              href="/coach-roster"
+              className="text-sm font-semibold text-[#D4AF37] hover:underline whitespace-nowrap"
+            >
+              Families &amp; contacts →
+            </Link>
           </div>
           <p className="text-muted-foreground text-sm md:text-base mt-1">
             {coachFirstName ? `Hey ${coachFirstName}` : 'Your sessions'} — who&apos;s booked, what&apos;s pending.
