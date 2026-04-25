@@ -494,6 +494,9 @@ export function AdminDashboardClient({
   const [bulkDeleteSelection, setBulkDeleteSelection] = useState<string[]>([]);
   const [bulkDeleteDialogOpen, setBulkDeleteDialogOpen] = useState(false);
   const [bulkDeleteLoading, setBulkDeleteLoading] = useState(false);
+  /** Admin bookings table: per-row delete (same rules as bulk DELETE /api/admin/sessions/[id]). */
+  const [singleDeleteSession, setSingleDeleteSession] = useState<AdminSession | null>(null);
+  const [singleDeleteLoading, setSingleDeleteLoading] = useState(false);
   // Roster modal state
   const [rosterSessionId, setRosterSessionId] = useState<string | null>(null);
   const [rosterData, setRosterData] = useState<Array<{
@@ -2461,6 +2464,26 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
         }
       };
 
+      const handleSingleDeleteConfirm = async () => {
+        if (!singleDeleteSession) return;
+        setSingleDeleteLoading(true);
+        try {
+          const res = await fetch(`/api/admin/sessions/${singleDeleteSession.id}`, {
+            method: 'DELETE',
+            credentials: 'same-origin',
+          });
+          const data = (await res.json().catch(() => ({}))) as { error?: string };
+          if (!res.ok) {
+            window.alert(data.error || 'Failed to delete session');
+            return;
+          }
+          setSingleDeleteSession(null);
+          router.refresh();
+        } finally {
+          setSingleDeleteLoading(false);
+        }
+      };
+
       return (
         <>
         <div className="space-y-6">
@@ -2777,6 +2800,18 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
                                   <Pencil className="h-3.5 w-3.5" />
                                 </Button>
                               </Link>
+                              {canBulkDelete && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                  title="Delete session permanently"
+                                  aria-label={`Delete session ${formatEST(new Date(s.scheduled_datetime), 'MMM d, yyyy h:mm a')}`}
+                                  onClick={() => setSingleDeleteSession(s)}
+                                >
+                                  <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -2788,10 +2823,58 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
             </div>
           </Card>
           <p className="text-xs text-muted-foreground px-1">
-            Use checkboxes to delete scheduled, cancelled, or no-show sessions in bulk. Completed sessions are not
-            deletable here. Coaches cannot delete sessions that already have paid registrations (cancel those first).
+            Delete scheduled, cancelled, or no-show sessions with the row trash icon or checkboxes for bulk delete.
+            Completed sessions are not deletable here. Coaches cannot delete sessions that already have paid
+            registrations (cancel those first).
           </p>
         </div>
+
+        <Dialog
+          open={!!singleDeleteSession}
+          onOpenChange={(open) => {
+            if (!open && !singleDeleteLoading) setSingleDeleteSession(null);
+          }}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Delete this session?</DialogTitle>
+              <DialogDescription>
+                {singleDeleteSession ? (
+                  <>
+                    <span className="block text-foreground font-medium">
+                      {formatEST(new Date(singleDeleteSession.scheduled_datetime), 'EEE MMM d, yyyy · h:mm a')}
+                    </span>
+                    <span className="block mt-1">
+                      {singleDeleteSession.athlete_name} · {singleDeleteSession.facility_name}
+                    </span>
+                    <span className="block mt-2">
+                      This permanently removes the session and participant rows. It cannot be undone.
+                    </span>
+                  </>
+                ) : null}
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setSingleDeleteSession(null)}
+                disabled={singleDeleteLoading}
+              >
+                Cancel
+              </Button>
+              <Button variant="destructive" onClick={() => void handleSingleDeleteConfirm()} disabled={singleDeleteLoading}>
+                {singleDeleteLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Deleting…
+                  </>
+                ) : (
+                  'Delete'
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         <Dialog open={bulkDeleteDialogOpen} onOpenChange={setBulkDeleteDialogOpen}>
           <DialogContent>
