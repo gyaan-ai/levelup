@@ -4,6 +4,8 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { SchoolLogo } from '@/components/school-logo';
+import { hasSchoolLogo } from '@/lib/school-logos';
 
 export type ParentHomeAnnouncement = {
   id: string;
@@ -12,6 +14,8 @@ export type ParentHomeAnnouncement = {
   headline: string;
   cta_label: string;
   cta_path: string;
+  /** Coach or facility school — used for college logo when available. */
+  school?: string | null;
 };
 
 export function ParentHomeAnnouncementBanners({ items }: { items: ParentHomeAnnouncement[] }) {
@@ -43,8 +47,14 @@ export function ParentHomeAnnouncementBanners({ items }: { items: ParentHomeAnno
           key={a.id}
           className="flex items-start gap-3 rounded-xl border-2 border-[#D4AF37]/60 bg-zinc-900/80 px-3 py-3 pr-2"
         >
-          <span className="text-lg shrink-0" aria-hidden>
-            🆕
+          <span className="shrink-0 w-9 h-9 flex items-center justify-center rounded-lg bg-zinc-800/90 border border-[#D4AF37]/25">
+            {a.school?.trim() && hasSchoolLogo(a.school.trim()) ? (
+              <SchoolLogo school={a.school.trim()} size="sm" className="max-w-[28px] max-h-[28px]" />
+            ) : (
+              <span className="text-lg leading-none" aria-hidden>
+                🆕
+              </span>
+            )}
           </span>
           <div className="min-w-0 flex-1">
             <p className="text-sm text-foreground leading-snug">{a.headline}</p>

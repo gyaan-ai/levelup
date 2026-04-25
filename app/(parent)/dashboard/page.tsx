@@ -108,20 +108,56 @@ export default async function HomePage() {
     const dismissed = new Set(
       (dismissalRows ?? []).map((d) => `${d.announcement_type}:${d.reference_id}`)
     );
-    homeAnnouncements = (announcementRows ?? [])
-      .filter(
-        (a) =>
-          !dismissed.has(`${a.announcement_type}:${a.reference_id}`) &&
-          (a.announcement_type === 'new_coach' || a.announcement_type === 'new_location')
-      )
-      .map((a) => ({
-        id: a.id,
-        announcement_type: a.announcement_type as 'new_coach' | 'new_location',
-        reference_id: a.reference_id,
-        headline: a.headline,
-        cta_label: a.cta_label ?? 'View',
-        cta_path: a.cta_path,
-      }));
+    const announcementFiltered = (announcementRows ?? []).filter(
+      (a) =>
+        !dismissed.has(`${a.announcement_type}:${a.reference_id}`) &&
+        (a.announcement_type === 'new_coach' || a.announcement_type === 'new_location')
+    );
+
+    const coachRefIds = [
+      ...new Set(
+        announcementFiltered.filter((a) => a.announcement_type === 'new_coach').map((a) => a.reference_id)
+      ),
+    ];
+    const facilityRefIds = [
+      ...new Set(
+        announcementFiltered.filter((a) => a.announcement_type === 'new_location').map((a) => a.reference_id)
+      ),
+    ];
+
+    const schoolByReferenceId = new Map<string, string>();
+    if (coachRefIds.length > 0) {
+      const { data: coachSchoolRows } = await admin
+        .from('athletes')
+        .select('id, school')
+        .in('id', coachRefIds);
+      for (const row of coachSchoolRows ?? []) {
+        const r = row as { id: string; school?: string | null };
+        const s = r.school?.trim();
+        if (s) schoolByReferenceId.set(r.id, s);
+      }
+    }
+    if (facilityRefIds.length > 0) {
+      const { data: facilitySchoolRows } = await admin
+        .from('facilities')
+        .select('id, school')
+        .in('id', facilityRefIds);
+      for (const row of facilitySchoolRows ?? []) {
+        const r = row as { id: string; school?: string | null };
+        const s = r.school?.trim();
+        if (s) schoolByReferenceId.set(r.id, s);
+      }
+    }
+
+    homeAnnouncements = announcementFiltered.map((a) => ({
+      id: a.id,
+      announcement_type: a.announcement_type as 'new_coach' | 'new_location',
+      reference_id: a.reference_id,
+      headline: a.headline,
+      cta_label: a.cta_label ?? 'View',
+      cta_path: a.cta_path,
+      school: schoolByReferenceId.get(a.reference_id) ?? null,
+    }));
   } catch {
     homeAnnouncements = [];
   }
