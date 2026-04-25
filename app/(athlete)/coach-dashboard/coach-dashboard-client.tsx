@@ -186,7 +186,7 @@ export function CoachDashboardClient({
         </Link>
         {' · '}
         <Link href="/coach-roster" className="text-accent font-medium underline">
-          Roster
+          Families &amp; contacts
         </Link>
         {' · '}
         <Link href="/coach-help" className="text-accent font-medium underline">
