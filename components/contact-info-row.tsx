@@ -99,6 +99,86 @@ export function ContactInfoRow({ label, name, phone, className }: ContactInfoRow
   );
 }
 
+/** Phone icon + number + copy/text actions — sits inline next to a coach name on profile hero. */
+export function InlineCoachPhone({ phone }: { phone: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const formatPhone = (p: string) => {
+    const digits = p.replace(/\D/g, '');
+    if (digits.length === 10) {
+      return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`;
+    }
+    if (digits.length === 11 && digits.startsWith('1')) {
+      return `(${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
+    }
+    return p;
+  };
+
+  const getDigits = (p: string) => {
+    const digits = p.replace(/\D/g, '');
+    if (digits.length === 11 && digits.startsWith('1')) {
+      return digits.slice(1);
+    }
+    return digits;
+  };
+
+  const handleCopy = async () => {
+    const digits = getDigits(phone);
+    const success = await copyTextToClipboard(digits);
+    if (success) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleText = () => {
+    const digits = getDigits(phone);
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+    if (isMobile) {
+      window.location.href = `sms:${digits}`;
+    } else {
+      void handleCopy();
+    }
+  };
+
+  return (
+    <div
+      className="flex flex-wrap items-center gap-x-2 gap-y-1 min-w-0 rounded-md border border-border/80 bg-muted/25 px-2 py-1.5 sm:py-1"
+      role="group"
+      aria-label="Coach phone: copy or text"
+    >
+      <Phone className="h-4 w-4 text-accent shrink-0" aria-hidden />
+      <span className="font-mono text-sm text-foreground tabular-nums">{formatPhone(phone)}</span>
+      <div className="flex items-center gap-0.5 shrink-0">
+        <Button
+          variant="ghost"
+          size="sm"
+          type="button"
+          onClick={() => void handleCopy()}
+          className="h-9 w-9 p-0 min-h-[44px] min-w-[44px] sm:h-8 sm:w-8 sm:min-h-0 sm:min-w-0 touch-manipulation"
+          title="Copy number"
+        >
+          {copied ? (
+            <Check className="h-4 w-4 text-emerald-500" />
+          ) : (
+            <Copy className="h-4 w-4" />
+          )}
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          type="button"
+          onClick={handleText}
+          className="h-9 w-9 p-0 min-h-[44px] min-w-[44px] sm:h-8 sm:w-8 sm:min-h-0 sm:min-w-0 touch-manipulation"
+          title="Text this number (opens Messages on your phone)"
+        >
+          <MessageSquare className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 // Compact version for inline use
 export function PhoneCopyButton({ phone, className }: { phone: string; className?: string }) {
   const [copied, setCopied] = useState(false);

@@ -25,7 +25,7 @@ import {
   COACH_SESSION_FALLBACK_USD,
   getCoachDisplayedParentRates,
 } from '@/lib/coach-session-pricing';
-import { ContactInfoRow } from '@/components/contact-info-row';
+import { InlineCoachPhone } from '@/components/contact-info-row';
 import { hasMinPhoneDigits } from '@/lib/phone';
 import { getEffectiveFilledCount } from '@/lib/sessions';
 import {
@@ -324,10 +324,17 @@ export default async function AthleteProfilePage({
 
             {/* Name and Info */}
             <div className="flex-1 min-w-0 w-full space-y-3">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
-                <h1 className="text-2xl sm:text-3xl font-bold leading-tight min-w-0 sm:flex-1 sm:pr-2">
-                  {athlete.first_name} {athlete.last_name}
-                </h1>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                <div className="flex flex-col gap-2 min-w-0 flex-1 sm:pr-2">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-2 min-w-0">
+                    <h1 className="text-2xl sm:text-3xl font-bold leading-tight min-w-0">
+                      {athlete.first_name} {athlete.last_name}
+                    </h1>
+                    {canInteractAsParentOrAdmin && coachPhoneForContact ? (
+                      <InlineCoachPhone phone={coachPhoneForContact} />
+                    ) : null}
+                  </div>
+                </div>
                 <FollowCoachButton coachId={athlete.id} className="w-full sm:w-auto shrink-0" />
               </div>
               
@@ -365,15 +372,6 @@ export default async function AthleteProfilePage({
               {nextOpenLine && (
                 <p className="text-sm font-medium text-accent/90">{nextOpenLine}</p>
               )}
-
-              {canInteractAsParentOrAdmin && coachPhoneForContact ? (
-                <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 max-w-lg">
-                  <ContactInfoRow label="Coach cell" name={athlete.first_name} phone={coachPhoneForContact} />
-                  <p className="text-xs text-muted-foreground mt-2">
-                    On your phone, use the message icon to open your texting app.
-                  </p>
-                </div>
-              ) : null}
 
               {/* Certification Badges */}
               <div className="flex flex-wrap gap-2">
