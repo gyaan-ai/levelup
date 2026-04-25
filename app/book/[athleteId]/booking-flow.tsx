@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Calendar } from '@/components/ui/calendar';
 import Link from 'next/link';
-import { User, Clock, CheckCircle, Link2, Users, Wallet, Sparkles } from 'lucide-react';
+import { User, Clock, CheckCircle, Link2, Users, Wallet, Sparkles, ChevronDown } from 'lucide-react';
 import { BackLink } from '@/components/back-link';
 import { SchoolLogo } from '@/components/school-logo';
 import { CoachSessionBadge } from '@/components/coach-session-badge';
@@ -25,6 +25,8 @@ import { COACH_REVENUE_FRACTION } from '@/lib/pricing';
 import { formatSlotDisplay, getDayOfWeek } from '@/lib/availability';
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { cn } from '@/lib/utils';
 
 const creditsFetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -143,6 +145,7 @@ export function BookingFlow({
   const [freeEntitlements, setFreeEntitlements] = useState({ free1on1: 0, free2Athlete: 0 });
   const [initialSlotSeeded, setInitialSlotSeeded] = useState(false);
   const [useCredits, setUseCredits] = useState(true);
+  const [attendingPickerOpen, setAttendingPickerOpen] = useState(false);
 
   const sessionMode: SessionMode | null =
     sessionChoice === '1-on-1' ? 'private'
@@ -898,43 +901,77 @@ export function BookingFlow({
                             : '.'}
                     </p>
                   </div>
-                  <div className="space-y-3">
-                    {youthWrestlers.map((w) => {
-                      const isSelected = selectedWrestlers.some((x) => x.id === w.id);
-                      const atMax = selectedWrestlers.length >= wrestlerBounds.max;
-                      const atMinRemove =
-                        isSelected && selectedWrestlers.length <= wrestlerBounds.min;
-                      const disabled = (!isSelected && atMax) || atMinRemove;
-                      return (
-                        <label
-                          key={w.id}
-                          className={`flex items-center gap-3 rounded-md border px-3 py-2.5 cursor-pointer touch-manipulation ${
-                            disabled ? 'opacity-60 cursor-not-allowed' : 'hover:bg-muted/40'
-                          }`}
-                        >
-                          <Checkbox
-                            checked={isSelected}
-                            disabled={disabled}
-                            onCheckedChange={() => {
-                              if (!disabled) toggleWrestlerOnReview(w);
-                            }}
-                            className="shrink-0"
-                          />
-                          <ProfileImage
-                            src={w.photo_url}
-                            alt=""
-                            focusX={w.photo_focus_x}
-                            focusY={w.photo_focus_y}
-                            className="w-10 h-10 shrink-0"
-                            fallbackIconClassName="h-5 w-5 text-muted-foreground"
-                          />
-                          <span className="text-sm font-medium">
-                            {w.first_name} {w.last_name}
-                          </span>
-                        </label>
-                      );
-                    })}
-                  </div>
+                  <Popover open={attendingPickerOpen} onOpenChange={setAttendingPickerOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="w-full min-h-[44px] justify-between font-normal text-left touch-manipulation"
+                        id="review-attending-select"
+                      >
+                        <span className="truncate pr-2">
+                          {selectedWrestlers.length === 0
+                            ? 'Select wrestlers…'
+                            : selectedWrestlers.length === 1
+                              ? `${selectedWrestlers[0].first_name} ${selectedWrestlers[0].last_name}`
+                              : `${selectedWrestlers.length} wrestlers: ${selectedWrestlers
+                                  .map((w) => `${w.first_name} ${w.last_name}`)
+                                  .join(', ')}`}
+                        </span>
+                        <ChevronDown className="h-4 w-4 shrink-0 opacity-60" aria-hidden />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      className="w-[var(--radix-popover-trigger-width)] max-h-[min(24rem,calc(100vh-8rem))] overflow-hidden p-0"
+                      align="start"
+                      onOpenAutoFocus={(e) => e.preventDefault()}
+                    >
+                      <div className="max-h-64 overflow-y-auto p-2 space-y-1">
+                        {youthWrestlers.map((w) => {
+                          const isSelected = selectedWrestlers.some((x) => x.id === w.id);
+                          const atMax = selectedWrestlers.length >= wrestlerBounds.max;
+                          const atMinRemove =
+                            isSelected && selectedWrestlers.length <= wrestlerBounds.min;
+                          const disabled = (!isSelected && atMax) || atMinRemove;
+                          return (
+                            <label
+                              key={w.id}
+                              className={cn(
+                                'flex items-center gap-3 rounded-md px-2 py-2 cursor-pointer touch-manipulation',
+                                disabled ? 'opacity-60 cursor-not-allowed' : 'hover:bg-muted/60'
+                              )}
+                            >
+                              <Checkbox
+                                checked={isSelected}
+                                disabled={disabled}
+                                onCheckedChange={() => {
+                                  if (!disabled) toggleWrestlerOnReview(w);
+                                }}
+                                className="shrink-0"
+                              />
+                              <ProfileImage
+                                src={w.photo_url}
+                                alt=""
+                                focusX={w.photo_focus_x}
+                                focusY={w.photo_focus_y}
+                                className="w-9 h-9 shrink-0"
+                                fallbackIconClassName="h-4 w-4 text-muted-foreground"
+                              />
+                              <span className="text-sm font-medium">
+                                {w.first_name} {w.last_name}
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                      <p className="text-xs text-muted-foreground px-3 py-2 border-t border-border">
+                        Choose {wrestlerBounds.min === wrestlerBounds.max
+                          ? `${wrestlerBounds.min}`
+                          : `${wrestlerBounds.min}–${wrestlerBounds.max}`}{' '}
+                        for this session. Linked kids on your account appear here too.
+                      </p>
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Session Type</p>

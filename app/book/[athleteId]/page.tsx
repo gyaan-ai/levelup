@@ -85,13 +85,28 @@ export default async function BookPage({
     notFound();
   }
 
-  // Fetch parent's youth wrestlers
-  const { data: youthWrestlers } = await supabase
+  // Wrestlers this user can book: primary parent + linked via youth_wrestler_parents (same as session register).
+  const { data: primaryRows } = await supabase
     .from('youth_wrestlers')
-    .select('*')
+    .select('id')
     .eq('parent_id', user.id)
-    .eq('active', true)
-    .order('created_at', { ascending: false });
+    .eq('active', true);
+  const { data: linkedRows } = await supabase
+    .from('youth_wrestler_parents')
+    .select('youth_wrestler_id')
+    .eq('parent_id', user.id);
+  const linkedIds = [...new Set((linkedRows ?? []).map((r: { youth_wrestler_id: string }) => r.youth_wrestler_id))];
+  const primaryIds = [...new Set((primaryRows ?? []).map((r: { id: string }) => r.id))];
+  const allYouthIds = [...new Set([...primaryIds, ...linkedIds])];
+  const { data: youthWrestlers } =
+    allYouthIds.length > 0
+      ? await supabase
+          .from('youth_wrestlers')
+          .select('*')
+          .in('id', allYouthIds)
+          .eq('active', true)
+          .order('created_at', { ascending: false })
+      : { data: [] as Record<string, unknown>[] };
 
   // When parent has no wrestlers, still render the book page so "See availability" lands here;
   // BookingFlow will show an "Add your wrestler to book" CTA instead of redirecting away.
