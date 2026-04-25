@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import { Star, MapPin, Award, Shield, CheckCircle, DollarSign, Pencil, Calendar, Clock } from 'lucide-react';
+import { Star, MapPin, Award, Shield, CheckCircle, DollarSign, Pencil, Calendar, Clock, Users } from 'lucide-react';
 import { BackLink } from '@/components/back-link';
 import { formatEST } from '@/lib/format-date';
 import { SchoolLogo } from '@/components/school-logo';
@@ -32,6 +32,16 @@ import {
   CoachProfileOpenSessions,
   type CoachProfileOpenSessionRow,
 } from '@/components/coach-profile-open-sessions';
+
+/** Partner or small-group posts parents can join; not the book-new 1-on-1 flow. */
+function isJoinExistingSessionType(s: CoachProfileOpenSessionRow): boolean {
+  const t = s.session_type ?? '';
+  if (t === 'group' || t === 'small_group') return true;
+  if (t === '2-athlete' || t === 'partner') return true;
+  const m = s.session_mode ?? '';
+  if (m === 'partner-open') return true;
+  return false;
+}
 
 function CoachProfileUnavailable() {
   return (
@@ -279,6 +289,9 @@ export default async function AthleteProfilePage({
     }
   }
 
+  const joinExistingOpenSessions = upcomingSessionsOpen.filter(isJoinExistingSessionType);
+  const otherOpenSessions = upcomingSessionsOpen.filter((s) => !isJoinExistingSessionType(s));
+
   const displayedParentRates = admin
     ? await getCoachDisplayedParentRates(admin, id)
     : {
@@ -381,102 +394,129 @@ export default async function AthleteProfilePage({
                 )}
               </div>
 
-              {/* Parents/admins: book. Coaches: edit own profile only (no admin shortcut here). */}
-              <div className="flex flex-col gap-3 w-full max-w-xl min-w-0">
-                <div className="flex flex-col sm:flex-row gap-3 w-full min-w-0">
-                  {canInteractAsParentOrAdmin && (
-                    <>
-                      <Link href={bookHref('private')} className="w-full min-w-0 sm:flex-1">
-                        <Button
-                          size="lg"
-                          variant="premium"
-                          className="w-full h-auto min-h-[52px] touch-manipulation flex flex-col gap-0.5 py-3 px-4 whitespace-normal text-center"
-                        >
-                          <span className="leading-snug">Private session</span>
-                          <span className="text-xs font-normal opacity-90 leading-tight">
-                            1 wrestler · 1-on-1 with coach
-                          </span>
-                        </Button>
-                      </Link>
-                      <Link href={bookHref('partner')} className="w-full min-w-0 sm:flex-1">
-                        <Button
-                          size="lg"
-                          variant="outline"
-                          className="w-full h-auto min-h-[52px] touch-manipulation flex flex-col gap-0.5 py-3 px-4 whitespace-normal text-center"
-                        >
-                          <span className="leading-snug">Partner session</span>
-                          <span className="text-xs font-normal opacity-90 leading-tight">
-                            2 wrestlers · shared hour
-                          </span>
-                        </Button>
-                      </Link>
-                    </>
-                  )}
-                  {isOwnProfile && (
-                    <Link href="/profile" className="w-full sm:w-auto">
-                      <Button size="lg" variant="outline" className="w-full sm:w-auto touch-manipulation">
-                        <Pencil className="h-4 w-4 mr-2" />
-                        Edit profile
-                      </Button>
-                    </Link>
-                  )}
+              {isOwnProfile && (
+                <div className="pt-1">
+                  <Link href="/profile">
+                    <Button size="lg" variant="outline" className="touch-manipulation">
+                      <Pencil className="h-4 w-4 mr-2" />
+                      Edit profile
+                    </Button>
+                  </Link>
                 </div>
-                {canInteractAsParentOrAdmin && (
-                  <>
-                    {coachPhoneForContact ? (
-                      <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 max-w-lg">
-                        <ContactInfoRow label="Coach cell" name={athlete.first_name} phone={coachPhoneForContact} />
-                        <p className="text-xs text-muted-foreground mt-2">
-                          On your phone, use the message icon to open your texting app.
-                        </p>
-                      </div>
-                    ) : null}
-                    <p className="text-sm text-muted-foreground">
-                      Book lists upcoming sessions and new times:{' '}
-                      <span className="text-foreground/90">private</span> is one-on-one;{' '}
-                      <span className="text-foreground/90">partner</span> is two wrestlers in the same hour.{' '}
-                      <Link href={`/coach/${athlete.id}`} className="text-accent font-medium underline">
-                        Shareable schedule
-                      </Link>{' '}
-                      for guests who aren&apos;t logged in yet.
-                    </p>
-                  </>
-                )}
-              </div>
+              )}
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Open upcoming sessions (public & invite-only with spots) */}
-      {upcomingSessionsOpen.length > 0 && (
+      {canInteractAsParentOrAdmin && (
         <Card className="mb-6">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
-              Open sessions
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Calendar className="h-5 w-5 text-accent" />
+              Book a new session
             </CardTitle>
             <p className="text-sm text-muted-foreground">
-              Add a spot to your cart or register. Schedule a new private or partner time with{' '}
-              <Link href={bookHref()} className="text-accent font-medium underline">
-                Book
-              </Link>
-              .
+              Start here for a fresh private or partner time — you&apos;ll pick the slot next.
             </p>
           </CardHeader>
-          <CardContent>
-            <CoachProfileOpenSessions
-              coachId={athlete.id}
-              coachName={athleteName}
-              sessions={upcomingSessionsOpen}
-              parentWrestlerIds={parentWrestlerIds}
-              preselectedYouthWrestlerId={youthWrestlerId ?? null}
-            />
-            <Link href={bookHref()}>
-              <Button variant="outline" className="w-full mt-4">
+          <CardContent className="space-y-4">
+            <div className="flex flex-col sm:flex-row gap-3 w-full max-w-xl min-w-0">
+              <Link href={bookHref('private')} className="w-full min-w-0 sm:flex-1">
+                <Button
+                  size="lg"
+                  variant="premium"
+                  className="w-full h-auto min-h-[52px] touch-manipulation flex flex-col gap-0.5 py-3 px-4 whitespace-normal text-center"
+                >
+                  <span className="leading-snug">Private session</span>
+                  <span className="text-xs font-normal opacity-90 leading-tight">
+                    1 wrestler · 1-on-1 with coach
+                  </span>
+                </Button>
+              </Link>
+              <Link href={bookHref('partner')} className="w-full min-w-0 sm:flex-1">
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="w-full h-auto min-h-[52px] touch-manipulation flex flex-col gap-0.5 py-3 px-4 whitespace-normal text-center border-accent/40"
+                >
+                  <span className="leading-snug">Partner session</span>
+                  <span className="text-xs font-normal opacity-90 leading-tight">
+                    2 wrestlers · shared hour
+                  </span>
+                </Button>
+              </Link>
+            </div>
+            {coachPhoneForContact ? (
+              <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 max-w-lg">
+                <ContactInfoRow label="Coach cell" name={athlete.first_name} phone={coachPhoneForContact} />
+                <p className="text-xs text-muted-foreground mt-2">
+                  On your phone, use the message icon to open your texting app.
+                </p>
+              </div>
+            ) : null}
+            <p className="text-sm text-muted-foreground max-w-xl">
+              <Link href={`/coach/${athlete.id}`} className="text-accent font-medium underline">
+                Public schedule link
+              </Link>{' '}
+              — share with families who don&apos;t have an account yet.
+            </p>
+            <Link href={bookHref()} className="block max-w-xl">
+              <Button variant="outline" className="w-full touch-manipulation">
                 All sessions & schedule new
               </Button>
             </Link>
+          </CardContent>
+        </Card>
+      )}
+
+      {(joinExistingOpenSessions.length > 0 || otherOpenSessions.length > 0) && (
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <Users className="h-5 w-5 text-accent" />
+              Join an existing session
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Open partner times and small groups this coach already posted — add to cart or register.
+              {canInteractAsParentOrAdmin ? (
+                <>
+                  {' '}
+                  Need another time?{' '}
+                  <Link href={bookHref()} className="text-accent font-medium underline">
+                    Open the booking calendar
+                  </Link>
+                  .
+                </>
+              ) : null}
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {joinExistingOpenSessions.length > 0 && (
+              <CoachProfileOpenSessions
+                coachId={athlete.id}
+                coachName={athleteName}
+                sessions={joinExistingOpenSessions}
+                parentWrestlerIds={parentWrestlerIds}
+                preselectedYouthWrestlerId={youthWrestlerId ?? null}
+              />
+            )}
+            {otherOpenSessions.length > 0 && (
+              <div className="space-y-3">
+                {joinExistingOpenSessions.length > 0 && (
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                    Other open times
+                  </p>
+                )}
+                <CoachProfileOpenSessions
+                  coachId={athlete.id}
+                  coachName={athleteName}
+                  sessions={otherOpenSessions}
+                  parentWrestlerIds={parentWrestlerIds}
+                  preselectedYouthWrestlerId={youthWrestlerId ?? null}
+                />
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
