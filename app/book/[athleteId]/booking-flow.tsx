@@ -567,8 +567,13 @@ export function BookingFlow({
               Book with {athlete.first_name} {athlete.last_name}
             </h1>
             <p className="text-sm text-muted-foreground">
-              Schedule a new private or partner session in the steps below. When this coach has posted join-in sessions,
-              they show in the list above.
+              When this coach has posted join-in sessions, they show in the list above. To book a new private or partner
+              session, use the steps below
+              {' '}
+              <a href="#schedule-new-session" className="text-accent font-medium underline underline-offset-2">
+                (jump to steps)
+              </a>
+              .
             </p>
             <p className="text-muted-foreground flex items-center gap-2 flex-wrap">
               <SchoolLogo school={athlete.school} size="sm" />

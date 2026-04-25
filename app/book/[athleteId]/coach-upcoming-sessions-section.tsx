@@ -102,13 +102,6 @@ export function CoachUpcomingSessionsSection({
         <CardTitle className="text-lg flex flex-wrap items-center gap-2">
           Upcoming sessions with {coachFirstName}
         </CardTitle>
-        <p className="text-sm text-muted-foreground">
-          Join a posted session below, or jump to{' '}
-          <a href="#schedule-new-session" className="text-accent font-medium underline">
-            schedule something new
-          </a>{' '}
-          (private or partner).
-        </p>
       </CardHeader>
       <CardContent className="space-y-3">
         {sessions.map((s) => {
