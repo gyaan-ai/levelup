@@ -235,7 +235,7 @@ export function AdminUsersClient({ initialUsers }: { initialUsers: AdminUserRow[
 
   const viewProfileUrl = (u: AdminUserRow) => {
     if (u.role === 'coach') return `/athlete/${u.id}`;
-    if (u.role === 'parent') return '/bookings';
+    if (u.role === 'parent') return `/admin/users/${u.id}`;
     return null;
   };
 
