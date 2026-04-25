@@ -71,6 +71,18 @@ export default async function TrainingPage({
   if (userData?.role === 'coach') redirect('/athlete-dashboard');
   if (userData?.role !== 'parent' && userData?.role !== 'admin' && userData?.role !== 'youth_wrestler') redirect('/dashboard');
 
+  /** Match client grid sort on first paint (avoids followed coaches jumping after /api/coach-follows loads). */
+  let initialFollowedCoachIds: string[] = [];
+  if (userData?.role === 'parent' || userData?.role === 'admin') {
+    const { data: followRows } = await supabase
+      .from('coach_follows')
+      .select('coach_id')
+      .eq('parent_id', user.id);
+    initialFollowedCoachIds = [
+      ...new Set((followRows ?? []).map((r: { coach_id: string }) => r.coach_id).filter(Boolean)),
+    ];
+  }
+
   // Fetch parent's wrestlers for "Booked" state check
   const { data: parentWrestlers } = await supabase
     .from('youth_wrestlers')
@@ -475,6 +487,7 @@ export default async function TrainingPage({
         coachIdsByFacilityId={coachIdsByFacilityId}
         coachDateFilterData={coachDateFilterData}
         coachDateFilterBounds={coachDateFilterBounds}
+        initialFollowedCoachIds={initialFollowedCoachIds}
       />
       </div>
     </div>

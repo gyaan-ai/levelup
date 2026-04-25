@@ -37,6 +37,8 @@ interface BrowseAthletesClientProps {
   initialYouthWrestlerId?: string;
   /** When true, hide back link and top title (e.g. when embedded in Training tab). */
   embedded?: boolean;
+  /** Server-fetched; avoids followed coaches jumping after /api/coach-follows loads. */
+  initialFollowedCoachIds?: string[];
 }
 
 function formatNextAvailable(slot_date: string, start_time: string): string {
@@ -77,7 +79,13 @@ function weightMatchesRanges(weightClass: string | undefined, selectedIds: strin
   });
 }
 
-export function BrowseAthletesClient({ initialAthletes, isAdmin, initialYouthWrestlerId, embedded }: BrowseAthletesClientProps) {
+export function BrowseAthletesClient({
+  initialAthletes,
+  isAdmin,
+  initialYouthWrestlerId,
+  embedded,
+  initialFollowedCoachIds = [],
+}: BrowseAthletesClientProps) {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSchool, setSelectedSchool] = useState<string>('all');
@@ -156,8 +164,9 @@ export function BrowseAthletesClient({ initialAthletes, isAdmin, initialYouthWre
       const bFollowed = followedCoachIds.has(b.id);
       if (aFollowed && !bFollowed) return -1;
       if (!aFollowed && bFollowed) return 1;
-      // Then by total sessions (most experienced first)
-      return (b.total_sessions ?? 0) - (a.total_sessions ?? 0);
+      const ts = (b.total_sessions ?? 0) - (a.total_sessions ?? 0);
+      if (ts !== 0) return ts;
+      return a.id.localeCompare(b.id);
     });
   }, [initialAthletes, searchQuery, selectedSchool, selectedWeightRanges, followedCoachIds]);
 

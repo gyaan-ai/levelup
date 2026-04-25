@@ -52,6 +52,17 @@ export default async function BrowsePage({
   }
   // parent and admin can both access browse (admin can switch to product view)
 
+  let initialFollowedCoachIds: string[] = [];
+  if (userData?.role === 'parent' || userData?.role === 'admin') {
+    const { data: followRows } = await supabase
+      .from('coach_follows')
+      .select('coach_id')
+      .eq('parent_id', user.id);
+    initialFollowedCoachIds = [
+      ...new Set((followRows ?? []).map((r: { coach_id: string }) => r.coach_id).filter(Boolean)),
+    ];
+  }
+
   // Fetch active athletes (profile complete). Photo and certifications optional for now.
   const { data: athletes, error } = await supabase
     .from('athletes')
@@ -103,6 +114,7 @@ export default async function BrowsePage({
       initialAthletes={athletesWithNext}
       isAdmin={!!isAdmin}
       initialYouthWrestlerId={sp.youthWrestlerId ?? undefined}
+      initialFollowedCoachIds={initialFollowedCoachIds}
     />
   );
 }

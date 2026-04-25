@@ -78,6 +78,8 @@ type Props = {
   coachIdsByFacilityId?: Record<string, string[]>;
   coachDateFilterData: CoachDateFilterData;
   coachDateFilterBounds: { minYmd: string; maxYmd: string };
+  /** Server-fetched so coach grid sort matches before client follow fetch completes. */
+  initialFollowedCoachIds?: string[];
 };
 
 export function TrainingClient({
@@ -100,6 +102,7 @@ export function TrainingClient({
   coachIdsByFacilityId = {},
   coachDateFilterData,
   coachDateFilterBounds,
+  initialFollowedCoachIds = [],
 }: Props) {
   const tab = (initialTab === 'sessions' ? 'sessions' : 'coaches') as TabId;
   const [activeTab, setActiveTab] = useState<TabId>(tab);
@@ -158,6 +161,7 @@ export function TrainingClient({
           coachDateFilterData={coachDateFilterData}
           coachDateFilterBounds={coachDateFilterBounds}
           initialSessionType={mapUrlTypeToCoachFilter(availabilitySessionType)}
+          initialFollowedCoachIds={initialFollowedCoachIds}
         />
       )}
     </>

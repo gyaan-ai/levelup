@@ -48,6 +48,7 @@ type Props = {
   coachDateFilterData: CoachDateFilterData;
   coachDateFilterBounds: { minYmd: string; maxYmd: string };
   initialSessionType?: CoachSessionTypeFilter;
+  initialFollowedCoachIds?: string[];
 };
 
 function formatCoachNextLine(slot_date: string, _start_time: string): string {
@@ -65,10 +66,13 @@ export function TrainingCoachesGrid({
   coachDateFilterData,
   coachDateFilterBounds,
   initialSessionType = 'all',
+  initialFollowedCoachIds = [],
 }: Props) {
   const { user, userRole } = useAuth();
   const [dateOpen, setDateOpen] = useState(false);
-  const [followedCoachIds, setFollowedCoachIds] = useState<Set<string>>(new Set());
+  const [followedCoachIds, setFollowedCoachIds] = useState<Set<string>>(
+    () => new Set(initialFollowedCoachIds)
+  );
   const [facilityId, setFacilityId] = useState<string>('all');
   const [sessionType, setSessionType] = useState<CoachSessionTypeFilter>(initialSessionType);
   const [availableOnly, setAvailableOnly] = useState(false);
@@ -148,7 +152,9 @@ export function TrainingCoachesGrid({
       const ar = a.average_rating ?? 0;
       const br = b.average_rating ?? 0;
       if (br !== ar) return br - ar;
-      return (b.review_count ?? 0) - (a.review_count ?? 0);
+      const rc = (b.review_count ?? 0) - (a.review_count ?? 0);
+      if (rc !== 0) return rc;
+      return a.id.localeCompare(b.id);
     });
     return copy;
   }, [filtered, followedCoachIds]);
