@@ -28,6 +28,12 @@ CREATE INDEX IF NOT EXISTS idx_parent_announcement_dismissals_parent ON public.p
 ALTER TABLE public.parent_announcements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.parent_announcement_dismissals ENABLE ROW LEVEL SECURITY;
 
+-- Idempotent: safe to re-run after a partial apply or SQL Editor retries.
+DROP POLICY IF EXISTS "parent_announcements_select_authenticated" ON public.parent_announcements;
+DROP POLICY IF EXISTS "parent_announcements_select_authenticated_parents" ON public.parent_announcements;
+DROP POLICY IF EXISTS "parent_announcement_dismissals_select_own" ON public.parent_announcement_dismissals;
+DROP POLICY IF EXISTS "parent_announcement_dismissals_insert_own" ON public.parent_announcement_dismissals;
+
 -- Any signed-in user may read non-expired rows (UI is parent-only; avoids requiring public.users at migration time).
 CREATE POLICY "parent_announcements_select_authenticated"
   ON public.parent_announcements FOR SELECT TO authenticated
