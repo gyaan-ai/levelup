@@ -294,31 +294,31 @@ export default async function AthleteProfilePage({
       </div>
 
       {/* Hero Section */}
-      <Card className="mb-6 relative">
-        <CardContent className="p-8">
-          <div className="absolute top-6 right-6">
-            <FollowCoachButton coachId={athlete.id} />
-          </div>
-          <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
+      <Card className="mb-6 overflow-hidden">
+        <CardContent className="p-4 sm:p-6 md:p-8">
+          <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-6 w-full min-w-0">
             {/* Photo */}
-            <div className="flex-shrink-0">
+            <div className="shrink-0">
               <ProfileImage
                 src={athlete.photo_url}
                 alt={`${athlete.first_name} ${athlete.last_name}`}
                 focusX={athlete.photo_focus_x}
                 focusY={athlete.photo_focus_y}
-                className="w-32 h-32 md:w-40 md:h-40 border-4 border-accent/30"
-                fallbackIconClassName="h-16 w-16 md:h-20 md:w-20 text-muted-foreground"
+                className="w-28 h-28 sm:w-32 sm:h-32 md:w-40 md:h-40 border-4 border-accent/30"
+                fallbackIconClassName="h-14 w-14 sm:h-16 sm:w-16 md:h-20 md:w-20 text-muted-foreground"
               />
             </div>
 
             {/* Name and Info */}
-            <div className="flex-1">
-              <h1 className="text-3xl font-bold mb-2">
-                {athlete.first_name} {athlete.last_name}
-              </h1>
+            <div className="flex-1 min-w-0 w-full space-y-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                <h1 className="text-2xl sm:text-3xl font-bold leading-tight min-w-0 sm:flex-1 sm:pr-2">
+                  {athlete.first_name} {athlete.last_name}
+                </h1>
+                <FollowCoachButton coachId={athlete.id} className="w-full sm:w-auto shrink-0" />
+              </div>
               
-              <div className="flex items-center gap-3 mb-3 flex-wrap">
+              <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
                 <CoachSessionBadge totalSessions={completedSessions} size="lg" />
                 <SchoolLogo school={athlete.school} size="md" />
                 <Badge className={schoolBadgeClassName(schoolColor)}>
@@ -335,7 +335,7 @@ export default async function AthleteProfilePage({
               </div>
 
               {/* Rating summary only; full stars + comments are below in "What parents say" */}
-              <div className="flex items-center gap-2 mb-4">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Star className="h-5 w-5 fill-accent text-accent" />
                 <span className="text-lg font-semibold">{rating}</span>
                 {reviewCount > 0 && (
@@ -350,11 +350,11 @@ export default async function AthleteProfilePage({
                 )}
               </div>
               {nextOpenLine && (
-                <p className="text-sm font-medium text-accent/90 mb-4">{nextOpenLine}</p>
+                <p className="text-sm font-medium text-accent/90">{nextOpenLine}</p>
               )}
 
               {/* Certification Badges */}
-              <div className="flex flex-wrap gap-2 mb-4">
+              <div className="flex flex-wrap gap-2">
                 {isSafeSportCertified && (
                   <Badge variant="outline" className="flex items-center gap-1">
                     <CheckCircle className="h-3 w-3 text-green-600" />
@@ -382,24 +382,38 @@ export default async function AthleteProfilePage({
               </div>
 
               {/* Parents/admins: book. Coaches: edit own profile only (no admin shortcut here). */}
-              <div className="flex flex-col gap-3 max-w-xl">
-                <div className="flex flex-wrap items-center gap-3">
+              <div className="flex flex-col gap-3 w-full max-w-xl min-w-0">
+                <div className="flex flex-col sm:flex-row gap-3 w-full min-w-0">
                   {canInteractAsParentOrAdmin && (
                     <>
-                      <Link href={bookHref('private')}>
-                        <Button size="lg" variant="premium" className="w-full sm:w-auto touch-manipulation">
-                          Book private
+                      <Link href={bookHref('private')} className="w-full min-w-0 sm:flex-1">
+                        <Button
+                          size="lg"
+                          variant="premium"
+                          className="w-full h-auto min-h-[52px] touch-manipulation flex flex-col gap-0.5 py-3 px-4 whitespace-normal text-center"
+                        >
+                          <span className="leading-snug">Private session</span>
+                          <span className="text-xs font-normal opacity-90 leading-tight">
+                            1 wrestler · 1-on-1 with coach
+                          </span>
                         </Button>
                       </Link>
-                      <Link href={bookHref('partner')}>
-                        <Button size="lg" variant="outline" className="w-full sm:w-auto touch-manipulation">
-                          Book partner
+                      <Link href={bookHref('partner')} className="w-full min-w-0 sm:flex-1">
+                        <Button
+                          size="lg"
+                          variant="outline"
+                          className="w-full h-auto min-h-[52px] touch-manipulation flex flex-col gap-0.5 py-3 px-4 whitespace-normal text-center"
+                        >
+                          <span className="leading-snug">Partner session</span>
+                          <span className="text-xs font-normal opacity-90 leading-tight">
+                            2 wrestlers · shared hour
+                          </span>
                         </Button>
                       </Link>
                     </>
                   )}
                   {isOwnProfile && (
-                    <Link href="/profile">
+                    <Link href="/profile" className="w-full sm:w-auto">
                       <Button size="lg" variant="outline" className="w-full sm:w-auto touch-manipulation">
                         <Pencil className="h-4 w-4 mr-2" />
                         Edit profile
@@ -418,8 +432,9 @@ export default async function AthleteProfilePage({
                       </div>
                     ) : null}
                     <p className="text-sm text-muted-foreground">
-                      Book lists this coach&apos;s upcoming sessions and lets you schedule a new private or partner
-                      time.{' '}
+                      Book lists upcoming sessions and new times:{' '}
+                      <span className="text-foreground/90">private</span> is one-on-one;{' '}
+                      <span className="text-foreground/90">partner</span> is two wrestlers in the same hour.{' '}
                       <Link href={`/coach/${athlete.id}`} className="text-accent font-medium underline">
                         Shareable schedule
                       </Link>{' '}
