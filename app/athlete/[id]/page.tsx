@@ -432,8 +432,8 @@ export default async function AthleteProfilePage({
               <Link href={bookHref('private')} className="w-full min-w-0 sm:flex-1">
                 <Button
                   size="lg"
-                  variant="premium"
-                  className="w-full h-auto min-h-[52px] touch-manipulation flex flex-col gap-0.5 py-3 px-4 whitespace-normal text-center"
+                  variant="outline"
+                  className="w-full h-auto min-h-[52px] touch-manipulation flex flex-col gap-0.5 py-3 px-4 whitespace-normal text-center border-border text-foreground hover:bg-muted/45 hover:text-foreground hover:border-accent/40"
                 >
                   <span className="leading-snug">Private session</span>
                   <span className="text-xs font-normal opacity-90 leading-tight">
@@ -445,7 +445,7 @@ export default async function AthleteProfilePage({
                 <Button
                   size="lg"
                   variant="outline"
-                  className="w-full h-auto min-h-[52px] touch-manipulation flex flex-col gap-0.5 py-3 px-4 whitespace-normal text-center border-accent/40"
+                  className="w-full h-auto min-h-[52px] touch-manipulation flex flex-col gap-0.5 py-3 px-4 whitespace-normal text-center border-border text-foreground hover:bg-muted/45 hover:text-foreground hover:border-accent/40"
                 >
                   <span className="leading-snug">Partner session</span>
                   <span className="text-xs font-normal opacity-90 leading-tight">
@@ -460,11 +460,6 @@ export default async function AthleteProfilePage({
               </Link>{' '}
               — share with families who don&apos;t have an account yet.
             </p>
-            <Link href={bookHref()} className="block max-w-xl">
-              <Button variant="outline" className="w-full touch-manipulation">
-                All sessions & schedule new
-              </Button>
-            </Link>
           </CardContent>
         </Card>
       )}

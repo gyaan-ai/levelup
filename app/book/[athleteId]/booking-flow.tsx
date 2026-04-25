@@ -30,6 +30,16 @@ import { cn } from '@/lib/utils';
 
 const creditsFetcher = (url: string) => fetch(url).then((r) => r.json());
 
+/** Unselected = neutral; selected = gold accent (same pattern for session-type cards). */
+function sessionTypeChoiceClass(selected: boolean) {
+  return cn(
+    'cursor-pointer transition-all border bg-background',
+    selected
+      ? 'ring-2 ring-accent border-accent bg-accent/10 shadow-sm'
+      : 'border-border shadow-none hover:border-accent/30 hover:bg-muted/20'
+  );
+}
+
 /** 8am–9pm fallback when coach has no availability */
 const TIME_SLOTS_24H = [
   '08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00',
@@ -584,7 +594,13 @@ export function BookingFlow({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div id="schedule-new-session" className="order-2 lg:order-1 lg:col-span-2 space-y-6 scroll-mt-24">
+        <div
+          id="schedule-new-session"
+          className={cn(
+            'order-2 lg:order-1 space-y-6 scroll-mt-24',
+            currentStep === 4 ? 'lg:col-span-2' : 'lg:col-span-3'
+          )}
+        >
           <Card>
             <CardContent className="pt-6">
               <div className="flex justify-between mb-2">
@@ -632,9 +648,7 @@ export function BookingFlow({
                         tabIndex={0}
                         onClick={() => toggleWrestler(w)}
                         onKeyDown={(e) => e.key === 'Enter' && toggleWrestler(w)}
-                        className={`cursor-pointer transition-all hover:shadow-md ${
-                          sel ? 'ring-2 ring-accent border-accent bg-accent/10' : 'border-border hover:border-accent/50'
-                        }`}
+                        className={sessionTypeChoiceClass(sel)}
                       >
                         <CardContent className="p-4 flex items-center gap-4">
                           <ProfileImage
@@ -695,9 +709,7 @@ export function BookingFlow({
                       tabIndex={0}
                       onClick={() => { setSessionChoice('1-on-1'); setPartnerOption(null); }}
                       onKeyDown={(e) => e.key === 'Enter' && (setSessionChoice('1-on-1'), setPartnerOption(null))}
-                      className={`cursor-pointer transition-all hover:shadow-md ${
-                        sessionChoice === '1-on-1' ? 'ring-2 ring-accent border-accent bg-accent/10' : 'border-border hover:border-accent/50'
-                      }`}
+                      className={sessionTypeChoiceClass(sessionChoice === '1-on-1')}
                     >
                       <CardContent className="p-5">
                         <h3 className="font-semibold text-lg">{firstPrivateProduct?.name ?? '1-on-1 Private Session'}</h3>
@@ -712,9 +724,10 @@ export function BookingFlow({
                       tabIndex={0}
                       onClick={() => setSessionChoice('partner')}
                       onKeyDown={(e) => e.key === 'Enter' && setSessionChoice('partner')}
-                      className={`relative cursor-pointer transition-all hover:shadow-md ${
-                        sessionChoice === 'partner' ? 'ring-2 ring-accent border-accent bg-accent/10' : 'border-border hover:border-accent/50'
-                      }`}
+                      className={cn(
+                        'relative',
+                        sessionTypeChoiceClass(sessionChoice === 'partner')
+                      )}
                     >
                       {firstPartnerProduct && !firstPrivateProduct && <Badge className="absolute top-4 right-4 bg-accent text-black text-xs">BEST VALUE</Badge>}
                       <CardContent className="p-5 pr-24">
@@ -736,9 +749,7 @@ export function BookingFlow({
                     tabIndex={0}
                     onClick={() => { setSessionChoice('sibling'); setPartnerOption(null); }}
                     onKeyDown={(e) => e.key === 'Enter' && (setSessionChoice('sibling'), setPartnerOption(null))}
-                    className={`cursor-pointer transition-all hover:shadow-md ${
-                      sessionChoice === 'sibling' ? 'ring-2 ring-accent border-accent bg-accent/10' : 'border-border hover:border-accent/50'
-                    }`}
+                    className={sessionTypeChoiceClass(sessionChoice === 'sibling')}
                   >
                     <CardContent className="p-5">
                       <h3 className="font-semibold text-lg">{firstSiblingProduct?.name ?? 'Sibling Session'}</h3>
@@ -765,9 +776,7 @@ export function BookingFlow({
                         tabIndex={0}
                         onClick={() => setPartnerOption(id)}
                         onKeyDown={(e) => e.key === 'Enter' && setPartnerOption(id)}
-                        className={`cursor-pointer transition-all hover:shadow-md ${
-                          partnerOption === id ? 'ring-2 ring-accent border-accent bg-accent/10' : 'border-border hover:border-accent/50'
-                        }`}
+                        className={sessionTypeChoiceClass(partnerOption === id)}
                       >
                         <CardContent className="p-4 flex items-start gap-4">
                           <Icon className="h-5 w-5 shrink-0 mt-0.5" />
@@ -1129,84 +1138,86 @@ export function BookingFlow({
           )}
         </div>
 
-        {/* Summary sidebar — first on small screens so totals sit above steps / pay */}
-        <div className="order-1 lg:order-2 lg:col-span-1">
-          <Card className="lg:sticky lg:top-4">
-            <CardHeader>
-              <CardTitle>Booking Summary</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center gap-3 pb-4 border-b">
-                <ProfileImage
-                  src={athlete.photo_url}
-                  alt={`${athlete.first_name} ${athlete.last_name}`}
-                  focusX={athlete.photo_focus_x}
-                  focusY={athlete.photo_focus_y}
-                  className="w-12 h-12 shrink-0"
-                  fallbackIconClassName="h-6 w-6 text-muted-foreground"
-                />
-                <div>
-                  <p className="font-medium flex items-center gap-2">
-                    <CoachSessionBadge totalSessions={athlete.total_sessions ?? 0} size="sm" />
-                    {athlete.first_name} {athlete.last_name}
-                  </p>
-                  <p className="text-sm text-muted-foreground flex items-center gap-1">
-                    <SchoolLogo school={athlete.school} size="sm" />
-                    {athlete.school}
-                  </p>
-                </div>
-              </div>
-              <div>
-                <p className="text-sm font-medium mb-2">Wrestler(s)</p>
-                {numSelected > 0 ? (
-                  <div className="space-y-1">
-                    {selectedWrestlers.map((w) => (
-                      <div key={w.id} className="flex items-center gap-2 text-sm">
-                        <User className="h-4 w-4 text-muted-foreground" />
-                        {w.first_name} {w.last_name}
-                      </div>
-                    ))}
+        {/* Summary only on final step — avoids empty “Not selected” sidebar on steps 1–3 */}
+        {currentStep === 4 && (
+          <div className="order-1 lg:order-2 lg:col-span-1">
+            <Card className="lg:sticky lg:top-4">
+              <CardHeader>
+                <CardTitle>Booking Summary</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center gap-3 pb-4 border-b">
+                  <ProfileImage
+                    src={athlete.photo_url}
+                    alt={`${athlete.first_name} ${athlete.last_name}`}
+                    focusX={athlete.photo_focus_x}
+                    focusY={athlete.photo_focus_y}
+                    className="w-12 h-12 shrink-0"
+                    fallbackIconClassName="h-6 w-6 text-muted-foreground"
+                  />
+                  <div>
+                    <p className="font-medium flex items-center gap-2">
+                      <CoachSessionBadge totalSessions={athlete.total_sessions ?? 0} size="sm" />
+                      {athlete.first_name} {athlete.last_name}
+                    </p>
+                    <p className="text-sm text-muted-foreground flex items-center gap-1">
+                      <SchoolLogo school={athlete.school} size="sm" />
+                      {athlete.school}
+                    </p>
                   </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">Not selected</p>
-                )}
-              </div>
-              <div>
-                <p className="text-sm font-medium mb-2">Session Type</p>
-                <p className="text-sm">
-                  {sessionMode === 'private' && '1-on-1 Private'}
-                  {sessionMode === 'sibling' && 'Sibling Session'}
-                  {sessionMode === 'partner-invite' && 'Partner (invite)'}
-                  {sessionMode === 'partner-open' && 'Partner (open)'}
-                  {!sessionMode && 'Not selected'}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm font-medium mb-2">Date & Time</p>
-                {selectedDate && selectedTime ? (
-                  <p className="text-sm flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    {formatEST(selectedDate, 'MMM d, yyyy')} at {formatSlotDisplay(selectedTime)}
-                  </p>
-                ) : (
-                  <p className="text-sm text-muted-foreground">Not selected</p>
-                )}
-              </div>
-              {facility && (
-                <div>
-                  <p className="text-sm font-medium mb-2">Location</p>
-                  <p className="text-sm">{facility.name}</p>
                 </div>
-              )}
-              <div className="pt-4 border-t flex justify-between">
-                <span className="font-semibold">Total</span>
-                <span className="text-xl font-bold">
-                  {sessionMode ? (hasPercentDiscount ? `$${displayPrice.toFixed(2)} (${effectivePercentOff}% off)` : `$${totalPrice.toFixed(2)}`) : '—'}
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+                <div>
+                  <p className="text-sm font-medium mb-2">Wrestler(s)</p>
+                  {numSelected > 0 ? (
+                    <div className="space-y-1">
+                      {selectedWrestlers.map((w) => (
+                        <div key={w.id} className="flex items-center gap-2 text-sm">
+                          <User className="h-4 w-4 text-muted-foreground" />
+                          {w.first_name} {w.last_name}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Not selected</p>
+                  )}
+                </div>
+                <div>
+                  <p className="text-sm font-medium mb-2">Session Type</p>
+                  <p className="text-sm">
+                    {sessionMode === 'private' && '1-on-1 Private'}
+                    {sessionMode === 'sibling' && 'Sibling Session'}
+                    {sessionMode === 'partner-invite' && 'Partner (invite)'}
+                    {sessionMode === 'partner-open' && 'Partner (open)'}
+                    {!sessionMode && 'Not selected'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-sm font-medium mb-2">Date & Time</p>
+                  {selectedDate && selectedTime ? (
+                    <p className="text-sm flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      {formatEST(selectedDate, 'MMM d, yyyy')} at {formatSlotDisplay(selectedTime)}
+                    </p>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Not selected</p>
+                  )}
+                </div>
+                {facility && (
+                  <div>
+                    <p className="text-sm font-medium mb-2">Location</p>
+                    <p className="text-sm">{facility.name}</p>
+                  </div>
+                )}
+                <div className="pt-4 border-t flex justify-between">
+                  <span className="font-semibold">Total</span>
+                  <span className="text-xl font-bold">
+                    {sessionMode ? (hasPercentDiscount ? `$${displayPrice.toFixed(2)} (${effectivePercentOff}% off)` : `$${totalPrice.toFixed(2)}`) : '—'}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
       </div>
     </div>
   );
