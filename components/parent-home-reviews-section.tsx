@@ -23,7 +23,7 @@ export function ParentHomeReviewsSection({
 
   return (
     <section className="px-4 mb-6" aria-label="Needs review">
-      <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Needs review</h2>
+      <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">Needs Review</h2>
       <div className="space-y-3">
         {sessions.map((s) => {
           const coach = s.athletes;

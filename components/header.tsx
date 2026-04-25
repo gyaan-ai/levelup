@@ -367,7 +367,6 @@ export function Header() {
                   )}
                   <Link href="/dashboard" className="text-white hover:text-accent transition-colors font-medium">Home</Link>
                   <Link href="/training" className="text-white hover:text-accent transition-colors font-medium">Training</Link>
-                  <Link href="/bookings" className="text-white hover:text-accent transition-colors font-medium">My bookings</Link>
                   <Link
                     href="/inbox"
                     className="relative flex items-center justify-center min-h-[44px] min-w-[44px] p-1.5 text-white hover:text-accent transition-colors font-medium rounded hover:bg-white/10"

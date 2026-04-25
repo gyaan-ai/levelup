@@ -12,81 +12,15 @@ import { formatEST } from '@/lib/format-date';
 import { getSessionTypeDisplay } from '@/lib/session-type-display';
 import { ensureAutoFamilyDiscountForParent } from '@/lib/family-auto-discount';
 import { checkoutAllowSavedAccountPercent } from '@/lib/checkout-promo';
-import { getUserCreditBalance } from '@/lib/credits';
-import { isSessionOpenForParentBrowse } from '@/lib/sessions';
 import { ParentHomeReviewsSection } from '@/components/parent-home-reviews-section';
-import { ParentHomeDiscoverySection } from '@/components/parent-home-discovery-section';
 import type { ReviewSessionPayload } from '@/components/parent-home-review-sheet';
-import type { DiscoverySession } from '@/components/home-discovery-session-card';
+import {
+  ParentHomeAnnouncementBanners,
+  type ParentHomeAnnouncement,
+} from '@/components/parent-home-announcement-banners';
+import { ParentHomeUpcomingSessionCard } from '@/components/parent-home-upcoming-session-card';
 
 export const dynamic = 'force-dynamic';
-
-const DISCOVERY_SELECT = `
-  id, scheduled_datetime, session_type, session_mode, join_policy,
-  current_participants, max_participants, price_per_participant, duration_minutes,
-  athlete_id, facility_id,
-  athletes:athlete_id(id, first_name, last_name, school, photo_url, photo_focus_x, photo_focus_y, average_rating, review_count),
-  facilities:facility_id(id, name),
-  session_participants(id, youth_wrestler_id, youth_wrestlers:youth_wrestler_id(id, first_name, last_name))
-`;
-
-function discoveryBookedByFamily(session: DiscoverySession, familyYouthIds: Set<string>): boolean {
-  for (const p of session.session_participants ?? []) {
-    const row = p as { youth_wrestler_id?: string | null };
-    if (row.youth_wrestler_id && familyYouthIds.has(row.youth_wrestler_id)) return true;
-  }
-  return false;
-}
-
-async function fetchDiscoverySessions(
-  admin: ReturnType<typeof createAdminClient>,
-  parentId: string,
-  nowIso: string,
-  familyYouthIds: Set<string>
-): Promise<DiscoverySession[]> {
-  const { data: follows } = await admin.from('coach_follows').select('coach_id').eq('parent_id', parentId);
-  const followedIds = [...new Set((follows ?? []).map((f: { coach_id: string }) => f.coach_id))];
-
-  const runQuery = async (restrictToCoaches: string[] | null) => {
-    let q = admin
-      .from('sessions')
-      .select(DISCOVERY_SELECT)
-      .eq('join_policy', 'public')
-      .eq('status', 'scheduled')
-      .gte('scheduled_datetime', nowIso)
-      .order('scheduled_datetime', { ascending: true })
-      .limit(80);
-    if (restrictToCoaches && restrictToCoaches.length > 0) {
-      q = q.in('athlete_id', restrictToCoaches);
-    }
-    const { data } = await q;
-    return (data ?? []) as unknown as DiscoverySession[];
-  };
-
-  const takeOpenNotBooked = (rows: DiscoverySession[], out: DiscoverySession[], seen: Set<string>) => {
-    for (const s of rows) {
-      if (out.length >= 3) break;
-      if (seen.has(s.id)) continue;
-      if (!isSessionOpenForParentBrowse(s)) continue;
-      if (discoveryBookedByFamily(s, familyYouthIds)) continue;
-      out.push(s);
-      seen.add(s.id);
-    }
-  };
-
-  const out: DiscoverySession[] = [];
-  const seen = new Set<string>();
-
-  const first = await runQuery(followedIds.length > 0 ? followedIds : null);
-  takeOpenNotBooked(first, out, seen);
-
-  if (out.length < 3) {
-    const second = await runQuery(null);
-    takeOpenNotBooked(second, out, seen);
-  }
-
-  return out.slice(0, 3);
-}
 
 export default async function HomePage() {
   const headersList = await headers();
@@ -118,8 +52,6 @@ export default async function HomePage() {
     await ensureAutoFamilyDiscountForParent(admin, user.id, user.email);
   }
 
-  const creditBalance = await getUserCreditBalance(user.id, tenant.slug);
-
   const youthWrestlerIds = await getParentYouthWrestlerIds(supabase, user.id);
   const { data: youthWrestlersRaw } = youthWrestlerIds.length > 0
     ? await supabase.from('youth_wrestlers').select('*').in('id', youthWrestlerIds).order('created_at', { ascending: false })
@@ -141,12 +73,16 @@ export default async function HomePage() {
         .from('sessions')
         .select(`
           id,
+          parent_id,
+          athlete_id,
+          partner_invite_code,
+          join_policy,
           scheduled_datetime,
           status,
           session_type,
           session_mode,
           duration_minutes,
-          athletes:athlete_id(id, first_name, last_name),
+          athletes:athlete_id(id, first_name, last_name, phone),
           facilities:facility_id(id, name),
           session_participants(youth_wrestler_id, youth_wrestlers(first_name, last_name))
         `)
@@ -156,6 +92,39 @@ export default async function HomePage() {
         .order('scheduled_datetime', { ascending: true })
         .limit(100)
     : { data: [] };
+
+  let homeAnnouncements: ParentHomeAnnouncement[] = [];
+  try {
+    const { data: announcementRows } = await supabase
+      .from('parent_announcements')
+      .select('id, announcement_type, reference_id, headline, cta_label, cta_path, expires_at')
+      .gt('expires_at', nowISO)
+      .order('created_at', { ascending: false })
+      .limit(20);
+    const { data: dismissalRows } = await supabase
+      .from('parent_announcement_dismissals')
+      .select('announcement_type, reference_id')
+      .eq('parent_id', user.id);
+    const dismissed = new Set(
+      (dismissalRows ?? []).map((d) => `${d.announcement_type}:${d.reference_id}`)
+    );
+    homeAnnouncements = (announcementRows ?? [])
+      .filter(
+        (a) =>
+          !dismissed.has(`${a.announcement_type}:${a.reference_id}`) &&
+          (a.announcement_type === 'new_coach' || a.announcement_type === 'new_location')
+      )
+      .map((a) => ({
+        id: a.id,
+        announcement_type: a.announcement_type as 'new_coach' | 'new_location',
+        reference_id: a.reference_id,
+        headline: a.headline,
+        cta_label: a.cta_label ?? 'View',
+        cta_path: a.cta_path,
+      }));
+  } catch {
+    homeAnnouncements = [];
+  }
 
   const { data: reviewIdRows } = await supabase
     .from('reviews')
@@ -273,18 +242,20 @@ export default async function HomePage() {
     });
   }
 
-  const discoverySessions =
-    (upcomingSessions ?? []).length === 0
-      ? await fetchDiscoverySessions(admin, user.id, nowISO, youthWrestlerIdSet)
-      : [];
-
   type UpcomingRow = {
     id: string;
+    parent_id?: string | null;
+    athlete_id?: string | null;
+    partner_invite_code?: string | null;
+    join_policy?: string | null;
     scheduled_datetime: string;
     session_type?: string | null;
     session_mode?: string | null;
     duration_minutes?: number | null;
-    athletes?: { first_name?: string; last_name?: string } | null;
+    athletes?:
+      | { first_name?: string; last_name?: string; phone?: string | null }
+      | { first_name?: string; last_name?: string; phone?: string | null }[]
+      | null;
     facilities?: { name?: string } | null;
     session_participants?: Array<{
       youth_wrestler_id?: string | null;
@@ -292,37 +263,17 @@ export default async function HomePage() {
     }>;
   };
 
-  const rawFirst = userData?.first_name;
-  const parentFirstName =
-    typeof rawFirst === 'string' &&
-    rawFirst.trim().length > 0 &&
-    rawFirst.trim().toLowerCase() !== 'null'
-      ? rawFirst.trim()
-      : null;
-
   return (
     <div className="min-h-screen pb-24">
-      {creditBalance > 0 && (
-        <Link
-          href="/wallet"
-          className="block mx-4 mt-4 mb-2 rounded-xl bg-[#D4AF37] px-4 py-3 text-black"
-        >
-          <p className="text-sm font-medium">
-            💰 You have ${creditBalance.toFixed(2)} in Guild credit — applied automatically at checkout
-          </p>
-        </Link>
-      )}
-
       <div className="px-4 pt-6 pb-2">
-        <h1 className="text-sm font-medium text-zinc-500 uppercase tracking-wide">Home</h1>
-        <p className="text-2xl font-bold text-foreground mt-1">
-          {parentFirstName ? `Hey ${parentFirstName} 👋` : 'Hey there 👋'}
-        </p>
+        <h1 className="text-xl font-bold text-foreground">Home</h1>
       </div>
 
-      <section className="px-4 mb-6" aria-label="Upcoming training">
+      <ParentHomeAnnouncementBanners items={homeAnnouncements} />
+
+      <section className="px-4 mb-6" aria-label="Upcoming sessions">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
-          Upcoming training
+          Upcoming Sessions
         </h2>
         {(upcomingSessions ?? []).length > 0 ? (
           <div className="space-y-3">
@@ -331,6 +282,7 @@ export default async function HomePage() {
               const coach = Array.isArray(s.athletes) ? s.athletes[0] : s.athletes;
               const facility = Array.isArray(s.facilities) ? s.facilities[0] : s.facilities;
               const coachName = coach ? [coach.first_name, coach.last_name].filter(Boolean).join(' ').trim() : 'Coach';
+              const coachFirstName = coach?.first_name?.trim() || 'Coach';
               const typeLabel = getSessionTypeDisplay(s.session_type ?? null, s.session_mode ?? null).label;
               const dt = new Date(s.scheduled_datetime);
               const dur = s.duration_minutes;
@@ -347,35 +299,33 @@ export default async function HomePage() {
                   : kidNames.length === 1
                     ? `${kidNames[0]} registered`
                     : `${kidNames.join(', ')} registered`;
+              const pid = s.parent_id ?? null;
+              const aid = s.athlete_id ?? null;
+              const isParentInitiated = Boolean(pid && aid && pid === user.id && pid !== aid);
+              const athleteFirstName = kidNames[0]?.split(/\s+/)[0] || 'your athlete';
+              const whenLine = `${formatEST(dt, 'EEE, MMM d')} · ${formatEST(dt, 'h:mm a')}`;
+              const detailLine = `${typeLabel}${facility?.name ? ` · ${facility.name}` : ''}${dur != null && dur > 0 ? ` · ${dur} min` : ''}`;
+              const coachKidsLine = `${coachName}${kidsLine ? ` · ${kidsLine}` : ''}`;
 
               return (
-                <div
+                <ParentHomeUpcomingSessionCard
                   key={s.id}
-                  className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 space-y-2"
-                >
-                  <p className="font-semibold text-foreground">
-                    {formatEST(dt, 'EEE, MMM d')} · {formatEST(dt, 'h:mm a')}
-                  </p>
-                  <p className="text-sm text-zinc-400">
-                    {typeLabel}
-                    {facility?.name ? ` · ${facility.name}` : ''}
-                    {dur != null && dur > 0 ? ` · ${dur} min` : ''}
-                  </p>
-                  <p className="text-sm text-zinc-300">
-                    {coachName}
-                    {kidsLine ? ` · ${kidsLine}` : ''}
-                  </p>
-                </div>
+                  sessionId={s.id}
+                  whenLine={whenLine}
+                  detailLine={detailLine}
+                  coachKidsLine={coachKidsLine}
+                  isParentInitiated={isParentInitiated}
+                  partnerInviteCode={s.partner_invite_code}
+                  coachPhone={coach?.phone ?? null}
+                  coachFirstName={coachFirstName}
+                  athleteFirstName={athleteFirstName}
+                />
               );
             })}
           </div>
         ) : (
           <div className="rounded-xl border border-dashed border-zinc-800 bg-zinc-900/20 p-6 text-center">
-            <p className="text-zinc-400 mb-4">No upcoming sessions</p>
-            <Button className="w-full min-h-[48px] bg-[#D4AF37] hover:bg-[#c9a432] text-black font-semibold" asChild>
-              <Link href="/training">Find Training</Link>
-            </Button>
-            <ParentHomeDiscoverySection sessions={discoverySessions} parentWrestlerIds={youthWrestlerIds} />
+            <p className="text-zinc-400">No upcoming sessions</p>
           </div>
         )}
       </section>
