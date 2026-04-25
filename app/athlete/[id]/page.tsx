@@ -366,6 +366,15 @@ export default async function AthleteProfilePage({
                 <p className="text-sm font-medium text-accent/90">{nextOpenLine}</p>
               )}
 
+              {canInteractAsParentOrAdmin && coachPhoneForContact ? (
+                <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 max-w-lg">
+                  <ContactInfoRow label="Coach cell" name={athlete.first_name} phone={coachPhoneForContact} />
+                  <p className="text-xs text-muted-foreground mt-2">
+                    On your phone, use the message icon to open your texting app.
+                  </p>
+                </div>
+              ) : null}
+
               {/* Certification Badges */}
               <div className="flex flex-wrap gap-2">
                 {isSafeSportCertified && (
@@ -447,14 +456,6 @@ export default async function AthleteProfilePage({
                 </Button>
               </Link>
             </div>
-            {coachPhoneForContact ? (
-              <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 max-w-lg">
-                <ContactInfoRow label="Coach cell" name={athlete.first_name} phone={coachPhoneForContact} />
-                <p className="text-xs text-muted-foreground mt-2">
-                  On your phone, use the message icon to open your texting app.
-                </p>
-              </div>
-            ) : null}
             <p className="text-sm text-muted-foreground max-w-xl">
               <Link href={`/coach/${athlete.id}`} className="text-accent font-medium underline">
                 Public schedule link
