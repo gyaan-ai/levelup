@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import useSWR from 'swr';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Calendar } from '@/components/ui/calendar';
 import Link from 'next/link';
-import { User, Clock, CheckCircle, Link2, Users, UserCircle, Wallet, Sparkles } from 'lucide-react';
+import { User, Clock, CheckCircle, Link2, Users, Wallet, Sparkles } from 'lucide-react';
 import { BackLink } from '@/components/back-link';
 import { SchoolLogo } from '@/components/school-logo';
 import { CoachSessionBadge } from '@/components/coach-session-badge';
@@ -24,6 +24,7 @@ import { getSessionPrice } from '@/lib/sessions';
 import { COACH_REVENUE_FRACTION } from '@/lib/pricing';
 import { formatSlotDisplay, getDayOfWeek } from '@/lib/availability';
 import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
 
 const creditsFetcher = (url: string) => fetch(url).then((r) => r.json());
 
@@ -123,7 +124,7 @@ export function BookingFlow({
     return [];
   });
   const [sessionChoice, setSessionChoice] = useState<'1-on-1' | 'partner' | 'sibling' | null>(null);
-  const [partnerOption, setPartnerOption] = useState<'invite' | 'open' | 'solo' | null>(null);
+  const [partnerOption, setPartnerOption] = useState<'invite' | 'open' | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(undefined);
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -148,7 +149,6 @@ export function BookingFlow({
     : sessionChoice === 'sibling' ? 'sibling'
     : sessionChoice === 'partner' && partnerOption === 'invite' ? 'partner-invite'
     : sessionChoice === 'partner' && partnerOption === 'open' ? 'partner-open'
-    : sessionChoice === 'partner' && partnerOption === 'solo' ? 'partner-invite' // same as invite for now
     : null;
 
   // Use product pricing if available, fall back to tenant pricing
@@ -350,6 +350,44 @@ export function BookingFlow({
     );
   };
 
+  /** Min/max athletes on the final review step (and enforced before pay). */
+  const wrestlerBounds = useMemo(() => {
+    if (!sessionMode) return { min: 1, max: Math.max(1, youthWrestlers.length) };
+    if (sessionMode === 'private') return { min: 1, max: 1 };
+    if (sessionMode === 'partner-invite' || sessionMode === 'partner-open') {
+      return { min: 1, max: Math.min(2, Math.max(1, youthWrestlers.length)) };
+    }
+    if (sessionMode === 'sibling') {
+      return { min: 2, max: Math.max(2, youthWrestlers.length) };
+    }
+    return { min: 1, max: Math.max(1, youthWrestlers.length) };
+  }, [sessionMode, youthWrestlers.length]);
+
+  const toggleWrestlerOnReview = (w: YouthWrestler) => {
+    setSelectedWrestlers((prev) => {
+      const sel = prev.some((x) => x.id === w.id);
+      if (sel) {
+        if (prev.length <= wrestlerBounds.min) return prev;
+        return prev.filter((x) => x.id !== w.id);
+      }
+      if (prev.length >= wrestlerBounds.max) return prev;
+      return [...prev, w];
+    });
+  };
+
+  useEffect(() => {
+    if (currentStep !== 4 || !sessionMode) return;
+    if (sessionMode === 'private' && selectedWrestlers.length > 1) {
+      setSelectedWrestlers((prev) => (prev[0] ? [prev[0]] : prev.slice(0, 1)));
+    }
+    if (
+      (sessionMode === 'partner-invite' || sessionMode === 'partner-open') &&
+      selectedWrestlers.length > 2
+    ) {
+      setSelectedWrestlers((prev) => prev.slice(0, 2));
+    }
+  }, [currentStep, sessionMode, selectedWrestlers.length]);
+
   const handleContinue = () => {
     if (currentStep === 1 && numSelected > 0) setCurrentStep(2);
     else if (currentStep === 2) {
@@ -430,6 +468,17 @@ export function BookingFlow({
       alert('Please complete all steps.');
       return;
     }
+    const n = selectedWrestlers.length;
+    if (n < wrestlerBounds.min || n > wrestlerBounds.max) {
+      alert(
+        sessionMode === 'sibling'
+          ? `Sibling sessions need at least ${wrestlerBounds.min} wrestlers selected.`
+          : sessionMode === 'private'
+            ? 'Private sessions include one wrestler only.'
+            : `Select between ${wrestlerBounds.min} and ${wrestlerBounds.max} wrestler(s) for this session.`
+      );
+      return;
+    }
     if (
       !checkoutUsesSavedAccountDiscount &&
       !willUseFreeSession &&
@@ -451,7 +500,7 @@ export function BookingFlow({
           youthWrestlerIds: selectedWrestlers.map((w) => w.id),
           sessionMode,
           joinPolicy:
-            partnerOption === 'invite' ? 'invite_only' : partnerOption === 'open' ? 'public' : partnerOption === 'solo' ? 'private' : undefined,
+            partnerOption === 'invite' ? 'invite_only' : partnerOption === 'open' ? 'public' : undefined,
           scheduledDate: dateStr,
           scheduledTime: is24h(selectedTime) ? selectedTime : timeTo24h(selectedTime),
           totalPrice,
@@ -708,7 +757,6 @@ export function BookingFlow({
                     {[
                       { id: 'invite' as const, Icon: Link2, title: 'Invite only', desc: 'Share a link with someone you know. Only they can pay & register.', sub: "They'll pay when they use the link." },
                       { id: 'open' as const, Icon: Users, title: 'Public', desc: 'Anyone can find this session and pay to register.', sub: 'Shows in Find training and Group & partner as a join-in option.' },
-                      { id: 'solo' as const, Icon: UserCircle, title: 'Private (train solo)', desc: 'No one else can join. Just you and the coach.', sub: "You'll only pay for your spot." },
                     ].map(({ id, Icon, title, desc, sub }) => (
                       <Card
                         key={id}
@@ -836,9 +884,57 @@ export function BookingFlow({
                     </span>
                   </div>
                 </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Wrestler(s)</p>
-                  <p className="mt-1">{selectedWrestlers.map((w) => `${w.first_name} ${w.last_name}`).join(', ')}</p>
+                <div className="rounded-lg border p-4 space-y-3">
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Who&apos;s attending?</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Select every wrestler included in this booking. Total updates automatically
+                      {sessionMode === 'private'
+                        ? ' (private = one athlete).'
+                        : sessionMode === 'sibling'
+                          ? ` (sibling = at least ${wrestlerBounds.min}).`
+                          : sessionMode === 'partner-invite' || sessionMode === 'partner-open'
+                            ? ' (partner = up to two from your account).'
+                            : '.'}
+                    </p>
+                  </div>
+                  <div className="space-y-3">
+                    {youthWrestlers.map((w) => {
+                      const isSelected = selectedWrestlers.some((x) => x.id === w.id);
+                      const atMax = selectedWrestlers.length >= wrestlerBounds.max;
+                      const atMinRemove =
+                        isSelected && selectedWrestlers.length <= wrestlerBounds.min;
+                      const disabled = (!isSelected && atMax) || atMinRemove;
+                      return (
+                        <label
+                          key={w.id}
+                          className={`flex items-center gap-3 rounded-md border px-3 py-2.5 cursor-pointer touch-manipulation ${
+                            disabled ? 'opacity-60 cursor-not-allowed' : 'hover:bg-muted/40'
+                          }`}
+                        >
+                          <Checkbox
+                            checked={isSelected}
+                            disabled={disabled}
+                            onCheckedChange={() => {
+                              if (!disabled) toggleWrestlerOnReview(w);
+                            }}
+                            className="shrink-0"
+                          />
+                          <ProfileImage
+                            src={w.photo_url}
+                            alt=""
+                            focusX={w.photo_focus_x}
+                            focusY={w.photo_focus_y}
+                            className="w-10 h-10 shrink-0"
+                            fallbackIconClassName="h-5 w-5 text-muted-foreground"
+                          />
+                          <span className="text-sm font-medium">
+                            {w.first_name} {w.last_name}
+                          </span>
+                        </label>
+                      );
+                    })}
+                  </div>
                 </div>
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Session Type</p>
@@ -975,14 +1071,25 @@ export function BookingFlow({
                       : ` You'll pay $${displayPrice.toFixed(2)}.`}
                   </p>
                 )}
-                {(sessionMode === 'partner-invite' || sessionMode === 'partner-open') && !willUseFreeSession && (
+                {(sessionMode === 'partner-invite' || sessionMode === 'partner-open') &&
+                  !willUseFreeSession &&
+                  numSelected === 1 && (
                   <p className="text-sm text-muted-foreground">
-                    Second spot: partner will pay $50 when they join.
+                    Second spot: another family pays $
+                    {(firstPartnerProduct?.parent_price ?? partnerPerPersonFallback).toFixed(0)} when they join.
                   </p>
                 )}
                 <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mt-4">
                   <Button variant="outline" onClick={handleBack} className="flex-1 w-full sm:w-auto">Back</Button>
-                  <Button onClick={handlePay} disabled={loading} className="flex-1 w-full sm:w-auto">
+                  <Button
+                    onClick={handlePay}
+                    disabled={
+                      loading ||
+                      selectedWrestlers.length < wrestlerBounds.min ||
+                      selectedWrestlers.length > wrestlerBounds.max
+                    }
+                    className="flex-1 w-full sm:w-auto"
+                  >
                     {loading
                       ? 'Booking…'
                       : willUseFreeSession

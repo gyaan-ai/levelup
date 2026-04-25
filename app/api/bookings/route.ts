@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
       facilityId: string | null;
       youthWrestlerIds: string[];
       sessionMode: SessionMode;
-      partnerOption?: 'invite' | 'open' | 'solo';
+      partnerOption?: 'invite' | 'open';
       joinPolicy?: JoinPolicy;
       scheduledDate: string;
       scheduledTime: string;
