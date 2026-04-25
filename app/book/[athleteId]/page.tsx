@@ -201,6 +201,9 @@ export default async function BookPage({
     .select(
       `
       id,
+      parent_id,
+      athlete_id,
+      athlete_paid,
       scheduled_datetime,
       session_type,
       session_mode,
@@ -219,7 +222,23 @@ export default async function BookPage({
     .order('scheduled_datetime', { ascending: true })
     .limit(200);
 
-  const sessionsBase = (coachSessionRows ?? []) as Omit<CoachSessionForBookList, 'session_participants'>[];
+  /** Book-a-coach + Stripe: a session row is created before checkout so metadata can reference it. Hide those unpaid shells here so parents don't see a "session" until payment (or full credit) completes. Coach-posted rows use parent_id === athlete_id. */
+  const coachSessionRowsFiltered = (coachSessionRows ?? []).filter((row) => {
+    const r = row as {
+      parent_id?: string | null;
+      athlete_id?: string | null;
+      athlete_paid?: boolean | null;
+      current_participants?: number | null;
+    };
+    const pid = r.parent_id ?? null;
+    const aid = r.athlete_id ?? null;
+    if (!pid || !aid || pid === aid) return true;
+    if (r.athlete_paid === true) return true;
+    if ((r.current_participants ?? 0) > 0) return true;
+    return false;
+  });
+
+  const sessionsBase = coachSessionRowsFiltered as Omit<CoachSessionForBookList, 'session_participants'>[];
   const coachSessionIds = sessionsBase.map((s) => s.id);
   const participantsBySessionId = new Map<string, unknown[]>();
   if (coachSessionIds.length > 0) {
