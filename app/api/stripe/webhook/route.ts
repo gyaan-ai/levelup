@@ -511,9 +511,20 @@ export async function POST(req: NextRequest) {
 
         const { data: sessBefore } = await supabase
           .from('sessions')
-          .select('current_participants, athlete_id, scheduled_datetime')
+          .select('status, current_participants, athlete_id, scheduled_datetime')
           .eq('id', sessionId)
           .single();
+        const sessStatus = (sessBefore as { status?: string } | null)?.status;
+        if (sessStatus === 'cancelled') {
+          console.warn(
+            'Stripe webhook: deferred booking payment for shell previously auto-cancelled; reactivating',
+            sessionId
+          );
+          await supabase
+            .from('sessions')
+            .update({ status: 'scheduled', updated_at: new Date().toISOString() })
+            .eq('id', sessionId);
+        }
         let currentCount =
           (sessBefore as { current_participants?: number } | null)?.current_participants ?? 0;
 
