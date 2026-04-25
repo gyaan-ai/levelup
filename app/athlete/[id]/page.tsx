@@ -3,7 +3,7 @@ import { headers } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
 
 export const dynamic = 'force-dynamic';
-import { createAdminClient } from '@/lib/supabase/admin';
+import { createAdminClientIfAvailable } from '@/lib/supabase/admin';
 import { getTenantByDomain } from '@/config/tenants';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -20,7 +20,11 @@ import { ProfileImage } from '@/components/profile-image';
 import { isBackgroundCheckValidForDisplay, isSafeSportValidForDisplay } from '@/lib/athletes';
 import { getSchoolBadgeColors, schoolBadgeClassName } from '@/lib/school-logos';
 import { summarizeWeeklyAvailability, type WeeklyAvailabilityRow } from '@/lib/availability';
-import { COACH_PROFILE_PUBLIC_RATE_ROWS, getCoachDisplayedParentRates } from '@/lib/coach-session-pricing';
+import {
+  COACH_PROFILE_PUBLIC_RATE_ROWS,
+  COACH_SESSION_FALLBACK_USD,
+  getCoachDisplayedParentRates,
+} from '@/lib/coach-session-pricing';
 import { ContactInfoRow } from '@/components/contact-info-row';
 import { hasMinPhoneDigits } from '@/lib/phone';
 import { getEffectiveFilledCount } from '@/lib/sessions';
@@ -171,9 +175,6 @@ export default async function AthleteProfilePage({
     .eq('athlete_id', id);
   const availabilitySummaryLines = summarizeWeeklyAvailability((weeklyAvailRows ?? []) as WeeklyAvailabilityRow[]);
 
-  const admin = createAdminClient(tenantSlug);
-  const nowISO = new Date().toISOString();
-
   let parentWrestlerIds: string[] = [];
   if (user && (isParent || isAdmin)) {
     const { data: primaryRows } = await supabase
@@ -190,9 +191,17 @@ export default async function AthleteProfilePage({
     parentWrestlerIds = [...new Set([...primaryIds, ...linkedIds])];
   }
 
-  const { data: upcomingSessionsRaw } = await admin
-    .from('sessions')
-    .select(`
+  const admin = createAdminClientIfAvailable(tenantSlug);
+  const nowISO = new Date().toISOString();
+
+  let upcomingSessionsOpen: CoachProfileOpenSessionRow[] = [];
+  let nextOpenLine: string | null = null;
+  let coachPhoneForContact: string | null = null;
+
+  if (admin) {
+    const { data: upcomingSessionsRaw } = await admin
+      .from('sessions')
+      .select(`
       id,
       parent_id,
       athlete_id,
@@ -208,73 +217,79 @@ export default async function AthleteProfilePage({
       duration_minutes,
       facilities(name)
     `)
-    .eq('athlete_id', id)
-    .eq('status', 'scheduled')
-    .in('join_policy', ['public', 'invite_only'])
-    .gte('scheduled_datetime', nowISO)
-    .order('scheduled_datetime', { ascending: true })
-    .limit(40);
+      .eq('athlete_id', id)
+      .eq('status', 'scheduled')
+      .in('join_policy', ['public', 'invite_only'])
+      .gte('scheduled_datetime', nowISO)
+      .order('scheduled_datetime', { ascending: true })
+      .limit(40);
 
-  /** Hide parent-booking shells until paid (same as book-coach list). */
-  const sessionsBase = (upcomingSessionsRaw ?? []).filter((row) => {
-    const r = row as {
-      parent_id?: string | null;
-      athlete_id?: string | null;
-      athlete_paid?: boolean | null;
-      current_participants?: number | null;
-    };
-    const pid = r.parent_id ?? null;
-    const aid = r.athlete_id ?? null;
-    if (!pid || !aid || pid === aid) return true;
-    if (r.athlete_paid === true) return true;
-    if ((r.current_participants ?? 0) > 0) return true;
-    return false;
-  });
-  const sessionIds = sessionsBase.map((s) => (s as { id: string }).id);
-  const participantsBySessionId = new Map<string, unknown[]>();
-  if (sessionIds.length > 0) {
-    const { data: partRows } = await admin
-      .from('session_participants')
-      .select('session_id')
-      .in('session_id', sessionIds);
-    for (const raw of partRows ?? []) {
-      const sid = (raw as { session_id?: string }).session_id;
-      if (!sid) continue;
-      const list = participantsBySessionId.get(sid) ?? [];
-      list.push(raw);
-      participantsBySessionId.set(sid, list);
+    /** Hide parent-booking shells until paid (same as book-coach list). */
+    const sessionsBase = (upcomingSessionsRaw ?? []).filter((row) => {
+      const r = row as {
+        parent_id?: string | null;
+        athlete_id?: string | null;
+        athlete_paid?: boolean | null;
+        current_participants?: number | null;
+      };
+      const pid = r.parent_id ?? null;
+      const aid = r.athlete_id ?? null;
+      if (!pid || !aid || pid === aid) return true;
+      if (r.athlete_paid === true) return true;
+      if ((r.current_participants ?? 0) > 0) return true;
+      return false;
+    });
+    const sessionIds = sessionsBase.map((s) => (s as { id: string }).id);
+    const participantsBySessionId = new Map<string, unknown[]>();
+    if (sessionIds.length > 0) {
+      const { data: partRows } = await admin
+        .from('session_participants')
+        .select('session_id')
+        .in('session_id', sessionIds);
+      for (const raw of partRows ?? []) {
+        const sid = (raw as { session_id?: string }).session_id;
+        if (!sid) continue;
+        const list = participantsBySessionId.get(sid) ?? [];
+        list.push(raw);
+        participantsBySessionId.set(sid, list);
+      }
+    }
+
+    upcomingSessionsOpen = sessionsBase
+      .map((row) => {
+        const sessionRowId = (row as { id: string }).id;
+        return {
+          ...(row as unknown as CoachProfileOpenSessionRow),
+          session_participants: participantsBySessionId.get(sessionRowId) ?? [],
+        };
+      })
+      .filter((s) => {
+        const max = s.max_participants ?? 1;
+        const filled = getEffectiveFilledCount(s);
+        return filled < max;
+      })
+      .slice(0, 12);
+
+    const nextOpenSession = upcomingSessionsOpen[0] as { scheduled_datetime?: string } | undefined;
+    nextOpenLine =
+      nextOpenSession?.scheduled_datetime != null
+        ? `Next: ${formatEST(new Date(nextOpenSession.scheduled_datetime), 'EEE, MMM d')} · ${formatEST(new Date(nextOpenSession.scheduled_datetime), 'h:mm a')}`
+        : null;
+
+    if (canInteractAsParentOrAdmin) {
+      const { data: coachUserRow } = await admin.from('users').select('phone').eq('id', id).maybeSingle();
+      const raw = (coachUserRow as { phone?: string | null } | null)?.phone;
+      coachPhoneForContact = raw && hasMinPhoneDigits(raw) ? raw : null;
     }
   }
 
-  const upcomingSessionsOpen: CoachProfileOpenSessionRow[] = sessionsBase
-    .map((row) => {
-      const id = (row as { id: string }).id;
-      return {
-        ...(row as unknown as CoachProfileOpenSessionRow),
-        session_participants: participantsBySessionId.get(id) ?? [],
+  const displayedParentRates = admin
+    ? await getCoachDisplayedParentRates(admin, id)
+    : {
+        private: COACH_SESSION_FALLBACK_USD.private,
+        partner: COACH_SESSION_FALLBACK_USD.partner,
+        small_group: COACH_SESSION_FALLBACK_USD.small_group,
       };
-    })
-    .filter((s) => {
-      const max = s.max_participants ?? 1;
-      const filled = getEffectiveFilledCount(s);
-      return filled < max;
-    })
-    .slice(0, 12);
-
-  const nextOpenSession = upcomingSessionsOpen[0] as { scheduled_datetime?: string } | undefined;
-  const nextOpenLine =
-    nextOpenSession?.scheduled_datetime != null
-      ? `Next: ${formatEST(new Date(nextOpenSession.scheduled_datetime), 'EEE, MMM d')} · ${formatEST(new Date(nextOpenSession.scheduled_datetime), 'h:mm a')}`
-      : null;
-
-  let coachPhoneForContact: string | null = null;
-  if (canInteractAsParentOrAdmin) {
-    const { data: coachUserRow } = await admin.from('users').select('phone').eq('id', id).maybeSingle();
-    const raw = (coachUserRow as { phone?: string | null } | null)?.phone;
-    coachPhoneForContact = raw && hasMinPhoneDigits(raw) ? raw : null;
-  }
-
-  const displayedParentRates = await getCoachDisplayedParentRates(admin, id);
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-5xl">

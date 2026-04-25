@@ -263,10 +263,21 @@ export default async function HomePage() {
     }>;
   };
 
+  const firstName = userData?.first_name?.trim();
+  const hasUpcoming = (upcomingSessions ?? []).length > 0;
+
   return (
     <div className="min-h-screen pb-24">
       <div className="px-4 pt-6 pb-2">
         <h1 className="text-xl font-bold text-foreground">Home</h1>
+        <p className="mt-1.5 text-sm text-muted-foreground leading-relaxed">
+          {firstName
+            ? `${firstName}, your upcoming sessions and reminders show up here.`
+            : 'Your upcoming sessions and reminders show up here.'}{' '}
+          <span className="text-zinc-500">
+            New coach or location alerts appear above when we post them.
+          </span>
+        </p>
       </div>
 
       <ParentHomeAnnouncementBanners items={homeAnnouncements} />
@@ -324,8 +335,22 @@ export default async function HomePage() {
             })}
           </div>
         ) : (
-          <div className="rounded-xl border border-dashed border-zinc-800 bg-zinc-900/20 p-6 text-center">
-            <p className="text-zinc-400">No upcoming sessions</p>
+          <div className="rounded-xl border border-dashed border-zinc-800 bg-zinc-900/20 p-6 text-center space-y-4">
+            <div className="space-y-1">
+              <p className="text-zinc-300 font-medium">No upcoming sessions</p>
+              <p className="text-sm text-zinc-500 max-w-md mx-auto">
+                When you book or join a session, it will appear here. Use Training to find coaches and open
+                sessions.
+              </p>
+            </div>
+            <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
+              <Button variant="outline" className="min-h-[44px] border-zinc-700" asChild>
+                <Link href="/bookings">My bookings</Link>
+              </Button>
+              <Button variant="outline" className="min-h-[44px] border-zinc-700" asChild>
+                <Link href="/my-wrestlers">My wrestlers</Link>
+              </Button>
+            </div>
           </div>
         )}
       </section>
@@ -339,13 +364,22 @@ export default async function HomePage() {
         }))}
       />
 
-      <section className="px-4 pb-8">
+      <section className="px-4 pb-8 space-y-3">
         <Button
           className="w-full min-h-[52px] bg-[#D4AF37] hover:bg-[#c9a432] text-black font-semibold text-base"
           asChild
         >
-          <Link href="/training">Find Training →</Link>
+          <Link href="/training">{hasUpcoming ? 'Find more training →' : 'Find training →'}</Link>
         </Button>
+        {!hasUpcoming ? (
+          <p className="text-center text-xs text-zinc-500">
+            Tip: open sessions you can add to cart also live under{' '}
+            <Link href="/find-training" className="text-[#D4AF37]/90 underline underline-offset-2">
+              Find training
+            </Link>
+            .
+          </p>
+        ) : null}
       </section>
     </div>
   );
