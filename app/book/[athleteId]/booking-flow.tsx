@@ -145,7 +145,6 @@ export function BookingFlow({
   const [bookingPromoPercent, setBookingPromoPercent] = useState<number | null>(null);
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
-  const [freeEntitlements, setFreeEntitlements] = useState({ free1on1: 0, free2Athlete: 0 });
   const [initialSlotSeeded, setInitialSlotSeeded] = useState(false);
   const [useCredits, setUseCredits] = useState(true);
   const [attendingPickerOpen, setAttendingPickerOpen] = useState(false);
@@ -225,14 +224,10 @@ export function BookingFlow({
   const isPartner = sessionChoice === 'partner';
   const needsPartnerOption = isPartner && partnerOption === null && oneWrestler;
 
-  const willUseFreeSession =
-    (sessionChoice === '1-on-1' && freeEntitlements.free1on1 > 0) ||
-    ((sessionChoice === 'partner' || sessionChoice === 'sibling') && freeEntitlements.free2Athlete > 0);
-
   const { data: creditsData } = useSWR('/api/credits', creditsFetcher);
   const creditBalance = typeof creditsData?.balance === 'number' ? creditsData.balance : 0;
   const creditsToApplyBooking =
-    useCredits && !willUseFreeSession ? Math.min(creditBalance, displayPrice) : 0;
+    useCredits ? Math.min(creditBalance, displayPrice) : 0;
   const amountAfterCredits = Math.max(0, displayPrice - creditsToApplyBooking);
 
   useEffect(() => {
@@ -256,11 +251,6 @@ export function BookingFlow({
   useEffect(() => {
     (async () => {
       try {
-        const entRes = await fetch('/api/early-adopter-entitlements');
-        if (entRes.ok) {
-          const d = await entRes.json();
-          setFreeEntitlements({ free1on1: d.free1on1 ?? 0, free2Athlete: d.free2Athlete ?? 0 });
-        }
         if (checkoutUsesSavedAccountDiscount) {
           const pctRes = await fetch('/api/account/percentage-discount');
           if (pctRes.ok) {
@@ -498,7 +488,6 @@ export function BookingFlow({
     }
     if (
       !checkoutUsesSavedAccountDiscount &&
-      !willUseFreeSession &&
       promoCode.trim() &&
       !bookingPromoApplied
     ) {
@@ -709,11 +698,7 @@ export function BookingFlow({
                         <h3 className="font-semibold text-lg">{firstPrivateProduct?.name ?? '1-on-1 Private Session'}</h3>
                         <p className="text-muted-foreground text-sm mb-2">Just your wrestler and the coach—no second athlete.</p>
                         <p className="text-2xl font-bold">
-                          {freeEntitlements.free1on1 > 0 ? (
-                            <span className="text-accent">Free session included</span>
-                          ) : (
-                            `$${firstPrivateProduct ? firstPrivateProduct.parent_price.toFixed(0) : tenantPricing.oneOnOne}`
-                          )}
+                          ${firstPrivateProduct ? firstPrivateProduct.parent_price.toFixed(0) : tenantPricing.oneOnOne}
                         </p>
                       </CardContent>
                     </Card>
@@ -733,11 +718,8 @@ export function BookingFlow({
                           Two athletes, one coach—you line up the second wrestler (invite someone or post an open spot).
                         </p>
                         <p className="text-2xl font-bold">
-                          {freeEntitlements.free2Athlete > 0 ? (
-                            <span className="text-accent">Free session included</span>
-                          ) : (
-                            <>${firstPartnerProduct ? firstPartnerProduct.parent_price.toFixed(0) : partnerPerPersonFallback} <span className="text-base font-normal text-muted-foreground">per person</span></>
-                          )}
+                          ${firstPartnerProduct ? firstPartnerProduct.parent_price.toFixed(0) : partnerPerPersonFallback}{' '}
+                          <span className="text-base font-normal text-muted-foreground">per person</span>
                         </p>
                       </CardContent>
                     </Card>
@@ -757,11 +739,8 @@ export function BookingFlow({
                       <h3 className="font-semibold text-lg">{firstSiblingProduct?.name ?? 'Sibling Session'}</h3>
                       <p className="text-muted-foreground text-sm mb-2">Train together with one coach</p>
                       <p className="text-2xl font-bold">
-                        {freeEntitlements.free2Athlete > 0 ? (
-                          <span className="text-accent">Free session included</span>
-                        ) : (
-                          <>${(firstSiblingProduct?.parent_price ?? partnerPerPersonFallback).toFixed(0)} per wrestler (Total: ${((firstSiblingProduct?.parent_price ?? partnerPerPersonFallback) * numSelected).toFixed(0)})</>
-                        )}
+                        ${(firstSiblingProduct?.parent_price ?? partnerPerPersonFallback).toFixed(0)} per wrestler (Total: $
+                        {((firstSiblingProduct?.parent_price ?? partnerPerPersonFallback) * numSelected).toFixed(0)})
                       </p>
                     </CardContent>
                   </Card>
@@ -1009,8 +988,7 @@ export function BookingFlow({
                     {facility.address && <p className="text-sm text-muted-foreground">{facility.address}</p>}
                   </div>
                 )}
-                {!willUseFreeSession &&
-                  (!checkoutUsesSavedAccountDiscount || !hasPercentDiscount) && (
+                {(!checkoutUsesSavedAccountDiscount || !hasPercentDiscount) && (
                     <div className="space-y-2 rounded-lg border p-4">
                       <Label htmlFor="booking-promo">Promo code</Label>
                       <p className="text-sm text-muted-foreground">
@@ -1057,7 +1035,7 @@ export function BookingFlow({
                       )}
                     </div>
                   )}
-                {!willUseFreeSession && creditBalance > 0 && (
+                {creditBalance > 0 && (
                   <div className="space-y-2 rounded-lg border border-[#D4AF37]/25 bg-[#D4AF37]/5 p-4">
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex items-start gap-3">
@@ -1091,9 +1069,7 @@ export function BookingFlow({
                 <div className="pt-4 border-t flex justify-between items-center">
                   <span className="font-semibold">Price</span>
                   <span className="text-2xl font-bold">
-                    {willUseFreeSession ? (
-                      <span className="text-accent">Free (early adopter)</span>
-                    ) : hasPercentDiscount ? (
+                    {hasPercentDiscount ? (
                       <span>
                         {effectivePercentOff}% off · you pay ${amountAfterCredits.toFixed(2)}
                       </span>
@@ -1109,12 +1085,7 @@ export function BookingFlow({
                     )}
                   </span>
                 </div>
-                {willUseFreeSession && (
-                  <p className="text-sm text-muted-foreground">
-                    Your free session from the early adopter offer will be applied. No payment required.
-                  </p>
-                )}
-                {hasPercentDiscount && !willUseFreeSession && (
+                {hasPercentDiscount && (
                   <p className="text-sm text-muted-foreground">
                     {effectivePercentOff}% discount applied.
                     {creditsToApplyBooking > 0
@@ -1123,7 +1094,6 @@ export function BookingFlow({
                   </p>
                 )}
                 {(sessionMode === 'partner-invite' || sessionMode === 'partner-open') &&
-                  !willUseFreeSession &&
                   numSelected === 1 && (
                   <p className="text-sm text-muted-foreground">
                     Second spot: another family pays $
@@ -1143,9 +1113,7 @@ export function BookingFlow({
                   >
                     {loading
                       ? 'Booking…'
-                      : willUseFreeSession
-                        ? 'Confirm booking (free)'
-                        : `Book Session ($${amountAfterCredits.toFixed(2)})`}
+                      : `Book Session ($${amountAfterCredits.toFixed(2)})`}
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground text-center">

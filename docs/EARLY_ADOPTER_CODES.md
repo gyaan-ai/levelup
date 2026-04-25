@@ -1,90 +1,54 @@
-# Early adopter / discount codes
+# Discount codes (signup & account)
 
-## Where parents can add the code
+## Current behavior
+
+- **Signup** (`/api/auth/signup`): Parents may enter an optional discount code. Valid codes must exist in `discount_codes`, be active, and resolve to a **percent-off** value. On success the parent gets a row in `parent_percentage_discounts` (and the code’s redemption count increments). **New signups do not create `early_adopter_entitlements` rows.**
+- **Redeem after signup** (`/api/redeem-discount-code`, Account → Rewards): Same rules — percent-off codes only.
+- **Book-a-coach** (`/book/...`): Uses normal coach pricing, promos, wallet credits, and Stripe. It does **not** treat legacy entitlements as “free early adopter” in the UI.
+
+## Legacy: `early_adopter_entitlements`
+
+Older migrations and **Admin → Grant early adopter** may still have created rows in `early_adopter_entitlements`. Those rows are **not** granted by current signup or redeem flows. Stripe checkout metadata may still include `early_adopter_entitlement_id` on some legacy paths; the webhook may decrement `remaining` when present.
+
+---
+
+## Where parents enter a code
 
 ### 1. At signup
 
 **Signup page** (`/signup`):
 
 1. Parent selects role **Parent**.
-2. A field appears: **Discount code (optional)** with placeholder `e.g. GUILDLAUNCH`.
-3. Description: *Early adopters: enter your code for 1 free private + 1 free small group session*.
-4. They submit signup with the code; the API validates it and, if valid, grants 1 free 1-on-1 and 2 free small group spots (e.g. 2 kids in one session).
+2. Field **Discount code (optional)** (e.g. `FAMILY10` or a code you created in Admin).
+3. Submit: code is validated; percent-off is stored for that parent.
 
-Only **parents** see this field. Coaches and youth wrestlers do not.
+Coaches and youth wrestlers do not see this field.
 
-### 2. After signup (Account page)
+### 2. After signup (Account)
 
-If a parent **did not** enter the code at signup, they can redeem it later:
-
-1. Parent goes to **Account** (bottom nav).
-2. Card **Redeem discount code**: enter the code (e.g. GUILDLAUNCH) and tap **Redeem code**.
-3. Same validation as signup (code must exist, not over limit, and they must not have already used it). On success they get 1 free 1-on-1 + 2 free small group spots.
-
-If they already have early adopter entitlements, the card shows that and does not show the form. **Note:** Parents who redeemed before the "2 small group spots" change only have 1 free small group spot in the DB; admins can grant an extra spot via a manual entitlement update if needed.
-
-### 3. Admin grant (for existing parents who didn’t use a code)
-
-Admins can grant early adopter benefits to any parent without a code:
-
-1. Go to **Admin → User Management** (`/admin/users`).
-2. Find the parent in the list.
-3. Click **Grant early adopter** (gift icon). This grants 1 free private + 2 free small group spots without using a discount code (stored as `ADMIN_GRANT`).
-4. If the parent already has entitlements, the API returns an error and no change is made.
+1. **Account** → **Rewards** → enter code → **Apply**.
 
 ---
 
-## How codes work
+## Admin
 
-- **Table:** `discount_codes`  
-  - `code` – unique text (e.g. `GUILDLAUNCH`), matched case-insensitively at signup.  
-  - `name` – optional label (e.g. Early Adopter).  
-  - `max_redemptions` – cap on uses; `NULL` = unlimited.  
-  - `redemptions` – current use count (incremented on each valid signup).
-
-- **Validation:** Signup API (`/api/auth/signup`) looks up the code (trimmed, uppercased). If not found or over limit, signup returns an error. If valid, it creates the user and inserts two rows into `early_adopter_entitlements`: 1-on-1 with `remaining: 1`, and 2-athlete (small group) with `remaining: 2` so families can register 2 kids for one small group for free.
+- **Discount codes** (`/admin/discount-codes`): Create codes and set **Percent off**.  
+- **Grant early adopter** (User Management): Legacy operation; inserts `early_adopter_entitlements` for ops/testing. Does not change how percent-off signup works.
 
 ---
 
-## How to generate / manage codes
+## How codes are stored
 
-### Option A: Seed in a migration (current)
-
-The migration `20240143000000_early_adopter_discount.sql` seeds one code:
-
-```sql
-INSERT INTO public.discount_codes (code, name, max_redemptions)
-VALUES ('GUILDLAUNCH', 'Early Adopter', 50)
-ON CONFLICT (code) DO NOTHING;
-```
-
-To add more codes, run SQL (e.g. in Supabase SQL editor or a new migration):
-
-```sql
-INSERT INTO public.discount_codes (code, name, max_redemptions)
-VALUES ('YOURCODE', 'Your campaign name', 100);  -- or max_redemptions NULL for unlimited
-```
-
-### Option B: Admin UI (recommended)
-
-Use **Admin → Discount codes** (`/admin/discount-codes`) to:
-
-- List existing codes (code, name, redemptions, max, created).
-- Create a new code: enter code string, optional name, optional max redemptions (leave blank for unlimited).
-
-Codes are stored in `discount_codes`; the signup API already reads from that table. No code generation algorithm – you choose the code string (e.g. `BETA2025`, `GUILDLAUNCH`).
+- **Table:** `discount_codes` — `code`, optional `name`, `max_redemptions`, `redemptions`, `active`, `percent_off`.
+- **Applied discount:** `parent_percentage_discounts` links a parent to `percent_off` after signup or redeem.
 
 ---
 
-## "Code not found" / "Invalid or expired" when redeeming GUILDLAUNCH
+## “Code not found” when testing
 
-If a parent (or you in Admin) gets **Code not found** or **Invalid or expired** when entering GUILDLAUNCH:
-
-1. **Ensure the code exists in the database.** Either:
-   - **Run migrations** so the early adopter migration (and the GUILDLAUNCH seed) have run:  
-     `supabase db push` or run the SQL in the Supabase dashboard. The migration `20240157000000_seed_guildlaunch_code.sql` inserts GUILDLAUNCH if missing.
-   - **Or add it in Admin:** go to **Admin → Discount codes**, create a new code with Code = `GUILDLAUNCH`, Name = Early Adopter, Max redemptions = 50 (or leave blank for unlimited).
-2. **Same project/tenant:** Redeeming uses the same Supabase project as the app. If you use multiple environments, ensure the code exists in the project that serves the domain you’re on.
+1. Ensure the row exists in `discount_codes` for this Supabase project (migrations or Admin).
+2. Code must have **Percent off** set (or match a known family code pattern in `lib/discount-codes`).
+3. Confirm you’re on the correct environment (staging vs production).
 
 ---
 
@@ -92,6 +56,6 @@ If a parent (or you in Admin) gets **Code not found** or **Invalid or expired** 
 
 | Question | Answer |
 |----------|--------|
-| **Where do they put the code?** | Signup page, when role is Parent: optional field **Discount code**. Or later on **Account → Redeem discount code**. |
-| **How do we generate the code?** | You define the code string yourself. Add it via SQL or Admin → Discount codes. No auto-generation. |
-| **Current code** | `GUILDLAUNCH` (Early Adopter, max 50 redemptions), seeded in migration. |
+| **Where?** | Signup (Parent) optional field, or Account → Rewards. |
+| **What do they get?** | Percentage off sessions (`parent_percentage_discounts`), not automatic $0 booking in book-a-coach. |
+| **Manage codes** | Admin → Discount codes. |

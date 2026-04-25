@@ -80,13 +80,6 @@ export default async function AccountPage() {
     }
   }
 
-  // Early adopter check
-  const { data: entitlements } = await supabase
-    .from('early_adopter_entitlements')
-    .select('id')
-    .eq('parent_id', user.id);
-  const hasEarlyAdopterEntitlements = (entitlements?.length ?? 0) > 0;
-
   const userEmail = user.email ?? '';
   const userPhone = (userData as { phone?: string | null })?.phone;
   const userZip = (userData as { zip_code?: string | null })?.zip_code ?? null;
@@ -219,7 +212,7 @@ export default async function AccountPage() {
 
         {/* Promo & Rewards */}
         <MenuSection title="Rewards">
-          <RedeemCodeCard hasEntitlements={hasEarlyAdopterEntitlements} compact />
+          <RedeemCodeCard compact />
         </MenuSection>
 
         {/* Sign Out */}

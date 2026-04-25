@@ -54,7 +54,7 @@ export default async function AdminDiscountCodesPage() {
       <div className="mb-8">
         <h1 className="text-3xl font-bold font-serif text-foreground">Discount codes</h1>
         <p className="text-muted-foreground mt-1">
-          Early adopter / signup codes. Parents enter a code on signup to get 1 free private + 1 free small group session.
+          Codes must have <strong className="font-medium">Percent off</strong> configured below. Parents enter them at signup or under Account → Rewards; that applies the percentage discount on sessions. Codes without percent off are rejected.
         </p>
       </div>
 

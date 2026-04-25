@@ -4,14 +4,13 @@ import { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Tag, Gift, ChevronRight, Check, X } from 'lucide-react';
+import { Tag, ChevronRight } from 'lucide-react';
 
 type Props = {
-  hasEntitlements: boolean;
   compact?: boolean;
 };
 
-export function RedeemCodeCard({ hasEntitlements, compact }: Props) {
+export function RedeemCodeCard({ compact }: Props) {
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
@@ -47,24 +46,10 @@ export function RedeemCodeCard({ hasEntitlements, compact }: Props) {
   };
 
   if (compact) {
-    if (hasEntitlements) {
-      return (
-        <div className="px-4 py-3.5">
-          <div className="flex items-center gap-3">
-            <Gift className="h-5 w-5 text-[#D4AF37]" />
-            <div className="flex-1">
-              <span className="font-medium">Early Adopter Benefits</span>
-              <p className="text-xs text-zinc-500">1 free private + 1 free small group</p>
-            </div>
-          </div>
-        </div>
-      );
-    }
-
     return (
       <div className="px-4 py-3.5">
         <div className="flex items-center gap-3">
-          <Gift className="h-5 w-5 text-zinc-400" />
+          <Tag className="h-5 w-5 text-zinc-400" />
           <form onSubmit={handleSubmit} className="flex-1 flex items-center gap-2">
             <Input
               value={code}
@@ -84,23 +69,6 @@ export function RedeemCodeCard({ hasEntitlements, compact }: Props) {
           </p>
         )}
       </div>
-    );
-  }
-
-  if (hasEntitlements) {
-    return (
-      <Card>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base flex items-center gap-2">
-            <Tag className="h-4 w-4" />
-            Discount code
-          </CardTitle>
-          <CardDescription>You have early adopter benefits (1 free private + 1 free small group session).</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">Use them when you book a private/partner session or join a small group — no payment will be charged.</p>
-        </CardContent>
-      </Card>
     );
   }
 

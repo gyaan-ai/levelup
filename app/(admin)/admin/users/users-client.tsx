@@ -503,7 +503,7 @@ export function AdminUsersClient({ initialUsers }: { initialUsers: AdminUserRow[
                               className="h-8"
                               onClick={() => handleGrantEarlyAdopter(u)}
                               disabled={loading || grantingId === u.id}
-                              title="Grant 1 free private + 1 free small group session"
+                              title="Grant legacy early_adopter_entitlements rows (admin ops; not used by current book-a-coach UI)"
                             >
                               {grantingId === u.id ? (
                                 'Granting…'
