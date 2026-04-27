@@ -6,7 +6,7 @@ import { getTenantByDomain } from '@/config/tenants';
 
 /**
  * DELETE /api/athletes/[id]
- * Delete athlete (coach) profile. Allowed for: admin, parent, or the athlete themselves.
+ * Delete athlete (coach) profile. Allowed for: admin, or the coach on their own profile only.
  */
 export async function DELETE(
   _req: NextRequest,
@@ -26,10 +26,9 @@ export async function DELETE(
     const { data: userData } = await supabase.from('users').select('role').eq('id', user.id).single();
     const role = userData?.role ?? null;
     const isAdmin = role === 'admin';
-    const isParent = role === 'parent';
     const isOwnProfile = user.id === id && role === 'coach';
 
-    if (!isAdmin && !isParent && !isOwnProfile) {
+    if (!isAdmin && !isOwnProfile) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 

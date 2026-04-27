@@ -33,9 +33,8 @@ import { IN_APP_MESSAGING_ENABLED } from '@/lib/in-app-messaging';
 
 type Coach = { id: string; first_name: string; last_name: string; school: string | null };
 
-/** Mobile Log in / Book strip: omit on home (hero CTAs) and auth flows (redundant with page). */
-function showLoggedOutMobileQuickBar(pathname: string): boolean {
-  if (pathname === '/') return false;
+/** Logged-out mobile header links: omit on auth flows (redundant with page). Home included. */
+function showLoggedOutMobileHeaderLinks(pathname: string): boolean {
   if (
     pathname.startsWith('/login') ||
     pathname.startsWith('/signup') ||
@@ -124,27 +123,8 @@ export function Header() {
   return (
     <>
       <header className="bg-primary text-white border-b border-accent/20 sticky top-0 z-50 pt-[env(safe-area-inset-top,0px)]">
-      {/* Mobile logged-out quick actions */}
-      {!user && showLoggedOutMobileQuickBar(pathname) && (
-        <div className="md:hidden bg-accent px-4 py-2">
-          <div className="flex items-center gap-2">
-            <Button asChild variant="secondary" size="sm" className="flex-1 bg-black text-white hover:bg-black/90">
-              <Link href="/login">Log in</Link>
-            </Button>
-            <Button asChild variant="premium" size="sm" className="flex-1">
-              <Link href="/signup">Book Training</Link>
-            </Button>
-          </div>
-          <Link
-            href="/signup/coach"
-            className="mt-2 block text-center text-xs font-semibold text-black/90 underline-offset-2 hover:underline"
-          >
-            Apply as a coach
-          </Link>
-        </div>
-      )}
       <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-14 sm:h-16">
+        <div className="flex items-center justify-between h-14 sm:h-16 gap-2">
           <div className="flex items-center gap-2 min-w-0">
             <Link href="/" className="flex items-center group shrink-0">
               <BrandLogo
@@ -459,8 +439,38 @@ export function Header() {
               </Button>
             </nav>
 
-            {/* Mobile logged-out actions live in the gold bar above */}
-            <div className="md:hidden" />
+            {showLoggedOutMobileHeaderLinks(pathname) && (
+              <nav
+                className="md:hidden flex flex-wrap items-center justify-end gap-x-2 gap-y-1 flex-1 min-w-0"
+                aria-label="Log in, sign up, and coach application"
+              >
+                <Link
+                  href="/login"
+                  className="text-white/90 hover:text-accent font-medium transition-colors whitespace-nowrap text-[11px] min-[400px]:text-xs"
+                >
+                  Log in
+                </Link>
+                <span className="text-white/30 select-none" aria-hidden>
+                  ·
+                </span>
+                <Link
+                  href="/signup"
+                  className="text-[#D4AF37] hover:text-[#e8c85c] font-semibold transition-colors whitespace-nowrap text-[11px] min-[400px]:text-xs"
+                >
+                  Sign up
+                </Link>
+                <span className="text-white/30 select-none" aria-hidden>
+                  ·
+                </span>
+                <Link
+                  href="/signup/coach"
+                  className="text-white/90 hover:text-accent font-medium transition-colors whitespace-nowrap text-[11px] min-[400px]:text-xs"
+                  title="Apply as a coach"
+                >
+                  Apply as coach
+                </Link>
+              </nav>
+            )}
             </>
 )}
   </div>

@@ -391,7 +391,8 @@ export function TrainingCoachesGrid({
                   focusX={a.photo_focus_x ?? 50}
                   focusY={a.photo_focus_y ?? 15}
                   rounded="lg"
-                  className="w-full h-full min-h-[140px] object-cover rounded-none"
+                  fit="contain"
+                  className="w-full h-full min-h-[140px] rounded-none"
                   fallbackIconClassName="h-16 w-16 text-muted-foreground"
                 />
               </Link>

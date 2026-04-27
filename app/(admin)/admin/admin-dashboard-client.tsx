@@ -61,6 +61,7 @@ import {
   Bell,
   History,
   Gift,
+  Ban,
 } from 'lucide-react';
 import Link from 'next/link';
 import { ProfileImage } from '@/components/profile-image';
@@ -497,6 +498,8 @@ export function AdminDashboardClient({
   /** Admin bookings table: per-row delete (same rules as bulk DELETE /api/admin/sessions/[id]). */
   const [singleDeleteSession, setSingleDeleteSession] = useState<AdminSession | null>(null);
   const [singleDeleteLoading, setSingleDeleteLoading] = useState(false);
+  const [cancelSessionTarget, setCancelSessionTarget] = useState<AdminSession | null>(null);
+  const [cancelSessionLoading, setCancelSessionLoading] = useState(false);
   // Roster modal state
   const [rosterSessionId, setRosterSessionId] = useState<string | null>(null);
   const [rosterData, setRosterData] = useState<Array<{
@@ -2484,6 +2487,29 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
         }
       };
 
+      const handleCancelSessionConfirm = async () => {
+        if (!cancelSessionTarget) return;
+        setCancelSessionLoading(true);
+        try {
+          const res = await fetch(`/api/sessions/${cancelSessionTarget.id}/cancel`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'same-origin',
+            body: JSON.stringify({ reason: 'Cancelled by admin' }),
+          });
+          const data = (await res.json().catch(() => ({}))) as { error?: string; message?: string };
+          if (!res.ok) {
+            window.alert(data.error || 'Failed to cancel session');
+            return;
+          }
+          if (data.message) window.alert(data.message);
+          setCancelSessionTarget(null);
+          router.refresh();
+        } finally {
+          setCancelSessionLoading(false);
+        }
+      };
+
       return (
         <>
         <div className="space-y-6">
@@ -2795,6 +2821,18 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
                               >
                                 <DollarSign className="h-3.5 w-3.5" />
                               </Button>
+                              {s.status === 'scheduled' && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 text-amber-600 hover:text-amber-700 hover:bg-amber-500/10"
+                                  title="Cancel session — wallet credit for paid bookings"
+                                  aria-label={`Cancel session ${formatEST(new Date(s.scheduled_datetime), 'MMM d, yyyy h:mm a')}`}
+                                  onClick={() => setCancelSessionTarget(s)}
+                                >
+                                  <Ban className="h-3.5 w-3.5" />
+                                </Button>
+                              )}
                               <Link href={`/admin/sessions/${s.id}/edit`}>
                                 <Button variant="ghost" size="sm" className="h-8 text-[#B89D60]">
                                   <Pencil className="h-3.5 w-3.5" />
@@ -2823,6 +2861,7 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
             </div>
           </Card>
           <p className="text-xs text-muted-foreground px-1">
+            Cancel open sessions with the ban icon to mark them cancelled and issue wallet credit for paid roster rows.
             Delete scheduled, cancelled, or no-show sessions with the row trash icon or checkboxes for bulk delete.
             Completed sessions are not deletable here. Coaches cannot delete sessions that already have paid
             registrations (cancel those first).
@@ -2870,6 +2909,58 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
                   </>
                 ) : (
                   'Delete'
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog
+          open={!!cancelSessionTarget}
+          onOpenChange={(open) => {
+            if (!open && !cancelSessionLoading) setCancelSessionTarget(null);
+          }}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Cancel this session?</DialogTitle>
+              <DialogDescription>
+                {cancelSessionTarget ? (
+                  <>
+                    <span className="block text-foreground font-medium">
+                      {formatEST(new Date(cancelSessionTarget.scheduled_datetime), 'EEE MMM d, yyyy · h:mm a')}
+                    </span>
+                    <span className="block mt-1">
+                      {cancelSessionTarget.athlete_name} · {cancelSessionTarget.facility_name}
+                    </span>
+                    <span className="block mt-2">
+                      Families with paid spots receive wallet credit automatically. The session will show as cancelled;
+                      you can delete it afterward if you want it removed from lists.
+                    </span>
+                  </>
+                ) : null}
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => setCancelSessionTarget(null)}
+                disabled={cancelSessionLoading}
+              >
+                Close
+              </Button>
+              <Button
+                className="bg-amber-600 hover:bg-amber-700 text-white"
+                onClick={() => void handleCancelSessionConfirm()}
+                disabled={cancelSessionLoading}
+              >
+                {cancelSessionLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                    Cancelling…
+                  </>
+                ) : (
+                  'Cancel session'
                 )}
               </Button>
             </DialogFooter>

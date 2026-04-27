@@ -21,7 +21,8 @@ export function AthleteCard({ athlete }: AthleteCardProps) {
           focusX={athlete.photo_focus_x}
           focusY={athlete.photo_focus_y}
           rounded="lg"
-          className="w-full h-48 mb-4"
+          fit="contain"
+          className="w-full h-48 mb-4 bg-muted"
           fallbackIconClassName="h-12 w-12 text-muted-foreground"
         />
         <CardTitle>{athlete.first_name} {athlete.last_name}</CardTitle>

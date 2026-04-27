@@ -163,7 +163,9 @@ export default async function AthleteProfilePage({
   const isParent = userData?.role === 'parent';
   const isAdmin = userData?.role === 'admin';
   const isOwnProfile = !!user && user.id === id && userData?.role === 'coach';
-  const canDelete = isAdmin || isOwnProfile;
+  /** Delete control: admins, or this coach on their own profile — not parents / other roles. */
+  const canShowDeleteProfile =
+    userData?.role === 'admin' || (!!user && user.id === id && userData?.role === 'coach');
   /** Parents and admins viewing a coach — book / message / request (not your own profile). */
   const canInteractAsParentOrAdmin = (isParent || isAdmin) && !isOwnProfile;
   const bookHref = (intent?: 'private' | 'partner') => {
@@ -664,8 +666,8 @@ export default async function AthleteProfilePage({
         </Card>
       )}
 
-      {/* Delete profile (admin, parent, or own profile) */}
-      {canDelete && (
+      {/* Delete profile — admin or coach on own profile only */}
+      {canShowDeleteProfile && (
         <DeleteAthleteProfileButton
           athleteId={id}
           athleteName={athleteName}
