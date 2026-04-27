@@ -397,9 +397,19 @@ export function TrainingCoachesGrid({
                 />
               </Link>
               <div className="p-3 flex flex-col flex-1 gap-2 min-h-0">
-                <Link href={profileHref(a.id)} className="font-semibold text-foreground text-sm leading-tight hover:underline">
-                  {a.first_name} {a.last_name}
-                </Link>
+                <div className="flex items-start gap-1.5 min-w-0">
+                  <Link
+                    href={profileHref(a.id)}
+                    className="font-semibold text-foreground text-sm leading-tight hover:underline flex-1 min-w-0"
+                  >
+                    {a.first_name} {a.last_name}
+                  </Link>
+                  <TrainingFollowHeartIcon
+                    coachId={a.id}
+                    isFollowed={isFollowed}
+                    onFollowChange={setFollowedCoachIds}
+                  />
+                </div>
                 <div className="flex items-center gap-1 flex-wrap text-xs text-zinc-500">
                   {a.school && <SchoolLogo school={a.school} size="sm" />}
                   <span className="truncate">{a.school}</span>
@@ -409,9 +419,23 @@ export function TrainingCoachesGrid({
                 <StarRating averageRating={a.average_rating} reviewCount={a.review_count} size="sm" />
                 <p className="text-xs text-zinc-400 mt-auto line-clamp-2">{nextLabel}</p>
                 <div className="grid grid-cols-2 gap-2 pt-1">
-                  <TrainingFollowHeart coachId={a.id} isFollowed={isFollowed} onFollowChange={setFollowedCoachIds} />
+                  <Button
+                    size="sm"
+                    className="min-h-[44px] text-xs px-2 bg-[#D4AF37] hover:bg-[#c9a432] text-black border-0 font-semibold"
+                    asChild
+                  >
+                    <Link
+                      href={
+                        preselectedWrestlerId
+                          ? `/book/${a.id}?youthWrestlerId=${encodeURIComponent(preselectedWrestlerId)}`
+                          : `/book/${a.id}`
+                      }
+                    >
+                      Book Now
+                    </Link>
+                  </Button>
                   <Button variant="outline" size="sm" className="min-h-[44px] text-xs px-2" asChild>
-                    <Link href={profileHref(a.id)}>View</Link>
+                    <Link href={profileHref(a.id)}>View Profile</Link>
                   </Button>
                 </div>
               </div>
@@ -423,7 +447,7 @@ export function TrainingCoachesGrid({
   );
 }
 
-function TrainingFollowHeart({
+function TrainingFollowHeartIcon({
   coachId,
   isFollowed,
   onFollowChange,
@@ -440,10 +464,21 @@ function TrainingFollowHeart({
     setFollowing(isFollowed);
   }, [isFollowed]);
 
+  const iconBtnClass =
+    'h-8 w-8 min-h-8 min-w-8 shrink-0 rounded-full p-0 border-accent/50 hover:bg-accent/10';
+
   if (!user || (userRole !== 'parent' && userRole !== 'admin')) {
     return (
-      <Button variant="outline" size="sm" className="min-h-[44px] text-xs px-1" disabled>
-        <Heart className="h-4 w-4" />
+      <Button
+        type="button"
+        variant="outline"
+        size="icon"
+        className={iconBtnClass}
+        disabled
+        title="Sign in as a parent to follow coaches"
+        aria-label="Follow (sign in required)"
+      >
+        <Heart className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
       </Button>
     );
   }
@@ -481,14 +516,16 @@ function TrainingFollowHeart({
   return (
     <Button
       type="button"
-      variant={following ? 'default' : 'outline'}
-      size="sm"
-      className={`min-h-[44px] text-xs px-2 ${following ? 'bg-[#D4AF37] hover:bg-[#c9a432] text-black border-0' : ''}`}
-      onClick={toggle}
+      variant="outline"
+      size="icon"
+      className={`${iconBtnClass} ${following ? 'bg-[#D4AF37] hover:bg-[#c9a432] text-black border-0 hover:text-black' : ''}`}
+      onClick={() => void toggle()}
       disabled={loading}
+      aria-pressed={following}
+      aria-label={following ? 'Unfollow coach' : 'Follow coach'}
+      title={following ? 'Unfollow' : 'Follow'}
     >
-      <Heart className={`h-4 w-4 mr-1 ${following ? 'fill-current' : ''}`} />
-      Follow
+      <Heart className={`h-3.5 w-3.5 ${following ? 'fill-current' : ''}`} aria-hidden />
     </Button>
   );
 }
