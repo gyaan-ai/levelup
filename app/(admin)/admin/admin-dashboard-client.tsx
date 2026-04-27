@@ -62,6 +62,8 @@ import {
   History,
   Gift,
   Ban,
+  CalendarDays,
+  ChevronLeft,
 } from 'lucide-react';
 import Link from 'next/link';
 import { ProfileImage } from '@/components/profile-image';
@@ -69,7 +71,7 @@ import { CapacityBadge } from '@/components/capacity-badge';
 import { SessionTypeBadge } from '@/components/session-type-badge';
 import { formatEST, APP_TIMEZONE } from '@/lib/format-date';
 import { formatInTimeZone, toZonedTime } from 'date-fns-tz';
-import { startOfWeek, startOfMonth, startOfYear, subDays, endOfWeek, addWeeks } from 'date-fns';
+import { startOfWeek, startOfMonth, startOfYear, subDays, endOfWeek, addWeeks, addDays, parseISO } from 'date-fns';
 import { CopySessionPhonesButton } from '@/components/copy-session-phones-button';
 import { CoachTextGroupDialog } from '@/components/coach-text-group-dialog';
 import { showSessionSmsCopyAndTextGroup } from '@/lib/session-sms-tools';
@@ -326,7 +328,8 @@ type SubSectionId =
   | 'athletes' 
   | 'parents' 
   | 'requests'
-  | 'messages';
+  | 'messages'
+  | 'coach_week';
 
 type Props = {
   sessions: AdminSession[];
@@ -500,6 +503,12 @@ export function AdminDashboardClient({
   const [singleDeleteLoading, setSingleDeleteLoading] = useState(false);
   const [cancelSessionTarget, setCancelSessionTarget] = useState<AdminSession | null>(null);
   const [cancelSessionLoading, setCancelSessionLoading] = useState(false);
+  /** People → Coach week: Sunday (Eastern) yyyy-MM-dd of the visible week. */
+  const [coachWeekStartYmd, setCoachWeekStartYmd] = useState(() => {
+    const z = toZonedTime(new Date(), APP_TIMEZONE);
+    return formatInTimeZone(startOfWeek(z, { weekStartsOn: 0 }), APP_TIMEZONE, 'yyyy-MM-dd');
+  });
+  const [coachScheduleCoachId, setCoachScheduleCoachId] = useState('');
   // Roster modal state
   const [rosterSessionId, setRosterSessionId] = useState<string | null>(null);
   const [rosterData, setRosterData] = useState<Array<{
@@ -903,6 +912,55 @@ export function AdminDashboardClient({
     }
     return [...map.entries()].sort((a, b) => a[1].localeCompare(b[1]));
   }, [sessions]);
+
+  const coachesScheduleList = useMemo(
+    () => [...athleteReports].sort((a, b) => a.athlete_name.localeCompare(b.athlete_name)),
+    [athleteReports]
+  );
+
+  const coachWeekModel = useMemo(() => {
+    const z = toZonedTime(parseISO(`${coachWeekStartYmd}T12:00:00`), APP_TIMEZONE);
+    const weekStart = startOfWeek(z, { weekStartsOn: 0 });
+    const days = Array.from({ length: 7 }, (_, i) => {
+      const d = addDays(weekStart, i);
+      return {
+        ymd: formatInTimeZone(d, APP_TIMEZONE, 'yyyy-MM-dd'),
+        label: formatInTimeZone(d, APP_TIMEZONE, 'EEE MMM d'),
+        dow: formatInTimeZone(d, APP_TIMEZONE, 'EEE'),
+      };
+    });
+    return { weekStart, days, startYmd: days[0].ymd, endYmd: days[6].ymd };
+  }, [coachWeekStartYmd]);
+
+  const coachWeekSessions = useMemo(() => {
+    if (!coachScheduleCoachId) return [];
+    const { startYmd, endYmd } = coachWeekModel;
+    return sessions
+      .filter((s) => {
+        if (s.athlete_id !== coachScheduleCoachId) return false;
+        const k = formatInTimeZone(new Date(s.scheduled_datetime), APP_TIMEZONE, 'yyyy-MM-dd');
+        return k >= startYmd && k <= endYmd;
+      })
+      .sort((a, b) => a.scheduled_datetime.localeCompare(b.scheduled_datetime));
+  }, [sessions, coachScheduleCoachId, coachWeekModel]);
+
+  const coachWeekByDay = useMemo(() => {
+    const map = new Map<string, AdminSession[]>();
+    for (const d of coachWeekModel.days) map.set(d.ymd, []);
+    for (const s of coachWeekSessions) {
+      const k = formatInTimeZone(new Date(s.scheduled_datetime), APP_TIMEZONE, 'yyyy-MM-dd');
+      const arr = map.get(k);
+      if (arr) arr.push(s);
+    }
+    return map;
+  }, [coachWeekSessions, coachWeekModel.days]);
+
+  useEffect(() => {
+    if (section !== 'people' || subSection !== 'coach_week') return;
+    if (coachScheduleCoachId) return;
+    const first = coachesScheduleList[0]?.athlete_id;
+    if (first) setCoachScheduleCoachId(first);
+  }, [section, subSection, coachScheduleCoachId, coachesScheduleList]);
 
   const filteredSessions = useMemo(() => {
     const sessionDateKeyLocal = (iso: string) =>
@@ -3796,6 +3854,194 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
 
     // PEOPLE SECTION
     if (section === 'people') {
+      if (subSection === 'coach_week') {
+        const coachIdx = coachesScheduleList.findIndex((c) => c.athlete_id === coachScheduleCoachId);
+        const prevCoachId = coachIdx > 0 ? coachesScheduleList[coachIdx - 1]?.athlete_id : null;
+        const nextCoachId =
+          coachIdx >= 0 && coachIdx < coachesScheduleList.length - 1
+            ? coachesScheduleList[coachIdx + 1]?.athlete_id
+            : null;
+        const shiftCoachWeek = (deltaWeek: number) => {
+          const z = toZonedTime(parseISO(`${coachWeekStartYmd}T12:00:00`), APP_TIMEZONE);
+          const shifted = addWeeks(z, deltaWeek);
+          const ws = startOfWeek(shifted, { weekStartsOn: 0 });
+          setCoachWeekStartYmd(formatInTimeZone(ws, APP_TIMEZONE, 'yyyy-MM-dd'));
+        };
+        const goThisWeek = () => {
+          const z = toZonedTime(new Date(), APP_TIMEZONE);
+          setCoachWeekStartYmd(
+            formatInTimeZone(startOfWeek(z, { weekStartsOn: 0 }), APP_TIMEZONE, 'yyyy-MM-dd')
+          );
+        };
+        const selectedCoach = coachesScheduleList.find((c) => c.athlete_id === coachScheduleCoachId);
+        const weekRangeLabel = `${coachWeekModel.days[0].label} – ${coachWeekModel.days[6].label}`;
+
+        return (
+          <div className="space-y-6">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-[#B89D60]/10">
+                  <CalendarDays className="h-5 w-5 text-[#B89D60]" />
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold">Coach week</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Eastern week · jump coaches with arrows or the list · open a session to edit
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <Card className="p-4 space-y-4">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="min-h-[40px]"
+                    onClick={() => shiftCoachWeek(-1)}
+                    aria-label="Previous week"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  <Button type="button" variant="secondary" size="sm" className="min-h-[40px]" onClick={goThisWeek}>
+                    This week
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="min-h-[40px]"
+                    onClick={() => shiftCoachWeek(1)}
+                    aria-label="Next week"
+                  >
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                  <span className="text-sm font-medium text-foreground tabular-nums px-1">{weekRangeLabel}</span>
+                </div>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:flex-wrap">
+                  <div className="flex items-center gap-2 min-w-0 flex-1 sm:max-w-md">
+                    <span className="text-xs font-medium text-muted-foreground uppercase shrink-0">Coach</span>
+                    <Select
+                      value={coachScheduleCoachId || undefined}
+                      onValueChange={(v) => setCoachScheduleCoachId(v)}
+                    >
+                      <SelectTrigger className="min-h-[40px] w-full sm:min-w-[220px]">
+                        <SelectValue placeholder="Select coach" />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-[min(60vh,320px)]">
+                        {coachesScheduleList.map((c) => (
+                          <SelectItem key={c.athlete_id} value={c.athlete_id}>
+                            {c.athlete_name}
+                            {c.school ? ` · ${c.school}` : ''}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="min-h-[40px] min-w-[40px] px-2"
+                      disabled={!prevCoachId}
+                      onClick={() => prevCoachId && setCoachScheduleCoachId(prevCoachId)}
+                      aria-label="Previous coach"
+                      title="Previous coach"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="min-h-[40px] min-w-[40px] px-2"
+                      disabled={!nextCoachId}
+                      onClick={() => nextCoachId && setCoachScheduleCoachId(nextCoachId)}
+                      aria-label="Next coach"
+                      title="Next coach"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                    {selectedCoach ? (
+                      <Link href={`/athlete/${selectedCoach.athlete_id}`} target="_blank" rel="noopener noreferrer">
+                        <Button type="button" variant="ghost" size="sm" className="min-h-[40px] text-[#B89D60]">
+                          Profile
+                          <ExternalLink className="h-3.5 w-3.5 ml-1" />
+                        </Button>
+                      </Link>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            </Card>
+
+            {!coachScheduleCoachId ? (
+              <p className="text-sm text-muted-foreground">Select a coach to load sessions.</p>
+            ) : (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  <span className="font-medium text-foreground">{selectedCoach?.athlete_name ?? 'Coach'}</span>
+                  {' · '}
+                  {coachWeekSessions.length} session{coachWeekSessions.length === 1 ? '' : 's'} this week
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+                  {coachWeekModel.days.map((day) => {
+                    const daySessions = coachWeekByDay.get(day.ymd) ?? [];
+                    const isToday =
+                      formatInTimeZone(new Date(), APP_TIMEZONE, 'yyyy-MM-dd') === day.ymd;
+                    return (
+                      <div
+                        key={day.ymd}
+                        className={`rounded-lg border p-2 min-h-[120px] flex flex-col gap-2 ${
+                          isToday ? 'border-[#B89D60]/50 bg-[#B89D60]/5' : 'border-border bg-card/30'
+                        }`}
+                      >
+                        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground border-b border-border/60 pb-1.5">
+                          <span className={isToday ? 'text-[#B89D60]' : ''}>{day.dow}</span>
+                          <span className="font-normal text-foreground/80 ml-1">
+                            {formatEST(`${day.ymd}T12:00:00`, 'MMM d')}
+                          </span>
+                        </div>
+                        <div className="flex flex-col gap-2 flex-1">
+                          {daySessions.length === 0 ? (
+                            <p className="text-xs text-muted-foreground py-1">—</p>
+                          ) : (
+                            daySessions.map((s) => (
+                              <Link
+                                key={s.id}
+                                href={`/admin/sessions/${s.id}/edit`}
+                                className="block rounded-md border border-border/80 bg-background/80 px-2 py-1.5 text-xs hover:border-[#B89D60]/40 hover:bg-muted/40 transition-colors"
+                              >
+                                <div className="font-medium tabular-nums text-foreground">
+                                  {formatEST(new Date(s.scheduled_datetime), 'h:mm a')}
+                                </div>
+                                <div className="text-muted-foreground truncate" title={s.facility_name}>
+                                  {s.facility_name}
+                                </div>
+                                <div className="mt-1 flex flex-wrap items-center gap-1">
+                                  <SessionTypeBadge sessionType={s.session_type} sessionMode={s.session_mode} />
+                                  {statusBadge(s.status)}
+                                </div>
+                                <div className="text-[10px] text-muted-foreground mt-0.5 tabular-nums">
+                                  {confirmedRosterCountForAdminList(s)}/{s.max_participants ?? 1} booked
+                                </div>
+                              </Link>
+                            ))
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+        );
+      }
+
       // Coaches Leaderboard sub-section
       if (subSection === 'coaches') {
         const totalOpenBookings = leaderboardData.reduce((sum, c) => sum + c.open_count, 0);
@@ -5227,6 +5473,12 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
               label="Coaches"
               active={section === 'people' && subSection === 'coaches'}
               onClick={() => handleNavChange('people', 'coaches')}
+            />
+            <NavItem
+              icon={CalendarDays}
+              label="Coach week"
+              active={section === 'people' && subSection === 'coach_week'}
+              onClick={() => handleNavChange('people', 'coach_week')}
             />
             <NavItem
               icon={User}
