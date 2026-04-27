@@ -91,6 +91,7 @@ import {
 } from 'recharts';
 import { AdminMessageLogSection } from '@/components/admin-message-log-section';
 import { isOpenSessionStatus } from '@/lib/session-checkout-shell';
+import { formatSlotDisplay } from '@/lib/availability';
 
 /** Payout history presets use the date stored in athlete_payout_date (Eastern calendar day). */
 type PayoutHistoryPeriodPreset = 'week' | 'month' | 'last30' | 'ytd' | 'all' | 'custom';
@@ -509,6 +510,17 @@ export function AdminDashboardClient({
     return formatInTimeZone(startOfWeek(z, { weekStartsOn: 0 }), APP_TIMEZONE, 'yyyy-MM-dd');
   });
   const [coachScheduleCoachId, setCoachScheduleCoachId] = useState('');
+  const [coachWeekAvailByDay, setCoachWeekAvailByDay] = useState<
+    Record<string, { blocked: boolean; slots: string[] }>
+  >({});
+  const [coachWeekAvailLoading, setCoachWeekAvailLoading] = useState(false);
+  /** Coach calendar: master grid vs single-coach week */
+  const [coachCalendarTab, setCoachCalendarTab] = useState<'all' | 'one'>('all');
+  const [masterWeekAvail, setMasterWeekAvail] = useState<
+    Record<string, Record<string, { blocked: boolean; slots: string[] }>>
+  >({});
+  const [masterWeekAvailLoading, setMasterWeekAvailLoading] = useState(false);
+  const [masterCoachFilter, setMasterCoachFilter] = useState('');
   // Roster modal state
   const [rosterSessionId, setRosterSessionId] = useState<string | null>(null);
   const [rosterData, setRosterData] = useState<Array<{
@@ -955,12 +967,124 @@ export function AdminDashboardClient({
     return map;
   }, [coachWeekSessions, coachWeekModel.days]);
 
+  const masterSessionsByCoachDay = useMemo(() => {
+    const multimap = new Map<string, AdminSession[]>();
+    const { startYmd, endYmd } = coachWeekModel;
+    for (const s of sessions) {
+      const ymd = formatInTimeZone(new Date(s.scheduled_datetime), APP_TIMEZONE, 'yyyy-MM-dd');
+      if (ymd < startYmd || ymd > endYmd) continue;
+      const key = `${s.athlete_id}|${ymd}`;
+      const arr = multimap.get(key) ?? [];
+      arr.push(s);
+      multimap.set(key, arr);
+    }
+    for (const arr of multimap.values()) {
+      arr.sort((a, b) => a.scheduled_datetime.localeCompare(b.scheduled_datetime));
+    }
+    return multimap;
+  }, [sessions, coachWeekModel]);
+
+  const masterCoachesFiltered = useMemo(() => {
+    const q = masterCoachFilter.trim().toLowerCase();
+    if (!q) return coachesScheduleList;
+    return coachesScheduleList.filter(
+      (c) =>
+        c.athlete_name.toLowerCase().includes(q) || (c.school ?? '').toLowerCase().includes(q)
+    );
+  }, [coachesScheduleList, masterCoachFilter]);
+
   useEffect(() => {
     if (section !== 'people' || subSection !== 'coach_week') return;
     if (coachScheduleCoachId) return;
     const first = coachesScheduleList[0]?.athlete_id;
     if (first) setCoachScheduleCoachId(first);
   }, [section, subSection, coachScheduleCoachId, coachesScheduleList]);
+
+  useEffect(() => {
+    if (section !== 'people' || subSection !== 'coach_week') return;
+    if (coachCalendarTab !== 'one') {
+      setCoachWeekAvailByDay({});
+      setCoachWeekAvailLoading(false);
+      return;
+    }
+    if (!coachScheduleCoachId) {
+      setCoachWeekAvailByDay({});
+      setCoachWeekAvailLoading(false);
+      return;
+    }
+    const weekStart = coachWeekModel.startYmd;
+    let cancelled = false;
+    setCoachWeekAvailLoading(true);
+    fetch(
+      `/api/admin/coach-week-availability?coachId=${encodeURIComponent(coachScheduleCoachId)}&weekStart=${encodeURIComponent(weekStart)}`,
+      { credentials: 'same-origin' }
+    )
+      .then((r) => r.json())
+      .then(
+        (data: {
+          error?: string;
+          days?: Record<string, { blocked: boolean; slots: string[] }>;
+        }) => {
+          if (cancelled) return;
+          if (data.error) setCoachWeekAvailByDay({});
+          else setCoachWeekAvailByDay(data.days ?? {});
+        }
+      )
+      .catch(() => {
+        if (!cancelled) setCoachWeekAvailByDay({});
+      })
+      .finally(() => {
+        if (!cancelled) setCoachWeekAvailLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [section, subSection, coachCalendarTab, coachScheduleCoachId, coachWeekModel.startYmd]);
+
+  useEffect(() => {
+    if (section !== 'people' || subSection !== 'coach_week') return;
+    if (coachCalendarTab !== 'all') {
+      setMasterWeekAvail({});
+      setMasterWeekAvailLoading(false);
+      return;
+    }
+    if (coachesScheduleList.length === 0) {
+      setMasterWeekAvail({});
+      setMasterWeekAvailLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setMasterWeekAvailLoading(true);
+    fetch('/api/admin/coaches-week-availability', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        weekStart: coachWeekModel.startYmd,
+        coachIds: coachesScheduleList.map((c) => c.athlete_id),
+      }),
+    })
+      .then((r) => r.json())
+      .then(
+        (data: {
+          error?: string;
+          byCoach?: Record<string, Record<string, { blocked: boolean; slots: string[] }>>;
+        }) => {
+          if (cancelled) return;
+          if (data.error) setMasterWeekAvail({});
+          else setMasterWeekAvail(data.byCoach ?? {});
+        }
+      )
+      .catch(() => {
+        if (!cancelled) setMasterWeekAvail({});
+      })
+      .finally(() => {
+        if (!cancelled) setMasterWeekAvailLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [section, subSection, coachCalendarTab, coachWeekModel.startYmd, coachesScheduleList]);
 
   const filteredSessions = useMemo(() => {
     const sessionDateKeyLocal = (iso: string) =>
@@ -3875,6 +3999,7 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
         };
         const selectedCoach = coachesScheduleList.find((c) => c.athlete_id === coachScheduleCoachId);
         const weekRangeLabel = `${coachWeekModel.days[0].label} – ${coachWeekModel.days[6].label}`;
+        const todayYmdMaster = formatInTimeZone(new Date(), APP_TIMEZONE, 'yyyy-MM-dd');
 
         return (
           <div className="space-y-6">
@@ -3884,160 +4009,345 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
                   <CalendarDays className="h-5 w-5 text-[#B89D60]" />
                 </div>
                 <div>
-                  <h2 className="text-lg font-semibold">Coach week</h2>
+                  <h2 className="text-lg font-semibold">Coach calendar</h2>
                   <p className="text-sm text-muted-foreground">
-                    Eastern week · jump coaches with arrows or the list · open a session to edit
+                    Eastern week · open availability vs booked sessions · any session card opens the editor
                   </p>
                 </div>
               </div>
             </div>
 
-            <Card className="p-4 space-y-4">
-              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="min-h-[40px]"
-                    onClick={() => shiftCoachWeek(-1)}
-                    aria-label="Previous week"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                  </Button>
-                  <Button type="button" variant="secondary" size="sm" className="min-h-[40px]" onClick={goThisWeek}>
-                    This week
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="min-h-[40px]"
-                    onClick={() => shiftCoachWeek(1)}
-                    aria-label="Next week"
-                  >
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                  <span className="text-sm font-medium text-foreground tabular-nums px-1">{weekRangeLabel}</span>
-                </div>
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:flex-wrap">
-                  <div className="flex items-center gap-2 min-w-0 flex-1 sm:max-w-md">
-                    <span className="text-xs font-medium text-muted-foreground uppercase shrink-0">Coach</span>
-                    <Select
-                      value={coachScheduleCoachId || undefined}
-                      onValueChange={(v) => setCoachScheduleCoachId(v)}
-                    >
-                      <SelectTrigger className="min-h-[40px] w-full sm:min-w-[220px]">
-                        <SelectValue placeholder="Select coach" />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-[min(60vh,320px)]">
-                        {coachesScheduleList.map((c) => (
-                          <SelectItem key={c.athlete_id} value={c.athlete_id}>
-                            {c.athlete_name}
-                            {c.school ? ` · ${c.school}` : ''}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="flex items-center gap-1">
+            <Tabs value={coachCalendarTab} onValueChange={(v) => setCoachCalendarTab(v as 'all' | 'one')}>
+              <TabsList className="grid w-full max-w-lg grid-cols-2 h-11">
+                <TabsTrigger value="all" className="text-sm">
+                  All coaches
+                </TabsTrigger>
+                <TabsTrigger value="one" className="text-sm">
+                  One coach
+                </TabsTrigger>
+              </TabsList>
+
+              <Card className="mt-4 p-4 space-y-4 border-border/80 shadow-sm">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="flex flex-wrap items-center gap-2">
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="min-h-[40px] min-w-[40px] px-2"
-                      disabled={!prevCoachId}
-                      onClick={() => prevCoachId && setCoachScheduleCoachId(prevCoachId)}
-                      aria-label="Previous coach"
-                      title="Previous coach"
+                      className="min-h-[40px]"
+                      onClick={() => shiftCoachWeek(-1)}
+                      aria-label="Previous week"
                     >
                       <ChevronLeft className="h-4 w-4" />
                     </Button>
+                    <Button type="button" variant="secondary" size="sm" className="min-h-[40px]" onClick={goThisWeek}>
+                      This week
+                    </Button>
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
-                      className="min-h-[40px] min-w-[40px] px-2"
-                      disabled={!nextCoachId}
-                      onClick={() => nextCoachId && setCoachScheduleCoachId(nextCoachId)}
-                      aria-label="Next coach"
-                      title="Next coach"
+                      className="min-h-[40px]"
+                      onClick={() => shiftCoachWeek(1)}
+                      aria-label="Next week"
                     >
                       <ChevronRight className="h-4 w-4" />
                     </Button>
-                    {selectedCoach ? (
-                      <Link href={`/athlete/${selectedCoach.athlete_id}`} target="_blank" rel="noopener noreferrer">
-                        <Button type="button" variant="ghost" size="sm" className="min-h-[40px] text-[#B89D60]">
-                          Profile
-                          <ExternalLink className="h-3.5 w-3.5 ml-1" />
-                        </Button>
-                      </Link>
-                    ) : null}
+                    <span className="text-sm font-semibold text-foreground tabular-nums px-1">{weekRangeLabel}</span>
                   </div>
-                </div>
-              </div>
-            </Card>
-
-            {!coachScheduleCoachId ? (
-              <p className="text-sm text-muted-foreground">Select a coach to load sessions.</p>
-            ) : (
-              <>
-                <p className="text-sm text-muted-foreground">
-                  <span className="font-medium text-foreground">{selectedCoach?.athlete_name ?? 'Coach'}</span>
-                  {' · '}
-                  {coachWeekSessions.length} session{coachWeekSessions.length === 1 ? '' : 's'} this week
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-                  {coachWeekModel.days.map((day) => {
-                    const daySessions = coachWeekByDay.get(day.ymd) ?? [];
-                    const isToday =
-                      formatInTimeZone(new Date(), APP_TIMEZONE, 'yyyy-MM-dd') === day.ymd;
-                    return (
-                      <div
-                        key={day.ymd}
-                        className={`rounded-lg border p-2 min-h-[120px] flex flex-col gap-2 ${
-                          isToday ? 'border-[#B89D60]/50 bg-[#B89D60]/5' : 'border-border bg-card/30'
-                        }`}
-                      >
-                        <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground border-b border-border/60 pb-1.5">
-                          <span className={isToday ? 'text-[#B89D60]' : ''}>{day.dow}</span>
-                          <span className="font-normal text-foreground/80 ml-1">
-                            {formatEST(`${day.ymd}T12:00:00`, 'MMM d')}
-                          </span>
-                        </div>
-                        <div className="flex flex-col gap-2 flex-1">
-                          {daySessions.length === 0 ? (
-                            <p className="text-xs text-muted-foreground py-1">—</p>
-                          ) : (
-                            daySessions.map((s) => (
-                              <Link
-                                key={s.id}
-                                href={`/admin/sessions/${s.id}/edit`}
-                                className="block rounded-md border border-border/80 bg-background/80 px-2 py-1.5 text-xs hover:border-[#B89D60]/40 hover:bg-muted/40 transition-colors"
-                              >
-                                <div className="font-medium tabular-nums text-foreground">
-                                  {formatEST(new Date(s.scheduled_datetime), 'h:mm a')}
-                                </div>
-                                <div className="text-muted-foreground truncate" title={s.facility_name}>
-                                  {s.facility_name}
-                                </div>
-                                <div className="mt-1 flex flex-wrap items-center gap-1">
-                                  <SessionTypeBadge sessionType={s.session_type} sessionMode={s.session_mode} />
-                                  {statusBadge(s.status)}
-                                </div>
-                                <div className="text-[10px] text-muted-foreground mt-0.5 tabular-nums">
-                                  {confirmedRosterCountForAdminList(s)}/{s.max_participants ?? 1} booked
-                                </div>
-                              </Link>
-                            ))
-                          )}
-                        </div>
+                  {coachCalendarTab === 'one' ? (
+                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:flex-wrap">
+                      <div className="flex items-center gap-2 min-w-0 flex-1 sm:max-w-md">
+                        <span className="text-xs font-medium text-muted-foreground uppercase shrink-0">Coach</span>
+                        <Select
+                          value={coachScheduleCoachId || undefined}
+                          onValueChange={(v) => setCoachScheduleCoachId(v)}
+                        >
+                          <SelectTrigger className="min-h-[40px] w-full sm:min-w-[220px]">
+                            <SelectValue placeholder="Select coach" />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-[min(60vh,320px)]">
+                            {coachesScheduleList.map((c) => (
+                              <SelectItem key={c.athlete_id} value={c.athlete_id}>
+                                {c.athlete_name}
+                                {c.school ? ` · ${c.school}` : ''}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
-                    );
-                  })}
+                      <div className="flex items-center gap-1">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="min-h-[40px] min-w-[40px] px-2"
+                          disabled={!prevCoachId}
+                          onClick={() => prevCoachId && setCoachScheduleCoachId(prevCoachId)}
+                          aria-label="Previous coach"
+                          title="Previous coach"
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="min-h-[40px] min-w-[40px] px-2"
+                          disabled={!nextCoachId}
+                          onClick={() => nextCoachId && setCoachScheduleCoachId(nextCoachId)}
+                          aria-label="Next coach"
+                          title="Next coach"
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                        {selectedCoach ? (
+                          <Link href={`/athlete/${selectedCoach.athlete_id}`} target="_blank" rel="noopener noreferrer">
+                            <Button type="button" variant="ghost" size="sm" className="min-h-[40px] text-[#B89D60]">
+                              Profile
+                              <ExternalLink className="h-3.5 w-3.5 ml-1" />
+                            </Button>
+                          </Link>
+                        ) : null}
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
-              </>
-            )}
+              </Card>
+
+              <div className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-muted-foreground">
+                <span className="inline-flex items-center gap-2 font-medium">
+                  <span className="h-2.5 w-2.5 shrink-0 rounded-sm bg-sky-500/80" aria-hidden />
+                  Open availability
+                </span>
+                <span className="inline-flex items-center gap-2 font-medium">
+                  <span className="h-2.5 w-2.5 shrink-0 rounded-sm bg-[#B89D60]" aria-hidden />
+                  Booked session → edit
+                </span>
+              </div>
+
+              <TabsContent value="all" className="mt-4 space-y-4 outline-none">
+                <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
+                  <div className="relative flex-1 max-w-md">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+                    <Input
+                      placeholder="Filter coaches by name or school…"
+                      value={masterCoachFilter}
+                      onChange={(e) => setMasterCoachFilter(e.target.value)}
+                      className="h-10 pl-9"
+                    />
+                  </div>
+                  <span className="text-xs text-muted-foreground sm:ml-auto tabular-nums">
+                    {masterCoachesFiltered.length} coach{masterCoachesFiltered.length === 1 ? '' : 'es'}
+                  </span>
+                </div>
+
+                <div className="overflow-x-auto rounded-xl border border-border bg-card/40 shadow-sm">
+                  <table className="w-full text-sm min-w-[980px] border-collapse">
+                    <thead>
+                      <tr className="bg-muted/60 border-b border-border">
+                        <th className="text-left py-3 px-3 sticky left-0 z-30 bg-muted/95 backdrop-blur-sm min-w-[152px] w-[152px] border-r border-border/80 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                          Coach
+                        </th>
+                        {coachWeekModel.days.map((day) => {
+                          const isToday = todayYmdMaster === day.ymd;
+                          return (
+                            <th
+                              key={day.ymd}
+                              className={`py-3 px-2 text-center align-bottom font-medium border-l border-border/40 min-w-[130px] ${
+                                isToday ? 'bg-[#B89D60]/15 text-[#B89D60]' : ''
+                              }`}
+                            >
+                              <div className="text-[11px] uppercase tracking-wide text-muted-foreground">{day.dow}</div>
+                              <div className="text-sm tabular-nums text-foreground">
+                                {formatEST(`${day.ymd}T12:00:00`, 'MMM d')}
+                              </div>
+                            </th>
+                          );
+                        })}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {masterCoachesFiltered.length === 0 ? (
+                        <tr>
+                          <td colSpan={8} className="py-16 text-center text-muted-foreground text-sm">
+                            No coaches match this filter.
+                          </td>
+                        </tr>
+                      ) : (
+                        masterCoachesFiltered.map((coach) => (
+                          <tr key={coach.athlete_id} className="border-b border-border/50 hover:bg-muted/15">
+                            <td className="py-2.5 px-3 sticky left-0 z-20 bg-card border-r border-border/80 align-top shadow-[4px_0_12px_-4px_rgba(0,0,0,0.25)]">
+                              <div className="font-medium text-foreground leading-tight">{coach.athlete_name}</div>
+                              {coach.school ? (
+                                <div
+                                  className="text-[11px] text-muted-foreground mt-0.5 truncate max-w-[136px]"
+                                  title={coach.school}
+                                >
+                                  {coach.school}
+                                </div>
+                              ) : null}
+                            </td>
+                            {coachWeekModel.days.map((day) => {
+                              const avail = masterWeekAvail[coach.athlete_id]?.[day.ymd];
+                              const daySessions =
+                                masterSessionsByCoachDay.get(`${coach.athlete_id}|${day.ymd}`) ?? [];
+                              const isToday = todayYmdMaster === day.ymd;
+                              return (
+                                <td
+                                  key={day.ymd}
+                                  className={`align-top py-2 px-2 border-l border-border/30 min-w-[130px] ${
+                                    isToday ? 'bg-[#B89D60]/5' : ''
+                                  }`}
+                                >
+                                  <div className="rounded-lg overflow-hidden border border-sky-500/30 bg-sky-950/40 px-1.5 py-1.5 mb-1.5">
+                                    <p className="text-[9px] font-bold uppercase tracking-wider text-sky-400/95 mb-1">
+                                      Open
+                                    </p>
+                                    {masterWeekAvailLoading ? (
+                                      <p className="text-[10px] text-muted-foreground animate-pulse">…</p>
+                                    ) : !avail ? (
+                                      <p className="text-[10px] text-muted-foreground">—</p>
+                                    ) : avail.blocked ? (
+                                      <p className="text-[10px] text-amber-500 font-medium leading-snug">Blocked</p>
+                                    ) : avail.slots.length === 0 ? (
+                                      <p className="text-[10px] text-muted-foreground">None</p>
+                                    ) : (
+                                      <ul className="text-[10px] text-sky-100/90 space-y-0.5 max-h-24 overflow-y-auto tabular-nums leading-snug">
+                                        {avail.slots.map((slot) => (
+                                          <li key={slot}>{formatSlotDisplay(slot)}</li>
+                                        ))}
+                                      </ul>
+                                    )}
+                                  </div>
+                                  <div className="rounded-lg overflow-hidden border border-[#B89D60]/40 bg-[#B89D60]/12 px-1.5 py-1.5">
+                                    <p className="text-[9px] font-bold uppercase tracking-wider text-[#B89D60] mb-1">
+                                      Booked
+                                    </p>
+                                    {daySessions.length === 0 ? (
+                                      <p className="text-[10px] text-muted-foreground">—</p>
+                                    ) : (
+                                      <div className="flex flex-col gap-1">
+                                        {daySessions.map((s) => (
+                                          <Link
+                                            key={s.id}
+                                            href={`/admin/sessions/${s.id}/edit`}
+                                            className="block rounded border border-[#B89D60]/30 bg-background/95 px-1.5 py-1 text-[10px] leading-snug hover:border-[#B89D60]/70 hover:bg-[#B89D60]/15 transition-colors"
+                                          >
+                                            <span className="font-semibold tabular-nums text-foreground">
+                                              {formatEST(new Date(s.scheduled_datetime), 'h:mm a')}
+                                            </span>
+                                            <span
+                                              className="text-muted-foreground truncate block mt-0.5"
+                                              title={s.facility_name}
+                                            >
+                                              {s.facility_name}
+                                            </span>
+                                          </Link>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="one" className="mt-4 space-y-4 outline-none">
+                {!coachScheduleCoachId ? (
+                  <p className="text-sm text-muted-foreground">Choose a coach in the bar above.</p>
+                ) : (
+                  <>
+                    <p className="text-sm text-muted-foreground">
+                      <span className="font-semibold text-foreground">{selectedCoach?.athlete_name ?? 'Coach'}</span>
+                      <span className="text-muted-foreground"> · detailed day columns</span>
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+                      {coachWeekModel.days.map((day) => {
+                        const daySessions = coachWeekByDay.get(day.ymd) ?? [];
+                        const isToday = todayYmdMaster === day.ymd;
+                        const avail = coachWeekAvailByDay[day.ymd];
+                        return (
+                          <div
+                            key={day.ymd}
+                            className={`rounded-xl border overflow-hidden flex flex-col min-h-[168px] ${
+                              isToday ? 'border-[#B89D60]/55 ring-1 ring-[#B89D60]/25' : 'border-border bg-card/20'
+                            }`}
+                          >
+                            <div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground bg-muted/40 px-2 py-1.5 border-b border-border/60">
+                              <span className={isToday ? 'text-[#B89D60]' : ''}>{day.dow}</span>
+                              <span className="font-normal text-foreground/90 ml-1 tabular-nums">
+                                {formatEST(`${day.ymd}T12:00:00`, 'MMM d')}
+                              </span>
+                            </div>
+                            <div className="flex flex-col flex-1 min-h-0">
+                              <div className="flex-1 border-b border-sky-500/20 bg-sky-950/35 px-2 py-2">
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-sky-400 mb-1.5">
+                                  Open availability
+                                </p>
+                                {coachWeekAvailLoading ? (
+                                  <p className="text-[10px] text-muted-foreground animate-pulse">Loading…</p>
+                                ) : !avail ? (
+                                  <p className="text-[10px] text-muted-foreground">—</p>
+                                ) : avail.blocked ? (
+                                  <p className="text-[10px] text-amber-500 font-medium">Blocked (day off)</p>
+                                ) : avail.slots.length === 0 ? (
+                                  <p className="text-[10px] text-muted-foreground">None published</p>
+                                ) : (
+                                  <ul className="text-[10px] text-sky-100/90 space-y-0.5 max-h-32 overflow-y-auto tabular-nums">
+                                    {avail.slots.map((slot) => (
+                                      <li key={slot}>{formatSlotDisplay(slot)}</li>
+                                    ))}
+                                  </ul>
+                                )}
+                              </div>
+                              <div className="flex-1 bg-[#B89D60]/10 px-2 py-2">
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-[#B89D60] mb-1.5">
+                                  Booked sessions
+                                </p>
+                                {daySessions.length === 0 ? (
+                                  <p className="text-[10px] text-muted-foreground">—</p>
+                                ) : (
+                                  <div className="flex flex-col gap-1.5">
+                                    {daySessions.map((s) => (
+                                      <Link
+                                        key={s.id}
+                                        href={`/admin/sessions/${s.id}/edit`}
+                                        className="block rounded-lg border border-[#B89D60]/35 bg-background/90 px-2 py-1.5 text-xs hover:border-[#B89D60]/70 hover:bg-[#B89D60]/10 transition-colors"
+                                      >
+                                        <div className="font-semibold tabular-nums text-foreground">
+                                          {formatEST(new Date(s.scheduled_datetime), 'h:mm a')}
+                                        </div>
+                                        <div className="text-muted-foreground truncate text-[11px]" title={s.facility_name}>
+                                          {s.facility_name}
+                                        </div>
+                                        <div className="mt-1 flex flex-wrap items-center gap-1">
+                                          <SessionTypeBadge sessionType={s.session_type} sessionMode={s.session_mode} />
+                                          {statusBadge(s.status)}
+                                        </div>
+                                        <div className="text-[10px] text-muted-foreground mt-0.5 tabular-nums">
+                                          {confirmedRosterCountForAdminList(s)}/{s.max_participants ?? 1} booked
+                                        </div>
+                                      </Link>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </>
+                )}
+              </TabsContent>
+            </Tabs>
           </div>
         );
       }
@@ -5476,7 +5786,7 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
             />
             <NavItem
               icon={CalendarDays}
-              label="Coach week"
+              label="Coach calendar"
               active={section === 'people' && subSection === 'coach_week'}
               onClick={() => handleNavChange('people', 'coach_week')}
             />
