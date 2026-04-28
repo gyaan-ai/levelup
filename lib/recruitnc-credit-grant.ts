@@ -4,8 +4,9 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getUserCreditBalance, grantCredit } from '@/lib/credits';
+import { RECRUITNC_ALLOCATION_DESC_MARKER } from '@/lib/recruitnc-credit-admin-stats';
 
-/** v1 sources allowed from RecruitNC; DB stores promotion or admin_grant via grantCredit mapping. */
+/** v1 body `source` is for RecruitNC only; inserts use DB `recruitnc_transfer` + allocation marker in description. */
 const allowedBodySources = ['promotion', 'admin_grant'] as const;
 
 export const recruitncGrantMetadataSchema = z
@@ -44,16 +45,9 @@ export function balanceDollarsToCents(balanceDollars: number): number {
   return Math.round(balanceDollars * 100);
 }
 
-function mapApiSourceToGrantSource(
-  source: RecruitncGrantBody['source']
-): Parameters<typeof grantCredit>[0]['sourceType'] {
-  if (source === 'admin_grant') return 'manual';
-  return 'promo';
-}
-
 function buildCreditDescription(body: RecruitncGrantBody): string {
   const allocation = body.metadata.recruitnc_allocation_id;
-  return `${body.description}\n[recruitnc_allocation:${allocation}]`;
+  return `${body.description}\n${RECRUITNC_ALLOCATION_DESC_MARKER}${allocation}]`;
 }
 
 /**
@@ -195,11 +189,12 @@ export async function handleRecruitncCreditGrant(opts: {
     const dollars = amountCentsToDollars(body.amount_cents);
     const description = buildCreditDescription(body);
 
+    /** DB `recruitnc_transfer` — body `source` is ignored for tagging (audit in description). */
     const grantResult = await grantCredit({
       userId: body.guild_parent_id,
       amount: dollars,
       reason: description,
-      sourceType: mapApiSourceToGrantSource(body.source),
+      sourceType: 'recruitnc',
       tenantSlug,
     });
 

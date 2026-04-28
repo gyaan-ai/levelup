@@ -34,8 +34,14 @@ function mapCreditRow(row: Record<string, unknown>): UserCredit {
 }
 
 function mapGrantSource(
-  sourceType: 'cancellation' | 'refund' | 'manual' | 'promo'
-): 'cancellation' | 'coach_cancellation' | 'admin_grant' | 'promotion' {
+  sourceType: 'cancellation' | 'refund' | 'manual' | 'promo' | 'recruitnc'
+):
+  | 'cancellation'
+  | 'coach_cancellation'
+  | 'admin_grant'
+  | 'promotion'
+  | 'recruitnc_transfer' {
+  if (sourceType === 'recruitnc') return 'recruitnc_transfer';
   if (sourceType === 'cancellation' || sourceType === 'refund') return 'cancellation';
   if (sourceType === 'promo') return 'promotion';
   return 'admin_grant';
@@ -102,7 +108,7 @@ export async function grantCredit({
   userId: string;
   amount: number;
   reason: string;
-  sourceType: 'cancellation' | 'refund' | 'manual' | 'promo';
+  sourceType: 'cancellation' | 'refund' | 'manual' | 'promo' | 'recruitnc';
   sourceId?: string;
   tenantSlug?: string;
 }): Promise<{ success: boolean; creditId?: string; error?: string }> {

@@ -92,6 +92,7 @@ import {
 import { AdminMessageLogSection } from '@/components/admin-message-log-section';
 import { isOpenSessionStatus } from '@/lib/session-checkout-shell';
 import { formatSlotDisplay } from '@/lib/availability';
+import type { RecruitNcCreditTotals } from '@/lib/recruitnc-credit-admin-stats';
 
 /** Payout history presets use the date stored in athlete_payout_date (Eastern calendar day). */
 type PayoutHistoryPeriodPreset = 'week' | 'month' | 'last30' | 'ytd' | 'all' | 'custom';
@@ -346,6 +347,8 @@ type Props = {
   recentSignups: RecentSignupRow[];
   /** Guild rewards program: show /admin/rewards in Money nav when enabled. */
   rewardsProgramEnabled?: boolean;
+  /** RecruitNC → Guild wallet: grant buckets and spend from those buckets at checkout. */
+  recruitNcCreditTotals?: RecruitNcCreditTotals;
 };
 
 // Sidebar Navigation Item Component
@@ -463,6 +466,12 @@ export function AdminDashboardClient({
   youthSessionSpendLines = [],
   recentSignups = [],
   rewardsProgramEnabled = false,
+  recruitNcCreditTotals = {
+    grantRows: 0,
+    totalGrantedUsd: 0,
+    remainingInWalletsUsd: 0,
+    spentAtCheckoutUsd: 0,
+  },
 }: Props) {
   const router = useRouter();
   const pathname = usePathname();
@@ -3596,6 +3605,43 @@ const handleToggleApproval = async (athleteId: string, currentActive: boolean) =
               <h2 className="text-lg font-semibold">Parent Credits</h2>
               <p className="text-sm text-muted-foreground">View and manage credit balances</p>
             </div>
+
+            <Card className="border-[#B89D60]/30 bg-[#B89D60]/5">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Gift className="h-4 w-4 text-[#B89D60]" />
+                  RecruitNC → Guild credits
+                </CardTitle>
+                <CardDescription>
+                  Fundraising dollars moved into Guild wallet. New grants use source <span className="font-mono text-xs">recruitnc_transfer</span>;
+                  legacy rows match <span className="font-mono text-xs">[recruitnc_allocation:…]</span> in description.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <dl className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+                  <div>
+                    <dt className="text-muted-foreground">Grant rows</dt>
+                    <dd className="font-semibold tabular-nums">{recruitNcCreditTotals.grantRows}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground">Total granted</dt>
+                    <dd className="font-semibold tabular-nums">${recruitNcCreditTotals.totalGrantedUsd.toFixed(2)}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground">Spent at checkout</dt>
+                    <dd className="font-semibold tabular-nums text-emerald-700">
+                      ${recruitNcCreditTotals.spentAtCheckoutUsd.toFixed(2)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-muted-foreground">Remaining in wallets</dt>
+                    <dd className="font-semibold tabular-nums text-[#B89D60]">
+                      ${recruitNcCreditTotals.remainingInWalletsUsd.toFixed(2)}
+                    </dd>
+                  </div>
+                </dl>
+              </CardContent>
+            </Card>
 
             <Card className="overflow-hidden">
               <div className="overflow-x-auto">

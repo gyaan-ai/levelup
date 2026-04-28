@@ -22,6 +22,11 @@ import { coachPayoutUsd, type SessionCoachPayoutFields } from '@/lib/coach-sessi
 import { isRewardsProgramEnabled } from '@/lib/rewards';
 import { formatEST } from '@/lib/format-date';
 import { isBookingCheckoutShellSession } from '@/lib/session-checkout-shell';
+import {
+  isRecruitNcCreditRow,
+  rollupRecruitNcGrantRowsUsd,
+  type RecruitNcCreditTotals,
+} from '@/lib/recruitnc-credit-admin-stats';
 
 type SessionWithPayoutStatus = SessionCoachPayoutFields & { status: string; booking_checkout_shell?: boolean };
 
@@ -558,6 +563,37 @@ export default async function AdminPage() {
     expires_at: c.expires_at,
   }));
 
+  const recruitNcRowsRaw = (creditsRes.data ?? []).filter((c) =>
+    isRecruitNcCreditRow({
+      source: typeof (c as { source?: unknown }).source === 'string' ? (c as { source: string }).source : null,
+      description:
+        typeof (c as { description?: unknown }).description === 'string'
+          ? (c as { description: string }).description
+          : null,
+    })
+  );
+
+  let recruitNcSpendUsd = 0;
+  const recruitNcIds = recruitNcRowsRaw.map((c) => (c as { id: string }).id);
+  if (recruitNcIds.length > 0) {
+    const { data: usageRows } = await admin.from('credit_usage').select('amount').in('credit_id', recruitNcIds);
+    recruitNcSpendUsd = (usageRows ?? []).reduce((s, r) => {
+      const amt = typeof (r as { amount?: unknown }).amount === 'number' ? (r as { amount: number }).amount : 0;
+      return s + amt;
+    }, 0);
+  }
+
+  const recruitNcRollup = rollupRecruitNcGrantRowsUsd(
+    recruitNcRowsRaw.map((c) => ({
+      amount: (c as { amount?: unknown }).amount,
+      remaining: (c as { remaining?: unknown }).remaining,
+    }))
+  );
+  const recruitNcCreditTotals: RecruitNcCreditTotals = {
+    ...recruitNcRollup,
+    spentAtCheckoutUsd: Math.round(recruitNcSpendUsd * 100) / 100,
+  };
+
   const coachNameByUserId = new Map(
     athletesRows.map((a) => [a.id, `${a.first_name} ${a.last_name}`.trim()])
   );
@@ -682,6 +718,7 @@ export default async function AdminPage() {
         athleteReports={athleteReports}
         coachPayouts={coachPayouts}
         credits={credits}
+        recruitNcCreditTotals={recruitNcCreditTotals}
         usersError={usersRes.error?.message ?? null}
         youthSessionSpendLines={youthSessionSpendLines}
         recentSignups={recentSignups}
