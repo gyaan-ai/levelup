@@ -1,5 +1,6 @@
 import type { NextResponse } from 'next/server';
 import { NextResponse as NextResponseCtor } from 'next/server';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getUserCreditBalance, grantCredit } from '@/lib/credits';
@@ -53,6 +54,38 @@ function mapApiSourceToGrantSource(
 function buildCreditDescription(body: RecruitncGrantBody): string {
   const allocation = body.metadata.recruitnc_allocation_id;
   return `${body.description}\n[recruitnc_allocation:${allocation}]`;
+}
+
+/**
+ * Parent-only role can always hold `credits.parent_id`.
+ * `users.role = 'admin'` rows can still be linked as primary or linked parent on youth wrestlers
+ * (staff who also have kids in the app)—allow wallet credits for those without opening all admins.
+ */
+export async function guildUserEligibleForRecruitncWalletGrant(
+  admin: SupabaseClient,
+  guildParentId: string,
+  role: string | null
+): Promise<boolean> {
+  if (role === 'parent') return true;
+  if (role !== 'admin') return false;
+
+  const { data: primary } = await admin
+    .from('youth_wrestlers')
+    .select('id')
+    .eq('parent_id', guildParentId)
+    .limit(1)
+    .maybeSingle();
+
+  if (primary) return true;
+
+  const { data: linked } = await admin
+    .from('youth_wrestler_parents')
+    .select('id')
+    .eq('parent_id', guildParentId)
+    .limit(1)
+    .maybeSingle();
+
+  return !!linked;
 }
 
 export type RecruitncGrantSuccessJson = {
@@ -147,9 +180,16 @@ export async function handleRecruitncCreditGrant(opts: {
       return NextResponseCtor.json({ error: 'guild_parent_id not found.' }, { status: 404 });
     }
 
-    if (parent.role !== 'parent') {
+    const eligible = await guildUserEligibleForRecruitncWalletGrant(admin, body.guild_parent_id, parent.role);
+    if (!eligible) {
       await admin.from('recruitnc_credit_grant_idempotency').delete().eq('idempotency_key', key);
-      return NextResponseCtor.json({ error: 'guild_parent_id is not a parent account.' }, { status: 404 });
+      return NextResponseCtor.json(
+        {
+          error:
+            'guild_parent_id is not eligible for wallet credits (requires role parent, or admin linked as primary/linked parent on a youth wrestler).',
+        },
+        { status: 404 }
+      );
     }
 
     const dollars = amountCentsToDollars(body.amount_cents);
