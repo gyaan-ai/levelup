@@ -442,10 +442,22 @@ export function CreateSessionForm({
                   id="price"
                   type="number"
                   min={0}
-                  step={5}
+                  step={0.01}
                   value={pricePerParticipant}
-                  onChange={(e) => setPricePerParticipant(Number(e.target.value) || 30)}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    if (v === '') {
+                      setPricePerParticipant(0);
+                      return;
+                    }
+                    const n = Number(v);
+                    if (!Number.isFinite(n)) return;
+                    setPricePerParticipant(Math.max(0, n));
+                  }}
                 />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Use <span className="font-medium">$0</span> for launch / comp sessions (parents complete registration with no card charge).
+                </p>
               </div>
             </div>
             <Button type="submit" disabled={loading} className="w-full">

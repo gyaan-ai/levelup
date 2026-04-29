@@ -20,6 +20,7 @@ import {
   checkoutAllowSavedAccountPercent,
   displayPercentForPromoOnlyCheckout,
 } from '@/lib/checkout-promo';
+import { sessionPricePerParticipantUsd } from '@/lib/session-price';
 
 /** Always fresh roster from DB (avoid stale cached HTML after admin adds a participant). */
 export const dynamic = 'force-dynamic';
@@ -89,7 +90,7 @@ export default async function JoinByCodePage({
   const dateTime = scheduledAt ? `${formatEST(scheduledAt, 'EEEE, MMMM d, yyyy')} at ${formatEST(scheduledAt, 'h:mm a')}` : '';
 
   const rawPrice = (session as { price_per_participant?: number }).price_per_participant;
-  const pricePerParticipant = rawPrice != null && rawPrice > 0 ? rawPrice : 30;
+  const pricePerParticipant = sessionPricePerParticipantUsd(rawPrice);
   const sessionType = (session as { session_type?: string }).session_type;
   const isSmallGroup =
     sessionType === 'group' ||

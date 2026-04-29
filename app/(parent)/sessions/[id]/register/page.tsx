@@ -19,6 +19,7 @@ import {
   checkoutAllowSavedAccountPercent,
   displayPercentForPromoOnlyCheckout,
 } from '@/lib/checkout-promo';
+import { sessionPricePerParticipantUsd } from '@/lib/session-price';
 
 export default async function SessionRegisterPage({
   params,
@@ -116,15 +117,12 @@ export default async function SessionRegisterPage({
   if (current >= max) notFound();
 
   const rawPrice = s.price_per_participant;
-  const pricePer = rawPrice != null && rawPrice > 0 ? rawPrice : 30;
-
+  const pricePer = sessionPricePerParticipantUsd(rawPrice);
   const isSmallGroup =
     s.session_type === 'group' ||
     s.session_type === '2-athlete' ||
     s.session_type === 'small_group' ||
     (max >= 2 && s.session_type !== '1-on-1');
-
-  if (!isOwner && pricePer <= 0) notFound();
 
   // Youth wrestlers this user can add (primary parent or linked parent)
   const { data: primaryIds } = await supabase

@@ -16,14 +16,11 @@ import { ensureAutoFamilyDiscountForParent } from '@/lib/family-auto-discount';
 import { checkoutAllowSavedAccountPercent, resolveCheckoutPercentOff } from '@/lib/checkout-promo';
 import { publicOriginForStripeRedirect } from '@/lib/stripe-redirect-origin';
 import { applyCredits, getCreditUsageSumForParentSession, getUserCreditBalance } from '@/lib/credits';
+import { sessionPricePerParticipantUsd } from '@/lib/session-price';
 
 /**
- * POST - Pay & register a youth wrestler for a session (public or invite_only).
- * - Session owner: add their own wrestler (no charge).
- * - Non-owner: Stripe Checkout (percent discounts); optional Guild wallet credits (same rules as cart). Webhook/finalize applies credits.
- * - Optional body.partnerInviteCode: when set and matches sessions.partner_invite_code, allows load + pay even if
- *   join_policy is private (RLS often hides those rows from the joining parent until they pay).
- * Early-adopter free sessions are disabled — everyone pays except session owner adding kids.
+ * POST — register a youth wrestler for a session (public or invite-only).
+ * **`price_per_participant = 0`:** no Stripe; confirms like a full discount / credit-only flow.
  */
 export async function POST(
   req: NextRequest,
@@ -195,7 +192,7 @@ export async function POST(
     }
 
     const rawPrice = s.price_per_participant;
-    const pricePer = rawPrice != null && rawPrice > 0 ? rawPrice : 30;
+    const pricePer = sessionPricePerParticipantUsd(rawPrice);
 
     const isSelf = role === 'youth_wrestler' && youthWrestlerId === user.id;
 

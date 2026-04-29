@@ -358,7 +358,7 @@ export function EditSessionForm({
                     id="price"
                     type="number"
                     min={0}
-                    step={5}
+                    step={0.01}
                     value={price}
                     onChange={(e) => setPrice(e.target.value)}
                   />
@@ -391,7 +391,7 @@ export function EditSessionForm({
                   id="price-other"
                   type="number"
                   min={0}
-                  step={5}
+                  step={0.01}
                   value={price}
                   onChange={(e) => setPrice(e.target.value)}
                 />

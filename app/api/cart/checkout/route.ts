@@ -13,6 +13,7 @@ import { checkoutAllowSavedAccountPercent, resolveCheckoutPercentOff } from '@/l
 import { createNotification } from '@/lib/notifications';
 import { notifyCoachAndAdminsNewBooking } from '@/lib/twilio';
 import { publicOriginForStripeRedirect } from '@/lib/stripe-redirect-origin';
+import { sessionPricePerParticipantUsd } from '@/lib/session-price';
 
 type CartLine = { sessionId: string; wrestlerId: string };
 
@@ -212,10 +213,9 @@ export async function POST(req: NextRequest) {
 
     for (const line of lines) {
       const s = sessionById.get(line.sessionId)!;
-      const pricePer =
-        s.price_per_participant != null && Number(s.price_per_participant) > 0
-          ? Number(s.price_per_participant)
-          : 30;
+      const pricePer = sessionPricePerParticipantUsd(
+        s.price_per_participant as number | null | undefined
+      );
       const amountCents = Math.round(pricePer * 100);
 
       const dt = s.scheduled_datetime ? new Date(s.scheduled_datetime as string) : null;
@@ -448,11 +448,13 @@ export async function POST(req: NextRequest) {
         ? cartSessionTypes[0]!
         : 'mixed';
 
+    const stripeLineItems = adjustedLineItems.filter((i) => i.price_data.unit_amount > 0);
+
     const stripeSession = await stripe.checkout.sessions.create(
       {
         mode: 'payment',
         payment_method_types: ['card'],
-        line_items: adjustedLineItems,
+        line_items: stripeLineItems,
         metadata: {
           business: 'guild',
           channel: 'bookings',
