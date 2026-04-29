@@ -6,8 +6,14 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { getUserCreditBalance, grantCredit } from '@/lib/credits';
 import { RECRUITNC_ALLOCATION_DESC_MARKER } from '@/lib/recruitnc-credit-admin-stats';
 
-/** v1 body `source` is for RecruitNC only; inserts use DB `recruitnc_transfer` + allocation marker in description. */
-const allowedBodySources = ['promotion', 'admin_grant'] as const;
+/**
+ * v1 body `source` is for RecruitNC tagging only; inserts always use DB `recruitnc_transfer`
+ * (see `grantCredit` + `mapGrantSource` in lib/credits.ts).
+ *
+ * DB `public.credits.source` allowed values (credits_source_check): cancellation, coach_cancellation,
+ * admin_grant, promotion, reward, recruitnc_transfer, recruitnc (alias).
+ */
+const allowedBodySources = ['promotion', 'admin_grant', 'recruitnc'] as const;
 
 export const recruitncGrantMetadataSchema = z
   .object({

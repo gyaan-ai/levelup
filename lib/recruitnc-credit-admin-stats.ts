@@ -1,12 +1,13 @@
 /** Description marker appended by RecruitNC → Guild grant route (survives in DB for auditing). */
 export const RECRUITNC_ALLOCATION_DESC_MARKER = '[recruitnc_allocation:';
 
-/** Rows funded from RecruitNC: new `recruitnc_transfer` source or legacy grants tagged in description. */
+/** Rows funded from RecruitNC: `recruitnc_transfer` / `recruitnc` source or legacy grants tagged in description. */
 export function isRecruitNcCreditRow(row: {
   source?: string | null;
   description?: string | null;
 }): boolean {
-  if (String(row.source ?? '') === 'recruitnc_transfer') return true;
+  const s = String(row.source ?? '');
+  if (s === 'recruitnc_transfer' || s === 'recruitnc') return true;
   const d = typeof row.description === 'string' ? row.description : '';
   return d.includes(RECRUITNC_ALLOCATION_DESC_MARKER);
 }
